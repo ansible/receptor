@@ -34,7 +34,6 @@ var nodeId string
 var debugFlag bool
 var peers stringList
 var listeners stringList
-var services stringList
 var udpServices stringList
 
 var epoch int64
@@ -186,6 +185,7 @@ func forwardMessage(md MessageData) error {
 	connectionLock.RLock()
 	writeChan := connections[nextHop].writeChan
 	connectionLock.RUnlock()
+	debug("Forwarding message to %s via %s\n", md.ToNode, nextHop)
 	if writeChan != nil {
 		message, err := makeMessage("send", md)
 		if err != nil { return err }
@@ -527,7 +527,6 @@ func main() {
 	flag.BoolVar(&debugFlag, "debug", false, "show debug output")
 	flag.Var(&peers, "peer", "host:port  to connect outbound to")
 	flag.Var(&listeners, "listen", "host:port to listen on for peer connections")
-	flag.Var(&services, "service", "service:type:params to provide as a service")
 	flag.Var(&udpServices, "udp", "{in|out}:lservice:host:port:node:rservice")
 	flag.Parse()
 	if nodeId == "" {

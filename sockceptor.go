@@ -138,7 +138,7 @@ func routingTableUpdater() {
 				updateRoutingTable()
 			}
 		case <- updateRoutingTableChan:
-			proposedTime := time.Now().Add(time.Second * 5)
+			proposedTime := time.Now().Add(time.Second * 2)
 			updateRequested = true
 			if proposedTime.Before(nextUpdateTime) {
 				nextUpdateTime = proposedTime

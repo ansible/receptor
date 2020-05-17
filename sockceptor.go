@@ -419,6 +419,7 @@ func runProtocol(conn net.Conn) {
 	}
 	knownConnections[nodeId][remoteNodeId] = 1.0
 	connectionLock.Unlock()
+	updateRoutingTableChan <- true
 	sendRouteBroadcastChan <- true
 	defer func() {
 		connectionLock.Lock()
@@ -426,6 +427,7 @@ func runProtocol(conn net.Conn) {
 		delete(knownConnections[remoteNodeId], nodeId)
 		delete(knownConnections[nodeId], remoteNodeId)
 		connectionLock.Unlock()
+		updateRoutingTableChan <- true
 		sendRouteBroadcastChan <- true
 	}()
 	go protoReader(rw.Reader, ci.readChan, ci.errorChan)

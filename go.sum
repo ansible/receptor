@@ -1,0 +1,4 @@
+github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde h1:+5PMaaQtDUwOcJIUlmX89P0J3iwTvErTmyn5WghzXAQ=
+github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde/go.mod h1:RDgD/dfPmIwFH0qdUOjw71HjtWg56CtyLIoHL+R1wJw=
+github.com/twmb/algoimpl v0.0.0-20170717182524-076353e90b94 h1:RVeQNVS7eoXqFemL1LnyzV7yuijHlBtiq6lH5T/mljw=
+github.com/twmb/algoimpl v0.0.0-20170717182524-076353e90b94/go.mod h1:+E0GZE9c8UBk2GYXo9mPIHAtmmBkJlSWCdzLMcsCWV0=

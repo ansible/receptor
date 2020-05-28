@@ -15,45 +15,25 @@ import (
 	"time"
 )
 
+const MTU = 16384
+const ROUTE_UPDATE_TIME = 10 * time.Second
+
 type ErrorFunc func(error)
 type BackendSessFunc func(BackendSession) error
 
+// Interface for back-ends that the Receptor network can run over
 type Backend interface {
 	Start(sessFunc BackendSessFunc, errFunc ErrorFunc)
 }
 
+// Interface for back-end sessions
 type BackendSession interface {
 	Send([]byte) error
 	Recv() ([]byte, error)
 	Close() error
 }
 
-type Listener struct {
-	s          		*Netceptor
-	service    		string
-	acceptChan      chan *Conn
-	srLock			*sync.Mutex
-	sessionRegistry map[string]*Conn
-	open			bool
-}
-
-type Conn struct {
-	li            *Listener
-	localService  string
-	remoteNode    string
-	remoteService string
-	RecvChan      chan *MessageData
-	open          bool
-}
-
-type MessageData struct {
-	FromNode    string
-	FromService string
-	ToNode      string
-	ToService   string
-	Data        []byte
-}
-
+// Main Receptor network object
 type Netceptor struct {
 	nodeId                 string
 	epoch                  int64
@@ -64,10 +44,18 @@ type Netceptor struct {
 	knownNodeInfo          map[string]*nodeInfo
 	knownConnectionCosts   map[string]map[string]float64
 	routingTable           map[string]string
-	listenerRegistry       map[string]*Listener
+	listenerRegistry       map[string]*PacketConn
 	sendRouteFloodChan     chan time.Duration
 	updateRoutingTableChan chan time.Duration
 	shutdownChans          []chan bool
+}
+
+type messageData struct {
+	FromNode    string
+	FromService string
+	ToNode      string
+	ToService   string
+	Data        []byte
 }
 
 type connInfo struct {
@@ -91,6 +79,7 @@ type routingUpdate struct {
 	ForwardingNode string
 }
 
+// Constructs a new Receptor network protocol instance
 func New(NodeId string) *Netceptor {
 	s := Netceptor{
 		nodeId:                 NodeId,
@@ -101,15 +90,16 @@ func New(NodeId string) *Netceptor {
 		knownNodeInfo:          make(map[string]*nodeInfo),
 		knownConnectionCosts:   make(map[string]map[string]float64),
 		routingTable:           make(map[string]string),
-		listenerRegistry:       make(map[string]*Listener),
+		listenerRegistry:       make(map[string]*PacketConn),
 		shutdownChans:			make([]chan bool, 4),
 	}
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour * 24, time.Second * 1, s.shutdownChans[1])
-	s.sendRouteFloodChan = tickrunner.Run(s.floodRoutingUpdate, time.Second * 10, time.Millisecond * 100, s.shutdownChans[2])
+	s.sendRouteFloodChan = tickrunner.Run(s.floodRoutingUpdate, ROUTE_UPDATE_TIME, time.Millisecond * 100, s.shutdownChans[2])
 	go s.monitorConnectionAging(s.shutdownChans[3])
 	return &s
 }
 
+// Shuts down a Receptor network protocol instance
 func (s *Netceptor) Shutdown() {
 	s.structLock.RLock()
 	defer s.structLock.RUnlock()
@@ -118,6 +108,7 @@ func (s *Netceptor) Shutdown() {
 	}
 }
 
+// Watches connections and expires any that haven't seen traffic in too long
 func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 	for {
 		select {
@@ -125,13 +116,13 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 			timedOut := make([]chan error, 0)
 			s.structLock.RLock()
 			for i := range s.connections {
-				if time.Since(s.connections[i].lastReceivedData) > 22 * time.Second {
+				if time.Since(s.connections[i].lastReceivedData) > (2 * ROUTE_UPDATE_TIME + 1 * time.Second) {
 					timedOut = append(timedOut, s.connections[i].ErrorChan)
 				}
 			}
 			s.structLock.RUnlock()
 			for i := range timedOut {
-				debug.Printf("Timing out connection")
+				debug.Printf("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
 			}
 		case <- shutdownChan:
@@ -140,6 +131,7 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 	}
 }
 
+// Recalculates the next-hop table based on current knowledge of the network
 func (s *Netceptor) updateRoutingTable() {
 	s.structLock.Lock()
 	defer s.structLock.Unlock()
@@ -187,6 +179,7 @@ func (s *Netceptor) updateRoutingTable() {
 	go s.printRoutingTable()
 }
 
+// Forwards a message to all neighbors, possibly excluding one
 func (s *Netceptor) flood(message []byte, excludeConn string) {
 	s.structLock.RLock()
 	writeChans := make([]chan []byte, 0)
@@ -211,13 +204,14 @@ func (s *Netceptor) makeMessage(command string, data interface{}) ([]byte, error
 	return msg, nil
 }
 
-func (s *Netceptor) forwardMessage(md *MessageData) error {
+// Forwards a message to its next hop
+func (s *Netceptor) forwardMessage(md *messageData) error {
 	nextHop, ok := s.routingTable[md.ToNode]
 	if ! ok { return fmt.Errorf("no route to node") }
 	s.structLock.RLock()
 	writeChan := s.connections[nextHop].WriteChan
 	s.structLock.RUnlock()
-	debug.Printf("Forwarding message to %s via %s\n", md.ToNode, nextHop)
+	//debug.Printf("Forwarding message to %s via %s\n", md.ToNode, nextHop)
 	if writeChan != nil {
 		message, err := s.makeMessage("send", md)
 		if err != nil { return err }
@@ -228,8 +222,9 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 	}
 }
 
-func (s *Netceptor) SendMessage(fromService string, toNode string, toService string, data []byte) error {
-	md := &MessageData{
+// Generates and sends a message over the Receptor network
+func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
+	md := &messageData{
 		FromNode:    s.nodeId,
 		FromService: fromService,
 		ToNode:      toNode,
@@ -239,6 +234,8 @@ func (s *Netceptor) SendMessage(fromService string, toNode string, toService str
 	return s.handleMessageData(md)
 }
 
+// Returns an unused random service name to use as the equivalent of a TCP/IP ephemeral port number.
+// Caller must already have s.structLock at least read-locked.
 func (s *Netceptor) getEphemeralService() string {
 	for {
 		service := randstr.RandomString(128)
@@ -249,102 +246,7 @@ func (s *Netceptor) getEphemeralService() string {
 	}
 }
 
-func (s *Netceptor) Listen(service string) (*Listener, error) {
-	s.structLock.Lock()
-	defer s.structLock.Unlock()
-	if service == "" {
-		service = s.getEphemeralService()
-	} else {
-		_, ok := s.listenerRegistry[service]
-		if ok {
-			return nil, fmt.Errorf("service %s is already listening", service)
-		}
-	}
-	li := Listener{
-		s:               s,
-		service:         service,
-		acceptChan:      make(chan *Conn),
-		srLock:          &sync.Mutex{},
-		sessionRegistry: make(map[string]*Conn),
-		open:            true,
-	}
-	s.listenerRegistry[service] = &li
-	return &li, nil
-}
-
-func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
-	s.structLock.Lock()
-	defer s.structLock.Unlock()
-	lservice := s.getEphemeralService()
-	li := Listener{
-		s:               s,
-		service:         lservice,
-		acceptChan:      nil,
-		srLock:          &sync.Mutex{},
-		sessionRegistry: make(map[string]*Conn),
-		open:            true,
-	}
-	s.listenerRegistry[lservice] = &li
-	li.srLock.Lock()
-	defer li.srLock.Unlock()
-	nc := Conn{
-		li:            &li,
-		localService:  lservice,
-		remoteNode:    node,
-		remoteService: service,
-		RecvChan:      make(chan *MessageData),
-		open:          true,
-	}
-	li.sessionRegistry[service] = &nc
-	return &nc, nil
-}
-
-func(li *Listener) Accept() *Conn {
-	nc := <- li.acceptChan
-	li.srLock.Lock()
-	defer li.srLock.Unlock()
-	li.sessionRegistry[nc.localService] = nc
-	return nc
-}
-
-func (li *Listener) Close() {
-	li.s.structLock.Lock()
-	defer li.s.structLock.Unlock()
-	li.open = false
-	delete(li.s.listenerRegistry, li.service)
-}
-
-func(nc *Conn) Send(data []byte) error {
-	if ! nc.open || ! nc.li.open {
-		return fmt.Errorf("cannot send on closed connection")
-	}
-	return nc.li.s.SendMessage(nc.localService, nc.remoteNode, nc.remoteService, data)
-}
-
-func(nc *Conn) Recv() ([]byte, error) {
-	if ! nc.open || ! nc.li.open {
-		return nil, fmt.Errorf("cannot receive on closed connection")
-	}
-	m := <- nc.RecvChan
-	return m.Data, nil
-}
-
-func (nc *Conn) LocalService() string {
-	return nc.localService
-}
-
-func (nc *Conn) RemoteNode() string {
-	return nc.remoteNode
-}
-
-func (nc *Conn) RemoteService() string {
-	return nc.remoteService
-}
-
-func(nc *Conn) Close() {
-	nc.open = false
-}
-
+// Prints the routing table.  Only used for debugging.
 func (s *Netceptor) printRoutingTable() {
 	if ! debug.Enable { return }
 	s.structLock.RLock()
@@ -364,6 +266,7 @@ func (s *Netceptor) printRoutingTable() {
 	debug.Printf("\n")
 }
 
+// Constructs a routing update message suitable for sending to the network.
 func (s *Netceptor) makeRoutingUpdate() ([]byte, error) {
 	s.sequence += 1
 	s.structLock.RLock()
@@ -388,13 +291,18 @@ func (s *Netceptor) makeRoutingUpdate() ([]byte, error) {
 	return message, nil
 }
 
+// Sends a routing update to all neighbors.
 func (s *Netceptor) floodRoutingUpdate() {
+	if len(s.connections) == 0 {
+		return
+	}
 	debug.Printf("Sending routing update\n")
 	message, err := s.makeRoutingUpdate()
 	if err != nil { return }
 	s.flood(message, "")
 }
 
+// Processes a routing update received from a connection.
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	debug.Printf("Received routing update from %s via %s\n", ri.NodeId, recvConn)
 	if ri.NodeId == s.nodeId || ri.NodeId == "" { return }
@@ -445,51 +353,46 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 }
 
-func(s *Netceptor) handleMessageData(md *MessageData) error {
+// Handles incoming data and dispatches it to a service listener.
+func(s *Netceptor) handleMessageData(md *messageData) error {
 	if md.ToNode == s.nodeId {
-		li, ok := s.listenerRegistry[md.ToService]; if ! ok {
+		pc, ok := s.listenerRegistry[md.ToService]; if ! ok {
 			return fmt.Errorf("received message for unknown service")
 		}
-		nc, ok := li.sessionRegistry[md.FromService]
-		if !ok {
-			nc = &Conn{
-				li:            li,
-				localService:  md.ToService,
-				remoteNode:    md.FromNode,
-				remoteService: md.FromService,
-				RecvChan:      make(chan *MessageData),
-				open:          true,
-			}
-			li.sessionRegistry[md.FromService] = nc
-			li.acceptChan <- nc
-		}
-		nc.RecvChan <- md
+		pc.recvChan <- md
 		return nil
 	} else {
 		return s.forwardMessage(md)
 	}
 }
 
-func (s *Netceptor) handleSend(data []byte) error {
-	md := &MessageData{}
-	err := json.Unmarshal(data, md)
-	if err != nil { return err }
-	return s.handleMessageData(md)
+// Translates an incoming message from wire protocol to messageData object.
+func (s *Netceptor) translateSendData(data []byte) (*messageData, error) {
+	md := &messageData{}
+	//TODO: Figure out if we really need to copy the data here
+	//This is a hack to work around "data changed under us" errors from json
+	mydata := make([]byte, len(data))
+	copy(mydata, data)
+	err := json.Unmarshal(mydata, md)
+	if err != nil { return nil, err }
+	return md, nil
 }
 
+// Goroutine to send data from the backend to the connection's ReadChan
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
-		message, err := sess.Recv()
-		ci.lastReceivedData = time.Now()
+		buf, err := sess.Recv()
 		if err != nil {
 			debug.Printf("UDP receiving error %s\n", err)
 			ci.ErrorChan <- err
 			return
 		}
-		ci.ReadChan <- message
+		ci.lastReceivedData = time.Now()
+		ci.ReadChan <- buf
 	}
 }
 
+// Goroutine to send data from the connection's WriteChan to the backend
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
 		message, more := <- ci.WriteChan
@@ -505,6 +408,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 	}
 }
 
+// Continuously sends routing updates to let the other end know who we are on initial connection
 func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
@@ -529,6 +433,7 @@ func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bo
 	}
 }
 
+// Main Netceptor protocol loop
 func (s *Netceptor) runProtocol(sess BackendSession) error {
 	defer func() {
 		_ = sess.Close()
@@ -585,9 +490,15 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 				s.handleRoutingUpdate(ri, remoteNodeId)
 			} else if established {
 				if command == "send" {
-					_ = s.handleSend(data)
+					md, err := s.translateSendData(data); if err != nil {
+						debug.Printf("Error translating data: %s\n", err)
+					} else {
+						err := s.handleMessageData(md); if err != nil {
+							debug.Printf("Error handling message data: %s\n", err)
+						}
+					}
 				} else {
-					debug.Printf("Unknown command: %s, Data: %s\n", command, data)
+					debug.Printf("Unknown command in network packet: %s\n", command)
 				}
 			}
 		case err := <- ci.ErrorChan:
@@ -598,6 +509,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 	}
 }
 
+// Runs the Netceptor protocol on a backend object
 func (s *Netceptor) RunBackend(b Backend, errf func(error)) {
 	b.Start(s.runProtocol, errf)
 }

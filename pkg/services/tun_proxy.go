@@ -6,38 +6,41 @@ import (
 	"github.org/ghjm/sockceptor/pkg/netceptor"
 )
 
-func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.Conn) {
+func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.PacketConn, remoteAddr netceptor.Addr) {
 	debug.Printf("Running tunnel to netceptor forwarder\n")
-	buf := make([]byte, 4096)
+	buf := make([]byte, netceptor.MTU)
 	for {
 		n, err := tunif.Read(buf); if err != nil {
 			debug.Printf("Error reading from tun device: %s\n", err)
-			break
+			continue
 		}
-		debug.Printf("Forwarding packet of length %d from tun to netceptor\n", n)
-		err = nconn.Send(buf[:n]); if err != nil {
+		// debug.Printf("Forwarding packet of length %d from tun to netceptor\n", n)
+		wn, err := nconn.WriteTo(buf[:n], remoteAddr); if err != nil || wn != n {
 			debug.Printf("Error writing to netceptor: %s\n", err)
-			break
 		}
 	}
 }
 
-func runNetceptorToTun(nconn *netceptor.Conn, tunif *water.Interface) {
+func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remoteAddr netceptor.Addr) {
 	debug.Printf("Running netceptor to tunnel forwarder\n")
+	buf := make([]byte, netceptor.MTU)
 	for {
-		buf, err := nconn.Recv(); if err != nil {
+		n, addr, err := nconn.ReadFrom(buf); if err != nil {
 			debug.Printf("Error reading from netceptor: %s\n", err)
-			break
+			continue
 		}
-		debug.Printf("Forwarding packet of length %d from netceptor to tun\n", len(buf))
-		n, err := tunif.Write(buf); if err != nil || n != len(buf){
+		if addr != remoteAddr {
+			debug.Printf("Data received from unexpected source: %s\n", addr)
+			continue
+		}
+		// debug.Printf("Forwarding packet of length %d from netceptor to tun\n", n)
+		nSend, err := tunif.Write(buf[:n]); if err != nil || nSend != n {
 			debug.Printf("Error writing to tun device: %s\n", err)
-			break
 		}
 	}
 }
 
-func TunProxyService(s *netceptor.Netceptor, direction string, tunInterface string, lservice string,
+func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice string,
 	node string, rservice string) {
 
 	cfg := water.Config{
@@ -48,25 +51,9 @@ func TunProxyService(s *netceptor.Netceptor, direction string, tunInterface stri
 		panic(err)
 	}
 
-	if direction == "dial" {
-		debug.Printf("Connecting to remote netceptor node %s service %s\n", node, rservice)
-		nconn, err := s.Dial(node, rservice); if err != nil { panic(err) }
-		go runTunToNetceptor(iface, nconn)
-		go runNetceptorToTun(nconn, iface)
-	} else {
-		debug.Printf("Listening for netceptor service %s\n", lservice)
-		li, err := s.Listen(lservice)
-		if err != nil { panic(err) }
-		go func(li *netceptor.Listener) {
-			for {
-				nconn := li.Accept()
-				debug.Printf("Accepted connection from node %s service %s\n", nconn.RemoteNode(),
-					nconn.RemoteService())
-				go runTunToNetceptor(iface, nconn)
-				go runNetceptorToTun(nconn, iface)
-			}
-		}(li)
-	}
+	debug.Printf("Connecting to remote netceptor node %s service %s\n", node, rservice)
+	nconn, err := s.ListenPacket(lservice); if err != nil { panic(err) }
+	raddr := netceptor.NewAddr(node, rservice)
+	go runTunToNetceptor(iface, nconn, raddr)
+	go runNetceptorToTun(nconn, iface, raddr)
 }
-
-

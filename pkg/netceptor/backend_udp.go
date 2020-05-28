@@ -2,14 +2,13 @@ package netceptor
 
 import (
 	"fmt"
+	"github.org/ghjm/sockceptor/pkg/debug"
 	"net"
 	"os"
 	"sync"
 	"syscall"
 	"time"
 )
-
-const MTU=4096
 
 // UdpDialer implements Backend for outbound UDP
 type UdpDialer struct {
@@ -40,7 +39,6 @@ func (b *UdpDialer) Start(bsf BackendSessFunc, errf ErrorFunc) {
 			if ok {
 				syserr, ok := operr.Err.(*os.SyscallError)
 				if ok {
-					//TODO: make this portable
 					if syserr.Err == syscall.ECONNREFUSED {
 						// If the other end isn't listening, just keep trying
 						time.Sleep(5 * time.Second)
@@ -85,9 +83,9 @@ func (ns *UdpDialerSession) Close() error {
 type UdpListener struct {
 	laddr           *net.UDPAddr
 	conn            *net.UDPConn
-	sessChan        chan UdpListenerSession
+	sessChan        chan *UdpListenerSession
 	sessRegLock		sync.Mutex
-	sessionRegistry map[string]UdpListenerSession
+	sessionRegistry map[string]*UdpListenerSession
 }
 
 func NewUdpListener(address string) (*UdpListener, error) {
@@ -100,17 +98,17 @@ func NewUdpListener(address string) (*UdpListener, error) {
 	ul := UdpListener{
 		laddr:           addr,
 		conn:            uc,
-		sessChan:        make(chan UdpListenerSession),
+		sessChan:        make(chan *UdpListenerSession),
 		sessRegLock:	 sync.Mutex{},
-		sessionRegistry: make(map[string]UdpListenerSession),
+		sessionRegistry: make(map[string]*UdpListenerSession),
 	}
 	return &ul, nil
 }
 
 func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 	go func() {
+		buf := make([]byte, MTU)
 		for {
-			buf := make([]byte, MTU)
 			n, addr, err := b.conn.ReadFromUDP(buf); if err != nil {
 				errf(err)
 				return
@@ -119,7 +117,8 @@ func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 			b.sessRegLock.Lock()
 			sess, ok := b.sessionRegistry[addrStr]
 			if !ok {
-				sess = UdpListenerSession{
+				debug.Printf("Creating new UDP listener session for %s\n", addrStr)
+				sess = &UdpListenerSession{
 					li:       b,
 					raddr:    addr,
 					recvChan: make(chan []byte),
@@ -127,7 +126,7 @@ func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 				b.sessionRegistry[addrStr] = sess
 				b.sessRegLock.Unlock()
 				go func () {
-					err := bsf(&sess); if err != nil {
+					err := bsf(sess); if err != nil {
 						errf(err)
 					}
 				}()

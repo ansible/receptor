@@ -9,7 +9,9 @@ import (
 func bridgeHalf(c1 net.Conn, c2 net.Conn) {
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, err := c1.Read(buf); if err != nil {
+                n, err := c1.Read(buf)
+                debug.Tracef("Forwarding TCP data len %d: %s\n", n, buf[:n])
+                if err != nil {
 			debug.Printf("Connection read error: %s\n", err)
 			return
 		}
@@ -29,7 +31,7 @@ func bridgeConns(c1 net.Conn, c2 net.Conn) {
 	go bridgeHalf(c2, c1)
 }
 
-func TCPProxyService_Inbound(s *netceptor.Netceptor, host string, port string, node string, rservice string) {
+func tCPProxyServiceInbound(s *netceptor.Netceptor, host string, port string, node string, rservice string) {
 	tli, err := net.Listen("tcp", net.JoinHostPort(host, port)); if err != nil {
 		panic(err)
 	}
@@ -44,7 +46,7 @@ func TCPProxyService_Inbound(s *netceptor.Netceptor, host string, port string, n
 	}
 }
 
-func TCPProxyService_Outbound(s *netceptor.Netceptor, lservice string, host string,
+func tCPProxyServiceOutbound(s *netceptor.Netceptor, lservice string, host string,
 	port string, node string, rservice string) {
 	qli, err := s.Listen(lservice); if err != nil {
 		panic(err)
@@ -60,11 +62,12 @@ func TCPProxyService_Outbound(s *netceptor.Netceptor, lservice string, host stri
 	}
 }
 
+// TCPProxyService runs the TCP-to-Receptor proxying tunnel.
 func TCPProxyService(s *netceptor.Netceptor, direction string, lservice string, host string,
 	port string, node string, rservice string) {
 	if direction == "in" {
-		TCPProxyService_Inbound(s, host, port, node, rservice)
+		tCPProxyServiceInbound(s, host, port, node, rservice)
 	} else {
-		TCPProxyService_Outbound(s, lservice, host, port, node, rservice)
+		tCPProxyServiceOutbound(s, lservice, host, port, node, rservice)
 	}
 }

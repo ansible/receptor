@@ -47,7 +47,7 @@ func main() {
 
 	for _, listener := range listeners {
 		debug.Printf("Running listener %s\n", listener)
-		li, err := netceptor.NewUdpListener(listener); if err != nil {
+		li, err := netceptor.NewUDPListener(listener); if err != nil {
 			fmt.Printf("Error listening on %s: %s\n", listener, err)
 			return
 		} else {
@@ -59,7 +59,7 @@ func main() {
 
 	for _, peer := range peers {
 		debug.Printf("Running peer connection %s\n", peer)
-		li, err := netceptor.NewUdpDialer(peer); if err != nil {
+		li, err := netceptor.NewUDPDialer(peer); if err != nil {
 			fmt.Printf("Error creating peer %s: %s\n", peer, err)
 			return
 		} else {
@@ -80,7 +80,7 @@ func main() {
 		debug.Printf("Running UDP service %s\n", udpService)
 		params := strings.Split(udpService, ":")
 		if len(params) != 6 { panic("Invalid parameters for UDP service") }
-		go services.UdpProxyService(s, params[0], params[1], params[2], params[3], params[4], params[5])
+		go services.UDPProxyService(s, params[0], params[1], params[2], params[3], params[4], params[5])
 	}
 
 	for _, tunService := range tunServices {

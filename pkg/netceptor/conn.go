@@ -14,14 +14,14 @@ import (
 	"time"
 )
 
-// Implements the net.Listener interface via the Receptor network
+// Listener implements the net.Listener interface via the Receptor network
 type Listener struct {
 	s             *Netceptor
 	pc            *PacketConn
 	ql            quic.Listener
 }
 
-// Returns a stream listener compatible with Go's net.Listener.
+// Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string) (*Listener, error) {
 	s.structLock.Lock()
@@ -50,6 +50,7 @@ func (s *Netceptor) Listen(service string) (*Listener, error) {
 	}, nil
 }
 
+// Accept accepts a connection via the listener
 func (li *Listener) Accept() (net.Conn, error) {
 	qc, err := li.ql.Accept(context.Background()); if err != nil {
 		return nil, err
@@ -66,21 +67,22 @@ func (li *Listener) Accept() (net.Conn, error) {
 	}, nil
 }
 
+// Close closes the listener
 func (li *Listener) Close() error {
 	qerr := li.ql.Close()
 	perr := li.pc.Close()
 	if qerr != nil {
 		return qerr
-	} else {
-		return perr
 	}
+	return perr
 }
 
+// Addr returns the local address of this listener
 func (li *Listener) Addr() net.Addr {
 	return li.pc.LocalAddr()
 }
 
-// Implements the net.Conn interface via the Receptor network
+// Conn implements the net.Conn interface via the Receptor network
 type Conn struct {
 	s             *Netceptor
 	pc            *PacketConn
@@ -91,7 +93,7 @@ type Conn struct {
 	writeDeadline time.Time
 }
 
-// Returns a stream connection compatible with Go's net.Conn.
+// Dial returns a stream connection compatible with Go's net.Conn.
 func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 	lservice := s.getEphemeralService()
 	pc, err := s.ListenPacket(lservice); if err != nil {
@@ -101,7 +103,7 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 	cfg := &quic.Config{
 		KeepAlive: true,
 	}
-	qc, err := quic.Dial(pc, rAddr, s.nodeId, generateClientTLSConfig(), cfg); if err != nil {
+	qc, err := quic.Dial(pc, rAddr, s.nodeID, generateClientTLSConfig(), cfg); if err != nil {
 		return nil, err
 	}
 	qs, err := qc.OpenStream(); if err != nil {
@@ -116,16 +118,19 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 	}, nil
 }
 
+// Read reads data from the connection
 func (c *Conn) Read(b []byte) (n int, err error) {
 	//TODO: respect nc.readDeadline
 	return c.qs.Read(b)
 }
 
+// Write writes data to the connection
 func (c *Conn) Write(b []byte) (n int, err error) {
 	//TODO: respect nc.writeDeadline
 	return c.qs.Write(b)
 }
 
+// Close closes the connection
 func (c *Conn) Close() error {
 	qerr := c.qs.Close()
 	var perr error
@@ -136,30 +141,34 @@ func (c *Conn) Close() error {
 	}
 	if qerr != nil {
 		return qerr
-	} else {
-		return perr
 	}
+	return perr
 }
 
+// LocalAddr returns the local address of this connection
 func (c *Conn) LocalAddr() net.Addr {
 	return c.qc.LocalAddr()
 }
 
+// RemoteAddr returns the remote address of this connection
 func (c *Conn) RemoteAddr() net.Addr {
 	return c.qc.RemoteAddr()
 }
 
+// SetDeadline sets both read and write deadlines
 func (c *Conn) SetDeadline(t time.Time) error {
 	c.readDeadline = t
 	c.writeDeadline = t
 	return nil
 }
 
+// SetReadDeadline sets the read deadline
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	c.readDeadline = t
 	return nil
 }
 
+// SetWriteDeadline sets the write deadline
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	c.writeDeadline = t
 	return nil

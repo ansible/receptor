@@ -40,6 +40,7 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 	}
 }
 
+// TunProxyService runs the Receptor to tun interface proxy.
 func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice string,
 	node string, rservice string) {
 

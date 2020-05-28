@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+// Run runs a task at a given periodic interval, or as requested over a channel.
+// If many requests come in close to the same time, only run the task once.
+// Callers can ask for the task to be run within a given amount of time, which
+// overrides defaltReqDelay. Sending a zero to the channel runs it immediately.
 func Run(f func(), periodicInterval time.Duration, defaultReqDelay time.Duration,
 	shutdownChan chan bool) chan time.Duration {
 	runChan := make(chan time.Duration)

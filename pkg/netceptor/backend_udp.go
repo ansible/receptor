@@ -10,27 +10,29 @@ import (
 	"time"
 )
 
-// UdpDialer implements Backend for outbound UDP
-type UdpDialer struct {
+// UDPDialer implements Backend for outbound UDP
+type UDPDialer struct {
 	address *net.UDPAddr
 }
 
-func NewUdpDialer(address string) (*UdpDialer, error) {
+// NewUDPDialer instantiates a new UDPDialer backend
+func NewUDPDialer(address string) (*UDPDialer, error) {
 	ua, err := net.ResolveUDPAddr("udp", address); if err != nil {
 		return nil, err
 	}
-	nd := UdpDialer{
+	nd := UDPDialer{
 		address: ua,
 	}
 	return &nd, nil
 }
 
-func (b *UdpDialer) Start(bsf BackendSessFunc, errf ErrorFunc) {
+// Start runs the given session function over this backend service
+func (b *UDPDialer) Start(bsf BackendSessFunc, errf ErrorFunc) {
 	go func() {
 		for {
 			conn, err := net.DialUDP("udp", nil, b.address)
 			if err == nil {
-				ns := UdpDialerSession{
+				ns := UDPDialerSession{
 					conn: conn,
 				}
 				err = bsf(&ns)
@@ -52,12 +54,13 @@ func (b *UdpDialer) Start(bsf BackendSessFunc, errf ErrorFunc) {
 	}()
 }
 
-//UdpDialerSession implements BackendSession for UDPDialer
-type UdpDialerSession struct {
+// UDPDialerSession implements BackendSession for UDPDialer
+type UDPDialerSession struct {
 	conn *net.UDPConn
 }
 
-func (ns *UdpDialerSession) Send(data []byte) error {
+// Send sends data over the session
+func (ns *UDPDialerSession) Send(data []byte) error {
 	n, err := ns.conn.Write(data)
 	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
@@ -69,7 +72,8 @@ func (ns *UdpDialerSession) Send(data []byte) error {
 	return nil
 }
 
-func (ns *UdpDialerSession) Recv() ([]byte, error) {
+// Recv receives data via the session
+func (ns *UDPDialerSession) Recv() ([]byte, error) {
 	buf := make([]byte, MTU)
 	n, err := ns.conn.Read(buf)
 	debug.Tracef("UDP sending data %s len %d sent %d err %s\n", buf, len(buf), n, err)
@@ -79,37 +83,40 @@ func (ns *UdpDialerSession) Recv() ([]byte, error) {
 	return buf[:n], nil
 }
 
-func (ns *UdpDialerSession) Close() error {
+// Close closes the session
+func (ns *UDPDialerSession) Close() error {
 	return ns.conn.Close()
 }
 
-// UdpListener implements Backend for inbound UDP
-type UdpListener struct {
+// UDPListener implements Backend for inbound UDP
+type UDPListener struct {
 	laddr           *net.UDPAddr
 	conn            *net.UDPConn
-	sessChan        chan *UdpListenerSession
+	sessChan        chan *UDPListenerSession
 	sessRegLock		sync.Mutex
-	sessionRegistry map[string]*UdpListenerSession
+	sessionRegistry map[string]*UDPListenerSession
 }
 
-func NewUdpListener(address string) (*UdpListener, error) {
+// NewUDPListener instantiates a new UDPListener backend
+func NewUDPListener(address string) (*UDPListener, error) {
 	addr, err := net.ResolveUDPAddr("udp", address); if err != nil {
 		return nil, err
 	}
 	uc, err := net.ListenUDP("udp", addr); if err != nil {
 		return nil, err
 	}
-	ul := UdpListener{
+	ul := UDPListener{
 		laddr:           addr,
 		conn:            uc,
-		sessChan:        make(chan *UdpListenerSession),
+		sessChan:        make(chan *UDPListenerSession),
 		sessRegLock:	 sync.Mutex{},
-		sessionRegistry: make(map[string]*UdpListenerSession),
+		sessionRegistry: make(map[string]*UDPListenerSession),
 	}
 	return &ul, nil
 }
 
-func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
+// Start runs the given session function over the UDPListener backend
+func (b *UDPListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 	go func() {
 		buf := make([]byte, MTU)
 		for {
@@ -126,7 +133,7 @@ func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 			sess, ok := b.sessionRegistry[addrStr]
 			if !ok {
 				debug.Printf("Creating new UDP listener session for %s\n", addrStr)
-				sess = &UdpListenerSession{
+				sess = &UDPListenerSession{
 					li:       b,
 					raddr:    addr,
 					recvChan: make(chan []byte),
@@ -146,14 +153,15 @@ func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 	}()
 }
 
-//UdpListenerSession implements BackendSession for UDPListener
-type UdpListenerSession struct {
-	li *UdpListener
+// UDPListenerSession implements BackendSession for UDPListener
+type UDPListenerSession struct {
+	li *UDPListener
 	raddr *net.UDPAddr
 	recvChan chan []byte
 }
 
-func (ns *UdpListenerSession) Send(data []byte) error{
+// Send sends data over the session
+func (ns *UDPListenerSession) Send(data []byte) error{
 	n, err := ns.li.conn.WriteToUDP(data, ns.raddr)
 	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
@@ -165,12 +173,14 @@ func (ns *UdpListenerSession) Send(data []byte) error{
 	}
 }
 
-func (ns *UdpListenerSession) Recv() ([]byte, error) {
+// Recv receives data from the session
+func (ns *UDPListenerSession) Recv() ([]byte, error) {
 	data := <- ns.recvChan
 	return data, nil
 }
 
-func (ns *UdpListenerSession) Close() error {
+// Close closes the session
+func (ns *UDPListenerSession) Close() error {
 	ns.li.sessRegLock.Lock()
 	defer ns.li.sessRegLock.Unlock()
 	delete(ns.li.sessionRegistry, ns.raddr.String())

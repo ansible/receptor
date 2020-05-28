@@ -211,7 +211,7 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	s.structLock.RLock()
 	writeChan := s.connections[nextHop].WriteChan
 	s.structLock.RUnlock()
-	//debug.Printf("Forwarding message to %s via %s\n", md.ToNode, nextHop)
+	debug.Tracef("Forwarding message to %s via %s\n", md.ToNode, nextHop)
 	if writeChan != nil {
 		message, err := s.makeMessage("send", md)
 		if err != nil { return err }
@@ -367,13 +367,10 @@ func(s *Netceptor) handleMessageData(md *messageData) error {
 }
 
 // Translates an incoming message from wire protocol to messageData object.
-func (s *Netceptor) translateSendData(data []byte) (*messageData, error) {
+func (s *Netceptor) translateData(data []byte) (*messageData, error) {
 	md := &messageData{}
-	//TODO: Figure out if we really need to copy the data here
-	//This is a hack to work around "data changed under us" errors from json
-	mydata := make([]byte, len(data))
-	copy(mydata, data)
-	err := json.Unmarshal(mydata, md)
+	err := json.Unmarshal(data, md)
+	debug.Tracef("Translated raw data %s to structured data with error %s\n", data, err)
 	if err != nil { return nil, err }
 	return md, nil
 }
@@ -382,6 +379,7 @@ func (s *Netceptor) translateSendData(data []byte) (*messageData, error) {
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv()
+		debug.Tracef("Protocol reader got data %s\n", buf)
 		if err != nil {
 			debug.Printf("UDP receiving error %s\n", err)
 			ci.ErrorChan <- err
@@ -396,6 +394,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
 		message, more := <- ci.WriteChan
+		debug.Tracef("Protocol writer got data %s\n", message)
 		if !more {
 			return
 		}
@@ -452,6 +451,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 	for {
 		select {
 		case message := <- ci.ReadChan:
+			debug.Tracef("Got message %s\n", message)
 			msgparts := bytes.SplitN(message, []byte(" "), 2)
 			command := string(msgparts[0])
 			data := []byte("")
@@ -490,8 +490,8 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 				s.handleRoutingUpdate(ri, remoteNodeId)
 			} else if established {
 				if command == "send" {
-					md, err := s.translateSendData(data); if err != nil {
-						debug.Printf("Error translating data: %s\n", err)
+					md, err := s.translateData(data); if err != nil {
+						debug.Printf("Error translating data: %s.  Data was %s\n", err, data)
 					} else {
 						err := s.handleMessageData(md); if err != nil {
 							debug.Printf("Error handling message data: %s\n", err)

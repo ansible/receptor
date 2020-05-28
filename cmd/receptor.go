@@ -31,6 +31,7 @@ var tunServices stringList
 func main() {
 	flag.StringVar(&nodeId, "node-id", "", "local node ID")
 	flag.BoolVar(&debug.Enable, "debug", false, "show debug output")
+	flag.BoolVar(&debug.Trace, "trace", false, "show full packet traces")
 	flag.Var(&peers, "peer", "host:port  to connect outbound to")
 	flag.Var(&listeners, "listen", "host:port to listen on for peer connections")
 	flag.Var(&tcpServices, "tcp", "{in|out}:lservice:host:port:node:rservice")

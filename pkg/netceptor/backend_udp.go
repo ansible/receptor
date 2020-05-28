@@ -57,8 +57,10 @@ type UdpDialerSession struct {
 	conn *net.UDPConn
 }
 
-func (ns *UdpDialerSession) Send(data []byte) error{
-	n, err := ns.conn.Write(data); if err != nil {
+func (ns *UdpDialerSession) Send(data []byte) error {
+	n, err := ns.conn.Write(data)
+	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
+	if err != nil {
 		return err
 	}
 	if n != len(data) {
@@ -69,7 +71,9 @@ func (ns *UdpDialerSession) Send(data []byte) error{
 
 func (ns *UdpDialerSession) Recv() ([]byte, error) {
 	buf := make([]byte, MTU)
-	n, err := ns.conn.Read(buf); if err != nil {
+	n, err := ns.conn.Read(buf)
+	debug.Tracef("UDP sending data %s len %d sent %d err %s\n", buf, len(buf), n, err)
+	if err != nil {
 		return nil, err
 	}
 	return buf[:n], nil
@@ -109,7 +113,11 @@ func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 	go func() {
 		buf := make([]byte, MTU)
 		for {
-			n, addr, err := b.conn.ReadFromUDP(buf); if err != nil {
+			n, addr, err := b.conn.ReadFromUDP(buf)
+			data := make([]byte, n)
+			copy(data, buf)
+			debug.Tracef("UDP received data %s len %d err %s\n", data, n, err)
+			if err != nil {
 				errf(err)
 				return
 			}
@@ -133,7 +141,7 @@ func (b *UdpListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
 			} else {
 				b.sessRegLock.Unlock()
 			}
-			sess.recvChan <- buf[:n]
+			sess.recvChan <- data
 		}
 	}()
 }
@@ -146,7 +154,9 @@ type UdpListenerSession struct {
 }
 
 func (ns *UdpListenerSession) Send(data []byte) error{
-	n, err := ns.li.conn.WriteToUDP(data, ns.raddr); if err != nil {
+	n, err := ns.li.conn.WriteToUDP(data, ns.raddr)
+	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
+	if err != nil {
 		return err
 	} else if n != len(data) {
 		return fmt.Errorf("partial data sent")

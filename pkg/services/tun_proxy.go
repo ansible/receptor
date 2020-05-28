@@ -34,7 +34,7 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 			continue
 		}
 		// debug.Printf("Forwarding packet of length %d from netceptor to tun\n", n)
-		nSend, err := tunif.Write(buf[:n]); if err != nil || nSend != n {
+		wn, err := tunif.Write(buf[:n]); if err != nil || wn != n {
 			debug.Printf("Error writing to tun device: %s\n", err)
 		}
 	}

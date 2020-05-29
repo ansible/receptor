@@ -1,7 +1,10 @@
 package backends
 
+import "net"
+
 //TODO: DTLS
 //TODO: configurable reconnect
+//TODO: figure out why this is 3x slower than TCP when it ought to be be faster
 
 import (
 	"fmt"

@@ -25,6 +25,8 @@ func (i *stringList) Set(value string) error {
 var nodeID string
 var peers stringList
 var listeners stringList
+var wspeers stringList
+var wslisteners stringList
 var tcpServices stringList
 var udpServices stringList
 var tunServices stringList
@@ -35,6 +37,8 @@ func main() {
 	flag.BoolVar(&debug.Trace, "trace", false, "show full packet traces")
 	flag.Var(&peers, "peer", "host:port  to connect outbound to")
 	flag.Var(&listeners, "listen", "host:port to listen on for peer connections")
+	flag.Var(&wspeers, "wspeer", "URL to connect to as websocket")
+	flag.Var(&wslisteners, "wslisten", "host:port to listen on for peer connections")
 	flag.Var(&tcpServices, "tcp", "{in|out}:lservice:host:port:node:rservice")
 	flag.Var(&udpServices, "udp", "{in|out}:lservice:host:port:node:rservice")
 	flag.Var(&tunServices, "tun", "tun_interface:lservice:node:rservice")
@@ -57,10 +61,21 @@ func main() {
 		})
 	}
 
-	for _, peer := range peers {
-		debug.Printf("Running peer connection %s\n", peer)
-		li, err := backends.NewUDPDialer(peer); if err != nil {
-			fmt.Printf("Error creating peer %s: %s\n", peer, err)
+	for _, wslistener := range wslisteners {
+		debug.Printf("Running websocket listener %s\n", wslistener)
+		li, err := backends.NewWebsocketListener(wslistener); if err != nil {
+			fmt.Printf("Error listening on %s: %s\n", wslistener, err)
+			return
+		}
+		s.RunBackend(li, func(err error) {
+			fmt.Printf("Error in listener backend: %s\n", err)
+		})
+	}
+
+	for _, wspeer := range wspeers {
+		debug.Printf("Running websocket peer connection %s\n", wspeer)
+		li, err := backends.NewWebsocketDialer(wspeer); if err != nil {
+			fmt.Printf("Error creating peer %s: %s\n", wspeer, err)
 			return
 		}
 		s.RunBackend(li, func(err error) {

@@ -2,9 +2,9 @@ package backends
 
 import (
 	"fmt"
-	"github.org/ghjm/sockceptor/pkg/debug"
-	"github.org/ghjm/sockceptor/pkg/framer"
-	"github.org/ghjm/sockceptor/pkg/netceptor"
+	"github.com/ghjm/sockceptor/pkg/debug"
+	"github.com/ghjm/sockceptor/pkg/framer"
+	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"golang.org/x/net/websocket"
 	"net"
 	"net/http"

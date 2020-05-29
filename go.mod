@@ -1,4 +1,4 @@
-module github.org/ghjm/sockceptor
+module github.com/ghjm/sockceptor
 
 go 1.14
 
@@ -7,6 +7,8 @@ require (
 	github.com/lucas-clemente/quic-go v0.15.8
 	github.com/minio/highwayhash v1.0.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
-	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
+	github.com/spf13/cobra v1.0.0 // indirect
+	github.com/spf13/viper v1.7.0 // indirect
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/sys v0.0.0-20200523222454-059865788121 // indirect
 )

@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.org/ghjm/sockceptor/pkg/debug"
-	"github.org/ghjm/sockceptor/pkg/netceptor"
+	"github.com/ghjm/sockceptor/pkg/debug"
+	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"net"
 )
 

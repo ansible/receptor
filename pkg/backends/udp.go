@@ -1,5 +1,6 @@
 package backends
 
+//TODO: DTLS
 //TODO: configurable reconnect
 
 import (
@@ -12,6 +13,9 @@ import (
 	"syscall"
 	"time"
 )
+
+// UDPMaxPacketLen is the maximum size of a message that can be sent over UDP
+const UDPMaxPacketLen = 65507
 
 // UDPDialer implements Backend for outbound UDP
 type UDPDialer struct {
@@ -64,6 +68,9 @@ type UDPDialerSession struct {
 
 // Send sends data over the session
 func (ns *UDPDialerSession) Send(data []byte) error {
+	if len(data) > UDPMaxPacketLen {
+		return fmt.Errorf("data too large")
+	}
 	n, err := ns.conn.Write(data)
 	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
@@ -96,7 +103,7 @@ type UDPListener struct {
 	laddr           *net.UDPAddr
 	conn            *net.UDPConn
 	sessChan        chan *UDPListenerSession
-	sessRegLock		sync.Mutex
+	sessRegLock	sync.RWMutex
 	sessionRegistry map[string]*UDPListenerSession
 }
 
@@ -112,7 +119,7 @@ func NewUDPListener(address string) (*UDPListener, error) {
 		laddr:           addr,
 		conn:            uc,
 		sessChan:        make(chan *UDPListenerSession),
-		sessRegLock:	 sync.Mutex{},
+		sessRegLock:	 sync.RWMutex{},
 		sessionRegistry: make(map[string]*UDPListenerSession),
 	}
 	return &ul, nil
@@ -132,10 +139,12 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 				return
 			}
 			addrStr := addr.String()
-			b.sessRegLock.Lock()
+			b.sessRegLock.RLock()
 			sess, ok := b.sessionRegistry[addrStr]
+			b.sessRegLock.RUnlock()
 			if !ok {
 				debug.Printf("Creating new UDP listener session for %s\n", addrStr)
+				b.sessRegLock.Lock()
 				sess = &UDPListenerSession{
 					li:       b,
 					raddr:    addr,
@@ -148,8 +157,6 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 						errf(err)
 					}
 				}()
-			} else {
-				b.sessRegLock.Unlock()
 			}
 			sess.recvChan <- data
 		}

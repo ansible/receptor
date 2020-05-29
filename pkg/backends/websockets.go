@@ -3,6 +3,7 @@ package backends
 import (
 	"fmt"
 	"github.org/ghjm/sockceptor/pkg/debug"
+	"github.org/ghjm/sockceptor/pkg/framer"
 	"github.org/ghjm/sockceptor/pkg/netceptor"
 	"golang.org/x/net/websocket"
 	"net/http"
@@ -38,49 +39,13 @@ func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.Er
 		for {
 			conn, err := websocket.Dial(b.address, "", b.origin)
 			if err == nil {
-				ns := WebsocketDialerSession{
-					conn: conn,
-				}
-				err = bsf(&ns)
+				ns := newWebsocketSession(conn)
+				err = bsf(ns)
 			}
 			errf(err)
 			return
 		}
 	}()
-}
-
-// WebsocketDialerSession implements BackendSession for WebsocketDialer
-type WebsocketDialerSession struct {
-	conn *websocket.Conn
-}
-
-// Send sends data over the session
-func (ns *WebsocketDialerSession) Send(data []byte) error {
-	n, err := ns.conn.Write(data)
-	debug.Tracef("Websocket sent data %s len %d sent %d err %s\n", data, len(data), n, err)
-	if err != nil {
-		return err
-	}
-	if n != len(data) {
-		return fmt.Errorf("partial data sent")
-	}
-	return nil
-}
-
-// Recv receives data via the session
-func (ns *WebsocketDialerSession) Recv() ([]byte, error) {
-	buf := make([]byte, netceptor.MTU)
-	n, err := ns.conn.Read(buf)
-	debug.Tracef("Websocket sending data %s len %d sent %d err %s\n", buf, len(buf), n, err)
-	if err != nil {
-		return nil, err
-	}
-	return buf[:n], nil
-}
-
-// Close closes the session
-func (ns *WebsocketDialerSession) Close() error {
-	return ns.conn.Close()
 }
 
 // WebsocketListener implements Backend for inbound Websocket
@@ -100,47 +65,71 @@ func NewWebsocketListener(address string) (*WebsocketListener, error) {
 func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	mux := http.NewServeMux()
 	mux.Handle("/", websocket.Handler(func(conn *websocket.Conn) {
-		wls := &WebsocketListenerSession{
-			conn: conn,
+		ws := newWebsocketSession(conn)
+		err := bsf(ws)
+		if err != nil {
+			errf(err)
 		}
-		bsf(wls)
 	}))
-	err := http.ListenAndServe(b.address, mux); if err != nil {
-		errf(err)
-		return
-	}
+	go func() {
+		err := http.ListenAndServe(b.address, mux);
+		if err != nil {
+			errf(err)
+			return
+		}
+	}()
 	debug.Printf("Listening on %s\n", b.address)
 }
 
-// WebsocketListenerSession implements BackendSession for WebsocketListener
-type WebsocketListenerSession struct {
+// WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener
+type WebsocketSession struct {
 	conn *websocket.Conn
+	framer framer.Framer
+}
+
+func newWebsocketSession(conn *websocket.Conn) *WebsocketSession {
+	ws := &WebsocketSession{
+		conn:   conn,
+		framer: framer.New(),
+	}
+	return ws
 }
 
 // Send sends data over the session
-func (ns *WebsocketListenerSession) Send(data []byte) error{
-	n, err := ns.conn.Write(data)
+func (ns *WebsocketSession) Send(data []byte) error {
+	buf := ns.framer.SendData(data)
+	n, err := ns.conn.Write(buf)
 	debug.Tracef("Websocket sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
 		return err
-	} else if n != len(data) {
+	}
+	if n != len(buf) {
 		return fmt.Errorf("partial data sent")
 	}
 	return nil
 }
 
-// Recv receives data from the session
-func (ns *WebsocketListenerSession) Recv() ([]byte, error) {
+// Recv receives data via the session
+func (ns *WebsocketSession) Recv() ([]byte, error) {
 	buf := make([]byte, netceptor.MTU)
-	n, err := ns.conn.Read(buf)
-	debug.Tracef("Websocket received data %s len %d err %s\n", buf[:n], n, err)
-	if err != nil {
+	for {
+		if ns.framer.MessageReady() {
+			break
+		}
+		n, err := ns.conn.Read(buf); if err != nil {
+			return nil, err
+		}
+		ns.framer.RecvData(buf[:n])
+	}
+	buf, err := ns.framer.GetMessage(); if err != nil {
 		return nil, err
 	}
-	return buf[:n], nil
+	debug.Tracef("Websocket received data %s len %d\n", buf, len(buf))
+	return buf, nil
 }
 
 // Close closes the session
-func (ns *WebsocketListenerSession) Close() error {
+func (ns *WebsocketSession) Close() error {
 	return ns.conn.Close()
 }
+

@@ -6,6 +6,9 @@ import (
 	"github.org/ghjm/sockceptor/pkg/framer"
 	"github.org/ghjm/sockceptor/pkg/netceptor"
 	"net"
+	"os"
+	"syscall"
+	"time"
 )
 
 //TODO: TLS
@@ -29,12 +32,26 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 	go func() {
 		for {
 			conn, err := net.Dial("tcp", b.address)
-			if err == nil {
-				ns := newTCPSession(conn)
-				err = bsf(ns)
+			operr, ok := err.(*net.OpError)
+			if ok {
+				syserr, ok := operr.Err.(*os.SyscallError)
+				if ok {
+					if syserr.Err == syscall.ECONNREFUSED {
+						errf(err, false)
+						time.Sleep(5 * time.Second)
+						continue
+					}
+				}
 			}
-			errf(err)
-			return
+			if err != nil {
+				errf(err, true)
+				return
+			}
+			ns := newTCPSession(conn)
+			err = bsf(ns)
+			if err != nil {
+				errf(err, false)
+			}
 		}
 	}()
 }
@@ -56,7 +73,7 @@ func NewTCPListener(address string) (*TCPListener, error) {
 func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	debug.Printf("listening\n")
 	li, err := net.Listen("tcp", b.address); if err != nil {
-		errf(err)
+		errf(err, true)
 		return
 	}
 	go func() {
@@ -64,7 +81,7 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 			debug.Printf("accepting\n")
 			c, err := li.Accept();
 			if err != nil {
-				errf(err)
+				errf(err, true)
 				return
 			}
 			go func() {
@@ -72,7 +89,7 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 				sess := newTCPSession(c)
 				err = bsf(sess)
 				if err != nil {
-					errf(err)
+					errf(err, false)
 				}
 			}()
 		}

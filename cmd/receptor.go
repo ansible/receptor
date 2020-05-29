@@ -9,6 +9,7 @@ import (
 	"github.org/ghjm/sockceptor/pkg/services"
 	"os"
 	"strings"
+	"sync"
 )
 
 type stringList []string
@@ -53,6 +54,7 @@ func main() {
 	}
 
 	s := netceptor.New(nodeID)
+	wg := sync.WaitGroup{}
 
 	for _, listener := range udpListeners {
 		debug.Printf("Running listener %s\n", listener)
@@ -60,8 +62,12 @@ func main() {
 			fmt.Printf("Error listening on %s: %s\n", listener, err)
 			return
 		}
-		s.RunBackend(li, func(err error) {
+		wg.Add(1)
+		s.RunBackend(li, func(err error, fatal bool) {
 			fmt.Printf("Error in listener backend: %s\n", err)
+			if fatal {
+				wg.Done()
+			}
 		})
 	}
 
@@ -71,8 +77,12 @@ func main() {
 			fmt.Printf("Error listening on %s: %s\n", listener, err)
 			return
 		}
-		s.RunBackend(li, func(err error) {
+		wg.Add(1)
+		s.RunBackend(li, func(err error, fatal bool) {
 			fmt.Printf("Error in listener backend: %s\n", err)
+			if fatal {
+				wg.Done()
+			}
 		})
 	}
 
@@ -82,8 +92,12 @@ func main() {
 			fmt.Printf("Error listening on %s: %s\n", wslistener, err)
 			return
 		}
-		s.RunBackend(li, func(err error) {
+		wg.Add(1)
+		s.RunBackend(li, func(err error, fatal bool) {
 			fmt.Printf("Error in listener backend: %s\n", err)
+			if fatal {
+				wg.Done()
+			}
 		})
 	}
 
@@ -93,8 +107,12 @@ func main() {
 			fmt.Printf("Error creating peer %s: %s\n", peer, err)
 			return
 		}
-		s.RunBackend(li, func(err error) {
+		wg.Add(1)
+		s.RunBackend(li, func(err error, fatal bool) {
 			fmt.Printf("Error in peer connection backend: %s\n", err)
+			if fatal {
+				wg.Done()
+			}
 		})
 	}
 
@@ -104,8 +122,12 @@ func main() {
 			fmt.Printf("Error creating peer %s: %s\n", peer, err)
 			return
 		}
-		s.RunBackend(li, func(err error) {
+		wg.Add(1)
+		s.RunBackend(li, func(err error, fatal bool) {
 			fmt.Printf("Error in peer connection backend: %s\n", err)
+			if fatal {
+				wg.Done()
+			}
 		})
 	}
 
@@ -115,8 +137,12 @@ func main() {
 			fmt.Printf("Error creating peer %s: %s\n", wspeer, err)
 			return
 		}
-		s.RunBackend(li, func(err error) {
+		wg.Add(1)
+		s.RunBackend(li, func(err error, fatal bool) {
 			fmt.Printf("Error in peer connection backend: %s\n", err)
+			if fatal {
+				wg.Done()
+			}
 		})
 	}
 
@@ -142,6 +168,6 @@ func main() {
 	}
 
 	debug.Printf("Initialization complete\n")
-	// Main goroutine sleeps forever
-	select{}
+
+	wg.Wait()
 }

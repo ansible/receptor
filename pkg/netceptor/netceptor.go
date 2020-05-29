@@ -22,8 +22,9 @@ const MTU = 16384
 // RouteUpdateTime is the interval at which regular route updates will be sent
 const RouteUpdateTime = 10 * time.Second
 
-// ErrorFunc is a function parameter used to process errors
-type ErrorFunc func(error)
+// ErrorFunc is a function parameter used to process errors. The boolean parameter
+// indicates whether the error is fatal (i.e. the associated process is going to exit).
+type ErrorFunc func(error, bool)
 
 // BackendSessFunc is a function run by a backend, that runs the Netceptor protocol (or some other protocol)
 type BackendSessFunc func(BackendSession) error
@@ -599,6 +600,6 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 }
 
 // RunBackend runs the Netceptor protocol on a backend object
-func (s *Netceptor) RunBackend(b Backend, errf func(error)) {
+func (s *Netceptor) RunBackend(b Backend, errf func(error, bool)) {
 	b.Start(s.runProtocol, errf)
 }

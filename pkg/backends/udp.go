@@ -1,11 +1,5 @@
 package backends
 
-import "net"
-
-//TODO: DTLS
-//TODO: configurable reconnect
-//TODO: figure out why this is 3x slower than TCP when it ought to be be faster
-
 import (
 	"fmt"
 	"github.org/ghjm/sockceptor/pkg/debug"
@@ -16,6 +10,10 @@ import (
 	"syscall"
 	"time"
 )
+
+//TODO: DTLS
+//TODO: configurable reconnect
+//TODO: figure out why this is 3x slower than TCP when it ought to be be faster
 
 // UDPMaxPacketLen is the maximum size of a message that can be sent over UDP
 const UDPMaxPacketLen = 65507
@@ -41,25 +39,28 @@ func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 	go func() {
 		for {
 			conn, err := net.DialUDP("udp", nil, b.address)
-			if err == nil {
-				ns := UDPDialerSession{
-					conn: conn,
-				}
-				err = bsf(&ns)
-			}
 			operr, ok := err.(*net.OpError)
 			if ok {
 				syserr, ok := operr.Err.(*os.SyscallError)
 				if ok {
 					if syserr.Err == syscall.ECONNREFUSED {
-						// If the other end isn't listening, just keep trying
+						errf(err, false)
 						time.Sleep(5 * time.Second)
 						continue
 					}
 				}
 			}
-			errf(err)
-			return
+			if err != nil {
+				errf(err, true)
+				return
+			}
+			ns := UDPDialerSession{
+				conn: conn,
+			}
+			err = bsf(&ns)
+			if err != nil {
+				errf(err, false)
+			}
 		}
 	}()
 }
@@ -138,7 +139,7 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 			copy(data, buf)
 			debug.Tracef("UDP received data %s len %d err %s\n", data, n, err)
 			if err != nil {
-				errf(err)
+				errf(err, true)
 				return
 			}
 			addrStr := addr.String()
@@ -157,7 +158,7 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 				b.sessRegLock.Unlock()
 				go func () {
 					err := bsf(sess); if err != nil {
-						errf(err)
+						errf(err, false)
 					}
 				}()
 			}

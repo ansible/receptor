@@ -6,8 +6,12 @@ import (
 	"github.org/ghjm/sockceptor/pkg/framer"
 	"github.org/ghjm/sockceptor/pkg/netceptor"
 	"golang.org/x/net/websocket"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"syscall"
+	"time"
 )
 
 //TODO: TLS
@@ -38,12 +42,29 @@ func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.Er
 	go func() {
 		for {
 			conn, err := websocket.Dial(b.address, "", b.origin)
-			if err == nil {
-				ns := newWebsocketSession(conn)
-				err = bsf(ns)
+			wsderr, ok := err.(*websocket.DialError)
+			if ok {
+				operr, ok := wsderr.Err.(*net.OpError)
+				if ok {
+					syserr, ok := operr.Err.(*os.SyscallError)
+					if ok {
+						if syserr.Err == syscall.ECONNREFUSED {
+							errf(err, false)
+							time.Sleep(5 * time.Second)
+							continue
+						}
+					}
+				}
 			}
-			errf(err)
-			return
+			if err != nil {
+				errf(err, true)
+				return
+			}
+			ns := newWebsocketSession(conn)
+			err = bsf(ns)
+			if err != nil {
+				errf(err, false)
+			}
 		}
 	}()
 }
@@ -68,13 +89,13 @@ func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.
 		ws := newWebsocketSession(conn)
 		err := bsf(ws)
 		if err != nil {
-			errf(err)
+			errf(err, false)
 		}
 	}))
 	go func() {
-		err := http.ListenAndServe(b.address, mux);
+		err := http.ListenAndServe(b.address, mux)
 		if err != nil {
-			errf(err)
+			errf(err, true)
 			return
 		}
 	}()

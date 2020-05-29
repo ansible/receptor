@@ -18,8 +18,8 @@ type PacketConn struct {
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
-	s.structLock.Lock()
-	defer s.structLock.Unlock()
+	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
 	if service == "" {
 		service = s.getEphemeralService()
 	} else {
@@ -77,8 +77,8 @@ func (nc *PacketConn) LocalAddr() net.Addr {
 
 // Close closes the connection.
 func (nc *PacketConn) Close() error {
-	nc.s.structLock.Lock()
-	defer nc.s.structLock.Unlock()
+	nc.s.listenerLock.Lock()
+	defer nc.s.listenerLock.Unlock()
 	delete(nc.s.listenerRegistry, nc.localService)
 	return nil
 }

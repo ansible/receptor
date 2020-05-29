@@ -24,8 +24,8 @@ type Listener struct {
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string) (*Listener, error) {
-	s.structLock.Lock()
-	defer s.structLock.Unlock()
+	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
 	if service == "" {
 		service = s.getEphemeralService()
 	} else {

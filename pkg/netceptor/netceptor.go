@@ -34,6 +34,9 @@ type Backend interface {
 }
 
 // BackendSession is the interface for a single session of a back-end
+// Backends must be DATAGRAM ORIENTED, meaning that Recv() must return
+// whole packets sent by Send(). If the underlying protocol is stream
+// oriented, then the backend must deal with any required buffering.
 type BackendSession interface {
 	Send([]byte) error
 	Recv() ([]byte, error)
@@ -45,12 +48,15 @@ type Netceptor struct {
 	nodeID                 string
 	epoch                  uint64
 	sequence               uint64
-	structLock             *sync.RWMutex
+	connLock               *sync.RWMutex
 	connections            map[string]*connInfo
+	knownNodeLock          *sync.RWMutex
 	seenUpdates            map[string]time.Time
 	knownNodeInfo          map[string]*nodeInfo
 	knownConnectionCosts   map[string]map[string]float64
+	routingTableLock       *sync.RWMutex
 	routingTable           map[string]string
+	listenerLock           *sync.RWMutex
 	listenerRegistry       map[string]*PacketConn
 	sendRouteFloodChan     chan time.Duration
 	updateRoutingTableChan chan time.Duration
@@ -98,18 +104,24 @@ type routingUpdate struct {
 // New constructs a new Receptor network protocol instance
 func New(NodeID string) *Netceptor {
 	s := Netceptor{
-		nodeID:               NodeID,
-		epoch:                uint64(time.Now().Unix()),
-		structLock:           &sync.RWMutex{},
-		connections:          make(map[string]*connInfo),
-		seenUpdates:          make(map[string]time.Time),
-		knownNodeInfo:        make(map[string]*nodeInfo),
-		knownConnectionCosts: make(map[string]map[string]float64),
-		routingTable:         make(map[string]string),
-		listenerRegistry:     make(map[string]*PacketConn),
-		shutdownChans:        make([]chan bool, 4),
-		hashLock:			  &sync.RWMutex{},
-		nameHashes:			  make(map[uint64]string),
+		nodeID:                 NodeID,
+		epoch:                  uint64(time.Now().Unix()),
+		sequence:               0,
+		connLock:               &sync.RWMutex{},
+		connections:            make(map[string]*connInfo),
+		knownNodeLock:          &sync.RWMutex{},
+		seenUpdates:            make(map[string]time.Time),
+		knownNodeInfo:          make(map[string]*nodeInfo),
+		knownConnectionCosts:   make(map[string]map[string]float64),
+		routingTableLock:       &sync.RWMutex{},
+		routingTable:           make(map[string]string),
+		listenerLock:           &sync.RWMutex{},
+		listenerRegistry:       make(map[string]*PacketConn),
+		sendRouteFloodChan:     nil,
+		updateRoutingTableChan: nil,
+		shutdownChans:          make([]chan bool, 4),
+		hashLock:               &sync.RWMutex{},
+		nameHashes:             make(map[uint64]string),
 	}
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour * 24, time.Second * 1, s.shutdownChans[1])
 	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond * 100, s.shutdownChans[2])
@@ -119,8 +131,6 @@ func New(NodeID string) *Netceptor {
 
 // Shutdown shuts down a Receptor network protocol instance
 func (s *Netceptor) Shutdown() {
-	s.structLock.RLock()
-	defer s.structLock.RUnlock()
 	for i := range s.shutdownChans {
 		s.shutdownChans[i] <- true
 	}
@@ -132,13 +142,13 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 		select {
 		case <- time.After(5 * time.Second):
 			timedOut := make([]chan error, 0)
-			s.structLock.RLock()
+			s.connLock.RLock()
 			for i := range s.connections {
 				if time.Since(s.connections[i].lastReceivedData) > (2 *RouteUpdateTime + 1 * time.Second) {
 					timedOut = append(timedOut, s.connections[i].ErrorChan)
 				}
 			}
-			s.structLock.RUnlock()
+			s.connLock.RUnlock()
 			for i := range timedOut {
 				debug.Printf("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
@@ -151,8 +161,8 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 
 // Recalculates the next-hop table based on current knowledge of the network
 func (s *Netceptor) updateRoutingTable() {
-	s.structLock.Lock()
-	defer s.structLock.Unlock()
+	s.knownNodeLock.RLock()
+	defer s.knownNodeLock.RUnlock()
 	debug.Printf("Re-calculating routing table\n")
 
 	// Dijkstra's algorithm
@@ -181,6 +191,8 @@ func (s *Netceptor) updateRoutingTable() {
 			}
 		}
 	}
+	s.routingTableLock.Lock()
+	defer s.routingTableLock.Unlock()
 	s.routingTable = make(map[string]string)
 	for dest := range s.knownConnectionCosts {
 		p := dest
@@ -194,19 +206,19 @@ func (s *Netceptor) updateRoutingTable() {
 			p = prev[p]
 		}
 	}
-	go s.printRoutingTable()
+	s.printRoutingTable()
 }
 
 // Forwards a message to all neighbors, possibly excluding one
 func (s *Netceptor) flood(message []byte, excludeConn string) {
-	s.structLock.RLock()
+	s.connLock.RLock()
 	writeChans := make([]chan []byte, 0)
 	for conn, connInfo := range s.connections {
 		if conn != excludeConn {
 			writeChans = append(writeChans, connInfo.WriteChan)
 		}
 	}
-	s.structLock.RUnlock()
+	s.connLock.RUnlock()
 	for i := range writeChans {
 		i := i
 		go func() { writeChans[i] <- message }()
@@ -216,12 +228,17 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 var zerokey = make([]byte, 32)
 
 func (s *Netceptor) addNameHash(name string) uint64 {
-	s.hashLock.Lock()
-	defer s.hashLock.Unlock()
 	h, _ := highwayhash.New64(zerokey)
 	_, _ = h.Write([]byte(name))
 	hv := h.Sum64()
-	s.nameHashes[hv] = name
+	s.hashLock.RLock()
+	_, ok := s.nameHashes[hv]
+	s.hashLock.RUnlock()
+	if !ok {
+		s.hashLock.Lock()
+		s.nameHashes[hv] = name
+		s.hashLock.Unlock()
+	}
 	return hv
 }
 
@@ -275,19 +292,21 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 
 // Forwards a message to its next hop
 func (s *Netceptor) forwardMessage(md *messageData) error {
-	nextHop, ok := s.routingTable[md.ToNode]
-	if ! ok { return fmt.Errorf("no route to node") }
-	s.structLock.RLock()
-	writeChan := s.connections[nextHop].WriteChan
-	s.structLock.RUnlock()
-	debug.Tracef("Forwarding message to %s via %s\n", md.ToNode, nextHop)
-	if writeChan != nil {
-		message, err := s.translateDataFromMessage(md)
-		if err != nil { return err }
-		writeChan <- message
-		return nil
+	nextHop, ok := s.routingTable[md.ToNode]; if ! ok {
+		return fmt.Errorf("no route to node")
 	}
-	return fmt.Errorf("could not write to node")
+	s.connLock.RLock()
+	c, ok := s.connections[nextHop]
+	s.connLock.RUnlock()
+	if !ok || c.WriteChan == nil {
+		return fmt.Errorf("no connection to next hop")
+	}
+	debug.Tracef("Forwarding message to %s via %s\n", md.ToNode, nextHop)
+	message, err := s.translateDataFromMessage(md); if err != nil {
+		return err
+	}
+	c.WriteChan <- message
+	return nil
 }
 
 // Generates and sends a message over the Receptor network
@@ -315,10 +334,9 @@ func (s *Netceptor) getEphemeralService() string {
 }
 
 // Prints the routing table.  Only used for debugging.
+// The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
 	if ! debug.Enable { return }
-	s.structLock.RLock()
-	defer s.structLock.RUnlock()
 	debug.Printf("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
 		debug.Printf("   %s: ", conn)
@@ -337,14 +355,14 @@ func (s *Netceptor) printRoutingTable() {
 // Constructs a routing update message
 func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 	s.sequence++
-	s.structLock.RLock()
+	s.connLock.RLock()
 	conns := make([]string, len(s.connections))
 	i := 0
 	for conn := range s.connections {
 		conns[i] = conn
 		i++
 	}
-	s.structLock.RUnlock()
+	s.connLock.RUnlock()
 	update := &routingUpdate{
 		NodeID:         s.nodeID,
 		UpdateID:       randstr.RandomString(128),
@@ -382,14 +400,14 @@ func (s *Netceptor) sendRoutingUpdate() {
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	debug.Printf("Received routing update from %s via %s\n", ri.NodeID, recvConn)
 	if ri.NodeID == s.nodeID || ri.NodeID == "" { return }
-	s.structLock.RLock()
+	s.knownNodeLock.RLock()
 	_, ok := s.seenUpdates[ri.UpdateID]
-	s.structLock.RUnlock()
+	s.knownNodeLock.RUnlock()
 	if ok { return }
-	s.structLock.Lock()
+	s.knownNodeLock.Lock()
 	s.seenUpdates[ri.UpdateID] = time.Now()
 	ni, ok := s.knownNodeInfo[ri.NodeID]
-	s.structLock.Unlock()
+	s.knownNodeLock.Unlock()
 	if ok {
 		if ri.UpdateEpoch < ni.Epoch { return }
 		if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence { return }
@@ -403,7 +421,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	for conn := range ri.Connections {
 		conns[ri.Connections[conn]] = 1.0
 	}
-	s.structLock.Lock()
+	s.knownNodeLock.Lock()
 	changed := false
 	if ! reflect.DeepEqual(conns, s.knownConnectionCosts[ri.NodeID]) {
 		changed = true
@@ -423,7 +441,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 			delete(s.knownConnectionCosts[conn], ri.NodeID)
 		}
 	}
-	s.structLock.Unlock()
+	s.knownNodeLock.Unlock()
 	ri.ForwardingNode = s.nodeID
 	message, err := s.translateRoutingUpdate(ri)
 	if err != nil { return }
@@ -451,7 +469,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 		buf, err := sess.Recv()
 		debug.Tracef("Protocol reader got data %s\n", buf)
 		if err != nil {
-			debug.Printf("UDP receiving error %s\n", err)
+			debug.Printf("Backend receiving error %s\n", err)
 			ci.ErrorChan <- err
 			return
 		}
@@ -470,7 +488,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 		}
 		err := sess.Send(message)
 		if err != nil {
-			debug.Printf("UDP sending error %s\n", err)
+			debug.Printf("Backend sending error %s\n", err)
 			ci.ErrorChan <- err
 			return
 		}
@@ -534,22 +552,26 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					initDoneChan <- true
 					remoteNodeID = ri.ForwardingNode
 					debug.Printf("Connection established with %s\n", remoteNodeID)
-					s.structLock.Lock()
+					s.connLock.Lock()
 					s.connections[remoteNodeID] = ci
+					s.connLock.Unlock()
+					s.knownNodeLock.Lock()
 					_, ok := s.knownConnectionCosts[s.nodeID]
 					if ! ok {
 						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
 					}
 					s.knownConnectionCosts[s.nodeID][remoteNodeID] = 1.0
-					s.structLock.Unlock()
+					s.knownNodeLock.Unlock()
 					s.updateRoutingTableChan <- 0
 					s.sendRouteFloodChan <- 0
 					defer func() {
-						s.structLock.Lock()
+						s.connLock.Lock()
 						delete(s.connections, remoteNodeID)
+						s.connLock.Unlock()
+						s.knownNodeLock.Lock()
 						delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
 						delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
-						s.structLock.Unlock()
+						s.knownNodeLock.Unlock()
 						s.updateRoutingTableChan <- 0
 						s.sendRouteFloodChan <- 0
 					}()

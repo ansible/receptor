@@ -72,6 +72,17 @@ func main() {
 		})
 	}
 
+	for _, peer := range peers {
+		debug.Printf("Running websocket peer connection %s\n", peer)
+		li, err := backends.NewUDPDialer(peer); if err != nil {
+			fmt.Printf("Error creating peer %s: %s\n", peer, err)
+			return
+		}
+		s.RunBackend(li, func(err error) {
+			fmt.Printf("Error in peer connection backend: %s\n", err)
+		})
+	}
+
 	for _, wspeer := range wspeers {
 		debug.Printf("Running websocket peer connection %s\n", wspeer)
 		li, err := backends.NewWebsocketDialer(wspeer); if err != nil {

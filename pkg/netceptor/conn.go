@@ -34,6 +34,7 @@ func (s *Netceptor) Listen(service string) (*Listener, error) {
 			return nil, fmt.Errorf("service %s is already listening", service)
 		}
 	}
+	_ = s.addNameHash(service)
 	pc := &PacketConn{
 		s:             s,
 		localService:  service,
@@ -95,6 +96,8 @@ type Conn struct {
 
 // Dial returns a stream connection compatible with Go's net.Conn.
 func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
+	_ = s.addNameHash(node)
+	_ = s.addNameHash(service)
 	lservice := s.getEphemeralService()
 	pc, err := s.ListenPacket(lservice); if err != nil {
 		return nil, err

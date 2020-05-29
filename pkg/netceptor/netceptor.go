@@ -2,10 +2,11 @@
 package netceptor
 
 import (
-	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	priorityQueue "github.com/jupp0r/go-priority-queue"
+	"github.com/minio/highwayhash"
 	"github.org/ghjm/sockceptor/pkg/debug"
 	"github.org/ghjm/sockceptor/pkg/randstr"
 	"github.org/ghjm/sockceptor/pkg/tickrunner"
@@ -41,20 +42,29 @@ type BackendSession interface {
 
 // Netceptor is the main object of the Receptor mesh network protocol
 type Netceptor struct {
-	nodeID               string
-	epoch                int64
-	sequence             int64
-	structLock           *sync.RWMutex
-	connections          map[string]*connInfo
-	seenUpdates          map[string]time.Time
-	knownNodeInfo        map[string]*nodeInfo
-	knownConnectionCosts map[string]map[string]float64
-	routingTable         map[string]string
-	listenerRegistry     map[string]*PacketConn
-	sendRouteFloodChan   chan time.Duration
+	nodeID                 string
+	epoch                  uint64
+	sequence               uint64
+	structLock             *sync.RWMutex
+	connections            map[string]*connInfo
+	seenUpdates            map[string]time.Time
+	knownNodeInfo          map[string]*nodeInfo
+	knownConnectionCosts   map[string]map[string]float64
+	routingTable           map[string]string
+	listenerRegistry       map[string]*PacketConn
+	sendRouteFloodChan     chan time.Duration
 	updateRoutingTableChan chan time.Duration
 	shutdownChans          []chan bool
+	hashLock               *sync.RWMutex
+	nameHashes			   map[uint64]string
 }
+
+const (
+	// MsgTypeData is a normal data-containing message
+	MsgTypeData  = 0
+	// MsgTypeRoute is a routing update
+	MsgTypeRoute = 1
+)
 
 type messageData struct {
 	FromNode    string
@@ -72,15 +82,15 @@ type connInfo struct {
 }
 
 type nodeInfo struct {
-	Epoch    int64
-	Sequence int64
+	Epoch    uint64
+	Sequence uint64
 }
 
 type routingUpdate struct {
 	NodeID         string
 	UpdateID       string
-	UpdateEpoch    int64
-	UpdateSequence int64
+	UpdateEpoch    uint64
+	UpdateSequence uint64
 	Connections    []string
 	ForwardingNode string
 }
@@ -89,7 +99,7 @@ type routingUpdate struct {
 func New(NodeID string) *Netceptor {
 	s := Netceptor{
 		nodeID:               NodeID,
-		epoch:                time.Now().Unix(),
+		epoch:                uint64(time.Now().Unix()),
 		structLock:           &sync.RWMutex{},
 		connections:          make(map[string]*connInfo),
 		seenUpdates:          make(map[string]time.Time),
@@ -98,9 +108,11 @@ func New(NodeID string) *Netceptor {
 		routingTable:         make(map[string]string),
 		listenerRegistry:     make(map[string]*PacketConn),
 		shutdownChans:        make([]chan bool, 4),
+		hashLock:			  &sync.RWMutex{},
+		nameHashes:			  make(map[uint64]string),
 	}
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour * 24, time.Second * 1, s.shutdownChans[1])
-	s.sendRouteFloodChan = tickrunner.Run(s.floodRoutingUpdate, RouteUpdateTime, time.Millisecond * 100, s.shutdownChans[2])
+	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond * 100, s.shutdownChans[2])
 	go s.monitorConnectionAging(s.shutdownChans[3])
 	return &s
 }
@@ -201,13 +213,64 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 	}
 }
 
-func (s *Netceptor) makeMessage(command string, data interface{}) ([]byte, error) {
-	dataj, err := json.Marshal(data)
-	if err != nil { return []byte{}, err }
-	msg := []byte(command)
-	msg = append(msg, ' ')
-	msg = append(msg, dataj...)
-	return msg, nil
+var zerokey = make([]byte, 32)
+
+func (s *Netceptor) addNameHash(name string) uint64 {
+	s.hashLock.Lock()
+	defer s.hashLock.Unlock()
+	h, _ := highwayhash.New64(zerokey)
+	_, _ = h.Write([]byte(name))
+	hv := h.Sum64()
+	s.nameHashes[hv] = name
+	return hv
+}
+
+func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
+	s.hashLock.RLock()
+	defer s.hashLock.RUnlock()
+	name, ok := s.nameHashes[namehash]; if !ok {
+		return "", fmt.Errorf("hash not found")
+	}
+	return name, nil
+}
+
+// Translates an incoming message from wire protocol to messageData object.
+func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
+	if len(data) < 33 {
+		return nil, fmt.Errorf("data too short to be a valid message")
+	}
+	fromNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[1:9])); if err != nil {
+		return nil, err
+	}
+	toNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[9:17])); if err != nil {
+		return nil, err
+	}
+	fromService, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[17:25])); if err != nil {
+		return nil, err
+	}
+	toService, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[25:33])); if err != nil {
+		return nil, err
+	}
+	md := &messageData{
+		FromNode:    fromNode,
+		FromService: fromService,
+		ToNode:      toNode,
+		ToService:   toService,
+		Data:        data[33:],
+	}
+	return md, nil
+}
+
+// Translates an outgoing message from a messageData object to wire protocol.
+func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
+	data := make([]byte, 33+len(msg.Data))
+	data[0] = MsgTypeData
+	binary.LittleEndian.PutUint64(data[1:9], s.addNameHash(msg.FromNode))
+	binary.LittleEndian.PutUint64(data[9:17], s.addNameHash(msg.ToNode))
+	binary.LittleEndian.PutUint64(data[17:25], s.addNameHash(msg.FromService))
+	binary.LittleEndian.PutUint64(data[25:33], s.addNameHash(msg.ToService))
+	copy(data[33:], msg.Data)
+	return data, nil
 }
 
 // Forwards a message to its next hop
@@ -219,7 +282,7 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	s.structLock.RUnlock()
 	debug.Tracef("Forwarding message to %s via %s\n", md.ToNode, nextHop)
 	if writeChan != nil {
-		message, err := s.makeMessage("send", md)
+		message, err := s.translateDataFromMessage(md)
 		if err != nil { return err }
 		writeChan <- message
 		return nil
@@ -271,8 +334,8 @@ func (s *Netceptor) printRoutingTable() {
 	debug.Printf("\n")
 }
 
-// Constructs a routing update message suitable for sending to the network.
-func (s *Netceptor) makeRoutingUpdate() ([]byte, error) {
+// Constructs a routing update message
+func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 	s.sequence++
 	s.structLock.RLock()
 	conns := make([]string, len(s.connections))
@@ -282,7 +345,7 @@ func (s *Netceptor) makeRoutingUpdate() ([]byte, error) {
 		i++
 	}
 	s.structLock.RUnlock()
-	update := routingUpdate{
+	update := &routingUpdate{
 		NodeID:         s.nodeID,
 		UpdateID:       randstr.RandomString(128),
 		UpdateEpoch:    s.epoch,
@@ -290,19 +353,27 @@ func (s *Netceptor) makeRoutingUpdate() ([]byte, error) {
 		Connections:    conns,
 		ForwardingNode: s.nodeID,
 	}
-	message, err := s.makeMessage("route", update); if err != nil {
+	return update
+}
+
+// Translates a routing update message to network bytes
+func (s *Netceptor) translateRoutingUpdate(update *routingUpdate) ([]byte, error) {
+	updateBytes, err := json.Marshal(update); if err != nil {
 		return nil, err
 	}
-	return message, nil
+	data := make([]byte, len(updateBytes)+1)
+	data[0] = MsgTypeRoute
+	copy(data[1:], updateBytes)
+	return data, nil
 }
 
 // Sends a routing update to all neighbors.
-func (s *Netceptor) floodRoutingUpdate() {
+func (s *Netceptor) sendRoutingUpdate() {
 	if len(s.connections) == 0 {
 		return
 	}
 	debug.Printf("Sending routing update\n")
-	message, err := s.makeRoutingUpdate()
+	message, err := s.translateRoutingUpdate(s.makeRoutingUpdate())
 	if err != nil { return }
 	s.flood(message, "")
 }
@@ -337,6 +408,10 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	if ! reflect.DeepEqual(conns, s.knownConnectionCosts[ri.NodeID]) {
 		changed = true
 	}
+	_, ok = s.knownNodeInfo[ri.NodeID]
+	if !ok {
+		_ = s.addNameHash(ri.NodeID)
+	}
 	s.knownNodeInfo[ri.NodeID] = ni
 	s.knownConnectionCosts[ri.NodeID] = conns
 	for conn := range s.knownConnectionCosts {
@@ -350,7 +425,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 	s.structLock.Unlock()
 	ri.ForwardingNode = s.nodeID
-	message, err := s.makeMessage("route", ri)
+	message, err := s.translateRoutingUpdate(ri)
 	if err != nil { return }
 	s.flood(message, recvConn)
 	if changed {
@@ -368,15 +443,6 @@ func(s *Netceptor) handleMessageData(md *messageData) error {
 		return nil
 	}
 	return s.forwardMessage(md)
-}
-
-// Translates an incoming message from wire protocol to messageData object.
-func (s *Netceptor) translateData(data []byte) (*messageData, error) {
-	md := &messageData{}
-	err := json.Unmarshal(data, md)
-	debug.Tracef("Translated raw data %s to structured data with error %s\n", data, err)
-	if err != nil { return nil, err }
-	return md, nil
 }
 
 // Goroutine to send data from the backend to the connection's ReadChan
@@ -415,7 +481,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
-		ri, err := s.makeRoutingUpdate(); if err != nil {
+		ri, err := s.translateRoutingUpdate(s.makeRoutingUpdate()); if err != nil {
 			debug.Printf("Error Sending initial routing message: %s\n", err)
 			return
 		}
@@ -454,18 +520,15 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 	remoteNodeID := ""
 	for {
 		select {
-		case message := <- ci.ReadChan:
-			debug.Tracef("Got message %s\n", message)
-			msgparts := bytes.SplitN(message, []byte(" "), 2)
-			command := string(msgparts[0])
-			data := []byte("")
-			if len(msgparts) > 1 {
-				data = msgparts[1]
-			}
-			if command == "route" {
+		case data := <- ci.ReadChan:
+			debug.Tracef("Got data %s\n", data)
+			msgType := data[0]
+			if msgType == MsgTypeRoute {
 				ri := &routingUpdate{}
-				err := json.Unmarshal(data, ri)
-				if err != nil { continue }
+				err := json.Unmarshal(data[1:], ri); if err != nil {
+					debug.Printf("Error unpacking routing update\n")
+					continue
+				}
 				if !established {
 					established = true
 					initDoneChan <- true
@@ -493,16 +556,16 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 				}
 				s.handleRoutingUpdate(ri, remoteNodeID)
 			} else if established {
-				if command == "send" {
-					md, err := s.translateData(data); if err != nil {
-						debug.Printf("Error translating data: %s.  Data was %s\n", err, data)
-					} else {
-						err := s.handleMessageData(md); if err != nil {
-							debug.Printf("Error handling message data: %s\n", err)
-						}
+				if msgType == MsgTypeData {
+					message, err := s.translateDataToMessage(data); if err != nil {
+						debug.Printf("Error translating data to message struct\n")
+						continue
+					}
+					err = s.handleMessageData(message); if err != nil {
+						debug.Printf("Error handling message data: %s\n", err)
 					}
 				} else {
-					debug.Printf("Unknown command in network packet: %s\n", command)
+					debug.Printf("Unknown message type %d\n", msgType)
 				}
 			}
 		case err := <- ci.ErrorChan:

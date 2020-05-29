@@ -28,6 +28,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 			return nil, fmt.Errorf("service %s is already listening", service)
 		}
 	}
+	_ = s.addNameHash(service)
 	pc := &PacketConn{
 		s:             s,
 		localService:  service,

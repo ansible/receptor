@@ -1,8 +1,11 @@
-package netceptor
+package backends
+
+//TODO: configurable reconnect
 
 import (
 	"fmt"
 	"github.org/ghjm/sockceptor/pkg/debug"
+	"github.org/ghjm/sockceptor/pkg/netceptor"
 	"net"
 	"os"
 	"sync"
@@ -27,7 +30,7 @@ func NewUDPDialer(address string) (*UDPDialer, error) {
 }
 
 // Start runs the given session function over this backend service
-func (b *UDPDialer) Start(bsf BackendSessFunc, errf ErrorFunc) {
+func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
 			conn, err := net.DialUDP("udp", nil, b.address)
@@ -74,7 +77,7 @@ func (ns *UDPDialerSession) Send(data []byte) error {
 
 // Recv receives data via the session
 func (ns *UDPDialerSession) Recv() ([]byte, error) {
-	buf := make([]byte, MTU)
+	buf := make([]byte, netceptor.MTU)
 	n, err := ns.conn.Read(buf)
 	debug.Tracef("UDP sending data %s len %d sent %d err %s\n", buf, len(buf), n, err)
 	if err != nil {
@@ -116,9 +119,9 @@ func NewUDPListener(address string) (*UDPListener, error) {
 }
 
 // Start runs the given session function over the UDPListener backend
-func (b *UDPListener) Start(bsf BackendSessFunc, errf ErrorFunc) {
+func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
-		buf := make([]byte, MTU)
+		buf := make([]byte, netceptor.MTU)
 		for {
 			n, addr, err := b.conn.ReadFromUDP(buf)
 			data := make([]byte, n)
@@ -168,9 +171,8 @@ func (ns *UDPListenerSession) Send(data []byte) error{
 		return err
 	} else if n != len(data) {
 		return fmt.Errorf("partial data sent")
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // Recv receives data from the session

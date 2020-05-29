@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.org/ghjm/sockceptor/pkg/backends"
 	"github.org/ghjm/sockceptor/pkg/debug"
 	"github.org/ghjm/sockceptor/pkg/netceptor"
 	"github.org/ghjm/sockceptor/pkg/services"
@@ -21,7 +22,7 @@ func (i *stringList) Set(value string) error {
 	return nil
 }
 
-var nodeId string
+var nodeID string
 var peers stringList
 var listeners stringList
 var tcpServices stringList
@@ -29,7 +30,7 @@ var udpServices stringList
 var tunServices stringList
 
 func main() {
-	flag.StringVar(&nodeId, "node-id", "", "local node ID")
+	flag.StringVar(&nodeID, "node-id", "", "local node ID")
 	flag.BoolVar(&debug.Enable, "debug", false, "show debug output")
 	flag.BoolVar(&debug.Trace, "trace", false, "show full packet traces")
 	flag.Var(&peers, "peer", "host:port  to connect outbound to")
@@ -38,35 +39,33 @@ func main() {
 	flag.Var(&udpServices, "udp", "{in|out}:lservice:host:port:node:rservice")
 	flag.Var(&tunServices, "tun", "tun_interface:lservice:node:rservice")
 	flag.Parse()
-	if nodeId == "" {
+	if nodeID == "" {
 		println("Must specify a node ID")
 		os.Exit(1)
 	}
 
-	s := netceptor.New(nodeId)
+	s := netceptor.New(nodeID)
 
 	for _, listener := range listeners {
 		debug.Printf("Running listener %s\n", listener)
-		li, err := netceptor.NewUDPListener(listener); if err != nil {
+		li, err := backends.NewUDPListener(listener); if err != nil {
 			fmt.Printf("Error listening on %s: %s\n", listener, err)
 			return
-		} else {
-			s.RunBackend(li, func(err error) {
-				fmt.Printf("Error in listener backend: %s\n", err)
-			})
 		}
+		s.RunBackend(li, func(err error) {
+			fmt.Printf("Error in listener backend: %s\n", err)
+		})
 	}
 
 	for _, peer := range peers {
 		debug.Printf("Running peer connection %s\n", peer)
-		li, err := netceptor.NewUDPDialer(peer); if err != nil {
+		li, err := backends.NewUDPDialer(peer); if err != nil {
 			fmt.Printf("Error creating peer %s: %s\n", peer, err)
 			return
-		} else {
-			s.RunBackend(li, func(err error) {
-				fmt.Printf("Error in peer connection backend: %s\n", err)
-			})
 		}
+		s.RunBackend(li, func(err error) {
+			fmt.Printf("Error in peer connection backend: %s\n", err)
+		})
 	}
 
 	for _, tcpService := range tcpServices {

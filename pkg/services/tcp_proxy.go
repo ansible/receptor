@@ -33,14 +33,17 @@ func bridgeConns(c1 net.Conn, c2 net.Conn) {
 
 func tCPProxyServiceInbound(s *netceptor.Netceptor, host string, port string, node string, rservice string) {
 	tli, err := net.Listen("tcp", net.JoinHostPort(host, port)); if err != nil {
-		panic(err)
+		debug.Printf("Error listening on TCP: %s\n", err)
+		return
 	}
 	for {
 		tc, err := tli.Accept(); if err != nil {
-			panic(err)
+			debug.Printf("Error accepting TCP connection: %s\n", err)
+			return
 		}
 		qc, err := s.Dial(node, rservice); if err != nil {
-			panic(err)
+			debug.Printf("Error connecting on Netceptor network: %s\n", err)
+			continue
 		}
 		bridgeConns(tc, qc)
 	}
@@ -49,14 +52,18 @@ func tCPProxyServiceInbound(s *netceptor.Netceptor, host string, port string, no
 func tCPProxyServiceOutbound(s *netceptor.Netceptor, lservice string, host string,
 	port string, node string, rservice string) {
 	qli, err := s.Listen(lservice); if err != nil {
-		panic(err)
+		debug.Printf("Error listening on Netceptor network: %s\n", err)
+		return
 	}
 	for {
 		qc, err := qli.Accept(); if err != nil {
-			panic(err)
+			debug.Printf("Error accepting connection on Netceptor network: %s\n", err)
+			return
+
 		}
 		tc, err := net.Dial("tcp", net.JoinHostPort(host, port)); if err != nil {
-			panic(err)
+			debug.Printf("Error connecting via TCP: %s\n", err)
+			continue
 		}
 		bridgeConns(qc, tc)
 	}

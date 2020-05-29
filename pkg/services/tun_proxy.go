@@ -51,11 +51,15 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 	}
 	cfg.Name = tunInterface
 	iface, err := water.New(water.Config{DeviceType: water.TUN}); if err != nil {
-		panic(err)
+		debug.Printf("Error opening tun device: %s\n", err)
+		return
 	}
 
 	debug.Printf("Connecting to remote netceptor node %s service %s\n", node, rservice)
-	nconn, err := s.ListenPacket(lservice); if err != nil { panic(err) }
+	nconn, err := s.ListenPacket(lservice); if err != nil {
+		debug.Printf("Error listening on Netceptor network\n")
+		return
+	}
 	raddr := netceptor.NewAddr(node, rservice)
 	go runTunToNetceptor(iface, nconn, raddr)
 	go runNetceptorToTun(nconn, iface, raddr)

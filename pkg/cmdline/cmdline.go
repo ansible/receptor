@@ -3,6 +3,7 @@ package cmdline
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,9 +28,92 @@ func AddConfigType(name string, description string, configType interface{}, requ
 	})
 }
 
+func printCmdHelp(ct param) {
+	fmt.Printf("   --%s: %s", strings.ToLower(ct.Name), ct.Description)
+	if ct.Required {
+		fmt.Printf(" (required)")
+	}
+	fmt.Printf("\n")
+	for j := 0; j < ct.Type.NumField(); j++ {
+		fmt.Printf("      %s=<%s>: %s", strings.ToLower(ct.Type.Field(j).Name),
+			ct.Type.Field(j).Type.Name(),
+			ct.Type.Field(j).Tag.Get("description"))
+		extras := make([]string, 0)
+		req, err := betterParseBool(ct.Type.Field(j).Tag.Get("required"))
+		if err == nil && req {
+			extras = append(extras, "required")
+		}
+		def := ct.Type.Field(j).Tag.Get("default")
+		if def != "" {
+			extras = append(extras, fmt.Sprintf("default: %s", def))
+		}
+		if len(extras) > 0 {
+			fmt.Printf(" (%s)", strings.Join(extras, ", "))
+		}
+		fmt.Printf("\n")
+	}
+	fmt.Printf("\n")
+}
+
 // ShowHelp prints command line help.  It does NOT exit.
 func ShowHelp() {
-	fmt.Printf("Would show help\n")
+	fmt.Printf("Usage: %s [--<action> [<param>=<value> ...] ...]\n\n", os.Args[0])
+	fmt.Printf("   --help: Show this help\n\n")
+	for i := range configTypes {
+		ct := configTypes[i]
+		if ct.Required {
+			printCmdHelp(ct)
+		}
+	}
+	for i := range configTypes {
+		ct := configTypes[i]
+		if ! ct.Required {
+			printCmdHelp(ct)
+		}
+	}
+}
+
+func bashCompletion() {
+	cmdName := filepath.Base(os.Args[0])
+	fmt.Printf("_%s()\n", cmdName)
+	fmt.Printf("{\n")
+	fmt.Printf("  local cur prevdashed count DASHCMDS\n")
+	fmt.Printf("  cur=${COMP_WORDS[COMP_CWORD]}\n")
+	fmt.Printf("  count=$((COMP_CWORD-1))\n")
+	fmt.Printf("  while [[ $count > 1 && ! ${COMP_WORDS[$count]} == --* ]]; do\n")
+	fmt.Printf("    count=$((count-1))\n")
+	fmt.Printf("  done\n")
+	fmt.Printf("  prevdashed=${COMP_WORDS[$count]}\n")
+	actions := make([]string, 0)
+	actions = append(actions, "--help")
+	actions = append(actions, "--bash-completion")
+	for i := range configTypes {
+		ct := configTypes[i]
+		actions = append(actions, fmt.Sprintf("--%s", strings.ToLower(ct.Name)))
+	}
+	fmt.Printf("  DASHCMDS=\"%s\"\n", strings.Join(actions, " "))
+	fmt.Printf("  if [[ $cur == -* ]]; then\n")
+	fmt.Printf("    COMPREPLY=($(compgen -W \"$DASHCMDS\" -- ${cur}))\n")
+	fmt.Printf("  else")
+	fmt.Printf("    case ${prevdashed} in\n")
+	for i := range configTypes {
+		ct := configTypes[i]
+		fmt.Printf("      --%s)\n", strings.ToLower(ct.Name))
+		params := make([]string, 0)
+		for j := 0; j < ct.Type.NumField(); j++ {
+			params = append(params, fmt.Sprintf("%s=", strings.ToLower(ct.Type.Field(j).Name)))
+		}
+		fmt.Printf("        COMPREPLY=($(compgen -W \"%s\" -- ${cur}))\n", strings.Join(params, " "))
+		fmt.Printf("        ;;\n")
+	}
+	fmt.Printf("      *)\n")
+	fmt.Printf("        COMPREPLY=($(compgen -W \"$DASHCMDS\" -- ${cur}))\n")
+	fmt.Printf("        ;;\n")
+	fmt.Printf("    esac\n")
+	fmt.Printf("  fi\n")
+	fmt.Printf("  [[ $COMPREPLY == *= ]] && compopt -o nospace\n")
+	fmt.Printf("}\n")
+	fmt.Printf("complete -F _%s %s\n", cmdName, cmdName)
 }
 
 func setValue(field *reflect.Value, value string) {
@@ -67,11 +151,11 @@ func joinMapKeys(m map[string]bool, sep string) string {
 	return strings.Join(sl, sep)
 }
 
-func plural(count int) string {
+func plural(count int, singular string, plural string) string {
 	if count > 1 {
-		return "s"
+		return plural
 	}
-	return ""
+	return singular
 }
 
 func betterParseBool(s string) (bool, error) {
@@ -113,7 +197,7 @@ func ParseAndRun(args []string) {
 
 	checkRequiredParams := func() {
 		if len(requiredParams) > 0 {
-			fmt.Printf("Required parameter%s missing for %s: %s\n", plural(len(requiredParams)),
+			fmt.Printf("Required parameter%s missing for %s: %s\n", plural(len(requiredParams), "", "s"),
 				accumArg, strings.ToLower(joinMapKeys(requiredParams, ", ")))
 			os.Exit(1)
 		}
@@ -124,6 +208,9 @@ func ParseAndRun(args []string) {
 		lcarg := strings.ToLower(arg)
 		if lcarg == "-h" || lcarg == "--help" {
 			ShowHelp()
+			os.Exit(0)
+		} else if lcarg == "--bash-completion" {
+			bashCompletion()
 			os.Exit(0)
 		} else if lcarg[0] == '-' {
 			// This is a param with dashes, which starts a new action
@@ -217,8 +304,11 @@ func ParseAndRun(args []string) {
 	}
 
 	if len(requiredObjs) > 0 {
-		fmt.Printf("Values%s are required for: %s\n", plural(len(requiredObjs)),
+		fmt.Printf("%s required for: %s\n", plural(len(requiredObjs), "A value is", "Values are"),
 			joinMapKeys(requiredObjs, ", "))
+		if len(args) == 0 {
+			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
+		}
 		os.Exit(1)
 	}
 

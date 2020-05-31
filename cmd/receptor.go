@@ -34,10 +34,18 @@ func (cfg traceCfg) Prepare() error {
 	return nil
 }
 
+type nullBackendCfg struct {}
+func (cfg nullBackendCfg) Run() error {
+	// This is a null backend that doesn't do anything
+	netceptor.AddBackend()
+	return nil
+}
+
 func main() {
 	cmdline.AddConfigType("node-id", "Network node ID of this instance", nodeIDCfg{}, true)
 	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false)
 	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false)
+	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false)
 	cmdline.ParseAndRun(os.Args[1:])
 
 	if nodeID == "" {

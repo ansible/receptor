@@ -22,12 +22,13 @@ const UDPMaxPacketLen = 65507
 // UDPDialer implements Backend for outbound UDP
 type UDPDialer struct {
 	address *net.UDPAddr
-	redial bool
+	redial  bool
 }
 
 // NewUDPDialer instantiates a new UDPDialer backend
 func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
-	ua, err := net.ResolveUDPAddr("udp", address); if err != nil {
+	ua, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
 		return nil, err
 	}
 	nd := UDPDialer{
@@ -112,23 +113,25 @@ type UDPListener struct {
 	laddr           *net.UDPAddr
 	conn            *net.UDPConn
 	sessChan        chan *UDPListenerSession
-	sessRegLock	sync.RWMutex
+	sessRegLock     sync.RWMutex
 	sessionRegistry map[string]*UDPListenerSession
 }
 
 // NewUDPListener instantiates a new UDPListener backend
 func NewUDPListener(address string) (*UDPListener, error) {
-	addr, err := net.ResolveUDPAddr("udp", address); if err != nil {
+	addr, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
 		return nil, err
 	}
-	uc, err := net.ListenUDP("udp", addr); if err != nil {
+	uc, err := net.ListenUDP("udp", addr)
+	if err != nil {
 		return nil, err
 	}
 	ul := UDPListener{
 		laddr:           addr,
 		conn:            uc,
 		sessChan:        make(chan *UDPListenerSession),
-		sessRegLock:	 sync.RWMutex{},
+		sessRegLock:     sync.RWMutex{},
 		sessionRegistry: make(map[string]*UDPListenerSession),
 	}
 	return &ul, nil
@@ -161,8 +164,9 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 				}
 				b.sessionRegistry[addrStr] = sess
 				b.sessRegLock.Unlock()
-				go func () {
-					err := bsf(sess); if err != nil {
+				go func() {
+					err := bsf(sess)
+					if err != nil {
 						errf(err, false)
 					}
 				}()
@@ -174,13 +178,13 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 
 // UDPListenerSession implements BackendSession for UDPListener
 type UDPListenerSession struct {
-	li *UDPListener
-	raddr *net.UDPAddr
+	li       *UDPListener
+	raddr    *net.UDPAddr
 	recvChan chan []byte
 }
 
 // Send sends data over the session
-func (ns *UDPListenerSession) Send(data []byte) error{
+func (ns *UDPListenerSession) Send(data []byte) error {
 	n, err := ns.li.conn.WriteToUDP(data, ns.raddr)
 	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
@@ -193,7 +197,7 @@ func (ns *UDPListenerSession) Send(data []byte) error{
 
 // Recv receives data from the session
 func (ns *UDPListenerSession) Recv() ([]byte, error) {
-	data := <- ns.recvChan
+	data := <-ns.recvChan
 	return data, nil
 }
 
@@ -219,7 +223,8 @@ type UDPListenerCfg struct {
 func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	debug.Printf("Running listener %s\n", address)
-	li, err := NewUDPListener(address); if err != nil {
+	li, err := NewUDPListener(address)
+	if err != nil {
 		debug.Printf("Error creating listener %s: %s\n", address, err)
 		return err
 	}
@@ -236,13 +241,14 @@ func (cfg UDPListenerCfg) Run() error {
 // UDPDialerCfg is the cmdline configuration object for a UDP listener
 type UDPDialerCfg struct {
 	Address string `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
-	Redial bool `description:"Keep redialing on lost connection" default:"true"`
+	Redial  bool   `description:"Keep redialing on lost connection" default:"true"`
 }
 
 // Run runs the action
 func (cfg UDPDialerCfg) Run() error {
 	debug.Printf("Running UDP peer connection %s\n", cfg.Address)
-	li, err := NewUDPDialer(cfg.Address, cfg.Redial); if err != nil {
+	li, err := NewUDPDialer(cfg.Address, cfg.Redial)
+	if err != nil {
 		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}

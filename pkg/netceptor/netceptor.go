@@ -5,11 +5,11 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	priorityQueue "github.com/jupp0r/go-priority-queue"
-	"github.com/minio/highwayhash"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/randstr"
 	"github.com/ghjm/sockceptor/pkg/tickrunner"
+	priorityQueue "github.com/jupp0r/go-priority-queue"
+	"github.com/minio/highwayhash"
 	"math"
 	"reflect"
 	"sync"
@@ -67,12 +67,12 @@ type Netceptor struct {
 	updateRoutingTableChan chan time.Duration
 	shutdownChans          []chan bool
 	hashLock               *sync.RWMutex
-	nameHashes			   map[uint64]string
+	nameHashes             map[uint64]string
 }
 
 const (
 	// MsgTypeData is a normal data-containing message
-	MsgTypeData  = 0
+	MsgTypeData = 0
 	// MsgTypeRoute is a routing update
 	MsgTypeRoute = 1
 )
@@ -88,7 +88,7 @@ type messageData struct {
 type connInfo struct {
 	ReadChan         chan []byte
 	WriteChan        chan []byte
-	ErrorChan 		 chan error
+	ErrorChan        chan error
 	lastReceivedData time.Time
 }
 
@@ -153,8 +153,8 @@ func New(NodeID string) *Netceptor {
 		nameHashes:             make(map[uint64]string),
 	}
 	s.addNameHash(NodeID)
-	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour * 24, time.Second * 1, s.shutdownChans[1])
-	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond * 100, s.shutdownChans[2])
+	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour*24, time.Second*1, s.shutdownChans[1])
+	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100, s.shutdownChans[2])
 	go s.monitorConnectionAging(s.shutdownChans[3])
 	return &s
 }
@@ -170,11 +170,11 @@ func (s *Netceptor) Shutdown() {
 func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 	for {
 		select {
-		case <- time.After(5 * time.Second):
+		case <-time.After(5 * time.Second):
 			timedOut := make([]chan error, 0)
 			s.connLock.RLock()
 			for i := range s.connections {
-				if time.Since(s.connections[i].lastReceivedData) > (2 *RouteUpdateTime + 1 * time.Second) {
+				if time.Since(s.connections[i].lastReceivedData) > (2*RouteUpdateTime + 1*time.Second) {
 					timedOut = append(timedOut, s.connections[i].ErrorChan)
 				}
 			}
@@ -183,7 +183,7 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 				debug.Printf("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
 			}
-		case <- shutdownChan:
+		case <-shutdownChan:
 			return
 		}
 	}
@@ -273,14 +273,15 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	s.hashLock.RLock()
 	defer s.hashLock.RUnlock()
-	name, ok := s.nameHashes[namehash]; if !ok {
+	name, ok := s.nameHashes[namehash]
+	if !ok {
 		return "", fmt.Errorf("hash not found")
 	}
 	return name, nil
 }
 
 func stringFromFixedLenBytes(bytes []byte) string {
-	p := len(bytes)-1
+	p := len(bytes) - 1
 	for p >= 0 && bytes[p] == 0 {
 		p--
 	}
@@ -301,10 +302,12 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 	if len(data) < 33 {
 		return nil, fmt.Errorf("data too short to be a valid message")
 	}
-	fromNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[1:9])); if err != nil {
+	fromNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[1:9]))
+	if err != nil {
 		return nil, err
 	}
-	toNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[9:17])); if err != nil {
+	toNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[9:17]))
+	if err != nil {
 		return nil, err
 	}
 	fromService := stringFromFixedLenBytes(data[17:25])
@@ -333,7 +336,8 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 
 // Forwards a message to its next hop
 func (s *Netceptor) forwardMessage(md *messageData) error {
-	nextHop, ok := s.routingTable[md.ToNode]; if ! ok {
+	nextHop, ok := s.routingTable[md.ToNode]
+	if !ok {
 		return fmt.Errorf("no route to node")
 	}
 	s.connLock.RLock()
@@ -343,7 +347,8 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 		return fmt.Errorf("no connection to next hop")
 	}
 	debug.Tracef("Forwarding message to %s via %s\n", md.ToNode, nextHop)
-	message, err := s.translateDataFromMessage(md); if err != nil {
+	message, err := s.translateDataFromMessage(md)
+	if err != nil {
 		return err
 	}
 	c.WriteChan <- message
@@ -380,7 +385,9 @@ func (s *Netceptor) getEphemeralService() string {
 // Prints the routing table.  Only used for debugging.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	if ! debug.Enable { return }
+	if !debug.Enable {
+		return
+	}
 	debug.Printf("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
 		debug.Printf("   %s: ", conn)
@@ -420,7 +427,8 @@ func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 
 // Translates a routing update message to network bytes
 func (s *Netceptor) translateRoutingUpdate(update *routingUpdate) ([]byte, error) {
-	updateBytes, err := json.Marshal(update); if err != nil {
+	updateBytes, err := json.Marshal(update)
+	if err != nil {
 		return nil, err
 	}
 	data := make([]byte, len(updateBytes)+1)
@@ -436,25 +444,35 @@ func (s *Netceptor) sendRoutingUpdate() {
 	}
 	debug.Printf("Sending routing update\n")
 	message, err := s.translateRoutingUpdate(s.makeRoutingUpdate())
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	s.flood(message, "")
 }
 
 // Processes a routing update received from a connection.
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	debug.Printf("Received routing update from %s via %s\n", ri.NodeID, recvConn)
-	if ri.NodeID == s.nodeID || ri.NodeID == "" { return }
+	if ri.NodeID == s.nodeID || ri.NodeID == "" {
+		return
+	}
 	s.knownNodeLock.RLock()
 	_, ok := s.seenUpdates[ri.UpdateID]
 	s.knownNodeLock.RUnlock()
-	if ok { return }
+	if ok {
+		return
+	}
 	s.knownNodeLock.Lock()
 	s.seenUpdates[ri.UpdateID] = time.Now()
 	ni, ok := s.knownNodeInfo[ri.NodeID]
 	s.knownNodeLock.Unlock()
 	if ok {
-		if ri.UpdateEpoch < ni.Epoch { return }
-		if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence { return }
+		if ri.UpdateEpoch < ni.Epoch {
+			return
+		}
+		if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence {
+			return
+		}
 	} else {
 		s.sendRouteFloodChan <- 0
 		ni = &nodeInfo{}
@@ -467,7 +485,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 	s.knownNodeLock.Lock()
 	changed := false
-	if ! reflect.DeepEqual(conns, s.knownConnectionCosts[ri.NodeID]) {
+	if !reflect.DeepEqual(conns, s.knownConnectionCosts[ri.NodeID]) {
 		changed = true
 	}
 	_, ok = s.knownNodeInfo[ri.NodeID]
@@ -481,14 +499,16 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 			continue
 		}
 		_, ok = conns[conn]
-		if ! ok {
+		if !ok {
 			delete(s.knownConnectionCosts[conn], ri.NodeID)
 		}
 	}
 	s.knownNodeLock.Unlock()
 	ri.ForwardingNode = s.nodeID
 	message, err := s.translateRoutingUpdate(ri)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	s.flood(message, recvConn)
 	if changed {
 		s.updateRoutingTableChan <- 0
@@ -496,9 +516,10 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 }
 
 // Handles incoming data and dispatches it to a service listener.
-func(s *Netceptor) handleMessageData(md *messageData) error {
+func (s *Netceptor) handleMessageData(md *messageData) error {
 	if md.ToNode == s.nodeID {
-		pc, ok := s.listenerRegistry[md.ToService]; if ! ok {
+		pc, ok := s.listenerRegistry[md.ToService]
+		if !ok {
 			return fmt.Errorf("received message for unknown service")
 		}
 		pc.recvChan <- md
@@ -525,7 +546,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 // Goroutine to send data from the connection's WriteChan to the backend
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
-		message, more := <- ci.WriteChan
+		message, more := <-ci.WriteChan
 		debug.Tracef("Protocol writer got data %s\n", message)
 		if !more {
 			return
@@ -543,7 +564,8 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
-		ri, err := s.translateRoutingUpdate(s.makeRoutingUpdate()); if err != nil {
+		ri, err := s.translateRoutingUpdate(s.makeRoutingUpdate())
+		if err != nil {
 			debug.Printf("Error Sending initial routing message: %s\n", err)
 			return
 		}
@@ -556,8 +578,8 @@ func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bo
 			return
 		}
 		select {
-		case <- time.After(1 * time.Second):
-		case <- initDoneChan:
+		case <-time.After(1 * time.Second):
+		case <-initDoneChan:
 			debug.Printf("Stopping initial updates\n")
 			return
 		}
@@ -570,7 +592,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 		_ = sess.Close()
 	}()
 	ci := &connInfo{
-		ReadChan: make(chan []byte),
+		ReadChan:  make(chan []byte),
 		WriteChan: make(chan []byte),
 		ErrorChan: make(chan error),
 	}
@@ -582,12 +604,13 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 	remoteNodeID := ""
 	for {
 		select {
-		case data := <- ci.ReadChan:
+		case data := <-ci.ReadChan:
 			debug.Tracef("Got data %s\n", data)
 			msgType := data[0]
 			if msgType == MsgTypeRoute {
 				ri := &routingUpdate{}
-				err := json.Unmarshal(data[1:], ri); if err != nil {
+				err := json.Unmarshal(data[1:], ri)
+				if err != nil {
 					debug.Printf("Error unpacking routing update\n")
 					continue
 				}
@@ -602,7 +625,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					s.connLock.Unlock()
 					s.knownNodeLock.Lock()
 					_, ok := s.knownConnectionCosts[s.nodeID]
-					if ! ok {
+					if !ok {
 						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
 					}
 					s.knownConnectionCosts[s.nodeID][remoteNodeID] = 1.0
@@ -624,20 +647,22 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 				s.handleRoutingUpdate(ri, remoteNodeID)
 			} else if established {
 				if msgType == MsgTypeData {
-					message, err := s.translateDataToMessage(data); if err != nil {
+					message, err := s.translateDataToMessage(data)
+					if err != nil {
 						debug.Printf("Error translating data to message struct\n")
 						continue
 					}
-					err = s.handleMessageData(message); if err != nil {
+					err = s.handleMessageData(message)
+					if err != nil {
 						debug.Printf("Error handling message data: %s\n", err)
 					}
 				} else {
 					debug.Printf("Unknown message type %d\n", msgType)
 				}
 			}
-		case err := <- ci.ErrorChan:
+		case err := <-ci.ErrorChan:
 			return err
-		case <- s.shutdownChans[0]:
+		case <-s.shutdownChans[0]:
 			return nil
 		}
 	}

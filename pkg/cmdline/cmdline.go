@@ -67,7 +67,7 @@ func ShowHelp() {
 	}
 	for i := range configTypes {
 		ct := configTypes[i]
-		if ! ct.Required {
+		if !ct.Required {
 			printCmdHelp(ct)
 		}
 	}
@@ -121,19 +121,22 @@ func setValue(field *reflect.Value, value string) {
 	if ftn == "string" {
 		field.SetString(value)
 	} else if ftn == "int" || ftn == "int16" || ftn == "int32" || ftn == "int64" {
-		iv, err := strconv.ParseInt(value, 0, 64); if err != nil {
+		iv, err := strconv.ParseInt(value, 0, 64)
+		if err != nil {
 			fmt.Printf("Field %s must be an integer\n", ftn)
 			os.Exit(1)
 		}
 		field.SetInt(iv)
 	} else if ftn == "float32" || ftn == "float64" {
-		fv, err := strconv.ParseFloat(value, 64); if err != nil {
+		fv, err := strconv.ParseFloat(value, 64)
+		if err != nil {
 			fmt.Printf("Field %s must be a floating point number\n", ftn)
 			os.Exit(1)
 		}
 		field.SetFloat(fv)
 	} else if ftn == "bool" {
-		bv, err := betterParseBool(value); if err != nil {
+		bv, err := betterParseBool(value)
+		if err != nil {
 			fmt.Printf("Field %s must be a Boolean (true/false) value\n", ftn)
 			os.Exit(1)
 		}
@@ -172,7 +175,8 @@ func convTagToBool(tag string, def bool) bool {
 	if tag == "" {
 		return def
 	}
-	b, err := betterParseBool(tag); if err != nil {
+	b, err := betterParseBool(tag)
+	if err != nil {
 		fmt.Printf("Could not parse %s as boolean\n", tag)
 		os.Exit(1)
 	}
@@ -260,7 +264,7 @@ func ParseAndRun(args []string) {
 					ctf := commandType.Field(i)
 					if convTagToBool(ctf.Tag.Get("barevalue"), false) {
 						f := accumulator.FieldByName(ctf.Name)
-						if ! f.CanSet() {
+						if !f.CanSet() {
 							continue
 						}
 						setValue(&f, sarg[0])
@@ -281,7 +285,7 @@ func ParseAndRun(args []string) {
 					ctf := commandType.Field(i)
 					if strings.ToLower(ctf.Name) == lcname {
 						f := accumulator.FieldByName(ctf.Name)
-						if ! f.CanSet() {
+						if !f.CanSet() {
 							continue
 						}
 						setValue(&f, sarg[1])

@@ -18,7 +18,7 @@ func Run(f func(), periodicInterval time.Duration, defaultReqDelay time.Duration
 			case <-time.After(time.Until(nextRunTime)):
 				nextRunTime = time.Now().Add(periodicInterval)
 				f()
-			case req := <- runChan:
+			case req := <-runChan:
 				proposedTime := time.Now()
 				if req == 0 {
 					proposedTime = proposedTime.Add(defaultReqDelay)
@@ -28,7 +28,7 @@ func Run(f func(), periodicInterval time.Duration, defaultReqDelay time.Duration
 				if proposedTime.Before(nextRunTime) {
 					nextRunTime = proposedTime
 				}
-			case <- shutdownChan:
+			case <-shutdownChan:
 				return
 			}
 		}

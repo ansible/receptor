@@ -22,21 +22,22 @@ import (
 
 // WebsocketDialer implements Backend for outbound Websocket
 type WebsocketDialer struct {
-	address string
-	origin string
-	redial bool
+	address     string
+	origin      string
+	redial      bool
 	extraHeader string
 }
 
 // NewWebsocketDialer instantiates a new WebsocketDialer backend
 func NewWebsocketDialer(address string, extraHeader string, redial bool) (*WebsocketDialer, error) {
-	addrURL, err := url.Parse(address); if err != nil {
+	addrURL, err := url.Parse(address)
+	if err != nil {
 		return nil, err
 	}
 	wd := WebsocketDialer{
-		address: address,
-		origin: fmt.Sprintf("http://%s", addrURL.Host),
-		redial: redial,
+		address:     address,
+		origin:      fmt.Sprintf("http://%s", addrURL.Host),
+		redial:      redial,
 		extraHeader: extraHeader,
 	}
 	return &wd, nil
@@ -46,7 +47,8 @@ func NewWebsocketDialer(address string, extraHeader string, redial bool) (*Webso
 func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
-			cfg, err := websocket.NewConfig(b.address, b.origin); if err != nil {
+			cfg, err := websocket.NewConfig(b.address, b.origin)
+			if err != nil {
 				errf(fmt.Errorf("error creating websocket config"), true)
 				return
 			}
@@ -121,7 +123,7 @@ func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.
 
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener
 type WebsocketSession struct {
-	conn *websocket.Conn
+	conn   *websocket.Conn
 	framer framer.Framer
 }
 
@@ -154,12 +156,14 @@ func (ns *WebsocketSession) Recv() ([]byte, error) {
 		if ns.framer.MessageReady() {
 			break
 		}
-		n, err := ns.conn.Read(buf); if err != nil {
+		n, err := ns.conn.Read(buf)
+		if err != nil {
 			return nil, err
 		}
 		ns.framer.RecvData(buf[:n])
 	}
-	buf, err := ns.framer.GetMessage(); if err != nil {
+	buf, err := ns.framer.GetMessage()
+	if err != nil {
 		return nil, err
 	}
 	debug.Tracef("Websocket received data %s len %d\n", buf, len(buf))
@@ -185,7 +189,8 @@ type WebsocketListenerCfg struct {
 func (cfg WebsocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	debug.Printf("Running listener %s\n", address)
-	li, err := NewWebsocketListener(address); if err != nil {
+	li, err := NewWebsocketListener(address)
+	if err != nil {
 		debug.Printf("Error creating listener %s: %s\n", address, err)
 		return err
 	}
@@ -208,10 +213,11 @@ type WebsocketDialerCfg struct {
 
 // Prepare verifies that we are reasonably ready to go
 func (cfg WebsocketDialerCfg) Prepare() error {
-	_, err := url.Parse(cfg.Address); if err != nil {
+	_, err := url.Parse(cfg.Address)
+	if err != nil {
 		return fmt.Errorf("address %s is not a valid URL: %s", cfg.Address, err)
 	}
-	if cfg.ExtraHeader != "" && ! strings.Contains(cfg.ExtraHeader, ":") {
+	if cfg.ExtraHeader != "" && !strings.Contains(cfg.ExtraHeader, ":") {
 		return fmt.Errorf("extra header must be in the form key:value")
 	}
 	return nil
@@ -221,7 +227,8 @@ func (cfg WebsocketDialerCfg) Prepare() error {
 func (cfg WebsocketDialerCfg) Run() error {
 	debug.Printf("Running Websocket peer connection %s\n", cfg.Address)
 	redial, _ := strconv.ParseBool(cfg.Redial)
-	li, err := NewWebsocketDialer(cfg.Address, cfg.ExtraHeader, redial); if err != nil {
+	li, err := NewWebsocketDialer(cfg.Address, cfg.ExtraHeader, redial)
+	if err != nil {
 		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}

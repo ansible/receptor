@@ -14,12 +14,14 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 	buffer := make([]byte, netceptor.MTU)
 
 	addrStr := fmt.Sprintf("%s:%d", host, port)
-	udpAddr, err := net.ResolveUDPAddr("udp", addrStr); if err != nil {
+	udpAddr, err := net.ResolveUDPAddr("udp", addrStr)
+	if err != nil {
 		debug.Printf("Could not resolve address %s\n", addrStr)
 		return
 	}
 
-	uc, err := net.ListenUDP("udp", udpAddr); if err != nil {
+	uc, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
 		debug.Printf("Error listening on UDP: %s\n", err)
 		return
 	}
@@ -31,7 +33,8 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 		raddrStr := addr.String()
 		pc, ok := connMap[raddrStr]
 		if !ok {
-			pc, err = s.ListenPacket(""); if err != nil {
+			pc, err = s.ListenPacket("")
+			if err != nil {
 				debug.Printf("Error listening on Receptor network: %s\n", err)
 				return
 			}
@@ -40,7 +43,8 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			go runNetceptorToUDPInbound(pc, uc, addr, netceptor.NewAddr(node, service))
 		}
 		debug.Tracef("Forwarding UDP packet length %d from %s to %s\n", n, raddrStr, ncAddr)
-		wn, err := pc.WriteTo(buffer[:n], ncAddr); if err != nil {
+		wn, err := pc.WriteTo(buffer[:n], ncAddr)
+		if err != nil {
 			debug.Printf("Error sending packet on Receptor network: %s\n", err)
 			continue
 		}
@@ -54,7 +58,8 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr net.Addr, expectedAddr netceptor.Addr) {
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, addr, err := pc.ReadFrom(buf); if err != nil {
+		n, addr, err := pc.ReadFrom(buf)
+		if err != nil {
 			debug.Printf("Error reading from Receptor network: %s\n", err)
 			continue
 		}
@@ -63,7 +68,8 @@ func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr
 			continue
 		}
 		debug.Tracef("Forwarding UDP packet length %d from %s to %s\n", n, pc.LocalAddr(), udpAddr)
-		wn, err := uc.WriteTo(buf[:n], udpAddr); if err != nil {
+		wn, err := uc.WriteTo(buf[:n], udpAddr)
+		if err != nil {
 			debug.Printf("Error sending packet via UDP: %s\n", err)
 			continue
 		}
@@ -79,24 +85,28 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 	connMap := make(map[string]*net.UDPConn)
 	buffer := make([]byte, netceptor.MTU)
 
-	udpAddr, err := net.ResolveUDPAddr("udp", address); if err != nil {
+	udpAddr, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
 		debug.Printf("Could not resolve UDP address %s\n", address)
 		return
 	}
 
-	pc, err := s.ListenPacket(service); if err != nil {
+	pc, err := s.ListenPacket(service)
+	if err != nil {
 		debug.Printf("Error listening on UDP: %s\n", err)
 		return
 	}
 	for {
-		n, addr, err := pc.ReadFrom(buffer); if err != nil {
+		n, addr, err := pc.ReadFrom(buffer)
+		if err != nil {
 			debug.Printf("Error reading from Receptor network: %s\n", err)
 			return
 		}
 		raddrStr := addr.String()
 		uc, ok := connMap[raddrStr]
 		if !ok {
-			uc, err = net.DialUDP("udp", nil, udpAddr); if err != nil {
+			uc, err = net.DialUDP("udp", nil, udpAddr)
+			if err != nil {
 				debug.Printf("Error connecting via UDP: %s\n", err)
 				return
 			}
@@ -105,7 +115,8 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 			go runUDPToNetceptorOutbound(uc, pc, addr)
 		}
 		debug.Printf("Forwarding UDP packet length %d from %s to %s\n", n, addr, uc.LocalAddr())
-		wn, err := uc.Write(buffer[:n]); if err != nil {
+		wn, err := uc.Write(buffer[:n])
+		if err != nil {
 			debug.Printf("Error writing to UDP: %s\n", err)
 			continue
 		}
@@ -119,12 +130,14 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr net.Addr) {
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, err := uc.Read(buf); if err != nil {
+		n, err := uc.Read(buf)
+		if err != nil {
 			debug.Printf("Error reading from UDP: %s\n", err)
 			return
 		}
 		debug.Printf("Forwarding UDP packet length %d from %s to %s\n", n, uc.LocalAddr(), addr)
-		wn, err := pc.WriteTo(buf[:n], addr); if err != nil {
+		wn, err := pc.WriteTo(buf[:n], addr)
+		if err != nil {
 			debug.Printf("Error writing to the Receptor network: %s\n", err)
 			continue
 		}

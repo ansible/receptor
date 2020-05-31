@@ -49,7 +49,7 @@ func (f *framer) messageReady() (int, bool) {
 		return 0, false
 	}
 	msgSize := int(binary.LittleEndian.Uint16(f.buffer[:2]))
-	return msgSize, len(f.buffer) >= msgSize + 2
+	return msgSize, len(f.buffer) >= msgSize+2
 }
 
 // MessageReady returns true if a full framed message is available to read
@@ -68,7 +68,7 @@ func (f *framer) GetMessage() ([]byte, error) {
 	if !ready {
 		return nil, fmt.Errorf("message not ready")
 	}
-	data := f.buffer[2:msgSize+2]
+	data := f.buffer[2 : msgSize+2]
 	f.buffer = f.buffer[msgSize+2:]
 	return data, nil
 }

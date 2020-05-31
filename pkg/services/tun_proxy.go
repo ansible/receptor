@@ -13,12 +13,14 @@ func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.PacketConn, remo
 	debug.Printf("Running tunnel-to-Receptor forwarder\n")
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, err := tunif.Read(buf); if err != nil {
+		n, err := tunif.Read(buf)
+		if err != nil {
 			debug.Printf("Error reading from tun device: %s\n", err)
 			continue
 		}
 		debug.Tracef("Forwarding packet of length %d from tun to Receptor\n", n)
-		wn, err := nconn.WriteTo(buf[:n], remoteAddr); if err != nil || wn != n {
+		wn, err := nconn.WriteTo(buf[:n], remoteAddr)
+		if err != nil || wn != n {
 			debug.Printf("Error writing to Receptor network: %s\n", err)
 		}
 	}
@@ -28,7 +30,8 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 	debug.Printf("Running netceptor to tunnel forwarder\n")
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, addr, err := nconn.ReadFrom(buf); if err != nil {
+		n, addr, err := nconn.ReadFrom(buf)
+		if err != nil {
 			debug.Printf("Error reading from Receptor: %s\n", err)
 			continue
 		}
@@ -37,7 +40,8 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 			continue
 		}
 		debug.Tracef("Forwarding packet of length %d from Receptor to tun\n", n)
-		wn, err := tunif.Write(buf[:n]); if err != nil || wn != n {
+		wn, err := tunif.Write(buf[:n])
+		if err != nil || wn != n {
 			debug.Printf("Error writing to tun device: %s\n", err)
 		}
 	}
@@ -51,13 +55,15 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 		DeviceType: water.TUN,
 	}
 	cfg.Name = tunInterface
-	iface, err := water.New(water.Config{DeviceType: water.TUN}); if err != nil {
+	iface, err := water.New(water.Config{DeviceType: water.TUN})
+	if err != nil {
 		debug.Printf("Error opening tun device: %s\n", err)
 		return
 	}
 
 	debug.Printf("Connecting to remote netceptor node %s service %s\n", node, rservice)
-	nconn, err := s.ListenPacket(lservice); if err != nil {
+	nconn, err := s.ListenPacket(lservice)
+	if err != nil {
 		debug.Printf("Error listening on Receptor network\n")
 		return
 	}

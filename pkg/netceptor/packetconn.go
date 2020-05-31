@@ -30,18 +30,18 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 	}
 	_ = s.addNameHash(service)
 	pc := &PacketConn{
-		s:             s,
-		localService:  service,
-		recvChan:      make(chan *messageData),
+		s:            s,
+		localService: service,
+		recvChan:     make(chan *messageData),
 	}
 	s.listenerRegistry[service] = pc
 	return pc, nil
 }
 
 // ReadFrom reads a packet from the network and returns its data and address.
-func(nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	//TODO: respect nc.readDeadline
-	m := <- nc.recvChan
+	m := <-nc.recvChan
 	nCopied := copy(p, m.Data)
 	fromAddr := Addr{
 		node:    m.FromNode,
@@ -51,12 +51,14 @@ func(nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 }
 
 // WriteTo writes a packet to an address on the network.
-func(nc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+func (nc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	//TODO: respect nc.writeDeadline
-	ncaddr, ok := addr.(Addr); if !ok {
+	ncaddr, ok := addr.(Addr)
+	if !ok {
 		return 0, fmt.Errorf("attempt to write to non-netceptor address")
 	}
-	err = nc.s.sendMessage(nc.localService, ncaddr.node, ncaddr.service, p); if err != nil {
+	err = nc.s.sendMessage(nc.localService, ncaddr.node, ncaddr.service, p)
+	if err != nil {
 		return 0, err
 	}
 	return len(p), nil

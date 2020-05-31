@@ -18,14 +18,14 @@ import (
 // TCPDialer implements Backend for outbound TCP
 type TCPDialer struct {
 	address string
-	redial bool
+	redial  bool
 }
 
 // NewTCPDialer instantiates a new TCP backend
 func NewTCPDialer(address string, redial bool) (*TCPDialer, error) {
 	td := TCPDialer{
 		address: address,
-		redial: redial,
+		redial:  redial,
 	}
 	return &td, nil
 }
@@ -76,13 +76,14 @@ func NewTCPListener(address string) (*TCPListener, error) {
 
 // Start runs the given session function over the WebsocketListener backend
 func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	li, err := net.Listen("tcp", b.address); if err != nil {
+	li, err := net.Listen("tcp", b.address)
+	if err != nil {
 		errf(err, true)
 		return
 	}
 	go func() {
 		for {
-			c, err := li.Accept();
+			c, err := li.Accept()
 			if err != nil {
 				errf(err, true)
 				return
@@ -101,7 +102,7 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 
 // TCPSession implements BackendSession for TCP backent
 type TCPSession struct {
-	conn net.Conn
+	conn   net.Conn
 	framer framer.Framer
 }
 
@@ -134,12 +135,14 @@ func (ns *TCPSession) Recv() ([]byte, error) {
 		if ns.framer.MessageReady() {
 			break
 		}
-		n, err := ns.conn.Read(buf); if err != nil {
+		n, err := ns.conn.Read(buf)
+		if err != nil {
 			return nil, err
 		}
 		ns.framer.RecvData(buf[:n])
 	}
-	buf, err := ns.framer.GetMessage(); if err != nil {
+	buf, err := ns.framer.GetMessage()
+	if err != nil {
 		return nil, err
 	}
 	debug.Tracef("Websocket received data %s len %d\n", buf, len(buf))
@@ -165,7 +168,8 @@ type TCPListenerCfg struct {
 func (cfg TCPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	debug.Printf("Running TCP listener on %s\n", address)
-	li, err := NewTCPListener(address); if err != nil {
+	li, err := NewTCPListener(address)
+	if err != nil {
 		debug.Printf("Error creating listener %s: %s\n", address, err)
 		return err
 	}
@@ -182,14 +186,15 @@ func (cfg TCPListenerCfg) Run() error {
 // TCPDialerCfg is the cmdline configuration object for a TCP listener
 type TCPDialerCfg struct {
 	Address string `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
-	Redial string `description:"Keep redialing on lost connection" default:"true"`
+	Redial  string `description:"Keep redialing on lost connection" default:"true"`
 }
 
 // Run runs the action
 func (cfg TCPDialerCfg) Run() error {
 	debug.Printf("Running TCP peer connection %s\n", cfg.Address)
 	redial, _ := strconv.ParseBool(cfg.Redial)
-	li, err := NewTCPDialer(cfg.Address, redial); if err != nil {
+	li, err := NewTCPDialer(cfg.Address, redial)
+	if err != nil {
 		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}

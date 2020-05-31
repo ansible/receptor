@@ -16,9 +16,9 @@ import (
 
 // Listener implements the net.Listener interface via the Receptor network
 type Listener struct {
-	s             *Netceptor
-	pc            *PacketConn
-	ql            quic.Listener
+	s  *Netceptor
+	pc *PacketConn
+	ql quic.Listener
 }
 
 // Listen returns a stream listener compatible with Go's net.Listener.
@@ -36,12 +36,13 @@ func (s *Netceptor) Listen(service string) (*Listener, error) {
 	}
 	_ = s.addNameHash(service)
 	pc := &PacketConn{
-		s:             s,
-		localService:  service,
-		recvChan:      make(chan *messageData),
+		s:            s,
+		localService: service,
+		recvChan:     make(chan *messageData),
 	}
 	s.listenerRegistry[service] = pc
-	ql, err := quic.Listen(pc, generateServerTLSConfig(), nil); if err != nil {
+	ql, err := quic.Listen(pc, generateServerTLSConfig(), nil)
+	if err != nil {
 		return nil, err
 	}
 	return &Listener{
@@ -53,17 +54,19 @@ func (s *Netceptor) Listen(service string) (*Listener, error) {
 
 // Accept accepts a connection via the listener
 func (li *Listener) Accept() (net.Conn, error) {
-	qc, err := li.ql.Accept(context.Background()); if err != nil {
+	qc, err := li.ql.Accept(context.Background())
+	if err != nil {
 		return nil, err
 	}
-	qs, err := qc.AcceptStream(context.Background()); if err != nil {
+	qs, err := qc.AcceptStream(context.Background())
+	if err != nil {
 		return nil, err
 	}
 	return &Conn{
-		s:  li.s,
-		pc: li.pc,
-		qc: qc,
-		qs: qs,
+		s:          li.s,
+		pc:         li.pc,
+		qc:         qc,
+		qs:         qs,
 		isListener: true,
 	}, nil
 }
@@ -99,24 +102,27 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 	_ = s.addNameHash(node)
 	_ = s.addNameHash(service)
 	lservice := s.getEphemeralService()
-	pc, err := s.ListenPacket(lservice); if err != nil {
+	pc, err := s.ListenPacket(lservice)
+	if err != nil {
 		return nil, err
 	}
 	rAddr := NewAddr(node, service)
 	cfg := &quic.Config{
 		KeepAlive: true,
 	}
-	qc, err := quic.Dial(pc, rAddr, s.nodeID, generateClientTLSConfig(), cfg); if err != nil {
+	qc, err := quic.Dial(pc, rAddr, s.nodeID, generateClientTLSConfig(), cfg)
+	if err != nil {
 		return nil, err
 	}
-	qs, err := qc.OpenStream(); if err != nil {
+	qs, err := qc.OpenStream()
+	if err != nil {
 		return nil, err
 	}
 	return &Conn{
-		s:  s,
-		pc: pc,
-		qc: qc,
-		qs: qs,
+		s:          s,
+		pc:         pc,
+		qc:         qc,
+		qs:         qs,
 		isListener: false,
 	}, nil
 }

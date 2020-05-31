@@ -2,27 +2,30 @@ package backends
 
 import (
 	"fmt"
+	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/framer"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"net"
 	"os"
+	"strconv"
 	"syscall"
 	"time"
 )
 
 //TODO: TLS
-//TODO: configurable reconnect
 
 // TCPDialer implements Backend for outbound TCP
 type TCPDialer struct {
 	address string
+	redial bool
 }
 
 // NewTCPDialer instantiates a new TCP backend
-func NewTCPDialer(address string) (*TCPDialer, error) {
+func NewTCPDialer(address string, redial bool) (*TCPDialer, error) {
 	td := TCPDialer{
 		address: address,
+		redial: redial,
 	}
 	return &td, nil
 }
@@ -32,14 +35,16 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 	go func() {
 		for {
 			conn, err := net.Dial("tcp", b.address)
-			operr, ok := err.(*net.OpError)
-			if ok {
-				syserr, ok := operr.Err.(*os.SyscallError)
+			if b.redial {
+				operr, ok := err.(*net.OpError)
 				if ok {
-					if syserr.Err == syscall.ECONNREFUSED {
-						errf(err, false)
-						time.Sleep(5 * time.Second)
-						continue
+					syserr, ok := operr.Err.(*os.SyscallError)
+					if ok {
+						if syserr.Err == syscall.ECONNREFUSED {
+							errf(err, false)
+							time.Sleep(5 * time.Second)
+							continue
+						}
 					}
 				}
 			}
@@ -71,21 +76,18 @@ func NewTCPListener(address string) (*TCPListener, error) {
 
 // Start runs the given session function over the WebsocketListener backend
 func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	debug.Printf("listening\n")
 	li, err := net.Listen("tcp", b.address); if err != nil {
 		errf(err, true)
 		return
 	}
 	go func() {
 		for {
-			debug.Printf("accepting\n")
 			c, err := li.Accept();
 			if err != nil {
 				errf(err, true)
 				return
 			}
 			go func() {
-				debug.Printf("running a session\n")
 				sess := newTCPSession(c)
 				err = bsf(sess)
 				if err != nil {
@@ -147,4 +149,61 @@ func (ns *TCPSession) Recv() ([]byte, error) {
 // Close closes the session
 func (ns *TCPSession) Close() error {
 	return ns.conn.Close()
+}
+
+// **************************************************************************
+// Command line
+// **************************************************************************
+
+// TCPListenerCfg is the cmdline configuration object for a TCP listener
+type TCPListenerCfg struct {
+	BindAddr string `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int    `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
+}
+
+// Run runs the action
+func (cfg TCPListenerCfg) Run() error {
+	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
+	debug.Printf("Running TCP listener on %s\n", address)
+	li, err := NewTCPListener(address); if err != nil {
+		debug.Printf("Error creating listener %s: %s\n", address, err)
+		return err
+	}
+	netceptor.AddBackend()
+	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+		fmt.Printf("Error in listener backend: %s\n", err)
+		if fatal {
+			netceptor.DoneBackend()
+		}
+	})
+	return nil
+}
+
+// TCPDialerCfg is the cmdline configuration object for a TCP listener
+type TCPDialerCfg struct {
+	Address string `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
+	Redial string `description:"If true, keep redialing on lost connection" default:"true"`
+}
+
+// Run runs the action
+func (cfg TCPDialerCfg) Run() error {
+	debug.Printf("Running TCP peer connection %s\n", cfg.Address)
+	redial, _ := strconv.ParseBool(cfg.Redial)
+	li, err := NewTCPDialer(cfg.Address, redial); if err != nil {
+		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
+		return err
+	}
+	netceptor.AddBackend()
+	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+		fmt.Printf("Error in peer connection backend: %s\n", err)
+		if fatal {
+			netceptor.DoneBackend()
+		}
+	})
+	return nil
+}
+
+func init() {
+	cmdline.AddConfigType("tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, false)
+	cmdline.AddConfigType("tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, false)
 }

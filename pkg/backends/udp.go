@@ -2,6 +2,7 @@ package backends
 
 import (
 	"fmt"
+	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"net"
@@ -21,15 +22,17 @@ const UDPMaxPacketLen = 65507
 // UDPDialer implements Backend for outbound UDP
 type UDPDialer struct {
 	address *net.UDPAddr
+	redial bool
 }
 
 // NewUDPDialer instantiates a new UDPDialer backend
-func NewUDPDialer(address string) (*UDPDialer, error) {
+func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 	ua, err := net.ResolveUDPAddr("udp", address); if err != nil {
 		return nil, err
 	}
 	nd := UDPDialer{
 		address: ua,
+		redial:  redial,
 	}
 	return &nd, nil
 }
@@ -39,14 +42,16 @@ func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 	go func() {
 		for {
 			conn, err := net.DialUDP("udp", nil, b.address)
-			operr, ok := err.(*net.OpError)
-			if ok {
-				syserr, ok := operr.Err.(*os.SyscallError)
+			if b.redial {
+				operr, ok := err.(*net.OpError)
 				if ok {
-					if syserr.Err == syscall.ECONNREFUSED {
-						errf(err, false)
-						time.Sleep(5 * time.Second)
-						continue
+					syserr, ok := operr.Err.(*os.SyscallError)
+					if ok {
+						if syserr.Err == syscall.ECONNREFUSED {
+							errf(err, false)
+							time.Sleep(5 * time.Second)
+							continue
+						}
 					}
 				}
 			}
@@ -198,4 +203,60 @@ func (ns *UDPListenerSession) Close() error {
 	defer ns.li.sessRegLock.Unlock()
 	delete(ns.li.sessionRegistry, ns.raddr.String())
 	return nil
+}
+
+// **************************************************************************
+// Command line
+// **************************************************************************
+
+// UDPListenerCfg is the cmdline configuration object for a UDP listener
+type UDPListenerCfg struct {
+	BindAddr string `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int    `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
+}
+
+// Run runs the action
+func (cfg UDPListenerCfg) Run() error {
+	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
+	debug.Printf("Running listener %s\n", address)
+	li, err := NewUDPListener(address); if err != nil {
+		debug.Printf("Error creating listener %s: %s\n", address, err)
+		return err
+	}
+	netceptor.AddBackend()
+	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+		fmt.Printf("Error in listener backend: %s\n", err)
+		if fatal {
+			netceptor.DoneBackend()
+		}
+	})
+	return nil
+}
+
+// UDPDialerCfg is the cmdline configuration object for a UDP listener
+type UDPDialerCfg struct {
+	Address string `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
+	Redial bool `description:"If true, keep redialing on lost connection" default:"true"`
+}
+
+// Run runs the action
+func (cfg UDPDialerCfg) Run() error {
+	debug.Printf("Running UDP peer connection %s\n", cfg.Address)
+	li, err := NewUDPDialer(cfg.Address, cfg.Redial); if err != nil {
+		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
+		return err
+	}
+	netceptor.AddBackend()
+	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+		fmt.Printf("Error in peer connection backend: %s\n", err)
+		if fatal {
+			netceptor.DoneBackend()
+		}
+	})
+	return nil
+}
+
+func init() {
+	cmdline.AddConfigType("UDP-listener", "Run a backend listener on a UDP port", UDPListenerCfg{}, false)
+	cmdline.AddConfigType("UDP-peer", "Make an outbound backend connection to a UDP peer", UDPDialerCfg{}, false)
 }

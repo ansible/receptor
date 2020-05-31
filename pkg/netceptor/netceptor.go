@@ -13,6 +13,7 @@ import (
 	"math"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -33,6 +34,9 @@ type BackendSessFunc func(BackendSession) error
 type Backend interface {
 	Start(sessFunc BackendSessFunc, errFunc ErrorFunc)
 }
+
+// MainInstance is the global instance of Netceptor instantiated by the command-line main() function
+var MainInstance *Netceptor
 
 // BackendSession is the interface for a single session of a back-end
 // Backends must be DATAGRAM ORIENTED, meaning that Recv() must return
@@ -102,6 +106,30 @@ type routingUpdate struct {
 	ForwardingNode string
 }
 
+var backendWaitGroup = sync.WaitGroup{}
+var backendCount int32 = 0
+
+// AddBackend adds a backend to the wait group
+func AddBackend() {
+	backendWaitGroup.Add(1)
+	atomic.AddInt32(&backendCount, 1)
+}
+
+// DoneBackend signals to the wait group that the backend is done
+func DoneBackend() {
+	backendWaitGroup.Done()
+}
+
+// BackendCount returns the number of backends that ever registered
+func BackendCount() int32 {
+	return backendCount
+}
+
+// BackendWait waits for the backend wait group
+func BackendWait() {
+	backendWaitGroup.Wait()
+}
+
 // New constructs a new Receptor network protocol instance
 func New(NodeID string) *Netceptor {
 	s := Netceptor{
@@ -124,6 +152,7 @@ func New(NodeID string) *Netceptor {
 		hashLock:               &sync.RWMutex{},
 		nameHashes:             make(map[uint64]string),
 	}
+	s.addNameHash(NodeID)
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour * 24, time.Second * 1, s.shutdownChans[1])
 	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond * 100, s.shutdownChans[2])
 	go s.monitorConnectionAging(s.shutdownChans[3])
@@ -232,13 +261,11 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 	h, _ := highwayhash.New64(zerokey)
 	_, _ = h.Write([]byte(name))
 	hv := h.Sum64()
-	s.hashLock.RLock()
+	s.hashLock.Lock()
+	defer s.hashLock.Unlock()
 	_, ok := s.nameHashes[hv]
-	s.hashLock.RUnlock()
 	if !ok {
-		s.hashLock.Lock()
 		s.nameHashes[hv] = name
-		s.hashLock.Unlock()
 	}
 	return hv
 }
@@ -252,6 +279,23 @@ func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	return name, nil
 }
 
+func stringFromFixedLenBytes(bytes []byte) string {
+	p := len(bytes)-1
+	for p >= 0 && bytes[p] == 0 {
+		p--
+	}
+	if p < 0 {
+		return ""
+	}
+	return string(bytes[:p+1])
+}
+
+func fixedLenBytesFromString(s string, l int) []byte {
+	bytes := make([]byte, l)
+	copy(bytes, s)
+	return bytes
+}
+
 // Translates an incoming message from wire protocol to messageData object.
 func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 	if len(data) < 33 {
@@ -263,12 +307,8 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 	toNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[9:17])); if err != nil {
 		return nil, err
 	}
-	fromService, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[17:25])); if err != nil {
-		return nil, err
-	}
-	toService, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[25:33])); if err != nil {
-		return nil, err
-	}
+	fromService := stringFromFixedLenBytes(data[17:25])
+	toService := stringFromFixedLenBytes(data[25:33])
 	md := &messageData{
 		FromNode:    fromNode,
 		FromService: fromService,
@@ -285,8 +325,8 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 	data[0] = MsgTypeData
 	binary.LittleEndian.PutUint64(data[1:9], s.addNameHash(msg.FromNode))
 	binary.LittleEndian.PutUint64(data[9:17], s.addNameHash(msg.ToNode))
-	binary.LittleEndian.PutUint64(data[17:25], s.addNameHash(msg.FromService))
-	binary.LittleEndian.PutUint64(data[25:33], s.addNameHash(msg.ToService))
+	copy(data[17:25], fixedLenBytesFromString(msg.FromService, 8))
+	copy(data[25:33], fixedLenBytesFromString(msg.ToService, 8))
 	copy(data[33:], msg.Data)
 	return data, nil
 }
@@ -312,6 +352,9 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 
 // Generates and sends a message over the Receptor network
 func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
+	if len(fromService) > 8 || len(toService) > 8 {
+		return fmt.Errorf("service name too long")
+	}
 	md := &messageData{
 		FromNode:    s.nodeID,
 		FromService: fromService,
@@ -326,7 +369,7 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 // Caller must already have s.structLock at least read-locked.
 func (s *Netceptor) getEphemeralService() string {
 	for {
-		service := randstr.RandomString(128)
+		service := randstr.RandomString(8)
 		_, ok := s.listenerRegistry[service]
 		if !ok {
 			return service
@@ -366,7 +409,7 @@ func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 	s.connLock.RUnlock()
 	update := &routingUpdate{
 		NodeID:         s.nodeID,
-		UpdateID:       randstr.RandomString(128),
+		UpdateID:       randstr.RandomString(8),
 		UpdateEpoch:    s.epoch,
 		UpdateSequence: s.sequence,
 		Connections:    conns,
@@ -553,6 +596,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					initDoneChan <- true
 					remoteNodeID = ri.ForwardingNode
 					debug.Printf("Connection established with %s\n", remoteNodeID)
+					s.addNameHash(remoteNodeID)
 					s.connLock.Lock()
 					s.connections[remoteNodeID] = ci
 					s.connLock.Unlock()

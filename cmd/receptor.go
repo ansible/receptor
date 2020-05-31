@@ -1,151 +1,51 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/backends"
+	_ "github.com/ghjm/sockceptor/pkg/backends"
+	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
-	"github.com/ghjm/sockceptor/pkg/services"
+	_ "github.com/ghjm/sockceptor/pkg/services"
 	"os"
-	"strings"
-	"sync"
+	"time"
 )
 
-type stringList []string
+var nodeID string
 
-func (i *stringList) String() string {
-	return strings.Join(*i, ", ")
+type nodeIDCfg struct {
+	NodeID string `description:"Node ID" barevalue:"yes" required:"yes"`
 }
-
-func (i *stringList) Set(value string) error {
-	*i = append(*i, value)
+func (cfg nodeIDCfg) Prepare() error {
+	nodeID = cfg.NodeID
+	netceptor.MainInstance = netceptor.New(cfg.NodeID)
 	return nil
 }
 
-var nodeID string
-var udpPeers stringList
-var udpListeners stringList
-var wsPeers stringList
-var wsListeners stringList
-var tcpPeers stringList
-var tcpListeners stringList
-var tcpServices stringList
-var udpServices stringList
-var tunServices stringList
+type debugCfg struct {}
+func (cfg debugCfg) Prepare() error {
+	debug.Enable = true
+	return nil
+}
+
+type traceCfg struct {}
+func (cfg traceCfg) Prepare() error {
+	debug.Trace = true
+	return nil
+}
 
 func main() {
-	flag.StringVar(&nodeID, "node-id", "", "local node ID")
-	flag.BoolVar(&debug.Enable, "debug", false, "show debug output")
-	flag.BoolVar(&debug.Trace, "trace", false, "show full packet traces")
-	flag.Var(&udpPeers, "udppeer", "host:port to connect outbound to via UDP")
-	flag.Var(&udpListeners, "udplisten", "host:port to listen on for UDP connections")
-	flag.Var(&tcpPeers, "tcppeer", "host:port to connect outbound to via TCP")
-	flag.Var(&tcpListeners, "tcplisten", "host:port to listen on for TCP connections")
-	flag.Var(&wsPeers, "wspeer", "URL to connect to as websocket")
-	flag.Var(&wsListeners, "wslisten", "host:port to run a web server on for websocket connections")
-	flag.Var(&tcpServices, "tcp", "{in|out}:lservice:host:port:node:rservice")
-	flag.Var(&udpServices, "udp", "{in|out}:lservice:host:port:node:rservice")
-	flag.Var(&tunServices, "tun", "tun_interface:lservice:node:rservice")
-	flag.Parse()
+	cmdline.AddConfigType("node-id", "Network node ID of this instance", nodeIDCfg{}, true)
+	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false)
+	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false)
+	cmdline.ParseAndRun(os.Args[1:])
+
 	if nodeID == "" {
 		println("Must specify a node ID")
 		os.Exit(1)
 	}
 
-	s := netceptor.New(nodeID)
-	wg := sync.WaitGroup{}
-
-	for _, listener := range udpListeners {
-		debug.Printf("Running listener %s\n", listener)
-		li, err := backends.NewUDPListener(listener); if err != nil {
-			fmt.Printf("Error listening on %s: %s\n", listener, err)
-			return
-		}
-		wg.Add(1)
-		s.RunBackend(li, func(err error, fatal bool) {
-			fmt.Printf("Error in listener backend: %s\n", err)
-			if fatal {
-				wg.Done()
-			}
-		})
-	}
-
-	for _, listener := range tcpListeners {
-		debug.Printf("Running listener %s\n", listener)
-		li, err := backends.NewTCPListener(listener); if err != nil {
-			fmt.Printf("Error listening on %s: %s\n", listener, err)
-			return
-		}
-		wg.Add(1)
-		s.RunBackend(li, func(err error, fatal bool) {
-			fmt.Printf("Error in listener backend: %s\n", err)
-			if fatal {
-				wg.Done()
-			}
-		})
-	}
-
-	for _, wslistener := range wsListeners {
-		debug.Printf("Running websocket listener %s\n", wslistener)
-		li, err := backends.NewWebsocketListener(wslistener); if err != nil {
-			fmt.Printf("Error listening on %s: %s\n", wslistener, err)
-			return
-		}
-		wg.Add(1)
-		s.RunBackend(li, func(err error, fatal bool) {
-			fmt.Printf("Error in listener backend: %s\n", err)
-			if fatal {
-				wg.Done()
-			}
-		})
-	}
-
-	for _, peer := range udpPeers {
-		debug.Printf("Running UDP peer connection %s\n", peer)
-		li, err := backends.NewUDPDialer(peer); if err != nil {
-			fmt.Printf("Error creating peer %s: %s\n", peer, err)
-			return
-		}
-		wg.Add(1)
-		s.RunBackend(li, func(err error, fatal bool) {
-			fmt.Printf("Error in peer connection backend: %s\n", err)
-			if fatal {
-				wg.Done()
-			}
-		})
-	}
-
-	for _, peer := range tcpPeers {
-		debug.Printf("Running TCP peer connection %s\n", peer)
-		li, err := backends.NewTCPDialer(peer); if err != nil {
-			fmt.Printf("Error creating peer %s: %s\n", peer, err)
-			return
-		}
-		wg.Add(1)
-		s.RunBackend(li, func(err error, fatal bool) {
-			fmt.Printf("Error in peer connection backend: %s\n", err)
-			if fatal {
-				wg.Done()
-			}
-		})
-	}
-
-	for _, wspeer := range wsPeers {
-		debug.Printf("Running websocket peer connection %s\n", wspeer)
-		li, err := backends.NewWebsocketDialer(wspeer); if err != nil {
-			fmt.Printf("Error creating peer %s: %s\n", wspeer, err)
-			return
-		}
-		wg.Add(1)
-		s.RunBackend(li, func(err error, fatal bool) {
-			fmt.Printf("Error in peer connection backend: %s\n", err)
-			if fatal {
-				wg.Done()
-			}
-		})
-	}
-
+	/*
 	for _, tcpService := range tcpServices {
 		debug.Printf("Running TCP service %s\n", tcpService)
 		params := strings.Split(tcpService, ":")
@@ -166,8 +66,25 @@ func main() {
 		if len(params) != 4 { panic("Invalid parameters for tun service") }
 		go services.TunProxyService(s, params[0], params[1], params[2], params[3])
 	}
+\	*/
 
+	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
+	done := make(chan struct{})
+	go func() {
+		netceptor.BackendWait()
+		close(done)
+	}()
+	select {
+	case <- done:
+		if netceptor.BackendCount() > 0 {
+			fmt.Printf("All backends have failed. Exiting.\n")
+			os.Exit(1)
+		} else {
+			fmt.Printf("Nothing to do - no backends were specified.\n")
+			os.Exit(1)
+		}
+	case <- time.After(100 * time.Millisecond):
+	}
 	debug.Printf("Initialization complete\n")
-
-	wg.Wait()
+	<- done
 }

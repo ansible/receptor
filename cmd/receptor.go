@@ -45,29 +45,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*
-	for _, tcpService := range tcpServices {
-		debug.Printf("Running TCP service %s\n", tcpService)
-		params := strings.Split(tcpService, ":")
-		if len(params) != 6 { panic("Invalid parameters for TCP service") }
-		go services.TCPProxyService(s, params[0], params[1], params[2], params[3], params[4], params[5])
-	}
-
-	for _, udpService := range udpServices {
-		debug.Printf("Running UDP service %s\n", udpService)
-		params := strings.Split(udpService, ":")
-		if len(params) != 6 { panic("Invalid parameters for UDP service") }
-		go services.UDPProxyService(s, params[0], params[1], params[2], params[3], params[4], params[5])
-	}
-
-	for _, tunService := range tunServices {
-		debug.Printf("Running tun service %s\n", tunService)
-		params := strings.Split(tunService, ":")
-		if len(params) != 4 { panic("Invalid parameters for tun service") }
-		go services.TunProxyService(s, params[0], params[1], params[2], params[3])
-	}
-\	*/
-
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})
 	go func() {
@@ -81,6 +58,7 @@ func main() {
 			os.Exit(1)
 		} else {
 			fmt.Printf("Nothing to do - no backends were specified.\n")
+			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
 			os.Exit(1)
 		}
 	case <- time.After(100 * time.Millisecond):

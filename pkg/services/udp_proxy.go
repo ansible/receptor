@@ -138,9 +138,9 @@ func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr n
 // UDPProxyInboundCfg is the cmdline configuration object for a UDP inbound proxy
 type UDPProxyInboundCfg struct {
 	Port          int    `required:"true" description:"Local UDP port to bind to"`
-	BindAddr      string `description:"Local address to bind UDP listener to" default:"0.0.0.0"`
-	RemoteNode    string `required:"true" description:"Receptor node to connect to for the other end of the tunnel"`
-	RemoteService string `required:"true" description:"Receptor service name to connect to on the remote node"`
+	BindAddr      string `description:"Address to bind UDP listener to" default:"0.0.0.0"`
+	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
+	RemoteService string `required:"true" description:"Receptor service name to connect to"`
 }
 
 // Run runs the action
@@ -165,7 +165,7 @@ func (cfg UDPProxyOutboundCfg) Run() error {
 
 func init() {
 	cmdline.AddConfigType("UDP-inbound-proxy",
-		"Listen for UDP and forward connections over the Receptor network", UDPProxyInboundCfg{}, false)
+		"Listen for UDP and forward via Receptor", UDPProxyInboundCfg{}, false)
 	cmdline.AddConfigType("UDP-outbound-proxy",
-		"Listen on the Receptor network and forward connectsion via outbound UDP", UDPProxyOutboundCfg{}, false)
+		"Listen on a Receptor service and forward via UDP", UDPProxyOutboundCfg{}, false)
 }

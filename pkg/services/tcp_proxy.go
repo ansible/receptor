@@ -75,9 +75,9 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 // TCPProxyInboundCfg is the cmdline configuration object for a TCP inbound proxy
 type TCPProxyInboundCfg struct {
 	Port          int    `required:"true" description:"Local TCP port to bind to"`
-	BindAddr      string `description:"Local address to bind TCP listener to" default:"0.0.0.0"`
-	RemoteNode    string `required:"true" description:"Receptor node to connect to for the other end of the tunnel"`
-	RemoteService string `required:"true" description:"Receptor service name to connect to on the remote node"`
+	BindAddr      string `description:"Address to bind TCP listener to" default:"0.0.0.0"`
+	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
+	RemoteService string `required:"true" description:"Receptor service name to connect to"`
 }
 
 // Run runs the action
@@ -102,7 +102,7 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 
 func init() {
 	cmdline.AddConfigType("tcp-inbound-proxy",
-		"Listen for TCP and forward connections over the Receptor network", TCPProxyInboundCfg{}, false)
+		"Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, false)
 	cmdline.AddConfigType("tcp-outbound-proxy",
-		"Listen on the Receptor network and forward connectsion via outbound TCP", TCPProxyOutboundCfg{}, false)
+		"Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, false)
 }

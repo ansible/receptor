@@ -236,7 +236,7 @@ func (cfg UDPListenerCfg) Run() error {
 // UDPDialerCfg is the cmdline configuration object for a UDP listener
 type UDPDialerCfg struct {
 	Address string `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
-	Redial bool `description:"If true, keep redialing on lost connection" default:"true"`
+	Redial bool `description:"Keep redialing on lost connection" default:"true"`
 }
 
 // Run runs the action

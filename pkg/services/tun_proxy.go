@@ -70,8 +70,8 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 type TunProxyCfg struct {
 	Interface     string `required:"true" description:"Name of the tun interface"`
 	Service       string `required:"true" description:"Local Receptor service name to bind to"`
-	RemoteNode    string `required:"true" description:"Receptor node to connect to for the other end of the tunnel"`
-	RemoteService string `required:"true" description:"Receptor service name to connect to on the remote node"`
+	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
+	RemoteService string `required:"true" description:"Receptor service name to connect to"`
 }
 
 // Run runs the action

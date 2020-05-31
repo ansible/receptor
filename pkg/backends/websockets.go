@@ -202,8 +202,8 @@ func (cfg WebsocketListenerCfg) Run() error {
 // WebsocketDialerCfg is the cmdline configuration object for a Websocket listener
 type WebsocketDialerCfg struct {
 	Address     string `description:"URL to connect to" barevalue:"yes" required:"yes"`
-	Redial      string `description:"If true, keep redialing on lost connection" default:"true"`
-	ExtraHeader string `description:"If provided, sends extra HTTP header on initial connection to the server"`
+	Redial      string `description:"Keep redialing on lost connection" default:"true"`
+	ExtraHeader string `description:"Sends extra HTTP header on initial connection"`
 }
 
 // Prepare verifies that we are reasonably ready to go

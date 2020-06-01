@@ -22,6 +22,8 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 	defer s.listenerLock.Unlock()
 	if service == "" {
 		service = s.getEphemeralService()
+	} else if len(service) > 8 {
+		return nil, fmt.Errorf("service name %s too long", service)
 	} else {
 		_, isReserved := s.reservedServices[service]
 		_, isListening := s.listenerRegistry[service]

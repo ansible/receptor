@@ -68,6 +68,15 @@ type Netceptor struct {
 	shutdownChans          []chan bool
 	hashLock               *sync.RWMutex
 	nameHashes             map[uint64]string
+	reservedServices       map[string]func(*messageData) error
+}
+
+// Status is the struct returned by Netceptor.Status().  It represents a public
+// view of the internal status of the Netceptor object.
+type Status struct {
+	NodeID       string
+	Connections  []string
+	RoutingTable map[string]string
 }
 
 const (
@@ -152,6 +161,10 @@ func New(NodeID string) *Netceptor {
 		hashLock:               &sync.RWMutex{},
 		nameHashes:             make(map[uint64]string),
 	}
+	s.reservedServices = map[string]func(*messageData) error{
+		"ping": s.handlePing,
+	}
+
 	s.addNameHash(NodeID)
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour*24, time.Second*1, s.shutdownChans[1])
 	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100, s.shutdownChans[2])
@@ -163,6 +176,23 @@ func New(NodeID string) *Netceptor {
 func (s *Netceptor) Shutdown() {
 	for i := range s.shutdownChans {
 		s.shutdownChans[i] <- true
+	}
+}
+
+// Status returns the current state of the Netceptor object
+func (s *Netceptor) Status() Status {
+	conns := make([]string, 0)
+	for conn := range s.connections {
+		conns = append(conns, conn)
+	}
+	routes := make(map[string]string)
+	for k, v := range s.routingTable {
+		routes[k] = v
+	}
+	return Status{
+		NodeID:       s.nodeID,
+		Connections:  conns,
+		RoutingTable: routes,
 	}
 }
 
@@ -375,10 +405,15 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 func (s *Netceptor) getEphemeralService() string {
 	for {
 		service := randstr.RandomString(8)
-		_, ok := s.listenerRegistry[service]
-		if !ok {
-			return service
+		_, ok := s.reservedServices[service]
+		if ok {
+			continue
 		}
+		_, ok = s.listenerRegistry[service]
+		if ok {
+			continue
+		}
+		return service
 	}
 }
 
@@ -515,9 +550,30 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 }
 
+// Handles a ping request
+func (s *Netceptor) handlePing(md *messageData) error {
+	return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
+}
+
+// Dispatches a message to a reserved service.  Returns true if handled, false otherwise.
+func (s *Netceptor) dispatchReservedService(md *messageData) (bool, error) {
+	svc, ok := s.reservedServices[md.ToService]
+	if ok {
+		return true, svc(md)
+	}
+	return false, nil
+}
+
 // Handles incoming data and dispatches it to a service listener.
 func (s *Netceptor) handleMessageData(md *messageData) error {
 	if md.ToNode == s.nodeID {
+		handled, err := s.dispatchReservedService(md)
+		if err != nil {
+			return err
+		}
+		if handled {
+			return nil
+		}
 		pc, ok := s.listenerRegistry[md.ToService]
 		if !ok {
 			return fmt.Errorf("received message for unknown service")

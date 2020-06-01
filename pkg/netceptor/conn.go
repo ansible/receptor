@@ -29,8 +29,9 @@ func (s *Netceptor) Listen(service string) (*Listener, error) {
 	if service == "" {
 		service = s.getEphemeralService()
 	} else {
-		_, ok := s.listenerRegistry[service]
-		if ok {
+		_, isReserved := s.reservedServices[service]
+		_, isListening := s.listenerRegistry[service]
+		if isReserved || isListening {
 			return nil, fmt.Errorf("service %s is already listening", service)
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	_ "github.com/ghjm/sockceptor/pkg/backends"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
+	_ "github.com/ghjm/sockceptor/pkg/controlsock"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	_ "github.com/ghjm/sockceptor/pkg/services"

@@ -18,7 +18,8 @@ func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.PacketConn, remo
 			debug.Printf("Error reading from tun device: %s\n", err)
 			continue
 		}
-		debug.Tracef("Forwarding packet of length %d from tun to Receptor\n", n)
+		debug.Tracef("    Forwarding data length %d from %s to %s\n", n,
+			tunif.Name(), remoteAddr.String())
 		wn, err := nconn.WriteTo(buf[:n], remoteAddr)
 		if err != nil || wn != n {
 			debug.Printf("Error writing to Receptor network: %s\n", err)
@@ -39,7 +40,8 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 			debug.Printf("Data received from unexpected source: %s\n", addr)
 			continue
 		}
-		debug.Tracef("Forwarding packet of length %d from Receptor to tun\n", n)
+		debug.Tracef("    Forwarding data length %d from %s to %s\n", n,
+			addr.String(), tunif.Name())
 		wn, err := tunif.Write(buf[:n])
 		if err != nil || wn != n {
 			debug.Printf("Error writing to tun device: %s\n", err)

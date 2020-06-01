@@ -376,11 +376,11 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	if !ok || c.WriteChan == nil {
 		return fmt.Errorf("no connection to next hop")
 	}
-	debug.Tracef("Forwarding message to %s via %s\n", md.ToNode, nextHop)
 	message, err := s.translateDataFromMessage(md)
 	if err != nil {
 		return err
 	}
+	debug.Tracef("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
 	c.WriteChan <- message
 	return nil
 }
@@ -397,6 +397,8 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 		ToService:   toService,
 		Data:        data,
 	}
+	debug.Tracef("--- Sending data length %d from %s:%s to %s:%s\n", len(md.Data),
+		md.FromNode, md.FromService, md.ToNode, md.ToService)
 	return s.handleMessageData(md)
 }
 
@@ -588,7 +590,6 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv()
-		debug.Tracef("Protocol reader got data %s\n", buf)
 		if err != nil {
 			debug.Printf("Backend receiving error %s\n", err)
 			ci.ErrorChan <- err
@@ -603,7 +604,6 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
 		message, more := <-ci.WriteChan
-		debug.Tracef("Protocol writer got data %s\n", message)
 		if !more {
 			return
 		}
@@ -661,7 +661,6 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 	for {
 		select {
 		case data := <-ci.ReadChan:
-			debug.Tracef("Got data %s\n", data)
 			msgType := data[0]
 			if msgType == MsgTypeRoute {
 				ri := &routingUpdate{}
@@ -708,6 +707,8 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 						debug.Printf("Error translating data to message struct\n")
 						continue
 					}
+					debug.Tracef("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
+						message.FromNode, message.FromService, message.ToNode, message.ToService, remoteNodeID)
 					err = s.handleMessageData(message)
 					if err != nil {
 						debug.Printf("Error handling message data: %s\n", err)

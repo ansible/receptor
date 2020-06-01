@@ -139,7 +139,6 @@ func newWebsocketSession(conn *websocket.Conn) *WebsocketSession {
 func (ns *WebsocketSession) Send(data []byte) error {
 	buf := ns.framer.SendData(data)
 	n, err := ns.conn.Write(buf)
-	debug.Tracef("Websocket sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
 		return err
 	}
@@ -166,7 +165,6 @@ func (ns *WebsocketSession) Recv() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	debug.Tracef("Websocket received data %s len %d\n", buf, len(buf))
 	return buf, nil
 }
 

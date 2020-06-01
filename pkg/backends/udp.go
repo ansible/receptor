@@ -82,7 +82,6 @@ func (ns *UDPDialerSession) Send(data []byte) error {
 		return fmt.Errorf("data too large")
 	}
 	n, err := ns.conn.Write(data)
-	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
 		return err
 	}
@@ -96,7 +95,6 @@ func (ns *UDPDialerSession) Send(data []byte) error {
 func (ns *UDPDialerSession) Recv() ([]byte, error) {
 	buf := make([]byte, netceptor.MTU)
 	n, err := ns.conn.Read(buf)
-	debug.Tracef("UDP sending data %s len %d sent %d err %s\n", buf, len(buf), n, err)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +143,6 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 			n, addr, err := b.conn.ReadFromUDP(buf)
 			data := make([]byte, n)
 			copy(data, buf)
-			debug.Tracef("UDP received data %s len %d err %s\n", data, n, err)
 			if err != nil {
 				errf(err, true)
 				return
@@ -155,7 +152,6 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 			sess, ok := b.sessionRegistry[addrStr]
 			b.sessRegLock.RUnlock()
 			if !ok {
-				debug.Printf("Creating new UDP listener session for %s\n", addrStr)
 				b.sessRegLock.Lock()
 				sess = &UDPListenerSession{
 					li:       b,
@@ -186,7 +182,6 @@ type UDPListenerSession struct {
 // Send sends data over the session
 func (ns *UDPListenerSession) Send(data []byte) error {
 	n, err := ns.li.conn.WriteToUDP(data, ns.raddr)
-	debug.Tracef("UDP sent data %s len %d sent %d err %s\n", data, len(data), n, err)
 	if err != nil {
 		return err
 	} else if n != len(data) {

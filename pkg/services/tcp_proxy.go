@@ -12,11 +12,12 @@ func bridgeHalf(c1 net.Conn, c2 net.Conn) {
 	buf := make([]byte, netceptor.MTU)
 	for {
 		n, err := c1.Read(buf)
-		debug.Tracef("Forwarding TCP data len %d: %s\n", n, buf[:n])
 		if err != nil {
 			debug.Printf("Connection read error: %s\n", err)
 			return
 		}
+		debug.Tracef("    Forwarding TCP data length %d from %s to %s\n", n,
+			c1.RemoteAddr().String(), c2.RemoteAddr().String())
 		wn, err := c2.Write(buf[:n])
 		if err != nil {
 			debug.Printf("Connection write error: %s\n", err)

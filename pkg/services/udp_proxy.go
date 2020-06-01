@@ -42,7 +42,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			connMap[raddrStr] = pc
 			go runNetceptorToUDPInbound(pc, uc, addr, netceptor.NewAddr(node, service))
 		}
-		debug.Tracef("Forwarding UDP packet length %d from %s to %s\n", n, raddrStr, ncAddr)
+		debug.Tracef("    Forwarding UDP packet length %d from %s to %s\n", n, raddrStr, ncAddr.String())
 		wn, err := pc.WriteTo(buffer[:n], ncAddr)
 		if err != nil {
 			debug.Printf("Error sending packet on Receptor network: %s\n", err)
@@ -67,7 +67,7 @@ func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr
 			debug.Printf("Received packet from unexpected source %s\n", addr)
 			continue
 		}
-		debug.Tracef("Forwarding UDP packet length %d from %s to %s\n", n, pc.LocalAddr(), udpAddr)
+		debug.Tracef("    Forwarding UDP packet length %d from %s to %s\n", n, addr, udpAddr.String())
 		wn, err := uc.WriteTo(buf[:n], udpAddr)
 		if err != nil {
 			debug.Printf("Error sending packet via UDP: %s\n", err)
@@ -114,7 +114,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 			connMap[raddrStr] = uc
 			go runUDPToNetceptorOutbound(uc, pc, addr)
 		}
-		debug.Printf("Forwarding UDP packet length %d from %s to %s\n", n, addr, uc.LocalAddr())
+		debug.Tracef("    Forwarding UDP packet length %d from %s to %s\n", n, addr, uc.LocalAddr())
 		wn, err := uc.Write(buffer[:n])
 		if err != nil {
 			debug.Printf("Error writing to UDP: %s\n", err)
@@ -135,7 +135,7 @@ func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr n
 			debug.Printf("Error reading from UDP: %s\n", err)
 			return
 		}
-		debug.Printf("Forwarding UDP packet length %d from %s to %s\n", n, uc.LocalAddr(), addr)
+		debug.Tracef("    Forwarding UDP packet length %d from %s to %s\n", n, uc.LocalAddr(), addr)
 		wn, err := pc.WriteTo(buf[:n], addr)
 		if err != nil {
 			debug.Printf("Error writing to the Receptor network: %s\n", err)

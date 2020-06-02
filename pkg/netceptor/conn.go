@@ -66,11 +66,10 @@ func (li *Listener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 	return &Conn{
-		s:          li.s,
-		pc:         li.pc,
-		qc:         qc,
-		qs:         qs,
-		isListener: true,
+		s:  li.s,
+		pc: li.pc,
+		qc: qc,
+		qs: qs,
 	}, nil
 }
 
@@ -95,7 +94,6 @@ type Conn struct {
 	pc            *PacketConn
 	qc            quic.Session
 	qs            quic.Stream
-	isListener    bool
 	readDeadline  time.Time
 	writeDeadline time.Time
 }
@@ -122,11 +120,10 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 		return nil, err
 	}
 	return &Conn{
-		s:          s,
-		pc:         pc,
-		qc:         qc,
-		qs:         qs,
-		isListener: false,
+		s:  s,
+		pc: pc,
+		qc: qc,
+		qs: qs,
 	}, nil
 }
 
@@ -142,19 +139,9 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	return c.qs.Write(b)
 }
 
-// Close closes the connection
+// Close closes the writer side of the connection
 func (c *Conn) Close() error {
-	qerr := c.qs.Close()
-	var perr error
-	if c.isListener {
-		perr = nil
-	} else {
-		perr = c.pc.Close()
-	}
-	if qerr != nil {
-		return qerr
-	}
-	return perr
+	return c.qs.Close()
 }
 
 // LocalAddr returns the local address of this connection

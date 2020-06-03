@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+//TODO: expire seenUpdates
+
 // MTU is the largest message sendable over the Netecptor network
 const MTU = 16384
 

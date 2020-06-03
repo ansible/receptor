@@ -332,11 +332,11 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 	if len(data) < 33 {
 		return nil, fmt.Errorf("data too short to be a valid message")
 	}
-	fromNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[1:9]))
+	fromNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[1:9]))
 	if err != nil {
 		return nil, err
 	}
-	toNode, err := s.getNameFromHash(binary.LittleEndian.Uint64(data[9:17]))
+	toNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[9:17]))
 	if err != nil {
 		return nil, err
 	}
@@ -356,8 +356,8 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 	data := make([]byte, 33+len(msg.Data))
 	data[0] = MsgTypeData
-	binary.LittleEndian.PutUint64(data[1:9], s.addNameHash(msg.FromNode))
-	binary.LittleEndian.PutUint64(data[9:17], s.addNameHash(msg.ToNode))
+	binary.BigEndian.PutUint64(data[1:9], s.addNameHash(msg.FromNode))
+	binary.BigEndian.PutUint64(data[9:17], s.addNameHash(msg.ToNode))
 	copy(data[17:25], fixedLenBytesFromString(msg.FromService, 8))
 	copy(data[25:33], fixedLenBytesFromString(msg.ToService, 8))
 	copy(data[33:], msg.Data)

@@ -8,6 +8,7 @@ import (
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	_ "github.com/ghjm/sockceptor/pkg/services"
+	_ "github.com/ghjm/sockceptor/pkg/workceptor"
 	"os"
 	"time"
 )

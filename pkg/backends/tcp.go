@@ -181,7 +181,7 @@ func (cfg TCPListenerCfg) Run() error {
 	return nil
 }
 
-// TCPDialerCfg is the cmdline configuration object for a TCP listener
+// TCPDialerCfg is the cmdline configuration object for a TCP dialer
 type TCPDialerCfg struct {
 	Address string `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
 	Redial  string `description:"Keep redialing on lost connection" default:"true"`

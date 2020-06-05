@@ -64,7 +64,13 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 	}
 
 	debug.Printf("Connecting to remote netceptor node %s service %s\n", node, rservice)
-	nconn, err := s.ListenPacket(lservice)
+	nconn, err := s.ListenPacketAndAdvertise(lservice, map[string]string{
+		"type":          "Tunnel Proxy",
+		"interface":     tunInterface,
+		"remotenode":    node,
+		"remoteservice": rservice,
+	})
+
 	if err != nil {
 		debug.Printf("Error listening on Receptor network\n")
 		return

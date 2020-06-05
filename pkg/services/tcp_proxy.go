@@ -59,7 +59,10 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 
 // TCPProxyServiceOutbound listens on the Receptor network and forwards the connection via TCP
 func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, address string) {
-	qli, err := s.Listen(service)
+	qli, err := s.ListenAndAdvertise(service, map[string]string{
+		"type":    "TCP Proxy",
+		"address": address,
+	})
 	if err != nil {
 		debug.Printf("Error listening on Receptor network: %s\n", err)
 		return

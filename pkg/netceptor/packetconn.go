@@ -13,6 +13,8 @@ type PacketConn struct {
 	recvChan      chan *messageData
 	readDeadline  time.Time
 	writeDeadline time.Time
+	advertise     bool
+	adTags        map[string]string
 }
 
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
@@ -36,8 +38,23 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 		s:            s,
 		localService: service,
 		recvChan:     make(chan *messageData),
+		advertise:    false,
+		adTags:       nil,
 	}
 	s.listenerRegistry[service] = pc
+	return pc, nil
+}
+
+// ListenPacketAndAdvertise returns a datagram listener, and also broadcasts service
+// advertisements to the Receptor network as long as the listener remains open.
+func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]string) (*PacketConn, error) {
+	pc, err := s.ListenPacket(service)
+	if err != nil {
+		return nil, err
+	}
+	pc.advertise = true
+	pc.adTags = tags
+	s.addLocalServiceAdvertisement(service, tags)
 	return pc, nil
 }
 
@@ -85,6 +102,12 @@ func (nc *PacketConn) Close() error {
 	nc.s.listenerLock.Lock()
 	defer nc.s.listenerLock.Unlock()
 	delete(nc.s.listenerRegistry, nc.localService)
+	if nc.advertise {
+		err := nc.s.removeLocalServiceAdvertisement(nc.localService)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

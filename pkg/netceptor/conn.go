@@ -21,9 +21,8 @@ type Listener struct {
 	ql quic.Listener
 }
 
-// Listen returns a stream listener compatible with Go's net.Listener.
-// If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) Listen(service string) (*Listener, error) {
+// Internal implementation of Listen and ListenAndAdvertise
+func (s *Netceptor) listen(service string, advertise bool, adTags map[string]string) (*Listener, error) {
 	s.listenerLock.Lock()
 	defer s.listenerLock.Unlock()
 	if service == "" {
@@ -42,17 +41,33 @@ func (s *Netceptor) Listen(service string) (*Listener, error) {
 		s:            s,
 		localService: service,
 		recvChan:     make(chan *messageData),
+		advertise:    advertise,
+		adTags:       adTags,
 	}
 	s.listenerRegistry[service] = pc
 	ql, err := quic.Listen(pc, generateServerTLSConfig(), nil)
 	if err != nil {
 		return nil, err
 	}
+	if advertise {
+		s.addLocalServiceAdvertisement(service, adTags)
+	}
 	return &Listener{
 		s:  s,
 		pc: pc,
 		ql: ql,
 	}, nil
+}
+
+// Listen returns a stream listener compatible with Go's net.Listener.
+// If service is blank, generates and uses an ephemeral service name.
+func (s *Netceptor) Listen(service string) (*Listener, error) {
+	return s.listen(service, false, nil)
+}
+
+// ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
+func (s *Netceptor) ListenAndAdvertise(service string, tags map[string]string) (*Listener, error) {
+	return s.listen(service, true, tags)
 }
 
 // Accept accepts a connection via the listener

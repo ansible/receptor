@@ -91,7 +91,10 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 		return
 	}
 
-	pc, err := s.ListenPacket(service)
+	pc, err := s.ListenPacketAndAdvertise(service, map[string]string{
+		"type":    "UDP Proxy",
+		"address": address,
+	})
 	if err != nil {
 		debug.Printf("Error listening on UDP: %s\n", err)
 		return

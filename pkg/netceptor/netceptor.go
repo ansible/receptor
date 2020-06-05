@@ -25,6 +25,9 @@ const MTU = 16384
 // RouteUpdateTime is the interval at which regular route updates will be sent
 const RouteUpdateTime = 10 * time.Second
 
+// ServiceAdTime is the interval at which regular service advertisements will be sent
+const ServiceAdTime = 60 * time.Second
+
 // ErrorFunc is a function parameter used to process errors. The boolean parameter
 // indicates whether the error is fatal (i.e. the associated process is going to exit).
 type ErrorFunc func(error, bool)
@@ -71,14 +74,18 @@ type Netceptor struct {
 	hashLock               *sync.RWMutex
 	nameHashes             map[uint64]string
 	reservedServices       map[string]func(*messageData) error
+	serviceAdsLock         *sync.RWMutex
+	serviceAdsReceived     map[string]map[string]*ServiceAdvertisement
+	sendServiceAdsChan     chan time.Duration
 }
 
 // Status is the struct returned by Netceptor.Status().  It represents a public
 // view of the internal status of the Netceptor object.
 type Status struct {
-	NodeID       string
-	Connections  []string
-	RoutingTable map[string]string
+	NodeID         string
+	Connections    []string
+	RoutingTable   map[string]string
+	Advertisements []*ServiceAdvertisement
 }
 
 const (
@@ -86,6 +93,8 @@ const (
 	MsgTypeData = 0
 	// MsgTypeRoute is a routing update
 	MsgTypeRoute = 1
+	// MsgTypeServiceAdvertisement is an advertisement for a service
+	MsgTypeServiceAdvertisement = 2
 )
 
 type messageData struct {
@@ -117,6 +126,21 @@ type routingUpdate struct {
 	ForwardingNode string
 }
 
+// ServiceAdvertisement is the data associated with a service advertisement
+type ServiceAdvertisement struct {
+	NodeID  string
+	Service string
+	Time    time.Time
+	Tags    map[string]string
+}
+
+// serviceAdvertisementFull is the whole message from the network
+type serviceAdvertisementFull struct {
+	*ServiceAdvertisement
+	Cancel bool
+}
+
+// The backend wait group keeps the application from exiting while a backend is running
 var backendWaitGroup = sync.WaitGroup{}
 var backendCount int32 = 0
 
@@ -159,18 +183,23 @@ func New(NodeID string) *Netceptor {
 		listenerRegistry:       make(map[string]*PacketConn),
 		sendRouteFloodChan:     nil,
 		updateRoutingTableChan: nil,
-		shutdownChans:          make([]chan bool, 4),
+		shutdownChans:          make([]chan bool, 5),
 		hashLock:               &sync.RWMutex{},
 		nameHashes:             make(map[uint64]string),
+		serviceAdsLock:         &sync.RWMutex{},
+		serviceAdsReceived:     make(map[string]map[string]*ServiceAdvertisement),
+		sendServiceAdsChan:     nil,
 	}
 	s.reservedServices = map[string]func(*messageData) error{
 		"ping": s.handlePing,
 	}
 
 	s.addNameHash(NodeID)
+	// shutdownChans[0] is for the main protocol loop
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour*24, time.Second*1, s.shutdownChans[1])
 	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100, s.shutdownChans[2])
-	go s.monitorConnectionAging(s.shutdownChans[3])
+	s.sendServiceAdsChan = tickrunner.Run(s.sendServiceAds, ServiceAdTime, time.Second*5, s.shutdownChans[3])
+	go s.monitorConnectionAging(s.shutdownChans[4])
 	return &s
 }
 
@@ -183,18 +212,116 @@ func (s *Netceptor) Shutdown() {
 
 // Status returns the current state of the Netceptor object
 func (s *Netceptor) Status() Status {
+	s.connLock.RLock()
 	conns := make([]string, 0)
 	for conn := range s.connections {
 		conns = append(conns, conn)
 	}
+	s.connLock.RUnlock()
+	s.routingTableLock.RLock()
 	routes := make(map[string]string)
 	for k, v := range s.routingTable {
 		routes[k] = v
 	}
+	s.routingTableLock.RUnlock()
+	s.serviceAdsLock.RLock()
+	serviceAds := make([]*ServiceAdvertisement, 0)
+	for n := range s.serviceAdsReceived {
+		for _, ad := range s.serviceAdsReceived[n] {
+			adCopy := *ad
+			if adCopy.NodeID == s.nodeID {
+				adCopy.Time = time.Now()
+			}
+			serviceAds = append(serviceAds, &adCopy)
+		}
+	}
+	s.serviceAdsLock.RUnlock()
 	return Status{
-		NodeID:       s.nodeID,
-		Connections:  conns,
-		RoutingTable: routes,
+		NodeID:         s.nodeID,
+		Connections:    conns,
+		RoutingTable:   routes,
+		Advertisements: serviceAds,
+	}
+}
+
+func (s *Netceptor) addLocalServiceAdvertisement(service string, tags map[string]string) {
+	s.serviceAdsLock.Lock()
+	defer s.serviceAdsLock.Unlock()
+	n, ok := s.serviceAdsReceived[s.nodeID]
+	if !ok {
+		n = make(map[string]*ServiceAdvertisement)
+		s.serviceAdsReceived[s.nodeID] = n
+	}
+	n[service] = &ServiceAdvertisement{
+		NodeID:  s.nodeID,
+		Service: service,
+		Time:    time.Now(),
+		Tags:    tags,
+	}
+	debug.Printf("Requesting service ad broadcast\n")
+	s.sendServiceAdsChan <- 0
+}
+
+func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
+	s.serviceAdsLock.Lock()
+	defer s.serviceAdsLock.Unlock()
+	n, ok := s.serviceAdsReceived[s.nodeID]
+	if ok {
+		delete(n, service)
+	}
+	sa := &serviceAdvertisementFull{
+		ServiceAdvertisement: &ServiceAdvertisement{
+			NodeID:  s.nodeID,
+			Service: service,
+			Time:    time.Now(),
+			Tags:    nil,
+		},
+		Cancel: true,
+	}
+	data, err := s.translateStructToNetwork(MsgTypeServiceAdvertisement, sa)
+	if err != nil {
+		return err
+	}
+	s.flood(data, "")
+	return nil
+}
+
+// Send a single service broadcast
+func (s *Netceptor) sendServiceAd(si *ServiceAdvertisement) error {
+	debug.Printf("Sending service advertisement: %s\n", si)
+	sf := serviceAdvertisementFull{
+		ServiceAdvertisement: si,
+		Cancel:               false,
+	}
+	data, err := s.translateStructToNetwork(MsgTypeServiceAdvertisement, sf)
+	if err != nil {
+		return err
+	}
+	s.flood(data, "")
+	return nil
+}
+
+// Send advertisements for all advertised services
+func (s *Netceptor) sendServiceAds() {
+	ads := make([]ServiceAdvertisement, 0)
+	s.listenerLock.RLock()
+	for sn := range s.listenerRegistry {
+		if s.listenerRegistry[sn].advertise {
+			sa := ServiceAdvertisement{
+				NodeID:  s.nodeID,
+				Service: sn,
+				Time:    time.Now(),
+				Tags:    s.listenerRegistry[sn].adTags,
+			}
+			ads = append(ads, sa)
+		}
+	}
+	s.listenerLock.RUnlock()
+	for i := range ads {
+		err := s.sendServiceAd(&ads[i])
+		if err != nil {
+			debug.Printf("Error sending service advertisement: %s\n", err)
+		}
 	}
 }
 
@@ -287,8 +414,10 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 	}
 }
 
+// All-zero seed for deterministic highwayhash
 var zerokey = make([]byte, 32)
 
+// Adds a name to the hash lookup table
 func (s *Netceptor) addNameHash(name string) uint64 {
 	h, _ := highwayhash.New64(zerokey)
 	_, _ = h.Write([]byte(name))
@@ -302,6 +431,7 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 	return hv
 }
 
+// Looks up a name given a hash received from the network
 func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	s.hashLock.RLock()
 	defer s.hashLock.RUnlock()
@@ -312,6 +442,7 @@ func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	return name, nil
 }
 
+// Given a string, returns a fixed-length buffer right-padded with null (0) bytes
 func stringFromFixedLenBytes(bytes []byte) string {
 	p := len(bytes) - 1
 	for p >= 0 && bytes[p] == 0 {
@@ -323,6 +454,7 @@ func stringFromFixedLenBytes(bytes []byte) string {
 	return string(bytes[:p+1])
 }
 
+// Given a fixed-length buffer, returns a string excluding any null (0) bytes on the right
 func fixedLenBytesFromString(s string, l int) []byte {
 	bytes := make([]byte, l)
 	copy(bytes, s)
@@ -464,15 +596,15 @@ func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 	return update
 }
 
-// Translates a routing update message to network bytes
-func (s *Netceptor) translateRoutingUpdate(update *routingUpdate) ([]byte, error) {
-	updateBytes, err := json.Marshal(update)
+// Translates an arbitrary struct to a network message
+func (s *Netceptor) translateStructToNetwork(messageType byte, content interface{}) ([]byte, error) {
+	contentBytes, err := json.Marshal(content)
 	if err != nil {
 		return nil, err
 	}
-	data := make([]byte, len(updateBytes)+1)
-	data[0] = MsgTypeRoute
-	copy(data[1:], updateBytes)
+	data := make([]byte, len(contentBytes)+1)
+	data[0] = messageType
+	copy(data[1:], contentBytes)
 	return data, nil
 }
 
@@ -482,7 +614,7 @@ func (s *Netceptor) sendRoutingUpdate() {
 		return
 	}
 	debug.Printf("Sending routing update\n")
-	message, err := s.translateRoutingUpdate(s.makeRoutingUpdate())
+	message, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate())
 	if err != nil {
 		return
 	}
@@ -544,7 +676,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 	s.knownNodeLock.Unlock()
 	ri.ForwardingNode = s.nodeID
-	message, err := s.translateRoutingUpdate(ri)
+	message, err := s.translateStructToNetwork(MsgTypeRoute, ri)
 	if err != nil {
 		return
 	}
@@ -588,6 +720,61 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 	return s.forwardMessage(md)
 }
 
+// GetServiceInfo returns the advertising info, if any, for a service on a node
+func (s *Netceptor) GetServiceInfo(NodeID string, Service string) (*ServiceAdvertisement, bool) {
+	s.serviceAdsLock.RLock()
+	defer s.serviceAdsLock.RUnlock()
+	n, ok := s.serviceAdsReceived[NodeID]
+	if !ok {
+		return nil, false
+	}
+	svc, ok := n[Service]
+	if !ok {
+		return nil, false
+	}
+	svcCopy := *svc
+	return &svcCopy, true
+}
+
+// Handles an incoming service advertisement
+func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string) error {
+	if data[0] != MsgTypeServiceAdvertisement {
+		return fmt.Errorf("message is the wrong type")
+	}
+	si := &serviceAdvertisementFull{}
+	err := json.Unmarshal(data[1:], si)
+	if err != nil {
+		return err
+	}
+	debug.Printf("Received service advertisement %s\n", si)
+	s.serviceAdsLock.Lock()
+	defer s.serviceAdsLock.Unlock()
+	n, ok := s.serviceAdsReceived[si.NodeID]
+	if !ok {
+		n = make(map[string]*ServiceAdvertisement)
+		s.serviceAdsReceived[si.NodeID] = n
+	}
+	curSvc, keepCur := n[si.Service]
+	if keepCur {
+		if si.Time.After(curSvc.Time) {
+			keepCur = false
+		}
+	}
+	if keepCur {
+		return nil
+	}
+	if si.Cancel {
+		delete(s.serviceAdsReceived[si.NodeID], si.Service)
+		if len(s.serviceAdsReceived[si.NodeID]) == 0 {
+			delete(s.serviceAdsReceived, si.NodeID)
+		}
+	} else {
+		s.serviceAdsReceived[si.NodeID][si.Service] = si.ServiceAdvertisement
+	}
+	s.flood(data, receivedFrom)
+	return nil
+}
+
 // Goroutine to send data from the backend to the connection's ReadChan
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
@@ -622,7 +809,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
-		ri, err := s.translateRoutingUpdate(s.makeRoutingUpdate())
+		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate())
 		if err != nil {
 			debug.Printf("Error Sending initial routing message: %s\n", err)
 			return
@@ -714,6 +901,12 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					err = s.handleMessageData(message)
 					if err != nil {
 						debug.Printf("Error handling message data: %s\n", err)
+					}
+				} else if msgType == MsgTypeServiceAdvertisement {
+					err := s.handleServiceAdvertisement(data, remoteNodeID)
+					if err != nil {
+						debug.Printf("Error handling service advertisement: %s\n", err)
+						continue
 					}
 				} else {
 					debug.Printf("Unknown message type %d\n", msgType)

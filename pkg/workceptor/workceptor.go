@@ -39,7 +39,7 @@ func New(nc *netceptor.Netceptor) (*Workceptor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not add work control function: %s", err)
 	}
-	w.li, err = w.nc.Listen("workstat")
+	w.li, err = w.nc.ListenAndAdvertise("workstat", nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not listen for workstat service: %s", err)
 	}
@@ -157,7 +157,7 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.", workType)
+			return cs.Printf("Unknown work type %s.\n", workType)
 		}
 		ident := tokens[2]
 		err := wT.Cancel(ident)
@@ -172,7 +172,7 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.", workType)
+			return cs.Printf("Unknown work type %s.\n", workType)
 		}
 		ident := tokens[2]
 		stream := tokens[3]

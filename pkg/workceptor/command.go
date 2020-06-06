@@ -3,7 +3,6 @@ package workceptor
 import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
-	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/randstr"
 	"os/exec"
 	"strings"
@@ -23,9 +22,7 @@ type commandInfo struct {
 // cmdWaiter hangs around and waits for the command to be done because apparently you
 // can't safely call exec.Cmd.Exited() unless you already know the command has exited.
 func cmdWaiter(cmd *commandInfo) {
-	debug.Printf("cmdWaiter starting\n")
 	_ = cmd.cmd.Wait()
-	debug.Printf("cmdWaiter returning\n")
 	*cmd.done = true
 }
 

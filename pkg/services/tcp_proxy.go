@@ -13,7 +13,10 @@ func bridgeHalf(c1 net.Conn, c2 net.Conn) {
 	for {
 		n, err := c1.Read(buf)
 		if err != nil {
-			debug.Printf("Connection read error: %s\n", err)
+			if err.Error() != "EOF" && err.Error() != "use of closed network connection" {
+				debug.Printf("Connection read error: %s\n", err)
+			}
+			_ = c2.Close()
 			return
 		}
 		debug.Tracef("    Forwarding TCP data length %d from %s to %s\n", n,

@@ -7,6 +7,7 @@ import (
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/juju/fslock"
 	"io"
 	"net"
 	"os"
@@ -217,7 +218,12 @@ type CmdlineConfig struct {
 
 // Run runs the action
 func (cfg CmdlineConfig) Run() error {
-	err := os.RemoveAll(cfg.Path)
+	lock := fslock.New(cfg.Path + ".lock")
+	err := lock.TryLock()
+	if err != nil {
+		return fmt.Errorf("could not acquire lock on control socket: %s", err)
+	}
+	err = os.RemoveAll(cfg.Path)
 	if err != nil {
 		return err
 	}

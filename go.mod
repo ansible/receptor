@@ -3,6 +3,7 @@ module github.com/ghjm/sockceptor
 go 1.14
 
 require (
+	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
 	github.com/lucas-clemente/quic-go v0.15.8
 	github.com/minio/highwayhash v1.0.0

@@ -9,6 +9,7 @@ import (
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
+	"net"
 )
 
 func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.PacketConn, remoteAddr netceptor.Addr) {
@@ -53,7 +54,7 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 
 // TunProxyService runs the Receptor to tun interface proxy.
 func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice string,
-	node string, rservice string, ifaddress string, route string) {
+	node string, rservice string, ifaddress string, destaddress string, route string) {
 
 	cfg := water.Config{
 		DeviceType: water.TUN,
@@ -71,12 +72,21 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 			debug.Printf("Error accessing link for tun device: %s\n", err)
 			return
 		}
-		ip, err := netlink.ParseAddr(ifaddress)
-		if err != nil {
-			debug.Printf("Error parsing IP address: %s\n", err)
+		localaddr := net.ParseIP(ifaddress)
+		if localaddr == nil {
+			debug.Printf("Invalid IP address: %s\n", ifaddress)
 			return
 		}
-		err = netlink.AddrAdd(link, ip)
+		destaddr := net.ParseIP(destaddress)
+		if destaddr == nil {
+			debug.Printf("Invalid IP address: %s\n", ifaddress)
+			return
+		}
+		addr := &netlink.Addr{
+			IPNet: netlink.NewIPNet(localaddr),
+			Peer:  netlink.NewIPNet(destaddr),
+		}
+		err = netlink.AddrAdd(link, addr)
 		if err != nil {
 			debug.Printf("Error adding IP address to link: %s\n", err)
 			return
@@ -96,6 +106,7 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 				LinkIndex: link.Attrs().Index,
 				Scope:     netlink.SCOPE_UNIVERSE,
 				Dst:       ipnet,
+				Gw:        destaddr,
 			})
 			if err != nil {
 				debug.Printf("Error adding route to interface: %s\n", err)
@@ -130,11 +141,15 @@ type TunProxyCfg struct {
 	RemoteService string `required:"true" description:"Receptor service name to connect to"`
 	Interface     string `description:"Name of the tun interface"`
 	IfAddress     string `description:"IP address to assign to the created interface"`
+	DestAddress   string `description:"IP address of the point-to-point destination"`
 	Route         string `description:"CIDR subnet to route over the created interface"`
 }
 
 // Prepare verifies we are ready to run
 func (cfg TunProxyCfg) Prepare() error {
+	if (cfg.IfAddress == "") != (cfg.DestAddress == "") {
+		return fmt.Errorf("ifaddress and destaddress must both be specified, or neither")
+	}
 	if cfg.Route != "" && cfg.IfAddress == "" {
 		return fmt.Errorf("when supplying a route, an IP address must also be given")
 	}
@@ -145,7 +160,7 @@ func (cfg TunProxyCfg) Prepare() error {
 func (cfg TunProxyCfg) Run() error {
 	debug.Printf("Running tun proxy service %s\n", cfg)
 	go TunProxyService(netceptor.MainInstance, cfg.Interface, cfg.Service, cfg.RemoteNode, cfg.RemoteService,
-		cfg.IfAddress, cfg.Route)
+		cfg.IfAddress, cfg.DestAddress, cfg.Route)
 	return nil
 }
 

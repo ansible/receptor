@@ -89,7 +89,7 @@ func (cw *CommandWorker) Cancel(identifier string) error {
 // CommandCfg is the cmdline configuration object for a worker that runs a command
 type CommandCfg struct {
 	Service string `required:"true" description:"Local Receptor service name to bind to"`
-	Command string `required:"true" description:"Command to run to handle sessions"`
+	Command string `required:"true" description:"Command to run to process units of work"`
 }
 
 // Run runs the action
@@ -102,5 +102,5 @@ func (cfg CommandCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, false)
+	cmdline.AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, false, workersSection)
 }

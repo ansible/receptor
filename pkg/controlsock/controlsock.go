@@ -246,5 +246,5 @@ func (cfg CmdlineConfig) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("controlsock", "Accept control commands through a Unix socket", CmdlineConfig{}, false)
+	cmdline.AddConfigType("controlsock", "Accept control commands through a Unix socket", CmdlineConfig{}, false, nil)
 }

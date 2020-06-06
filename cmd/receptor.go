@@ -48,10 +48,10 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cmdline.AddConfigType("node-id", "Network node ID of this instance", nodeIDCfg{}, true)
-	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false)
-	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false)
+	cmdline.AddConfigType("node-id", "Network node ID of this instance", nodeIDCfg{}, true, nil)
+	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false, nil)
+	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, nil)
+	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
 
 	if nodeID == "" {

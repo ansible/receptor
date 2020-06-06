@@ -3,28 +3,38 @@ package cmdline
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
+
+// Section defines a section of the help output, for grouping commands together
+type Section struct {
+	Description string
+	Order       int
+}
 
 type param struct {
 	Name        string
 	Description string
 	Type        reflect.Type
 	Required    bool
+	Section     *Section
 }
 
 var configTypes []param
 
 // AddConfigType registers a new config type with the system
-func AddConfigType(name string, description string, configType interface{}, required bool) {
+func AddConfigType(name string, description string, configType interface{}, required bool, section *Section) {
 	configTypes = append(configTypes, param{
 		Name:        name,
 		Description: description,
 		Type:        reflect.TypeOf(configType),
 		Required:    required,
+		Section:     section,
 	})
 }
 
@@ -34,16 +44,16 @@ func printCmdHelp(ct param) {
 		fmt.Printf(" (required)")
 	}
 	fmt.Printf("\n")
-	for j := 0; j < ct.Type.NumField(); j++ {
-		fmt.Printf("      %s=<%s>: %s", strings.ToLower(ct.Type.Field(j).Name),
-			ct.Type.Field(j).Type.Name(),
-			ct.Type.Field(j).Tag.Get("description"))
+	for i := 0; i < ct.Type.NumField(); i++ {
+		fmt.Printf("      %s=<%s>: %s", strings.ToLower(ct.Type.Field(i).Name),
+			ct.Type.Field(i).Type.Name(),
+			ct.Type.Field(i).Tag.Get("description"))
 		extras := make([]string, 0)
-		req, err := betterParseBool(ct.Type.Field(j).Tag.Get("required"))
+		req, err := betterParseBool(ct.Type.Field(i).Tag.Get("required"))
 		if err == nil && req {
 			extras = append(extras, "required")
 		}
-		def := ct.Type.Field(j).Tag.Get("default")
+		def := ct.Type.Field(i).Tag.Get("default")
 		if def != "" {
 			extras = append(extras, fmt.Sprintf("default: %s", def))
 		}
@@ -57,18 +67,59 @@ func printCmdHelp(ct param) {
 
 // ShowHelp prints command line help.  It does NOT exit.
 func ShowHelp() {
-	fmt.Printf("Usage: %s [--<action> [<param>=<value> ...] ...]\n\n", os.Args[0])
-	fmt.Printf("   --help: Show this help\n\n")
-	for i := range configTypes {
-		ct := configTypes[i]
-		if ct.Required {
-			printCmdHelp(ct)
-		}
+
+	// Construct list of sections
+	sections := make([]*Section, 1)
+	sections[0] = &Section{
+		Description: "",
+		Order:       0,
 	}
 	for i := range configTypes {
 		ct := configTypes[i]
-		if !ct.Required {
-			printCmdHelp(ct)
+		if ct.Section == nil {
+			continue
+		}
+		found := false
+		for j := range sections {
+			if ct.Section == sections[j] {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		sections = append(sections, ct.Section)
+	}
+	sort.SliceStable(sections, func(i int, j int) bool {
+		return sections[i].Order < sections[j].Order
+	})
+
+	fmt.Printf("Usage: %s [--<action> [<param>=<value> ...] ...]\n\n", path.Base(os.Args[0]))
+	fmt.Printf("   --help: Show this help\n\n")
+
+	for s := range sections {
+		sect := sections[s]
+		if sect.Description != "" {
+			fmt.Printf("%s\n\n", sect.Description)
+		}
+		for i := range configTypes {
+			ct := configTypes[i]
+			if (s == 0 && ct.Section != nil) || (s != 0 && ct.Section != sect) {
+				continue
+			}
+			if ct.Required {
+				printCmdHelp(ct)
+			}
+		}
+		for i := range configTypes {
+			ct := configTypes[i]
+			if (s == 0 && ct.Section != nil) || (s != 0 && ct.Section != sect) {
+				continue
+			}
+			if !ct.Required {
+				printCmdHelp(ct)
+			}
 		}
 	}
 }

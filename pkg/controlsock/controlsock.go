@@ -98,7 +98,7 @@ func (s *Server) AddControlFunc(name string, cFunc ControlFunc) error {
 	return nil
 }
 
-func (s *Server) pingReplyHandler(cs Sock, pc *netceptor.PacketConn) {
+func (s *Server) pingReplyHandler(cs Sock, pc *netceptor.PacketConn, startTime time.Time) {
 	defer func() {
 		err := pc.Close()
 		if err != nil {
@@ -118,7 +118,7 @@ func (s *Server) pingReplyHandler(cs Sock, pc *netceptor.PacketConn) {
 		}
 		return
 	}
-	err = cs.Printf("Ping reply from %s\n", addr.String())
+	err = cs.Printf("Reply from %s in %s\n", addr.String(), time.Since(startTime))
 	if err != nil {
 		cs.PrintError(false, "Write error in control socket: %s\n", err)
 	}
@@ -129,7 +129,7 @@ func (s *Server) controlPing(cs Sock, params string) error {
 	if err != nil {
 		return err
 	}
-	go s.pingReplyHandler(cs, pc)
+	go s.pingReplyHandler(cs, pc, time.Now())
 	_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(params, "ping"))
 	if err != nil {
 		cs.PrintError(true, "Error sending ping: %s\n", err)

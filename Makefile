@@ -7,3 +7,4 @@ lint:
 format:
 	find cmd/ pkg/ -type f -name '*.go' -exec go fmt {} \;
 
+fmt: format

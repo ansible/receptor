@@ -135,12 +135,12 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 		}
 	case "status":
 		if len(tokens) < 3 {
-			return cs.Printf("Must specify work type and identifier.")
+			return cs.Printf("Must specify work type and identifier.\n")
 		}
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.", workType)
+			return cs.Printf("Unknown work type %s.\n", workType)
 		}
 		ident := tokens[2]
 		exited, succeeded, status, err := wT.Status(ident)
@@ -150,7 +150,7 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 		return cs.Printf("Done: %t, Success: %t, Status: %s\n", exited, succeeded, status)
 	case "cancel":
 		if len(tokens) < 3 {
-			return cs.Printf("Must specify work type and identifier.")
+			return cs.Printf("Must specify work type and identifier.\n")
 		}
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]

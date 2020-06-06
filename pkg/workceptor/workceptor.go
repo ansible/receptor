@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/controlsock"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"io"
 	"strings"
 
 	//    "github.com/ghjm/sockceptor/pkg/controlsock"
@@ -17,6 +18,7 @@ type WorkType interface {
 	List() ([]string, error)
 	Status(string) (bool, bool, string, error)
 	Cancel(string) error
+	Get(string, string) (io.ReadCloser, error)
 }
 
 // Workceptor is the main object that handles unit-of-work management
@@ -163,6 +165,30 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 			return cs.Printf("Error cancelling work: %s.\n", err)
 		}
 		return cs.Printf("Cancelled %s\n", ident)
+	case "get":
+		if len(tokens) < 4 {
+			return cs.Printf("Must specify work type, identifier and stream.\n")
+		}
+		workType := tokens[1]
+		wT, ok := w.workTypes[workType]
+		if !ok {
+			return cs.Printf("Unknown work type %s.", workType)
+		}
+		ident := tokens[2]
+		stream := tokens[3]
+		iorc, err := wT.Get(ident, stream)
+		if err != nil {
+			return cs.Printf("Error getting stream: %s.\n", err)
+		}
+		wr, err := cs.Writer()
+		if err != nil {
+			return cs.Printf("Error getting control socket writer: %s.\n", err)
+		}
+		_, err = io.Copy(wr, iorc)
+		if err != nil {
+			return cs.Printf("Error copying stream: %s.\n", err)
+		}
+		return cs.Printf("--- End of Stream ---\n")
 	}
 	return nil
 }

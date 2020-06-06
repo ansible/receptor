@@ -19,6 +19,7 @@ import (
 // Sock is a limited view into the control socket
 type Sock interface {
 	Printf(format string, a ...interface{}) error
+	Writer() (io.Writer, error)
 	ReadLine() (string, error)
 	PrintError(printToSock bool, format string, a ...interface{})
 }
@@ -32,6 +33,11 @@ type sock struct {
 func (s *sock) Printf(format string, a ...interface{}) error {
 	_, err := s.conn.Write([]byte(fmt.Sprintf(format, a...)))
 	return err
+}
+
+// Writer gets an io.writer for sending output to the socket
+func (s *sock) Writer() (io.Writer, error) {
+	return io.Writer(s.conn), nil
 }
 
 // ReadLine reads a line of text from the control socket

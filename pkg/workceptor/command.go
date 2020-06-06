@@ -3,7 +3,11 @@ package workceptor
 import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
+	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/randstr"
+	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -15,8 +19,10 @@ type CommandWorker struct {
 }
 
 type commandInfo struct {
-	cmd  *exec.Cmd
-	done *bool
+	cmd    *exec.Cmd
+	done   *bool
+	stdout *os.File
+	stderr *os.File
 }
 
 // cmdWaiter hangs around and waits for the command to be done because apparently you
@@ -24,6 +30,19 @@ type commandInfo struct {
 func cmdWaiter(cmd *commandInfo) {
 	_ = cmd.cmd.Wait()
 	*cmd.done = true
+}
+
+func tempfile() (*os.File, error) {
+	f, err := ioutil.TempFile(os.TempDir(), "receptor*.tmp")
+	if err != nil {
+		return nil, err
+	}
+	// Pre-remove the file
+	err = os.Remove(f.Name())
+	if err != nil {
+		debug.Printf("Error pre-removing temp file: %s\n", err)
+	}
+	return f, nil
 }
 
 // Start launches a job with given parameters.  It returns an identifier string and an error.
@@ -37,14 +56,26 @@ func (cw *CommandWorker) Start(param string) (string, error) {
 		}
 	}
 	cmd := exec.Command(cw.command, strings.Split(param, " ")...)
-	err := cmd.Start()
+	stdout, err := tempfile()
+	if err != nil {
+		return "", err
+	}
+	cmd.Stdout = stdout
+	stderr, err := tempfile()
+	if err != nil {
+		return "", err
+	}
+	cmd.Stderr = stderr
+	err = cmd.Start()
 	if err != nil {
 		return "", err
 	}
 	done := false
 	ci := &commandInfo{
-		cmd:  cmd,
-		done: &done,
+		cmd:    cmd,
+		done:   &done,
+		stdout: stdout,
+		stderr: stderr,
 	}
 	go cmdWaiter(ci)
 	cw.processes[ident] = ci
@@ -80,6 +111,28 @@ func (cw *CommandWorker) Cancel(identifier string) error {
 		return fmt.Errorf("unknown identifier")
 	}
 	return cmd.cmd.Process.Kill()
+}
+
+// Get gets an output stream from a job.
+func (cw *CommandWorker) Get(identifier string, streamID string) (io.ReadCloser, error) {
+	cmd, ok := cw.processes[identifier]
+	if !ok {
+		return nil, fmt.Errorf("unknown identifier")
+	}
+	if strings.ToLower(streamID) == "stdout" {
+		_, err := cmd.stdout.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, err
+		}
+		return cmd.stdout, nil
+	} else if strings.ToLower(streamID) == "stderr" {
+		_, err := cmd.stderr.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, err
+		}
+		return cmd.stderr, nil
+	}
+	return nil, fmt.Errorf("unknown stream identifier")
 }
 
 // **************************************************************************

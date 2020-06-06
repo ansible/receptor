@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -98,8 +99,10 @@ func ShowHelp() {
 	progname := path.Base(os.Args[0])
 	fmt.Printf("Usage: %s [--<action> [<param>=<value> ...] ...]\n\n", progname)
 	fmt.Printf("   --help: Show this help\n")
-	fmt.Printf("   --bash-completion: Generate a completion script for the bash shell\n")
-	fmt.Printf("         Run \". <(%s --bash-completion)\" to activate now\n\n", progname)
+	if runtime.GOOS != "windows" {
+		fmt.Printf("   --bash-completion: Generate a completion script for the bash shell\n")
+		fmt.Printf("         Run \". <(%s --bash-completion)\" to activate now\n\n", progname)
+	}
 	for s := range sections {
 		sect := sections[s]
 		if sect.Description != "" {

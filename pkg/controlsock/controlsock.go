@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -252,5 +253,7 @@ func (cfg CmdlineConfig) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("controlsock", "Accept control commands through a Unix socket", CmdlineConfig{}, false, nil)
+	if runtime.GOOS != "windows" {
+		cmdline.AddConfigType("controlsock", "Accept control commands through a Unix socket", CmdlineConfig{}, false, nil)
+	}
 }

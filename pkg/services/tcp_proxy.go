@@ -4,40 +4,10 @@ import (
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/ghjm/sockceptor/pkg/sockutils"
 	"net"
 	"strconv"
-	"strings"
 )
-
-func bridgeHalf(c1 net.Conn, c2 net.Conn) {
-	buf := make([]byte, netceptor.MTU)
-	for {
-		n, err := c1.Read(buf)
-		if err != nil {
-			if err.Error() != "EOF" && !strings.Contains(err.Error(), "use of closed network connection") {
-				debug.Printf("Connection read error: %s\n", err)
-			}
-			_ = c2.Close()
-			return
-		}
-		debug.Tracef("    Forwarding TCP data length %d from %s to %s\n", n,
-			c1.RemoteAddr().String(), c2.RemoteAddr().String())
-		wn, err := c2.Write(buf[:n])
-		if err != nil {
-			debug.Printf("Connection write error: %s\n", err)
-			return
-		}
-		if wn != n {
-			debug.Printf("Not all bytes written\n", err)
-			return
-		}
-	}
-}
-
-func bridgeConns(c1 net.Conn, c2 net.Conn) {
-	go bridgeHalf(c1, c2)
-	go bridgeHalf(c2, c1)
-}
 
 // TCPProxyServiceInbound listens on a TCP port and forwards the connection over the Receptor network
 func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node string, rservice string) {
@@ -57,7 +27,7 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			debug.Printf("Error connecting on Receptor network: %s\n", err)
 			continue
 		}
-		bridgeConns(tc, qc)
+		go sockutils.BridgeConns(tc, qc)
 	}
 }
 
@@ -83,7 +53,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 			debug.Printf("Error connecting via TCP: %s\n", err)
 			continue
 		}
-		bridgeConns(qc, tc)
+		go sockutils.BridgeConns(qc, tc)
 	}
 }
 
@@ -116,8 +86,8 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("tcp-inbound-proxy",
+	cmdline.AddConfigType("tcp-server",
 		"Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, false, servicesSection)
-	cmdline.AddConfigType("tcp-outbound-proxy",
+	cmdline.AddConfigType("tcp-client",
 		"Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, false, servicesSection)
 }

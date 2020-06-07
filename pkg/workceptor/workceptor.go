@@ -2,12 +2,13 @@ package workceptor
 
 import (
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/controlsock"
+	"github.com/ghjm/sockceptor/pkg/controlsvc"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"io"
+	"net"
 	"strings"
 
-	//    "github.com/ghjm/sockceptor/pkg/controlsock"
+	//    "github.com/ghjm/sockceptor/pkg/controlsvc"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	//    "strings"
 )
@@ -35,7 +36,7 @@ func New(nc *netceptor.Netceptor) (*Workceptor, error) {
 		nc:        nc,
 	}
 	debug.Printf("Starting worker status services\n")
-	err := controlsock.MainInstance().AddControlFunc("work", w.workFunc)
+	err := controlsvc.MainInstance().AddControlFunc("work", w.workFunc)
 	if err != nil {
 		return nil, fmt.Errorf("could not add work control function: %s", err)
 	}
@@ -62,7 +63,7 @@ func MainInstance() *Workceptor {
 }
 
 func (w *Workceptor) runWorkService() {
-	ws := controlsock.NewServer(false, nil)
+	ws := controlsvc.NewServer(false, nil)
 	_ = ws.AddControlFunc("work", w.workFunc)
 	for {
 		conn, err := w.li.Accept()
@@ -70,7 +71,7 @@ func (w *Workceptor) runWorkService() {
 			debug.Printf("Error accepting connection on work service: %s\n", err)
 			return
 		}
-		go ws.RunSockServer(conn)
+		go ws.RunControlSession(conn)
 	}
 }
 
@@ -85,16 +86,16 @@ func (w *Workceptor) RegisterWorker(service string, worker WorkType) error {
 }
 
 // Worker function called by the control socket and workstat service to process a single command
-func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
+func (w *Workceptor) workFunc(conn net.Conn, params string) error {
 	if len(params) == 0 {
-		_ = cs.Printf("Bad command. Use start, list, status or cancel.\n")
+		_ = controlsvc.Printf(conn, "Bad command. Use start, list, status or cancel.\n")
 		return nil
 	}
 	tokens := strings.Split(params, " ")
 	switch tokens[0] {
 	case "start":
 		if len(tokens) < 2 {
-			return cs.Printf("Must specify work type.\n")
+			return controlsvc.Printf(conn, "Must specify work type.\n")
 		}
 		workType := tokens[1]
 		params := ""
@@ -103,33 +104,33 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 		}
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.\n", workType)
+			return controlsvc.Printf(conn, "Unknown work type %s.\n", workType)
 		}
 		ident, err := wT.Start(params)
 		if err != nil {
-			return cs.Printf("Error starting work: %s.\n", err)
+			return controlsvc.Printf(conn, "Error starting work: %s.\n", err)
 		}
-		return cs.Printf("%s\n", ident)
+		return controlsvc.Printf(conn, "%s\n", ident)
 	case "list":
-		err := cs.Printf("%-10s %-10s %-8s %-8s %s\n", "Type", "Ident", "Done", "Success", "Status")
+		err := controlsvc.Printf(conn, "%-10s %-10s %-8s %-8s %s\n", "Type", "Ident", "Done", "Success", "Status")
 		if err != nil {
 			return err
 		}
 		for workType := range w.workTypes {
 			wT, ok := w.workTypes[workType]
 			if !ok {
-				return cs.Printf("Unknown work type %s.\n", workType)
+				return controlsvc.Printf(conn, "Unknown work type %s.\n", workType)
 			}
 			work, err := wT.List()
 			if err != nil {
-				return cs.Printf("Error listing work: %s.\n", err)
+				return controlsvc.Printf(conn, "Error listing work: %s.\n", err)
 			}
 			for workItem := range work {
 				exited, succeeded, status, err := wT.Status(work[workItem])
 				if err != nil {
-					return cs.Printf("Error getting work status: %s.\n", err)
+					return controlsvc.Printf(conn, "Error getting work status: %s.\n", err)
 				}
-				err = cs.Printf("%-10s %-10s %-8t %-8t %s\n", workType, work[workItem], exited, succeeded, status)
+				err = controlsvc.Printf(conn, "%-10s %-10s %-8t %-8t %s\n", workType, work[workItem], exited, succeeded, status)
 				if err != nil {
 					return err
 				}
@@ -137,58 +138,54 @@ func (w *Workceptor) workFunc(cs controlsock.Sock, params string) error {
 		}
 	case "status":
 		if len(tokens) < 3 {
-			return cs.Printf("Must specify work type and identifier.\n")
+			return controlsvc.Printf(conn, "Must specify work type and identifier.\n")
 		}
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.\n", workType)
+			return controlsvc.Printf(conn, "Unknown work type %s.\n", workType)
 		}
 		ident := tokens[2]
 		exited, succeeded, status, err := wT.Status(ident)
 		if err != nil {
-			return cs.Printf("Error getting work status: %s.\n", err)
+			return controlsvc.Printf(conn, "Error getting work status: %s.\n", err)
 		}
-		return cs.Printf("Done: %t, Success: %t, Status: %s\n", exited, succeeded, status)
+		return controlsvc.Printf(conn, "Done: %t, Success: %t, Status: %s\n", exited, succeeded, status)
 	case "cancel":
 		if len(tokens) < 3 {
-			return cs.Printf("Must specify work type and identifier.\n")
+			return controlsvc.Printf(conn, "Must specify work type and identifier.\n")
 		}
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.\n", workType)
+			return controlsvc.Printf(conn, "Unknown work type %s.\n", workType)
 		}
 		ident := tokens[2]
 		err := wT.Cancel(ident)
 		if err != nil {
-			return cs.Printf("Error cancelling work: %s.\n", err)
+			return controlsvc.Printf(conn, "Error cancelling work: %s.\n", err)
 		}
-		return cs.Printf("Cancelled %s\n", ident)
+		return controlsvc.Printf(conn, "Cancelled %s\n", ident)
 	case "get":
 		if len(tokens) < 4 {
-			return cs.Printf("Must specify work type, identifier and stream.\n")
+			return controlsvc.Printf(conn, "Must specify work type, identifier and stream.\n")
 		}
 		workType := tokens[1]
 		wT, ok := w.workTypes[workType]
 		if !ok {
-			return cs.Printf("Unknown work type %s.\n", workType)
+			return controlsvc.Printf(conn, "Unknown work type %s.\n", workType)
 		}
 		ident := tokens[2]
 		stream := tokens[3]
 		iorc, err := wT.Get(ident, stream)
 		if err != nil {
-			return cs.Printf("Error getting stream: %s.\n", err)
+			return controlsvc.Printf(conn, "Error getting stream: %s.\n", err)
 		}
-		wr, err := cs.Writer()
+		_, err = io.Copy(conn, iorc)
 		if err != nil {
-			return cs.Printf("Error getting control socket writer: %s.\n", err)
+			return controlsvc.Printf(conn, "Error copying stream: %s.\n", err)
 		}
-		_, err = io.Copy(wr, iorc)
-		if err != nil {
-			return cs.Printf("Error copying stream: %s.\n", err)
-		}
-		return cs.Printf("--- End of Stream ---\n")
+		return controlsvc.Printf(conn, "--- End of Stream ---\n")
 	}
 	return nil
 }

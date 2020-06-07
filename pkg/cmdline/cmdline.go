@@ -98,7 +98,7 @@ func ShowHelp() {
 
 	progname := path.Base(os.Args[0])
 	fmt.Printf("Usage: %s [--<action> [<param>=<value> ...] ...]\n\n", progname)
-	fmt.Printf("   --help: Show this help\n")
+	fmt.Printf("   --help: Show this help\n\n")
 	if runtime.GOOS != "windows" {
 		fmt.Printf("   --bash-completion: Generate a completion script for the bash shell\n")
 		fmt.Printf("         Run \". <(%s --bash-completion)\" to activate now\n\n", progname)

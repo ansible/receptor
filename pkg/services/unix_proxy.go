@@ -1,18 +1,25 @@
-//+build linux
-
 package services
 
 import (
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/ghjm/sockceptor/pkg/sockutils"
+	"github.com/juju/fslock"
 	"net"
 	"os"
+	"runtime"
 )
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, node string, rservice string) {
-	err := os.RemoveAll(filename)
+	lock := fslock.New(filename + ".lock")
+	err := lock.TryLock()
+	if err != nil {
+		debug.Printf("Could not acquire lock on socket file: %s\n", err)
+		return
+	}
+	err = os.RemoveAll(filename)
 	if err != nil {
 		debug.Printf("Could not overwrite socket file: %s\n", err)
 		return
@@ -33,7 +40,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, node strin
 			debug.Printf("Error connecting on Receptor network: %s\n", err)
 			continue
 		}
-		bridgeConns(tc, qc)
+		go sockutils.BridgeConns(tc, qc)
 	}
 }
 
@@ -59,13 +66,13 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, filename s
 			debug.Printf("Error connecting via Unix socket: %s\n", err)
 			continue
 		}
-		bridgeConns(qc, uc)
+		go sockutils.BridgeConns(qc, uc)
 	}
 }
 
 // UnixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy
 type UnixProxyInboundCfg struct {
-	Filename      string `required:"true" description:"Filename of the socket file, which will be overwritten"`
+	Filename      string `required:"true" description:"Socket filename, which will be overwritten"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
 	RemoteService string `required:"true" description:"Receptor service name to connect to"`
 }
@@ -80,7 +87,7 @@ func (cfg UnixProxyInboundCfg) Run() error {
 // UnixProxyOutboundCfg is the cmdline configuration object for a Unix socket outbound proxy
 type UnixProxyOutboundCfg struct {
 	Service  string `required:"true" description:"Receptor service name to bind to"`
-	Filename string `required:"true" description:"Filename of the socket file, which must already exist"`
+	Filename string `required:"true" description:"Socket filename, which must already exist"`
 }
 
 // Run runs the action
@@ -91,8 +98,10 @@ func (cfg UnixProxyOutboundCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("unix-inbound-proxy",
-		"Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, false, servicesSection)
-	cmdline.AddConfigType("unix-outbound-proxy",
-		"Listen on a Receptor service and forward via a Unix socket", UnixProxyOutboundCfg{}, false, servicesSection)
+	if runtime.GOOS != "windows" {
+		cmdline.AddConfigType("unix-socket-server",
+			"Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, false, servicesSection)
+		cmdline.AddConfigType("unix-socket-client",
+			"Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, false, servicesSection)
+	}
 }

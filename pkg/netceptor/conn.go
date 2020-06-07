@@ -80,6 +80,14 @@ func (li *Listener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	buf := make([]byte, 1)
+	n, err := qs.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	if n != 1 || buf[0] != 0 {
+		return nil, fmt.Errorf("stream failed to initialize")
+	}
 	return &Conn{
 		s:  li.s,
 		pc: li.pc,
@@ -131,6 +139,11 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 		return nil, err
 	}
 	qs, err := qc.OpenStream()
+	if err != nil {
+		return nil, err
+	}
+	// We need to write something to the stream to trigger the Accept() to happen
+	_, err = qs.Write([]byte{0})
 	if err != nil {
 		return nil, err
 	}

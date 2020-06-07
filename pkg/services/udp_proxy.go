@@ -180,8 +180,8 @@ func (cfg UDPProxyOutboundCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("UDP-inbound-proxy",
+	cmdline.AddConfigType("udp-server",
 		"Listen for UDP and forward via Receptor", UDPProxyInboundCfg{}, false, servicesSection)
-	cmdline.AddConfigType("UDP-outbound-proxy",
+	cmdline.AddConfigType("udp-client",
 		"Listen on a Receptor service and forward via UDP", UDPProxyOutboundCfg{}, false, servicesSection)
 }

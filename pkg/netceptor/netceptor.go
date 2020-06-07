@@ -210,6 +210,11 @@ func (s *Netceptor) Shutdown() {
 	}
 }
 
+// NodeID returns the local Node ID of this Netceptor instance
+func (s *Netceptor) NodeID() string {
+	return s.nodeID
+}
+
 // Status returns the current state of the Netceptor object
 func (s *Netceptor) Status() Status {
 	s.connLock.RLock()
@@ -258,7 +263,6 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, tags map[string
 		Time:    time.Now(),
 		Tags:    tags,
 	}
-	debug.Printf("Requesting service ad broadcast\n")
 	s.sendServiceAdsChan <- 0
 }
 

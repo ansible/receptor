@@ -7,9 +7,7 @@ import (
 	"github.com/ghjm/sockceptor/pkg/framer"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"net"
-	"os"
 	"strconv"
-	"syscall"
 	"time"
 )
 
@@ -35,20 +33,12 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 	go func() {
 		for {
 			conn, err := net.Dial("tcp", b.address)
-			if b.redial {
-				operr, ok := err.(*net.OpError)
-				if ok {
-					syserr, ok := operr.Err.(*os.SyscallError)
-					if ok {
-						if syserr.Err == syscall.ECONNREFUSED {
-							errf(err, false)
-							time.Sleep(5 * time.Second)
-							continue
-						}
-					}
-				}
-			}
 			if err != nil {
+				if b.redial {
+					errf(err, false)
+					time.Sleep(5 * time.Second)
+					continue
+				}
 				errf(err, true)
 				return
 			}
@@ -100,7 +90,7 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 	debug.Printf("Listening on %s\n", b.address)
 }
 
-// TCPSession implements BackendSession for TCP backent
+// TCPSession implements BackendSession for TCP backend
 type TCPSession struct {
 	conn   net.Conn
 	framer framer.Framer

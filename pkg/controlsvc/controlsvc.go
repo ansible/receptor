@@ -11,6 +11,7 @@ import (
 	"github.com/ghjm/sockceptor/pkg/sockutils"
 	"io"
 	"net"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -248,8 +249,9 @@ type CmdlineConfigWindows struct {
 
 // CmdlineConfigUnix is the cmdline configuration object for a control service on Unix
 type CmdlineConfigUnix struct {
-	Service  string `description:"Receptor service name to listen on" default:"control"`
-	Filename string `description:"Filename of local Unix socket to bind to the service"`
+	Service     string `description:"Receptor service name to listen on" default:"control"`
+	Filename    string `description:"Filename of local Unix socket to bind to the service"`
+	Permissions int    `description:"Socket file permissions" default:"0600"`
 }
 
 // Run runs the action
@@ -261,7 +263,7 @@ func (cfg CmdlineConfigUnix) Run() error {
 		return err
 	}
 	if cfg.Filename != "" {
-		go services.UnixProxyServiceInbound(nc, cfg.Filename, nc.NodeID(), cfg.Service)
+		go services.UnixProxyServiceInbound(nc, cfg.Filename, os.FileMode(cfg.Permissions), nc.NodeID(), cfg.Service)
 	}
 	return nil
 }

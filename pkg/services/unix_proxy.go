@@ -12,7 +12,8 @@ import (
 )
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network
-func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, node string, rservice string) {
+func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
+	node string, rservice string) {
 	lock := fslock.New(filename + ".lock")
 	err := lock.TryLock()
 	if err != nil {
@@ -27,6 +28,11 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, node strin
 	uli, err := net.Listen("unix", filename)
 	if err != nil {
 		debug.Printf("Could not listen on socket file: %s\n", err)
+		return
+	}
+	err = os.Chmod(filename, permissions)
+	if err != nil {
+		debug.Printf("Error setting socket file permissions: %s\n", err)
 		return
 	}
 	for {
@@ -73,6 +79,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, filename s
 // UnixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy
 type UnixProxyInboundCfg struct {
 	Filename      string `required:"true" description:"Socket filename, which will be overwritten"`
+	Permissions   int    `description:"Socket file permissions" default:"0600"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
 	RemoteService string `required:"true" description:"Receptor service name to connect to"`
 }
@@ -80,7 +87,8 @@ type UnixProxyInboundCfg struct {
 // Run runs the action
 func (cfg UnixProxyInboundCfg) Run() error {
 	debug.Printf("Running Unix socket inbound proxy service %s\n", cfg)
-	go UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, cfg.RemoteNode, cfg.RemoteService)
+	go UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, os.FileMode(cfg.Permissions),
+		cfg.RemoteNode, cfg.RemoteService)
 	return nil
 }
 

@@ -2,6 +2,7 @@ package controlsvc
 
 import (
 	"bufio"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
@@ -143,11 +144,22 @@ func (s *Server) controlStatus(conn net.Conn, params string) error {
 
 func (s *Server) controlConnect(conn net.Conn, params string) error {
 	tokens := strings.Split(params, " ")
-	if len(tokens) != 2 {
-		PrintError(conn, true, "Syntax: connect <node> <service>\n")
+	if len(tokens) < 2 || len(tokens) > 3 {
+		PrintError(conn, true, "Syntax: connect <node> <service> [<tls-client-config>]\n")
 		return nil
 	}
-	rc, err := s.nc.Dial(tokens[0], tokens[1])
+	var tlsname string
+	if len(tokens) == 3 {
+		tlsname = tokens[2]
+	} else {
+		tlsname = ""
+	}
+	tlscfg, err := netceptor.GetClientTLSConfig(tlsname, tokens[0])
+	if err != nil {
+		PrintError(conn, true, "Error getting TLS config: %s\n", err)
+		return nil
+	}
+	rc, err := s.nc.Dial(tokens[0], tokens[1], tlscfg)
 	if err != nil {
 		PrintError(conn, true, "Error connecting to node: %s\n", err)
 		return nil
@@ -219,8 +231,8 @@ func (s *Server) RunControlSession(conn net.Conn) {
 }
 
 // RunControlSvc runs the main accept loop of the control service
-func (s *Server) RunControlSvc(service string) error {
-	li, err := s.nc.ListenAndAdvertise(service, nil)
+func (s *Server) RunControlSvc(service string, tlscfg *tls.Config) error {
+	li, err := s.nc.ListenAndAdvertise(service, tlscfg, nil)
 	if err != nil {
 		return err
 	}
@@ -252,18 +264,33 @@ type CmdlineConfigUnix struct {
 	Service     string `description:"Receptor service name to listen on" default:"control"`
 	Filename    string `description:"Filename of local Unix socket to bind to the service"`
 	Permissions int    `description:"Socket file permissions" default:"0600"`
+	TLS         string `description:"Name of TLS server config for the Receptor listener"`
 }
 
 // Run runs the action
 func (cfg CmdlineConfigUnix) Run() error {
 	nc := netceptor.MainInstance
+	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
+	if err != nil {
+		return err
+	}
 	s := NewServer(true, nc)
-	err := s.RunControlSvc(cfg.Service)
+	err = s.RunControlSvc(cfg.Service, tlscfg)
 	if err != nil {
 		return err
 	}
 	if cfg.Filename != "" {
-		go services.UnixProxyServiceInbound(nc, cfg.Filename, os.FileMode(cfg.Permissions), nc.NodeID(), cfg.Service)
+		var clientTLS *tls.Config
+		if cfg.TLS == "" {
+			clientTLS = nil
+		} else {
+			clientTLS, err = netceptor.GetClientTLSConfig("default", nc.NodeID())
+			if err != nil {
+				return err
+			}
+		}
+		go services.UnixProxyServiceInbound(nc, cfg.Filename, os.FileMode(cfg.Permissions),
+			nc.NodeID(), cfg.Service, clientTLS)
 	}
 	return nil
 }

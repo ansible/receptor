@@ -25,26 +25,18 @@ type WorkType interface {
 // Workceptor is the main object that handles unit-of-work management
 type Workceptor struct {
 	workTypes map[string]WorkType
-	nc        *netceptor.Netceptor
-	li        *netceptor.Listener
 }
 
 // New constructs a new Workceptor instance
-func New(nc *netceptor.Netceptor) (*Workceptor, error) {
+func New(nc *netceptor.Netceptor, cs *controlsvc.Server) (*Workceptor, error) {
 	w := &Workceptor{
 		workTypes: make(map[string]WorkType),
-		nc:        nc,
 	}
 	debug.Printf("Starting worker status services\n")
-	err := controlsvc.MainInstance().AddControlFunc("work", w.workFunc)
+	err := cs.AddControlFunc("work", w.workFunc)
 	if err != nil {
 		return nil, fmt.Errorf("could not add work control function: %s", err)
 	}
-	w.li, err = w.nc.ListenAndAdvertise("workstat", nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not listen for workstat service: %s", err)
-	}
-	go w.runWorkService()
 	return w, nil
 }
 
@@ -54,25 +46,12 @@ var mainInstance *Workceptor
 func MainInstance() *Workceptor {
 	if mainInstance == nil {
 		var err error
-		mainInstance, err = New(netceptor.MainInstance)
+		mainInstance, err = New(netceptor.MainInstance, controlsvc.MainInstance())
 		if err != nil {
 			panic(err)
 		}
 	}
 	return mainInstance
-}
-
-func (w *Workceptor) runWorkService() {
-	ws := controlsvc.NewServer(false, nil)
-	_ = ws.AddControlFunc("work", w.workFunc)
-	for {
-		conn, err := w.li.Accept()
-		if err != nil {
-			debug.Printf("Error accepting connection on work service: %s\n", err)
-			return
-		}
-		go ws.RunControlSession(conn)
-	}
 }
 
 // RegisterWorker notifies the Workceptor of a new kind of work that can be done
@@ -85,7 +64,7 @@ func (w *Workceptor) RegisterWorker(service string, worker WorkType) error {
 	return nil
 }
 
-// Worker function called by the control socket and workstat service to process a single command
+// Worker function called by the control service to process a "work" command
 func (w *Workceptor) workFunc(conn net.Conn, params string) error {
 	if len(params) == 0 {
 		_ = controlsvc.Printf(conn, "Bad command. Use start, list, status or cancel.\n")

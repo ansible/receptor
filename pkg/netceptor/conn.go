@@ -22,7 +22,7 @@ type Listener struct {
 }
 
 // Internal implementation of Listen and ListenAndAdvertise
-func (s *Netceptor) listen(service string, advertise bool, adTags map[string]string) (*Listener, error) {
+func (s *Netceptor) listen(service string, tls *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	s.listenerLock.Lock()
 	defer s.listenerLock.Unlock()
 	if service == "" {
@@ -45,7 +45,13 @@ func (s *Netceptor) listen(service string, advertise bool, adTags map[string]str
 		adTags:       adTags,
 	}
 	s.listenerRegistry[service] = pc
-	ql, err := quic.Listen(pc, generateServerTLSConfig(), nil)
+	if tls == nil {
+		tls = generateServerTLSConfig()
+	} else {
+		tls = tls.Clone()
+		tls.NextProtos = []string{"netceptor"}
+	}
+	ql, err := quic.Listen(pc, tls, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -61,13 +67,13 @@ func (s *Netceptor) listen(service string, advertise bool, adTags map[string]str
 
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) Listen(service string) (*Listener, error) {
-	return s.listen(service, false, nil)
+func (s *Netceptor) Listen(service string, tls *tls.Config) (*Listener, error) {
+	return s.listen(service, tls, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
-func (s *Netceptor) ListenAndAdvertise(service string, tags map[string]string) (*Listener, error) {
-	return s.listen(service, true, tags)
+func (s *Netceptor) ListenAndAdvertise(service string, tls *tls.Config, tags map[string]string) (*Listener, error) {
+	return s.listen(service, tls, true, tags)
 }
 
 // Accept accepts a connection via the listener
@@ -113,16 +119,14 @@ func (li *Listener) Addr() net.Addr {
 
 // Conn implements the net.Conn interface via the Receptor network
 type Conn struct {
-	s             *Netceptor
-	pc            *PacketConn
-	qc            quic.Session
-	qs            quic.Stream
-	readDeadline  time.Time
-	writeDeadline time.Time
+	s  *Netceptor
+	pc *PacketConn
+	qc quic.Session
+	qs quic.Stream
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
-func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
+func (s *Netceptor) Dial(node string, service string, tls *tls.Config) (*Conn, error) {
 	_ = s.addNameHash(node)
 	_ = s.addNameHash(service)
 	lservice := s.getEphemeralService()
@@ -134,7 +138,13 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 	cfg := &quic.Config{
 		KeepAlive: true,
 	}
-	qc, err := quic.Dial(pc, rAddr, s.nodeID, generateClientTLSConfig(), cfg)
+	if tls == nil {
+		tls = generateClientTLSConfig()
+	} else {
+		tls = tls.Clone()
+		tls.NextProtos = []string{"netceptor"}
+	}
+	qc, err := quic.Dial(pc, rAddr, s.nodeID, tls, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -157,13 +167,11 @@ func (s *Netceptor) Dial(node string, service string) (*Conn, error) {
 
 // Read reads data from the connection
 func (c *Conn) Read(b []byte) (n int, err error) {
-	//TODO: respect nc.readDeadline
 	return c.qs.Read(b)
 }
 
 // Write writes data to the connection
 func (c *Conn) Write(b []byte) (n int, err error) {
-	//TODO: respect nc.writeDeadline
 	return c.qs.Write(b)
 }
 
@@ -184,24 +192,19 @@ func (c *Conn) RemoteAddr() net.Addr {
 
 // SetDeadline sets both read and write deadlines
 func (c *Conn) SetDeadline(t time.Time) error {
-	c.readDeadline = t
-	c.writeDeadline = t
-	return nil
+	return c.qs.SetDeadline(t)
 }
 
 // SetReadDeadline sets the read deadline
 func (c *Conn) SetReadDeadline(t time.Time) error {
-	c.readDeadline = t
-	return nil
+	return c.qs.SetReadDeadline(t)
 }
 
 // SetWriteDeadline sets the write deadline
 func (c *Conn) SetWriteDeadline(t time.Time) error {
-	c.writeDeadline = t
-	return nil
+	return c.qs.SetWriteDeadline(t)
 }
 
-//TODO: Remove this and do real TLS with properly configured certs etc
 func generateServerTLSConfig() *tls.Config {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -225,7 +228,6 @@ func generateServerTLSConfig() *tls.Config {
 	}
 }
 
-//TODO: Remove this and do real TLS with properly configured certs etc
 func generateClientTLSConfig() *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true,

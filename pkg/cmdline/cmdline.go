@@ -401,7 +401,7 @@ func ParseAndRun(args []string) {
 			}
 			s := cfgobj.FieldByName(f.Name)
 			if s.IsZero() && s.CanSet() {
-				s.SetString(defaultValue)
+				setValue(&s, defaultValue)
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
@@ -17,13 +18,15 @@ import (
 type TCPDialer struct {
 	address string
 	redial  bool
+	tls     *tls.Config
 }
 
 // NewTCPDialer instantiates a new TCP backend
-func NewTCPDialer(address string, redial bool) (*TCPDialer, error) {
+func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, error) {
 	td := TCPDialer{
 		address: address,
 		redial:  redial,
+		tls:     tls,
 	}
 	return &td, nil
 }
@@ -32,7 +35,13 @@ func NewTCPDialer(address string, redial bool) (*TCPDialer, error) {
 func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
-			conn, err := net.Dial("tcp", b.address)
+			var conn net.Conn
+			var err error
+			if b.tls == nil {
+				conn, err = net.Dial("tcp", b.address)
+			} else {
+				conn, err = tls.Dial("tcp", b.address, b.tls)
+			}
 			if err != nil {
 				if b.redial {
 					errf(err, false)
@@ -54,12 +63,14 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 // TCPListener implements Backend for inbound TCP
 type TCPListener struct {
 	address string
+	tls     *tls.Config
 }
 
 // NewTCPListener instantiates a new TCPListener backend
-func NewTCPListener(address string) (*TCPListener, error) {
+func NewTCPListener(address string, tls *tls.Config) (*TCPListener, error) {
 	tl := TCPListener{
 		address: address,
+		tls:     tls,
 	}
 	return &tl, nil
 }
@@ -70,6 +81,9 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 	if err != nil {
 		errf(err, true)
 		return
+	}
+	if b.tls != nil {
+		li = tls.NewListener(li, b.tls)
 	}
 	go func() {
 		for {
@@ -150,13 +164,18 @@ func (ns *TCPSession) Close() error {
 type TCPListenerCfg struct {
 	BindAddr string `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int    `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
+	TLS      string `description:"Name of TLS server config"`
 }
 
 // Run runs the action
 func (cfg TCPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	debug.Printf("Running TCP listener on %s\n", address)
-	li, err := NewTCPListener(address)
+	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
+	if err != nil {
+		return err
+	}
+	li, err := NewTCPListener(address, tlscfg)
 	if err != nil {
 		debug.Printf("Error creating listener %s: %s\n", address, err)
 		return err
@@ -175,13 +194,22 @@ func (cfg TCPListenerCfg) Run() error {
 type TCPDialerCfg struct {
 	Address string `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
 	Redial  string `description:"Keep redialing on lost connection" default:"true"`
+	TLS     string `description:"Name of TLS client config"`
 }
 
 // Run runs the action
 func (cfg TCPDialerCfg) Run() error {
 	debug.Printf("Running TCP peer connection %s\n", cfg.Address)
 	redial, _ := strconv.ParseBool(cfg.Redial)
-	li, err := NewTCPDialer(cfg.Address, redial)
+	host, _, err := net.SplitHostPort(cfg.Address)
+	if err != nil {
+		return err
+	}
+	tlscfg, err := netceptor.GetClientTLSConfig(cfg.TLS, host)
+	if err != nil {
+		return err
+	}
+	li, err := NewTCPDialer(cfg.Address, redial, tlscfg)
 	if err != nil {
 		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
 		return err

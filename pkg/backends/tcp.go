@@ -8,7 +8,6 @@ import (
 	"github.com/ghjm/sockceptor/pkg/framer"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"net"
-	"strconv"
 	"time"
 )
 
@@ -193,14 +192,13 @@ func (cfg TCPListenerCfg) Run() error {
 // TCPDialerCfg is the cmdline configuration object for a TCP dialer
 type TCPDialerCfg struct {
 	Address string `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
-	Redial  string `description:"Keep redialing on lost connection" default:"true"`
+	Redial  bool   `description:"Keep redialing on lost connection" default:"true"`
 	TLS     string `description:"Name of TLS client config"`
 }
 
 // Run runs the action
 func (cfg TCPDialerCfg) Run() error {
 	debug.Printf("Running TCP peer connection %s\n", cfg.Address)
-	redial, _ := strconv.ParseBool(cfg.Redial)
 	host, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
 		return err
@@ -209,7 +207,7 @@ func (cfg TCPDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	li, err := NewTCPDialer(cfg.Address, redial, tlscfg)
+	li, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
 	if err != nil {
 		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
 		return err

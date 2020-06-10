@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"github.com/lucas-clemente/quic-go"
@@ -205,12 +206,21 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.qs.SetWriteDeadline(t)
 }
 
+const insecureCommonName = "netceptor-insecure-common-name"
+
 func generateServerTLSConfig() *tls.Config {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
 	}
-	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: insecureCommonName,
+		},
+		NotBefore: time.Now().Add(-1 * time.Minute),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+	}
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
 	if err != nil {
 		panic(err)
@@ -228,9 +238,24 @@ func generateServerTLSConfig() *tls.Config {
 	}
 }
 
+func verifyServerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	for i := 0; i < len(rawCerts); i++ {
+		cert, err := x509.ParseCertificate(rawCerts[i])
+		if err != nil {
+			continue
+		}
+		if cert.Subject.CommonName == insecureCommonName {
+			return nil
+		}
+	}
+	return fmt.Errorf("insecure connection to secure service")
+}
+
 func generateClientTLSConfig() *tls.Config {
 	return &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"netceptor"},
+		InsecureSkipVerify:    true,
+		VerifyPeerCertificate: verifyServerCertificate,
+		NextProtos:            []string{"netceptor"},
+		ServerName:            insecureCommonName,
 	}
 }

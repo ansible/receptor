@@ -3,136 +3,106 @@ package workceptor
 import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
-	"github.com/ghjm/sockceptor/pkg/debug"
-	"github.com/ghjm/sockceptor/pkg/randstr"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
-// CommandWorker is a worker type that executes commands
-type CommandWorker struct {
-	command   string
-	processes map[string]*commandInfo
-}
-
-type commandInfo struct {
-	cmd    *exec.Cmd
-	done   *bool
-	stdout *os.File
-	stderr *os.File
+// commandUnit implements the WorkUnit interface
+type commandUnit struct {
+	command        string
+	cmd            *exec.Cmd
+	done           *bool
+	stdinFilename  string
+	stdoutFilename string
 }
 
 // cmdWaiter hangs around and waits for the command to be done because apparently you
 // can't safely call exec.Cmd.Exited() unless you already know the command has exited.
-func cmdWaiter(cmd *commandInfo) {
+func cmdWaiter(cmd *commandUnit) {
 	_ = cmd.cmd.Wait()
 	*cmd.done = true
 }
 
-func tempfile() (*os.File, error) {
-	f, err := ioutil.TempFile(os.TempDir(), "receptor*.tmp")
-	if err != nil {
-		return nil, err
-	}
-	// Pre-remove the file
-	err = os.Remove(f.Name())
-	if err != nil {
-		debug.Printf("Error pre-removing temp file: %s\n", err)
-	}
-	return f, nil
-}
-
 // Start launches a job with given parameters.  It returns an identifier string and an error.
-func (cw *CommandWorker) Start(param string) (string, error) {
-	var ident string
-	for {
-		ident = randstr.RandomString(8)
-		_, ok := cw.processes[ident]
-		if !ok {
-			break
-		}
+func (cw *commandUnit) Start(params string, stdinFilename string) error {
+	var cmd *exec.Cmd
+	if params == "" {
+		cmd = exec.Command(cw.command)
+	} else {
+		cmd = exec.Command(cw.command, strings.Split(params, " ")...)
 	}
-	cmd := exec.Command(cw.command, strings.Split(param, " ")...)
-	stdout, err := tempfile()
+	stdin, err := os.Open(stdinFilename)
 	if err != nil {
-		return "", err
+		return err
+	}
+	cmd.Stdin = stdin
+	stdout, err := ioutil.TempFile(os.TempDir(), "receptor-stdout*.tmp")
+	if err != nil {
+		return err
+	}
+	cw.stdoutFilename, err = filepath.Abs(stdout.Name())
+	if err != nil {
+		return err
 	}
 	cmd.Stdout = stdout
-	stderr, err := tempfile()
-	if err != nil {
-		return "", err
-	}
-	cmd.Stderr = stderr
+	cmd.Stderr = stdout
+	done := false
+	cw.done = &done
 	err = cmd.Start()
 	if err != nil {
-		return "", err
+		return err
 	}
-	done := false
-	ci := &commandInfo{
-		cmd:    cmd,
-		done:   &done,
-		stdout: stdout,
-		stderr: stderr,
-	}
-	go cmdWaiter(ci)
-	cw.processes[ident] = ci
-	return ident, nil
+	cw.cmd = cmd
+	go cmdWaiter(cw)
+	return nil
 }
 
 // Status returns the status of a previously job identified by the identifier.
 // The return values are running (bool), status detail, and error.
-func (cw *CommandWorker) Status(identifier string) (bool, bool, string, error) {
-	cmd, ok := cw.processes[identifier]
-	if !ok {
-		return false, false, "", fmt.Errorf("unknown identifier")
-	}
-	if !*cmd.done {
-		return false, false, fmt.Sprintf("Running: PID %d", cmd.cmd.Process.Pid), nil
-	}
-	return *cmd.done, cmd.cmd.ProcessState.Success(), cmd.cmd.ProcessState.String(), nil
-}
-
-// List lists the tasks known to this
-func (cw *CommandWorker) List() ([]string, error) {
-	procs := make([]string, 0, len(cw.processes))
-	for proc := range cw.processes {
-		procs = append(procs, proc)
-	}
-	return procs, nil
-}
-
-// Cancel cancels a running job.
-func (cw *CommandWorker) Cancel(identifier string) error {
-	cmd, ok := cw.processes[identifier]
-	if !ok {
-		return fmt.Errorf("unknown identifier")
-	}
-	return cmd.cmd.Process.Kill()
-}
-
-// Get gets an output stream from a job.
-func (cw *CommandWorker) Get(identifier string, streamID string) (io.ReadCloser, error) {
-	cmd, ok := cw.processes[identifier]
-	if !ok {
-		return nil, fmt.Errorf("unknown identifier")
-	}
-	if strings.ToLower(streamID) == "stdout" {
-		_, err := cmd.stdout.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
+func (cw *commandUnit) Status() (state int, detail string, err error) {
+	if cw.done != nil && *cw.done {
+		if cw.cmd.ProcessState.Success() {
+			return WorkStateSucceeded, cw.cmd.ProcessState.String(), nil
 		}
-		return cmd.stdout, nil
-	} else if strings.ToLower(streamID) == "stderr" {
-		_, err := cmd.stderr.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-		return cmd.stderr, nil
+		return WorkStateFailed, cw.cmd.ProcessState.String(), nil
 	}
-	return nil, fmt.Errorf("unknown stream identifier")
+	if cw.cmd != nil {
+		return WorkStateRunning, fmt.Sprintf("Running: PID %d", cw.cmd.Process.Pid), nil
+	}
+	return WorkStatePending, "Not started yet", nil
+}
+
+// Release releases resources associated with a job, including cancelling it if running.
+func (cw *commandUnit) Release() error {
+	if cw.cmd != nil && !*cw.done {
+		err := cw.cmd.Process.Kill()
+		if err != nil {
+			return err
+		}
+	}
+	err1 := os.Remove(cw.stdinFilename)
+	err2 := os.Remove(cw.stdoutFilename)
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// Results returns the results of the job.
+func (cw *commandUnit) Results() (results io.Reader, err error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+// Marshal returns a binary representation of this object
+func (cw *commandUnit) Marshal() ([]byte, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }
 
 // **************************************************************************
@@ -145,12 +115,19 @@ type CommandCfg struct {
 	Command string `required:"true" description:"Command to run to process units of work"`
 }
 
+func (cfg CommandCfg) newWorker() WorkType {
+	return &commandUnit{
+		command: cfg.Command,
+	}
+}
+
+func (cfg CommandCfg) unmarshalWorker(data []byte) (WorkType, error) {
+	return nil, fmt.Errorf("not implemented yet")
+}
+
 // Run runs the action
 func (cfg CommandCfg) Run() error {
-	err := MainInstance().RegisterWorker(cfg.Service, &CommandWorker{
-		command:   cfg.Command,
-		processes: make(map[string]*commandInfo),
-	})
+	err := MainInstance().RegisterWorker(cfg.Service, cfg.newWorker, cfg.unmarshalWorker)
 	return err
 }
 

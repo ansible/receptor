@@ -3,12 +3,14 @@ package workceptor
 import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
+	"github.com/ghjm/sockceptor/pkg/debug"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // commandUnit implements the WorkUnit interface
@@ -35,6 +37,7 @@ func (cw *commandUnit) Start(params string, stdinFilename string) error {
 	} else {
 		cmd = exec.Command(cw.command, strings.Split(params, " ")...)
 	}
+	cw.stdinFilename = stdinFilename
 	stdin, err := os.Open(stdinFilename)
 	if err != nil {
 		return err
@@ -96,8 +99,46 @@ func (cw *commandUnit) Release() error {
 }
 
 // Results returns the results of the job.
-func (cw *commandUnit) Results() (results io.Reader, err error) {
-	return nil, fmt.Errorf("not implemented yet")
+func (cw *commandUnit) Results() (results chan []byte, err error) {
+	resultChan := make(chan []byte)
+	go func() {
+		defer close(resultChan)
+		var stdout *os.File
+		var filePos int64
+		buf := make([]byte, 1024)
+		for {
+			if cw.cmd == nil {
+				// Command has not started running yet
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			if stdout == nil {
+				stdout, err = os.Open(cw.stdoutFilename)
+				filePos = 0
+			}
+			newPos, err := stdout.Seek(filePos, 0)
+			if newPos != filePos {
+				debug.Printf("Seek error processing stdout\n")
+				return
+			}
+			n, err := stdout.Read(buf)
+			if n > 0 {
+				filePos += int64(n)
+				resultChan <- buf[:n]
+			}
+			if err == io.EOF {
+				if *cw.done {
+					return
+				}
+				// TODO: something more intelligent using fsnotify
+				time.Sleep(250 * time.Millisecond)
+			} else if err != nil {
+				debug.Printf("Error reading from stdout: %s\n", err)
+				return
+			}
+		}
+	}()
+	return resultChan, nil
 }
 
 // Marshal returns a binary representation of this object

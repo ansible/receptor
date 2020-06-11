@@ -31,7 +31,7 @@ const (
 type WorkType interface {
 	Start(params string, stdinFilename string) (err error)
 	Status() (state int, detail string, err error)
-	Results() (results io.Reader, err error)
+	Results() (results chan []byte, err error)
 	Release() error
 	Marshal() ([]byte, error)
 }
@@ -176,6 +176,19 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 	return unit.worker.Release()
 }
 
+// GetResults returns a live stream of the results of a unit
+func (w *Workceptor) GetResults(unitID string) (chan []byte, error) {
+	unit, ok := w.activeUnits[unitID]
+	if !ok {
+		return nil, fmt.Errorf("unknown work unit %s", unitID)
+	}
+	resultChan, err := unit.worker.Results()
+	if err != nil {
+		return nil, err
+	}
+	return resultChan, nil
+}
+
 // Worker function called by the control service to process a "work" command
 func (w *Workceptor) workFunc(conn net.Conn, params string) error {
 	if len(params) == 0 {
@@ -260,29 +273,26 @@ func (w *Workceptor) workFunc(conn net.Conn, params string) error {
 			return controlsvc.Printf(conn, "Error releasing unit: %s.\n", err)
 		}
 		return controlsvc.Printf(conn, "Unit %s released.\n", tokens[1])
-	case "get":
-		return controlsvc.Printf(conn, "Not implemented yet\n")
-		/*
-			if len(tokens) < 4 {
-				return controlsvc.Printf(conn, "Must specify work type, identifier and stream.\n")
-			}
-			workType := tokens[1]
-			wT, ok := w.workTypes[workType]
-			if !ok {
-				return controlsvc.Printf(conn, "Unknown work type %s.\n", workType)
-			}
-			ident := tokens[2]
-			stream := tokens[3]
-			iorc, err := wT.Get(ident, stream)
+	case "results":
+		// TODO: Take a parameter here to begin streaming results from a byte position
+		if len(tokens) != 2 {
+			return controlsvc.Printf(conn, "Must specify unit ID.\n")
+		}
+		resultChan, err := w.GetResults(tokens[1])
+		if err != nil {
+			return err
+		}
+		err = controlsvc.Printf(conn, "Streaming results for work unit %s\n", tokens[1])
+		if err != nil {
+			return err
+		}
+		for bytes := range resultChan {
+			_, err := conn.Write(bytes)
 			if err != nil {
-				return controlsvc.Printf(conn, "Error getting stream: %s.\n", err)
+				return err
 			}
-			_, err = io.Copy(conn, iorc)
-			if err != nil {
-				return controlsvc.Printf(conn, "Error copying stream: %s.\n", err)
-			}
-			return controlsvc.Printf(conn, "--- End of Stream ---\n")
-		*/
+		}
+		return controlsvc.NormalCloseError
 	}
 	return nil
 }

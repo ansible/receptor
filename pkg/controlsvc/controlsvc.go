@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
@@ -23,6 +24,9 @@ type sock struct {
 	conn   net.Conn
 	reader *bufio.Reader
 }
+
+// ErrNormalClose is an error indicating no error occurred, but the control socket should close
+var ErrNormalClose = errors.New("Normal Close")
 
 // Printf prints formatted text to a socket
 func Printf(sock net.Conn, format string, a ...interface{}) error {
@@ -164,7 +168,7 @@ func (s *Server) controlConnect(conn net.Conn, params string) error {
 		PrintError(conn, true, "Error connecting to node: %s\n", err)
 		return nil
 	}
-	sockutils.BridgeConns(conn, rc)
+	sockutils.BridgeConns(rc, conn)
 	return nil
 }
 
@@ -215,9 +219,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			s.controlFuncLock.RUnlock()
 			if cf != nil {
 				err := cf(conn, params)
-				if err != nil {
-					debug.Printf("Error in control service %s command: %s\n", cmd, err)
+				if err == NormalCloseError {
 					return
+				} else if err != nil {
+					err = Printf(conn, "Error in control service %s command: %s\n", cmd, err)
+					if err != nil {
+						debug.Printf("Write error in control service: %s\n", err)
+						return
+					}
 				}
 			} else {
 				err = Printf(conn, "Unknown command\n")

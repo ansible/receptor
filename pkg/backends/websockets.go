@@ -61,14 +61,12 @@ func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.Er
 				cfg.Header = header
 			}
 			conn, err := websocket.DialConfig(cfg)
-			if b.redial {
+			if err != nil {
 				if b.redial {
 					errf(err, false)
 					time.Sleep(5 * time.Second)
 					continue
 				}
-			}
-			if err != nil {
 				errf(err, true)
 				return
 			}

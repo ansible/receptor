@@ -219,7 +219,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			s.controlFuncLock.RUnlock()
 			if cf != nil {
 				err := cf(conn, params)
-				if err == NormalCloseError {
+				if err == ErrNormalClose {
 					return
 				} else if err != nil {
 					err = Printf(conn, "Error in control service %s command: %s\n", cmd, err)

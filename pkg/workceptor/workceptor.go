@@ -292,7 +292,7 @@ func (w *Workceptor) workFunc(conn net.Conn, params string) error {
 				return err
 			}
 		}
-		return controlsvc.NormalCloseError
+		return controlsvc.ErrNormalClose
 	}
 	return nil
 }

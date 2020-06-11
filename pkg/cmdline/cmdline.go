@@ -262,14 +262,6 @@ func setValue(field *reflect.Value, value interface{}) error {
 	return fmt.Errorf("unknown type in config object: %s", field.Type().Name())
 }
 
-func joinMapKeys(m map[string]bool, sep string) string {
-	sl := make([]string, 0, len(m))
-	for p := range m {
-		sl = append(sl, p)
-	}
-	return strings.Join(sl, sep)
-}
-
 func plural(count int, singular string, plural string) string {
 	if count > 1 {
 		return plural
@@ -344,8 +336,12 @@ func buildRequiredParams(commandType reflect.Type) map[string]bool {
 
 func checkRequiredParams(requiredParams map[string]bool, commandName string) {
 	if len(requiredParams) > 0 {
+		sl := make([]string, 0, len(requiredParams))
+		for p := range requiredParams {
+			sl = append(sl, p)
+		}
 		fmt.Printf("Required parameter%s missing for %s: %s\n", plural(len(requiredParams), "", "s"),
-			commandName, strings.ToLower(joinMapKeys(requiredParams, ", ")))
+			commandName, strings.Join(sl, ", "))
 		os.Exit(1)
 	}
 }
@@ -554,13 +550,23 @@ func ParseAndRun(args []string) {
 	}
 	if commandType != nil {
 		// If we were accumulating an object, store it now since we're done
-		checkRequiredParams(requiredObjs, accumArg)
+		checkRequiredParams(requiredParams, accumArg)
 		activeObjs = append(activeObjs, accumulator)
 	}
 
 	if len(requiredObjs) > 0 {
+		sl := make([]string, 0, len(requiredObjs))
+		for p := range requiredObjs {
+			for i := range configTypes {
+				ct := configTypes[i]
+				if ct.Type.Name() == p {
+					sl = append(sl, ct.Name)
+					break
+				}
+			}
+		}
 		fmt.Printf("%s required for: %s\n", plural(len(requiredObjs), "A value is", "Values are"),
-			joinMapKeys(requiredObjs, ", "))
+			strings.Join(sl, ", "))
 		if len(args) == 0 {
 			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
 		}

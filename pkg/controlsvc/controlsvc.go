@@ -182,7 +182,7 @@ func (s *Server) controlConnect(params string, cfo ControlFuncOperations) (map[s
 	if err != nil {
 		return nil, err
 	}
-	err = cfo.BridgeConn("Connecting", rc, "connected service")
+	err = cfo.BridgeConn("Connecting\n", rc, "connected service")
 	if err != nil {
 		return nil, err
 	}

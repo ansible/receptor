@@ -1,10 +1,8 @@
 package controlsvc
 
 import (
-	"bufio"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
@@ -20,34 +18,65 @@ import (
 	"time"
 )
 
-type sock struct {
-	conn   net.Conn
-	reader *bufio.Reader
+// ControlFunc is a function called when a control service command is called
+type ControlFunc func(string, ControlFuncOperations) (map[string]interface{}, error)
+
+// ControlFuncOperations provides callbacks for control services to take actions
+type ControlFuncOperations interface {
+	BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error
+	ReadFromConn(message string, out io.Writer) error
+	WriteToConn(message string, in chan []byte) error
+	Close() error
 }
 
-// ErrNormalClose is an error indicating no error occurred, but the control socket should close
-var ErrNormalClose = errors.New("Normal Close")
-
-// Printf prints formatted text to a socket
-func Printf(sock net.Conn, format string, a ...interface{}) error {
-	_, err := sock.Write([]byte(fmt.Sprintf(format, a...)))
-	return err
+type sockControl struct {
+	conn net.Conn
 }
 
-// PrintError deals with an error, optionally printing it to the socket
-func PrintError(sock net.Conn, printToSock bool, format string, a ...interface{}) {
-	msg := fmt.Sprintf(format, a...)
-	debug.Printf("Error in control socket session: %s\n", msg)
-	if printToSock {
-		err := Printf(sock, msg)
+func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error {
+	if message != "" {
+		_, err := s.conn.Write([]byte(message))
 		if err != nil {
-			debug.Printf("Write error in control socket: %s\n", err)
+			return err
 		}
 	}
+	sockutils.BridgeConns(s.conn, "control service", bc, bcName)
+	return nil
 }
 
-// ControlFunc is a function called when a control service command is called
-type ControlFunc func(net.Conn, string) error
+func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
+	if message != "" {
+		_, err := s.conn.Write([]byte(message))
+		if err != nil {
+			return err
+		}
+	}
+	_, err := io.Copy(out, s.conn)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *sockControl) WriteToConn(message string, in chan []byte) error {
+	if message != "" {
+		_, err := s.conn.Write([]byte(message))
+		if err != nil {
+			return err
+		}
+	}
+	for bytes := range in {
+		_, err := s.conn.Write(bytes)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *sockControl) Close() error {
+	return s.conn.Close()
+}
 
 // Server is an instance of a control service
 type Server struct {
@@ -93,64 +122,51 @@ func (s *Server) AddControlFunc(name string, cFunc ControlFunc) error {
 	return nil
 }
 
-func (s *Server) pingReplyHandler(conn net.Conn, pc *netceptor.PacketConn, startTime time.Time) {
-	defer func() {
-		err := pc.Close()
-		if err != nil {
-			debug.Printf("Error closing Netceptor connection\n")
-		}
-	}()
-	buf := make([]byte, 8)
-	_ = pc.SetReadDeadline(time.Now().Add(10 * time.Second))
-	_, addr, err := pc.ReadFrom(buf)
-	if err != nil {
-		nerr, ok := err.(net.Error)
-		if ok && nerr.Timeout() {
-			err = Printf(conn, "Timeout waiting for ping reply\n")
-			if err != nil {
-				PrintError(conn, false, "Write error in control socket: %s\n", err)
-			}
-		}
-		return
-	}
-	err = Printf(conn, "Reply from %s in %s\n", addr.String(), time.Since(startTime))
-	if err != nil {
-		PrintError(conn, false, "Write error in control socket: %s\n", err)
-	}
-}
-
-func (s *Server) controlPing(conn net.Conn, params string) error {
+func (s *Server) controlPing(params string, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	pc, err := s.nc.ListenPacket("")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	go s.pingReplyHandler(conn, pc, time.Now())
+	defer func() {
+		_ = pc.Close()
+	}()
+	startTime := time.Now()
+	replyChan := make(chan net.Addr)
+	go func() {
+		buf := make([]byte, 8)
+		_, addr, err := pc.ReadFrom(buf)
+		if err == nil {
+			replyChan <- addr
+		}
+	}()
 	_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(params, "ping"))
 	if err != nil {
-		PrintError(conn, true, "Error sending ping: %s\n", err)
+		return nil, err
 	}
-	return nil
+	cfr := make(map[string]interface{})
+	select {
+	case addr := <-replyChan:
+		cfr["Result"] = fmt.Sprintf("Reply from %s in %s\n", addr.String(), time.Since(startTime))
+	case <-time.After(10 * time.Second):
+		cfr["Result"] = "Timeout waiting for ping response"
+	}
+	return cfr, nil
 }
 
-func (s *Server) controlStatus(conn net.Conn, params string) error {
+func (s *Server) controlStatus(params string, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	status := netceptor.MainInstance.Status()
-	bytes, err := json.Marshal(status)
-	if err != nil {
-		PrintError(conn, true, "JSON error marshaling status: %s\n", err)
-		return nil
-	}
-	err = Printf(conn, "%s\n", bytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	cfr := make(map[string]interface{})
+	cfr["NodeID"] = status.NodeID
+	cfr["Connections"] = status.Connections
+	cfr["RoutingTable"] = status.RoutingTable
+	cfr["Advertisements"] = status.Advertisements
+	return cfr, nil
 }
 
-func (s *Server) controlConnect(conn net.Conn, params string) error {
+func (s *Server) controlConnect(params string, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	tokens := strings.Split(params, " ")
 	if len(tokens) < 2 || len(tokens) > 3 {
-		PrintError(conn, true, "Syntax: connect <node> <service> [<tls-client-config>]\n")
-		return nil
+		return nil, fmt.Errorf("invalid parameters")
 	}
 	var tlsname string
 	if len(tokens) == 3 {
@@ -160,47 +176,61 @@ func (s *Server) controlConnect(conn net.Conn, params string) error {
 	}
 	tlscfg, err := netceptor.GetClientTLSConfig(tlsname, tokens[0])
 	if err != nil {
-		PrintError(conn, true, "Error getting TLS config: %s\n", err)
-		return nil
+		return nil, err
 	}
 	rc, err := s.nc.Dial(tokens[0], tokens[1], tlscfg)
 	if err != nil {
-		PrintError(conn, true, "Error connecting to node: %s\n", err)
-		return nil
+		return nil, err
 	}
-	sockutils.BridgeConns(rc, conn)
-	return nil
+	err = cfo.BridgeConn("Connecting", rc, "connected service")
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // RunControlSession runs the server protocol on the given connection
 func (s *Server) RunControlSession(conn net.Conn) {
 	debug.Printf("Client connected to control service\n")
 	defer func() {
+		debug.Printf("Client disconnected from control service\n")
 		err := conn.Close()
 		if err != nil {
 			debug.Printf("Error closing connection: %s\n", err)
 		}
 	}()
-	err := Printf(conn, "Receptor Control, node %s\n", s.nc.NodeID())
+	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
 	if err != nil {
 		debug.Printf("Write error in control service: %s\n", err)
 		return
 	}
 	done := false
-	reader := bufio.NewReader(conn)
 	for !done {
-		cmd, err := reader.ReadString('\n')
-		if err == io.EOF {
-			debug.Printf("Control service closed\n")
-			done = true
-		} else if err != nil {
-			debug.Printf("Read error in control service: %s\n", err)
-			return
+		// Inefficiently read one line from the socket - we can't use bufio
+		// because we cannot read ahead beyond the newline character
+		cmdBytes := make([]byte, 0)
+		buf := make([]byte, 1)
+		for {
+			n, err := conn.Read(buf)
+			if err == io.EOF {
+				debug.Printf("Control service closed\n")
+				done = true
+				break
+			} else if err != nil {
+				debug.Printf("Read error in control service: %s\n", err)
+				return
+			}
+			if n == 1 {
+				if buf[0] == '\n' {
+					break
+				}
+				cmdBytes = append(cmdBytes, buf[0])
+			}
 		}
+		cmd := string(cmdBytes)
 		if len(cmd) == 0 {
 			continue
 		}
-		cmd = strings.TrimRight(cmd, "\n")
 		tokens := strings.SplitN(cmd, " ", 2)
 		if len(tokens) > 0 {
 			cmd = strings.ToLower(tokens[0])
@@ -218,18 +248,36 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			}
 			s.controlFuncLock.RUnlock()
 			if cf != nil {
-				err := cf(conn, params)
-				if err == ErrNormalClose {
-					return
-				} else if err != nil {
-					err = Printf(conn, "Error in control service %s command: %s\n", cmd, err)
+				cfo := &sockControl{
+					conn: conn,
+				}
+				cfr, err := cf(params, cfo)
+				if err != nil {
+					_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 					if err != nil {
 						debug.Printf("Write error in control service: %s\n", err)
 						return
 					}
+				} else {
+					if cfr != nil {
+						rbytes, err := json.Marshal(cfr)
+						if err != nil {
+							_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
+							if err != nil {
+								debug.Printf("Write error in control service: %s\n", err)
+								return
+							}
+						}
+						rbytes = append(rbytes, '\n')
+						_, err = conn.Write(rbytes)
+						if err != nil {
+							debug.Printf("Write error in control service: %s\n", err)
+							return
+						}
+					}
 				}
 			} else {
-				err = Printf(conn, "Unknown command\n")
+				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: Unknown command\n")))
 				if err != nil {
 					debug.Printf("Write error in control service: %s\n", err)
 					return
@@ -266,6 +314,7 @@ func (s *Server) RunControlSvc(service string, tlscfg *tls.Config) error {
 // CmdlineConfigWindows is the cmdline configuration object for a control service on Windows
 type CmdlineConfigWindows struct {
 	Service string `description:"Receptor service name to listen on" default:"control"`
+	TLS     string `description:"Name of TLS server config for the Receptor listener"`
 }
 
 // CmdlineConfigUnix is the cmdline configuration object for a control service on Unix
@@ -307,8 +356,8 @@ func (cfg CmdlineConfigUnix) Run() error {
 // Run runs the action
 func (cfg CmdlineConfigWindows) Run() error {
 	return CmdlineConfigUnix{
-		Service:  cfg.Service,
-		Filename: "",
+		Service: cfg.Service,
+		TLS:     cfg.TLS,
 	}.Run()
 }
 

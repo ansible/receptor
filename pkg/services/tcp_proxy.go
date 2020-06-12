@@ -32,7 +32,7 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 			debug.Printf("Error connecting on Receptor network: %s\n", err)
 			continue
 		}
-		go sockutils.BridgeConns(tc, qc)
+		go sockutils.BridgeConns(tc, "tcp service", qc, "receptor connection")
 	}
 }
 
@@ -64,7 +64,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 			debug.Printf("Error connecting via TCP: %s\n", err)
 			continue
 		}
-		go sockutils.BridgeConns(qc, tc)
+		go sockutils.BridgeConns(qc, "receptor service", tc, "tcp connection")
 	}
 }
 

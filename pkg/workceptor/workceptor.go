@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/controlsvc"
 	"github.com/ghjm/sockceptor/pkg/randstr"
-	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,16 +188,15 @@ func (w *Workceptor) GetResults(unitID string) (chan []byte, error) {
 }
 
 // Worker function called by the control service to process a "work" command
-func (w *Workceptor) workFunc(conn net.Conn, params string) error {
+func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	if len(params) == 0 {
-		_ = controlsvc.Printf(conn, "Bad command. Use start, list, status or cancel.\n")
-		return nil
+		return nil, fmt.Errorf("bad command")
 	}
 	tokens := strings.Split(params, " ")
 	switch tokens[0] {
 	case "start":
 		if len(tokens) < 2 {
-			return controlsvc.Printf(conn, "Must specify work type.\n")
+			return nil, fmt.Errorf("bad command")
 		}
 		workType := tokens[1]
 		params := ""
@@ -208,91 +205,88 @@ func (w *Workceptor) workFunc(conn net.Conn, params string) error {
 		}
 		ident, err := w.PreStartUnit(workType)
 		if err != nil {
-			return controlsvc.Printf(conn, "Error pre-starting unit: %s\n", err)
+			return nil, err
 		}
 		stdin, err := ioutil.TempFile(os.TempDir(), "receptor-stdin*.tmp")
 		if err != nil {
-			return controlsvc.Printf(conn, "Error creating temp file: %s\n", err)
+			return nil, err
 		}
 		stdinFilename, err := filepath.Abs(stdin.Name())
 		if err != nil {
-			return controlsvc.Printf(conn, "Error creating temp file: %s\n", err)
+			return nil, err
 		}
-		err = controlsvc.Printf(conn, "Work unit created with ID %s. Send stdin data and EOF.\n", ident)
+		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", ident), stdin)
 		if err != nil {
-			return err
-		}
-		_, err = io.Copy(stdin, conn)
-		if err != nil {
-			return err
+			return nil, err
 		}
 		err = stdin.Close()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = w.StartUnit(ident, params, stdinFilename)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return controlsvc.Printf(conn, "Job %s started.\n", ident)
+		cfr := make(map[string]interface{})
+		cfr["unitid"] = ident
+		cfr["result"] = "Job Started"
+		return cfr, nil
 	case "list":
 		unitList := w.ListActiveUnitIDs()
-		if len(unitList) == 0 {
-			return controlsvc.Printf(conn, "No active work\n")
-		}
-		err := controlsvc.Printf(conn, "%-10s %-10s %s\n", "Ident", "State", "Detail")
-		if err != nil {
-			return err
-		}
+		cfr := make(map[string]interface{})
 		for i := range unitList {
 			unitID := unitList[i]
 			state, detail, err := w.UnitStatus(unitID)
 			if err != nil {
-				return controlsvc.Printf(conn, "Error getting work status for unit %s: %s.\n", unitID, err)
+				return nil, err
 			}
-			err = controlsvc.Printf(conn, "%-10s %-10s %s\n", unitID, WorkStateToString(state), detail)
-			if err != nil {
-				return err
-			}
+			sub := make(map[string]interface{})
+			sub["state"] = WorkStateToString(state)
+			sub["detail"] = detail
+			cfr[unitID] = sub
 		}
+		return cfr, nil
 	case "status":
 		if len(tokens) != 2 {
-			return controlsvc.Printf(conn, "Must specify unit ID.\n")
+			return nil, fmt.Errorf("bad command")
 		}
 		state, detail, err := w.UnitStatus(tokens[1])
 		if err != nil {
-			return controlsvc.Printf(conn, "Error getting work status: %s.\n", err)
+			return nil, err
 		}
-		return controlsvc.Printf(conn, "State: %s\nDetail: %s\n", WorkStateToString(state), detail)
+		cfr := make(map[string]interface{})
+		cfr["state"] = WorkStateToString(state)
+		cfr["detail"] = detail
+		return cfr, nil
 	case "release":
 		if len(tokens) != 2 {
-			return controlsvc.Printf(conn, "Must specify unit ID.\n")
+			return nil, fmt.Errorf("bad command")
 		}
 		err := w.ReleaseUnit(tokens[1])
 		if err != nil {
-			return controlsvc.Printf(conn, "Error releasing unit: %s.\n", err)
+			return nil, err
 		}
-		return controlsvc.Printf(conn, "Unit %s released.\n", tokens[1])
+		cfr := make(map[string]interface{})
+		cfr["released"] = tokens[1]
+		return cfr, nil
 	case "results":
 		// TODO: Take a parameter here to begin streaming results from a byte position
 		if len(tokens) != 2 {
-			return controlsvc.Printf(conn, "Must specify unit ID.\n")
+			return nil, fmt.Errorf("bad command")
 		}
 		resultChan, err := w.GetResults(tokens[1])
 		if err != nil {
-			return err
+			return nil, err
 		}
-		err = controlsvc.Printf(conn, "Streaming results for work unit %s\n", tokens[1])
+		err = cfo.WriteToConn(fmt.Sprintf("Streaming results for work unit %s\n", tokens[1]), resultChan)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for bytes := range resultChan {
-			_, err := conn.Write(bytes)
-			if err != nil {
-				return err
-			}
+		err = cfo.Close()
+		if err != nil {
+			return nil, err
 		}
-		return controlsvc.ErrNormalClose
+		return nil, nil
 	}
-	return nil
+	return nil, fmt.Errorf("bad command")
 }

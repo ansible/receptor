@@ -1,54 +1,27 @@
+// +build !windows
+
 package services
 
 import (
 	"crypto/tls"
+	"github.com/creack/pty"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
-	"io"
+	"github.com/ghjm/sockceptor/pkg/sockutils"
 	"net"
 	"os/exec"
 	"strings"
-	"sync"
 )
-
-func copyReadToWrite(writer io.WriteCloser, reader io.Reader, wg *sync.WaitGroup) {
-	defer wg.Done()
-	_, err := io.Copy(writer, reader)
-	if err != nil {
-		debug.Printf("Error in pipe: %s\n", err)
-	}
-	err = writer.Close()
-	if err != nil {
-		debug.Printf("Error in pipe: %s\n", err)
-	}
-}
 
 func runCommand(qc net.Conn, command string) error {
 	args := strings.Split(command, " ")
 	cmd := exec.Command(args[0], args[1:]...)
-	stdin, err := cmd.StdinPipe()
+	tty, err := pty.Start(cmd)
 	if err != nil {
 		return err
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-	wg := &sync.WaitGroup{}
-	wg.Add(3)
-	go copyReadToWrite(stdin, qc, wg)
-	go copyReadToWrite(qc, stdout, wg)
-	go copyReadToWrite(qc, stderr, wg)
-	wg.Wait()
+	sockutils.BridgeConns(tty, "external command", qc, "command service")
 	return nil
 }
 
@@ -72,6 +45,7 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 			if err != nil {
 				debug.Printf("Error running command: %s\n", err)
 			}
+			_ = qc.Close()
 		}()
 	}
 }

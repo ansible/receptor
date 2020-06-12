@@ -37,7 +37,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 		return
 	}
 	for {
-		tc, err := uli.Accept()
+		uc, err := uli.Accept()
 		if err != nil {
 			debug.Printf("Error accepting Unix socket connection: %s\n", err)
 			return
@@ -47,7 +47,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 			debug.Printf("Error connecting on Receptor network: %s\n", err)
 			continue
 		}
-		go sockutils.BridgeConns(tc, qc)
+		go sockutils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
 	}
 }
 
@@ -73,7 +73,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 			debug.Printf("Error connecting via Unix socket: %s\n", err)
 			continue
 		}
-		go sockutils.BridgeConns(qc, uc)
+		go sockutils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
 	}
 }
 

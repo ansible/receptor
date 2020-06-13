@@ -1,0 +1,16 @@
+- Admission control for new node connections (nodeid restriction, etc)
+- Pluggable authentication for backends and services
+- Remote submission and queuing of work
+- DTLS option for UDP and packetconn
+- Better websockets library with proxies, TLS server, etc
+- Add ability to stream results starting at byte position
+- Support calling Python worker plugins using old-Receptor interface
+- Support Ansible Runner units of work
+- Receptorctl CLI (in Python?) for communicating with socket & importing as library
+
+---
+
+- Clean up debug output, particularly where there are structs-as-strings
+- Change debug.printf stuff to proper logging
+- Write systemd unit file with an instance specifier like openvpn
+- Packaging

@@ -6,6 +6,21 @@ import (
 	"time"
 )
 
+// ErrTimeout is returned for an expired deadline.
+var ErrTimeout error = &TimeoutError{}
+
+// TimeoutError is returned for an expired deadline.
+type TimeoutError struct{}
+
+// Error returns a string describing the error.
+func (e *TimeoutError) Error() string { return "i/o timeout" }
+
+// Timeout returns true if this error was a timeout.
+func (e *TimeoutError) Timeout() bool { return true }
+
+// Temporary returns true if a retry is likely a good idea.
+func (e *TimeoutError) Temporary() bool { return true }
+
 // PacketConn implements the net.PacketConn interface via the Receptor network
 type PacketConn struct {
 	s             *Netceptor
@@ -60,8 +75,16 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 
 // ReadFrom reads a packet from the network and returns its data and address.
 func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	//TODO: respect nc.readDeadline
-	m := <-nc.recvChan
+	var m *messageData
+	if nc.readDeadline.IsZero() {
+		m = <-nc.recvChan
+	} else {
+		select {
+		case m = <-nc.recvChan:
+		case <-time.After(time.Until(nc.readDeadline)):
+			return 0, nil, ErrTimeout
+		}
+	}
 	nCopied := copy(p, m.Data)
 	fromAddr := Addr{
 		node:    m.FromNode,
@@ -72,7 +95,6 @@ func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 
 // WriteTo writes a packet to an address on the network.
 func (nc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	//TODO: respect nc.writeDeadline
 	ncaddr, ok := addr.(Addr)
 	if !ok {
 		return 0, fmt.Errorf("attempt to write to non-netceptor address")
@@ -114,7 +136,6 @@ func (nc *PacketConn) Close() error {
 // SetDeadline sets both the read and write deadlines.
 func (nc *PacketConn) SetDeadline(t time.Time) error {
 	nc.readDeadline = t
-	nc.writeDeadline = t
 	return nil
 }
 
@@ -126,6 +147,6 @@ func (nc *PacketConn) SetReadDeadline(t time.Time) error {
 
 // SetWriteDeadline sets the write deadline.
 func (nc *PacketConn) SetWriteDeadline(t time.Time) error {
-	nc.readDeadline = t
+	// Write deadline doesn't mean anything because Write() implementation is non-blocking.
 	return nil
 }

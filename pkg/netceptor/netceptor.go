@@ -17,8 +17,6 @@ import (
 	"time"
 )
 
-//TODO: expire seenUpdates
-
 // MTU is the largest message sendable over the Netecptor network
 const MTU = 16384
 
@@ -27,6 +25,9 @@ const RouteUpdateTime = 10 * time.Second
 
 // ServiceAdTime is the interval at which regular service advertisements will be sent
 const ServiceAdTime = 60 * time.Second
+
+// SeenUpdateExpireTime is the age after which routing update IDs can be discarded
+const SeenUpdateExpireTime = 1 * time.Hour
 
 // ErrorFunc is a function parameter used to process errors. The boolean parameter
 // indicates whether the error is fatal (i.e. the associated process is going to exit).
@@ -183,7 +184,7 @@ func New(NodeID string) *Netceptor {
 		listenerRegistry:       make(map[string]*PacketConn),
 		sendRouteFloodChan:     nil,
 		updateRoutingTableChan: nil,
-		shutdownChans:          make([]chan bool, 5),
+		shutdownChans:          make([]chan bool, 6),
 		hashLock:               &sync.RWMutex{},
 		nameHashes:             make(map[uint64]string),
 		serviceAdsLock:         &sync.RWMutex{},
@@ -200,6 +201,7 @@ func New(NodeID string) *Netceptor {
 	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100, s.shutdownChans[2])
 	s.sendServiceAdsChan = tickrunner.Run(s.sendServiceAds, ServiceAdTime, time.Second*5, s.shutdownChans[3])
 	go s.monitorConnectionAging(s.shutdownChans[4])
+	go s.expireSeenUpdates(s.shutdownChans[5])
 	return &s
 }
 
@@ -346,6 +348,25 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 				debug.Printf("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
 			}
+		case <-shutdownChan:
+			return
+		}
+	}
+}
+
+// Expires old updates from the seenUpdates table
+func (s *Netceptor) expireSeenUpdates(shutdownChan chan bool) {
+	for {
+		select {
+		case <-time.After(SeenUpdateExpireTime / 2):
+			thresholdTime := time.Now().Add(-SeenUpdateExpireTime)
+			s.knownNodeLock.Lock()
+			for id := range s.seenUpdates {
+				if s.seenUpdates[id].Before(thresholdTime) {
+					delete(s.seenUpdates, id)
+				}
+			}
+			s.knownNodeLock.Unlock()
 		case <-shutdownChan:
 			return
 		}

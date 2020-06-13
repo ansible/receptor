@@ -12,9 +12,7 @@ import (
 	"time"
 )
 
-//TODO: DTLS
-//TODO: configurable reconnect
-//TODO: figure out why this is 3x slower than TCP when it ought to be be faster
+//TODO: DTLS?
 
 // UDPMaxPacketLen is the maximum size of a message that can be sent over UDP
 const UDPMaxPacketLen = 65507

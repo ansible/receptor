@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-//TODO: TLS
-
 // TCPDialer implements Backend for outbound TCP
 type TCPDialer struct {
 	address string

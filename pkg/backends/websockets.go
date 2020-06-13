@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+//TODO: Switch to better supported websockets library
 //TODO: TLS Server
 //TODO: HTTP/HTTPS proxy support
 

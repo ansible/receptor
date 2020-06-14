@@ -10,18 +10,24 @@ import (
 	_ "github.com/ghjm/sockceptor/pkg/services"
 	_ "github.com/ghjm/sockceptor/pkg/workceptor"
 	"os"
+	"strings"
 	"time"
 )
 
 var nodeID string
 
-type nodeIDCfg struct {
-	NodeID string `description:"Node ID" barevalue:"yes" required:"yes"`
+type nodeCfg struct {
+	ID           string `description:"Node ID" barevalue:"yes" required:"yes"`
+	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow" required:"no"`
 }
 
-func (cfg nodeIDCfg) Prepare() error {
-	nodeID = cfg.NodeID
-	netceptor.MainInstance = netceptor.New(cfg.NodeID)
+func (cfg nodeCfg) Prepare() error {
+	nodeID = cfg.ID
+	var allowedPeers []string
+	if cfg.AllowedPeers != "" {
+		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
+	}
+	netceptor.MainInstance = netceptor.New(cfg.ID, allowedPeers)
 	return nil
 }
 
@@ -48,7 +54,7 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cmdline.AddConfigType("node-id", "Network node ID of this instance", nodeIDCfg{}, true, nil)
+	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, nil)
 	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false, nil)
 	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, nil)

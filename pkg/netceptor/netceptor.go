@@ -57,6 +57,7 @@ type BackendSession interface {
 // Netceptor is the main object of the Receptor mesh network protocol
 type Netceptor struct {
 	nodeID                 string
+	allowedPeers           []string
 	epoch                  uint64
 	sequence               uint64
 	connLock               *sync.RWMutex
@@ -96,6 +97,8 @@ const (
 	MsgTypeRoute = 1
 	// MsgTypeServiceAdvertisement is an advertisement for a service
 	MsgTypeServiceAdvertisement = 2
+	// MsgTypeReject indicates a rejection
+	MsgTypeReject = 3
 )
 
 type messageData struct {
@@ -167,9 +170,10 @@ func BackendWait() {
 }
 
 // New constructs a new Receptor network protocol instance
-func New(NodeID string) *Netceptor {
+func New(NodeID string, AllowedPeers []string) *Netceptor {
 	s := Netceptor{
 		nodeID:                 NodeID,
+		allowedPeers:           AllowedPeers,
 		epoch:                  uint64(time.Now().Unix()),
 		sequence:               0,
 		connLock:               &sync.RWMutex{},
@@ -194,7 +198,6 @@ func New(NodeID string) *Netceptor {
 	s.reservedServices = map[string]func(*messageData) error{
 		"ping": s.handlePing,
 	}
-
 	s.addNameHash(NodeID)
 	// shutdownChans[0] is for the main protocol loop
 	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour*24, time.Second*1, s.shutdownChans[1])
@@ -831,15 +834,15 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 }
 
 // Continuously sends routing updates to let the other end know who we are on initial connection
-func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bool) {
+func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
 		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate())
 		if err != nil {
-			debug.Printf("Error Sending initial routing message: %s\n", err)
+			debug.Printf("Error Sending initial connection message: %s\n", err)
 			return
 		}
-		debug.Printf("Sending initial routing message\n")
+		debug.Printf("Sending initial connection message\n")
 		ci.WriteChan <- ri
 		count++
 		if count > 10 {
@@ -849,6 +852,7 @@ func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bo
 		}
 		select {
 		case <-time.After(1 * time.Second):
+			continue
 		case <-initDoneChan:
 			debug.Printf("Stopping initial updates\n")
 			return
@@ -856,10 +860,30 @@ func (s *Netceptor) sendInitialRoutingUpdates(ci *connInfo, initDoneChan chan bo
 	}
 }
 
+func (s *Netceptor) sendRejectMessage(writeChan chan []byte) {
+	rejMsg, err := s.translateStructToNetwork(MsgTypeReject, make([]string, 0))
+	if err != nil {
+		writeChan <- rejMsg
+	}
+}
+
 // Main Netceptor protocol loop
 func (s *Netceptor) runProtocol(sess BackendSession) error {
+	established := false
+	remoteNodeID := ""
 	defer func() {
 		_ = sess.Close()
+		if established {
+			s.connLock.Lock()
+			delete(s.connections, remoteNodeID)
+			s.connLock.Unlock()
+			s.knownNodeLock.Lock()
+			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
+			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
+			s.knownNodeLock.Unlock()
+			s.updateRoutingTableChan <- 0
+			s.sendRouteFloodChan <- 0
+		}
 	}()
 	ci := &connInfo{
 		ReadChan:  make(chan []byte),
@@ -868,53 +892,13 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 	}
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
-	established := false
 	initDoneChan := make(chan bool)
-	go s.sendInitialRoutingUpdates(ci, initDoneChan)
-	remoteNodeID := ""
+	go s.sendInitialConnectMessage(ci, initDoneChan)
 	for {
 		select {
 		case data := <-ci.ReadChan:
 			msgType := data[0]
-			if msgType == MsgTypeRoute {
-				ri := &routingUpdate{}
-				err := json.Unmarshal(data[1:], ri)
-				if err != nil {
-					debug.Printf("Error unpacking routing update\n")
-					continue
-				}
-				if !established {
-					established = true
-					initDoneChan <- true
-					remoteNodeID = ri.ForwardingNode
-					debug.Printf("Connection established with %s\n", remoteNodeID)
-					s.addNameHash(remoteNodeID)
-					s.connLock.Lock()
-					s.connections[remoteNodeID] = ci
-					s.connLock.Unlock()
-					s.knownNodeLock.Lock()
-					_, ok := s.knownConnectionCosts[s.nodeID]
-					if !ok {
-						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
-					}
-					s.knownConnectionCosts[s.nodeID][remoteNodeID] = 1.0
-					s.knownNodeLock.Unlock()
-					s.updateRoutingTableChan <- 0
-					s.sendRouteFloodChan <- 0
-					defer func() {
-						s.connLock.Lock()
-						delete(s.connections, remoteNodeID)
-						s.connLock.Unlock()
-						s.knownNodeLock.Lock()
-						delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
-						delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
-						s.knownNodeLock.Unlock()
-						s.updateRoutingTableChan <- 0
-						s.sendRouteFloodChan <- 0
-					}()
-				}
-				s.handleRoutingUpdate(ri, remoteNodeID)
-			} else if established {
+			if established {
 				if msgType == MsgTypeData {
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
@@ -927,14 +911,89 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					if err != nil {
 						debug.Printf("Error handling message data: %s\n", err)
 					}
+				} else if msgType == MsgTypeRoute {
+					ri := &routingUpdate{}
+					err := json.Unmarshal(data[1:], ri)
+					if err != nil {
+						debug.Printf("Error unpacking routing update\n")
+						continue
+					}
+					if ri.NodeID != remoteNodeID {
+						return fmt.Errorf("remote node ID changed unexpectedly from %s to %s",
+							remoteNodeID, ri.NodeID)
+					}
+					s.handleRoutingUpdate(ri, remoteNodeID)
 				} else if msgType == MsgTypeServiceAdvertisement {
 					err := s.handleServiceAdvertisement(data, remoteNodeID)
 					if err != nil {
 						debug.Printf("Error handling service advertisement: %s\n", err)
 						continue
 					}
+				} else if msgType == MsgTypeReject {
+					debug.Printf("Received a rejection message from peer.")
+					return fmt.Errorf("remote node rejected the connection")
 				} else {
 					debug.Printf("Unknown message type %d\n", msgType)
+				}
+			} else {
+				// Connection not established
+				if msgType == MsgTypeRoute {
+					ri := &routingUpdate{}
+					err := json.Unmarshal(data[1:], ri)
+					if err != nil {
+						debug.Printf("Error unpacking routing update\n")
+						continue
+					}
+					remoteNodeID = ri.ForwardingNode
+					// Decide whether the remote node is acceptable
+					remoteNodeAccepted := true
+					s.routingTableLock.RLock()
+					for node := range s.routingTable {
+						if node == remoteNodeID {
+							remoteNodeAccepted = false
+							break
+						}
+					}
+					s.routingTableLock.RUnlock()
+					if !remoteNodeAccepted {
+						s.sendRejectMessage(ci.WriteChan)
+						return fmt.Errorf("Rejected connection attempt from node %s because "+
+							"this node ID already exists on the network.\n", remoteNodeID)
+					}
+					if s.allowedPeers != nil {
+						remoteNodeAccepted = false
+						for i := range s.allowedPeers {
+							if s.allowedPeers[i] == remoteNodeID {
+								remoteNodeAccepted = true
+								break
+							}
+						}
+					}
+					if !remoteNodeAccepted {
+						s.sendRejectMessage(ci.WriteChan)
+						return fmt.Errorf("Rejected connection attempt from node %s because "+
+							"it is not in the allowed connections list.\n", remoteNodeID)
+					}
+					// Establish the connection
+					initDoneChan <- true
+					debug.Printf("Connection established with %s\n", remoteNodeID)
+					s.addNameHash(remoteNodeID)
+					s.connLock.Lock()
+					s.connections[remoteNodeID] = ci
+					s.connLock.Unlock()
+					s.knownNodeLock.Lock()
+					_, ok := s.knownConnectionCosts[s.nodeID]
+					if !ok {
+						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
+					}
+					s.knownConnectionCosts[s.nodeID][remoteNodeID] = 1.0
+					s.knownNodeLock.Unlock()
+					s.sendRouteFloodChan <- 0
+					s.updateRoutingTableChan <- 0
+					established = true
+				} else if msgType == MsgTypeReject {
+					debug.Printf("Received a rejection message from peer.")
+					return fmt.Errorf("remote node rejected the connection")
 				}
 			}
 		case err := <-ci.ErrorChan:

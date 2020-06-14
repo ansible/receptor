@@ -6,9 +6,7 @@ import (
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	"net"
-	"os"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -41,29 +39,20 @@ func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 	go func() {
 		for {
 			conn, err := net.DialUDP("udp", nil, b.address)
-			if b.redial {
-				operr, ok := err.(*net.OpError)
-				if ok {
-					syserr, ok := operr.Err.(*os.SyscallError)
-					if ok {
-						if syserr.Err == syscall.ECONNREFUSED {
-							errf(err, false)
-							time.Sleep(5 * time.Second)
-							continue
-						}
-					}
+			if err == nil {
+				ns := UDPDialerSession{
+					conn: conn,
 				}
+				err = bsf(&ns)
 			}
 			if err != nil {
-				errf(err, true)
-				return
-			}
-			ns := UDPDialerSession{
-				conn: conn,
-			}
-			err = bsf(&ns)
-			if err != nil {
-				errf(err, false)
+				if b.redial {
+					errf(err, false)
+					time.Sleep(5 * time.Second)
+				} else {
+					errf(err, true)
+					return
+				}
 			}
 		}
 	}()

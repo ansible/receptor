@@ -346,7 +346,21 @@ func checkRequiredParams(requiredParams map[string]bool, commandName string) {
 	}
 }
 
-func loadConfigFromFile(filename string) ([]reflect.Value, error) {
+type cfgObjInfo struct {
+	obj       reflect.Value
+	arg       string
+	fieldsSet []string
+}
+
+func newCOI() *cfgObjInfo {
+	return &cfgObjInfo{
+		obj:       reflect.Value{},
+		arg:       "",
+		fieldsSet: make([]string, 0),
+	}
+}
+
+func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -356,7 +370,7 @@ func loadConfigFromFile(filename string) ([]reflect.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfgObjs := make([]reflect.Value, 0)
+	cfgObjs := make([]*cfgObjInfo, 0)
 	for i := range config {
 		cfg := config[i]
 		str, ok := cfg.(string)
@@ -417,9 +431,11 @@ func loadConfigFromFile(filename string) ([]reflect.Value, error) {
 				}
 			}
 		}
-		cfgObj := reflect.New(ct.Type).Elem()
+		coi := newCOI()
+		coi.obj = reflect.New(ct.Type).Elem()
+		coi.arg = command
 		for k, v := range params {
-			f, err := getFieldByName(&cfgObj, k)
+			f, err := getFieldByName(&coi.obj, k)
 			if err != nil {
 				return nil, fmt.Errorf("field %s not defined for command %s: %s", k, command, err)
 			}
@@ -430,20 +446,20 @@ func loadConfigFromFile(filename string) ([]reflect.Value, error) {
 			if err != nil {
 				return nil, fmt.Errorf("error setting field %s in command %s: %s", k, command, err)
 			}
+			coi.fieldsSet = append(coi.fieldsSet, k)
 		}
-		cfgObjs = append(cfgObjs, cfgObj)
+		cfgObjs = append(cfgObjs, coi)
 	}
 	return cfgObjs, nil
 }
 
 // ParseAndRun parses the command line configuration and runs the selected actions.
 func ParseAndRun(args []string) {
-	var accumulator reflect.Value
-	var accumArg string
+	var accumulator *cfgObjInfo
 	var commandType reflect.Type
 	var requiredParams map[string]bool
 	requiredObjs := make(map[string]bool)
-	activeObjs := make([]reflect.Value, 0)
+	activeObjs := make([]*cfgObjInfo, 0)
 	configCmd := false
 
 	for i := range configTypes {
@@ -468,10 +484,10 @@ func ParseAndRun(args []string) {
 				lcarg = lcarg[1:]
 			}
 			// If we were accumulating an action, store it (it is now complete)
-			if commandType != nil {
-				checkRequiredParams(requiredParams, accumArg)
+			if commandType != nil && accumulator != nil {
+				checkRequiredParams(requiredParams, accumulator.arg)
 				activeObjs = append(activeObjs, accumulator)
-				accumulator = reflect.Value{}
+				accumulator = nil
 			}
 			if lcarg == "config" || lcarg == "c" {
 				configCmd = true
@@ -483,8 +499,9 @@ func ParseAndRun(args []string) {
 					os.Exit(1)
 				}
 				commandType = ct.Type
-				accumulator = reflect.New(commandType).Elem()
-				accumArg = arg
+				accumulator = newCOI()
+				accumulator.obj = reflect.New(commandType).Elem()
+				accumulator.arg = arg
 				delete(requiredObjs, ct.Type.Name())
 				requiredParams = buildRequiredParams(ct.Type)
 			}
@@ -498,13 +515,13 @@ func ParseAndRun(args []string) {
 					os.Exit(1)
 				}
 				for i := range newObjs {
-					obj := newObjs[i]
-					delete(requiredObjs, obj.Type().Name())
-					activeObjs = append(activeObjs, obj)
+					coi := newObjs[i]
+					delete(requiredObjs, coi.obj.Type().Name())
+					activeObjs = append(activeObjs, coi)
 				}
 				continue
 			}
-			if commandType == nil {
+			if commandType == nil || accumulator == nil {
 				fmt.Printf("Parameter specified before command\n")
 				os.Exit(1)
 			}
@@ -516,7 +533,7 @@ func ParseAndRun(args []string) {
 					fmt.Printf("Config error: %s\n", err)
 					os.Exit(1)
 				}
-				f := accumulator.FieldByName(bp)
+				f := accumulator.obj.FieldByName(bp)
 				if !f.CanSet() {
 					fmt.Printf("Internal error: field %s is not settable\n", bp)
 					os.Exit(1)
@@ -526,11 +543,12 @@ func ParseAndRun(args []string) {
 					fmt.Printf("Error setting config value: %s\n", err)
 					os.Exit(1)
 				}
+				accumulator.fieldsSet = append(accumulator.fieldsSet, bp)
 				delete(requiredParams, strings.ToLower(bp))
 			} else if len(sarg) == 2 {
 				// This is a key/value pair, so look for a parameter matching the key
 				lcname := strings.ToLower(sarg[0])
-				f, err := getFieldByName(&accumulator, lcname)
+				f, err := getFieldByName(&accumulator.obj, lcname)
 				if err != nil {
 					fmt.Printf("Config error: %s\n", err)
 					os.Exit(1)
@@ -544,13 +562,14 @@ func ParseAndRun(args []string) {
 					fmt.Printf("Error setting config value: %s\n", err)
 					os.Exit(1)
 				}
+				accumulator.fieldsSet = append(accumulator.fieldsSet, lcname)
 				delete(requiredParams, lcname)
 			}
 		}
 	}
-	if commandType != nil {
+	if commandType != nil && accumulator != nil {
 		// If we were accumulating an object, store it now since we're done
-		checkRequiredParams(requiredParams, accumArg)
+		checkRequiredParams(requiredParams, accumulator.arg)
 		activeObjs = append(activeObjs, accumulator)
 	}
 
@@ -576,19 +595,29 @@ func ParseAndRun(args []string) {
 	// Set default values where required
 	for i := range activeObjs {
 		cfgObj := activeObjs[i]
-		cfgType := reflect.TypeOf(cfgObj.Interface())
+		cfgType := reflect.TypeOf(cfgObj.obj.Interface())
 		for j := 0; j < cfgType.NumField(); j++ {
 			f := cfgType.Field(j)
 			defaultValue := f.Tag.Get("default")
 			if defaultValue == "" {
 				continue
 			}
-			s := cfgObj.FieldByName(f.Name)
-			if s.IsZero() && s.CanSet() {
-				err := setValue(&s, defaultValue)
-				if err != nil {
-					fmt.Printf("Error setting default value: %s\n", err)
-					os.Exit(1)
+			lcname := strings.ToLower(f.Name)
+			hasBeenSet := false
+			for i := range cfgObj.fieldsSet {
+				if cfgObj.fieldsSet[i] == lcname {
+					hasBeenSet = true
+					break
+				}
+			}
+			if !hasBeenSet {
+				s := cfgObj.obj.FieldByName(f.Name)
+				if s.CanSet() {
+					err := setValue(&s, defaultValue)
+					if err != nil {
+						fmt.Printf("Error setting default value: %s\n", err)
+						os.Exit(1)
+					}
 				}
 			}
 		}
@@ -598,7 +627,7 @@ func ParseAndRun(args []string) {
 	runMethod := func(methodName string) {
 		for i := range activeObjs {
 			cfgObj := activeObjs[i]
-			m := cfgObj.MethodByName(methodName)
+			m := cfgObj.obj.MethodByName(methodName)
 			if m.IsValid() {
 				result := m.Call(make([]reflect.Value, 0))
 				err := result[0].Interface()

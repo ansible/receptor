@@ -39,19 +39,18 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 			} else {
 				conn, err = tls.Dial("tcp", b.address, b.tls)
 			}
+			if err == nil {
+				ns := newTCPSession(conn)
+				err = bsf(ns)
+			}
 			if err != nil {
 				if b.redial {
 					errf(err, false)
 					time.Sleep(5 * time.Second)
-					continue
+				} else {
+					errf(err, true)
+					return
 				}
-				errf(err, true)
-				return
-			}
-			ns := newTCPSession(conn)
-			err = bsf(ns)
-			if err != nil {
-				errf(err, false)
 			}
 		}
 	}()

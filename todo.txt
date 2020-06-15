@@ -5,6 +5,7 @@
 - Support calling Python worker plugins using old-Receptor interface
 - Support Ansible Runner units of work
 - Receptorctl CLI and Python module for communicating with socket
+- Test CI
 
 ---
 

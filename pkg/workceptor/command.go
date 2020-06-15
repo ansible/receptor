@@ -5,49 +5,55 @@ import (
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"path"
 	"strings"
 	"time"
 )
 
 // commandUnit implements the WorkUnit interface
 type commandUnit struct {
-	command        string
-	cmd            *exec.Cmd
-	done           *bool
-	stdinFilename  string
-	stdoutFilename string
+	command    string
+	cmd        *exec.Cmd
+	done       *bool
+	unitdir    string
+	statusChan chan *StatusInfo
 }
 
 // cmdWaiter hangs around and waits for the command to be done because apparently you
 // can't safely call exec.Cmd.Exited() unless you already know the command has exited.
-func cmdWaiter(cmd *commandUnit) {
-	_ = cmd.cmd.Wait()
-	*cmd.done = true
+func cmdWaiter(cw *commandUnit) {
+	_ = cw.cmd.Wait()
+	*cw.done = true
+	var state int
+	if cw.cmd.ProcessState.Success() {
+		state = WorkStateSucceeded
+	} else {
+		state = WorkStateFailed
+	}
+	cw.statusChan <- &StatusInfo{
+		State:  state,
+		Detail: cw.cmd.ProcessState.String(),
+	}
 }
 
 // Start launches a job with given parameters.  It returns an identifier string and an error.
-func (cw *commandUnit) Start(params string, stdinFilename string) error {
+func (cw *commandUnit) Start(params string, unitdir string, statusChan chan *StatusInfo) error {
+	cw.unitdir = unitdir
+	cw.statusChan = statusChan
 	var cmd *exec.Cmd
 	if params == "" {
 		cmd = exec.Command(cw.command)
 	} else {
 		cmd = exec.Command(cw.command, strings.Split(params, " ")...)
 	}
-	cw.stdinFilename = stdinFilename
-	stdin, err := os.Open(stdinFilename)
+	stdin, err := os.Open(path.Join(cw.unitdir, "stdin"))
 	if err != nil {
 		return err
 	}
 	cmd.Stdin = stdin
-	stdout, err := ioutil.TempFile(os.TempDir(), "receptor-stdout*.tmp")
-	if err != nil {
-		return err
-	}
-	cw.stdoutFilename, err = filepath.Abs(stdout.Name())
+	stdout, err := os.OpenFile(path.Join(cw.unitdir, "stdout"), os.O_CREATE+os.O_WRONLY, 0700)
 	if err != nil {
 		return err
 	}
@@ -60,23 +66,12 @@ func (cw *commandUnit) Start(params string, stdinFilename string) error {
 		return err
 	}
 	cw.cmd = cmd
+	cw.statusChan <- &StatusInfo{
+		State:  WorkStateRunning,
+		Detail: fmt.Sprintf("Running: PID %d", cw.cmd.Process.Pid),
+	}
 	go cmdWaiter(cw)
 	return nil
-}
-
-// Status returns the status of a previously job identified by the identifier.
-// The return values are running (bool), status detail, and error.
-func (cw *commandUnit) Status() (state int, detail string, err error) {
-	if cw.done != nil && *cw.done {
-		if cw.cmd.ProcessState.Success() {
-			return WorkStateSucceeded, cw.cmd.ProcessState.String(), nil
-		}
-		return WorkStateFailed, cw.cmd.ProcessState.String(), nil
-	}
-	if cw.cmd != nil {
-		return WorkStateRunning, fmt.Sprintf("Running: PID %d", cw.cmd.Process.Pid), nil
-	}
-	return WorkStatePending, "Not started yet", nil
 }
 
 // Release releases resources associated with a job, including cancelling it if running.
@@ -86,14 +81,6 @@ func (cw *commandUnit) Release() error {
 		if err != nil {
 			return err
 		}
-	}
-	err1 := os.Remove(cw.stdinFilename)
-	err2 := os.Remove(cw.stdoutFilename)
-	if err1 != nil {
-		return err1
-	}
-	if err2 != nil {
-		return err2
 	}
 	return nil
 }
@@ -113,7 +100,7 @@ func (cw *commandUnit) Results() (results chan []byte, err error) {
 				continue
 			}
 			if stdout == nil {
-				stdout, err = os.Open(cw.stdoutFilename)
+				stdout, err = os.Open(path.Join(cw.unitdir, "stdout"))
 				filePos = 0
 			}
 			newPos, err := stdout.Seek(filePos, 0)
@@ -141,11 +128,6 @@ func (cw *commandUnit) Results() (results chan []byte, err error) {
 	return resultChan, nil
 }
 
-// Marshal returns a binary representation of this object
-func (cw *commandUnit) Marshal() ([]byte, error) {
-	return nil, fmt.Errorf("not implemented yet")
-}
-
 // **************************************************************************
 // Command line
 // **************************************************************************
@@ -162,13 +144,9 @@ func (cfg CommandCfg) newWorker() WorkType {
 	}
 }
 
-func (cfg CommandCfg) unmarshalWorker(data []byte) (WorkType, error) {
-	return nil, fmt.Errorf("not implemented yet")
-}
-
 // Run runs the action
 func (cfg CommandCfg) Run() error {
-	err := MainInstance().RegisterWorker(cfg.Service, cfg.newWorker, cfg.unmarshalWorker)
+	err := MainInstance.RegisterWorker(cfg.Service, cfg.newWorker)
 	return err
 }
 

@@ -4,30 +4,36 @@ import (
 	"fmt"
 	_ "github.com/ghjm/sockceptor/pkg/backends"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
+	"github.com/ghjm/sockceptor/pkg/controlsvc"
 	_ "github.com/ghjm/sockceptor/pkg/controlsvc"
 	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/netceptor"
 	_ "github.com/ghjm/sockceptor/pkg/services"
+	"github.com/ghjm/sockceptor/pkg/workceptor"
 	_ "github.com/ghjm/sockceptor/pkg/workceptor"
 	"os"
 	"strings"
 	"time"
 )
 
-var nodeID string
-
 type nodeCfg struct {
 	ID           string `description:"Node ID" barevalue:"yes" required:"yes"`
 	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow" required:"no"`
+	DataDir      string `description:"Directory in which to store node data"`
 }
 
 func (cfg nodeCfg) Prepare() error {
-	nodeID = cfg.ID
 	var allowedPeers []string
 	if cfg.AllowedPeers != "" {
 		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
 	}
 	netceptor.MainInstance = netceptor.New(cfg.ID, allowedPeers)
+	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
+	var err error
+	workceptor.MainInstance, err = workceptor.New(controlsvc.MainInstance, cfg.ID, cfg.DataDir)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -59,11 +65,6 @@ func main() {
 	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
-
-	if nodeID == "" {
-		println("Must specify a node ID")
-		os.Exit(1)
-	}
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})

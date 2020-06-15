@@ -4,18 +4,15 @@ import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/controlsvc"
 	"github.com/ghjm/sockceptor/pkg/randstr"
-	"io/ioutil"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
+	"sync"
 	//    "strings"
 )
 
 // NewWorkerFunc is called to initialize a new, empty WorkType object
 type NewWorkerFunc func() WorkType
-
-// UnmarshalWorkerFunc is called to unmarshal a WorkType object from disk
-type UnmarshalWorkerFunc func([]byte) (WorkType, error)
 
 // Work state constants
 const (
@@ -25,31 +22,39 @@ const (
 	WorkStateFailed    = 3
 )
 
+// StatusInfo describes the status of a unit of work
+type StatusInfo struct {
+	State  int
+	Detail string
+}
+
 // WorkType represents a unique type of worker
 type WorkType interface {
-	Start(params string, stdinFilename string) (err error)
-	Status() (state int, detail string, err error)
+	Start(params string, unitdir string, statusChan chan *StatusInfo) (err error)
 	Results() (results chan []byte, err error)
 	Release() error
-	Marshal() ([]byte, error)
 }
 
 // Internal data for a registered worker type
 type workType struct {
-	newWorker       NewWorkerFunc
-	unmarshalWorker UnmarshalWorkerFunc
+	newWorker NewWorkerFunc
 }
 
 // Internal data for a single unit of work
 type workUnit struct {
 	started bool
 	worker  WorkType
+	state   int
+	detail  string
 }
 
 // Workceptor is the main object that handles unit-of-work management
 type Workceptor struct {
-	workTypes   map[string]workType
-	activeUnits map[string]workUnit
+	nodeID          string
+	dataDir         string
+	workTypes       map[string]*workType
+	activeUnitsLock *sync.RWMutex
+	activeUnits     map[string]*workUnit
 }
 
 // WorkStateToString returns a string representation of a WorkState
@@ -69,10 +74,17 @@ func WorkStateToString(workState int) string {
 }
 
 // New constructs a new Workceptor instance
-func New(cs *controlsvc.Server) (*Workceptor, error) {
+func New(cs *controlsvc.Server, nodeID string, dataDir string) (*Workceptor, error) {
+	if dataDir == "" {
+		dataDir = path.Join(os.TempDir(), "receptor")
+	}
+	dataDir = path.Join(dataDir, nodeID)
 	w := &Workceptor{
-		workTypes:   make(map[string]workType),
-		activeUnits: make(map[string]workUnit),
+		nodeID:          nodeID,
+		dataDir:         dataDir,
+		workTypes:       make(map[string]*workType),
+		activeUnitsLock: &sync.RWMutex{},
+		activeUnits:     make(map[string]*workUnit),
 	}
 	err := cs.AddControlFunc("work", w.workFunc)
 	if err != nil {
@@ -81,29 +93,17 @@ func New(cs *controlsvc.Server) (*Workceptor, error) {
 	return w, nil
 }
 
-var mainInstance *Workceptor
-
-// MainInstance returns a global singleton instance of Workceptor
-func MainInstance() *Workceptor {
-	if mainInstance == nil {
-		var err error
-		mainInstance, err = New(controlsvc.MainInstance())
-		if err != nil {
-			panic(err)
-		}
-	}
-	return mainInstance
-}
+// MainInstance is the global instance of Workceptor instantiated by the command-line main() function
+var MainInstance *Workceptor
 
 // RegisterWorker notifies the Workceptor of a new kind of work that can be done
-func (w *Workceptor) RegisterWorker(typeName string, newWorker NewWorkerFunc, unmarshalWorker UnmarshalWorkerFunc) error {
+func (w *Workceptor) RegisterWorker(typeName string, newWorker NewWorkerFunc) error {
 	_, ok := w.workTypes[typeName]
 	if ok {
 		return fmt.Errorf("work type %s already registered", typeName)
 	}
-	w.workTypes[typeName] = workType{
-		newWorker:       newWorker,
-		unmarshalWorker: unmarshalWorker,
+	w.workTypes[typeName] = &workType{
+		newWorker: newWorker,
 	}
 	return nil
 }
@@ -114,6 +114,8 @@ func (w *Workceptor) PreStartUnit(workType string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown work type %s", workType)
 	}
+	w.activeUnitsLock.Lock()
+	defer w.activeUnitsLock.Unlock()
 	var ident string
 	for {
 		ident = randstr.RandomString(8)
@@ -122,15 +124,26 @@ func (w *Workceptor) PreStartUnit(workType string) (string, error) {
 			break
 		}
 	}
-	w.activeUnits[ident] = workUnit{
+	w.activeUnits[ident] = &workUnit{
 		started: false,
 		worker:  wT.newWorker(),
+		state:   0,
+		detail:  "",
 	}
 	return ident, nil
 }
 
+func (w *Workceptor) monitorStatusChan(statusChan chan *StatusInfo, unit *workUnit) {
+	for status := range statusChan {
+		unit.state = status.State
+		unit.detail = status.Detail
+	}
+}
+
 // StartUnit starts a unit of work
-func (w *Workceptor) StartUnit(unitID string, params string, stdinFilename string) error {
+func (w *Workceptor) StartUnit(unitID string, params string, unitdir string) error {
+	w.activeUnitsLock.Lock()
+	defer w.activeUnitsLock.Unlock()
 	unit, ok := w.activeUnits[unitID]
 	if !ok {
 		return fmt.Errorf("unknown work unit %s", unitID)
@@ -138,7 +151,9 @@ func (w *Workceptor) StartUnit(unitID string, params string, stdinFilename strin
 	if unit.started {
 		return fmt.Errorf("work unit %s was already started", unitID)
 	}
-	err := unit.worker.Start(params, stdinFilename)
+	statusChan := make(chan *StatusInfo)
+	go w.monitorStatusChan(statusChan, unit)
+	err := unit.worker.Start(params, unitdir, statusChan)
 	if err != nil {
 		return fmt.Errorf("error starting work: %s", err)
 	}
@@ -148,6 +163,8 @@ func (w *Workceptor) StartUnit(unitID string, params string, stdinFilename strin
 
 // ListActiveUnitIDs returns a slice containing the active unit IDs
 func (w *Workceptor) ListActiveUnitIDs() []string {
+	w.activeUnitsLock.RLock()
+	defer w.activeUnitsLock.RUnlock()
 	result := make([]string, 0, len(w.activeUnits))
 	for id := range w.activeUnits {
 		result = append(result, id)
@@ -155,28 +172,43 @@ func (w *Workceptor) ListActiveUnitIDs() []string {
 	return result
 }
 
-// UnitStatus returns the status of a unit
+// UnitStatus returns the state of a unit
 func (w *Workceptor) UnitStatus(unitID string) (state int, detail string, err error) {
+	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
+	w.activeUnitsLock.RUnlock()
 	if !ok {
 		return -1, "", fmt.Errorf("unknown work unit %s", unitID)
 	}
-	return unit.worker.Status()
+	return unit.state, unit.detail, nil
 }
 
 // ReleaseUnit releases a unit, canceling it if it is still running
 func (w *Workceptor) ReleaseUnit(unitID string) error {
+	w.activeUnitsLock.Lock()
 	unit, ok := w.activeUnits[unitID]
 	if !ok {
+		w.activeUnitsLock.Unlock()
 		return fmt.Errorf("unknown work unit %s", unitID)
 	}
 	delete(w.activeUnits, unitID)
-	return unit.worker.Release()
+	w.activeUnitsLock.Unlock()
+	err := unit.worker.Release()
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(path.Join(w.dataDir, unitID))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetResults returns a live stream of the results of a unit
 func (w *Workceptor) GetResults(unitID string) (chan []byte, error) {
+	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
+	w.activeUnitsLock.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("unknown work unit %s", unitID)
 	}
@@ -207,11 +239,12 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		if err != nil {
 			return nil, err
 		}
-		stdin, err := ioutil.TempFile(os.TempDir(), "receptor-stdin*.tmp")
+		unitdir := path.Join(w.dataDir, ident)
+		err = os.MkdirAll(unitdir, 0700)
 		if err != nil {
 			return nil, err
 		}
-		stdinFilename, err := filepath.Abs(stdin.Name())
+		stdin, err := os.OpenFile(path.Join(unitdir, "stdin"), os.O_CREATE+os.O_WRONLY, 0700)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +256,7 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		if err != nil {
 			return nil, err
 		}
-		err = w.StartUnit(ident, params, stdinFilename)
+		err = w.StartUnit(ident, params, unitdir)
 		if err != nil {
 			return nil, err
 		}

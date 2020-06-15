@@ -85,8 +85,8 @@ type Server struct {
 	controlFuncs    map[string]ControlFunc
 }
 
-// NewServer returns a new instance of a control service.
-func NewServer(stdServices bool, nc *netceptor.Netceptor) *Server {
+// New returns a new instance of a control service.
+func New(stdServices bool, nc *netceptor.Netceptor) *Server {
 	s := &Server{
 		nc:              nc,
 		controlFuncLock: sync.RWMutex{},
@@ -100,15 +100,8 @@ func NewServer(stdServices bool, nc *netceptor.Netceptor) *Server {
 	return s
 }
 
-var mainInstance *Server
-
-// MainInstance returns a global singleton instance of Server
-func MainInstance() *Server {
-	if mainInstance == nil {
-		mainInstance = NewServer(true, netceptor.MainInstance)
-	}
-	return mainInstance
-}
+// MainInstance is the global instance of the control service instantiated by the command-line main() function
+var MainInstance *Server
 
 // AddControlFunc registers a function that can be used from a control socket.
 func (s *Server) AddControlFunc(name string, cFunc ControlFunc) error {
@@ -301,7 +294,7 @@ func (s *Server) RunControlSvc(service string, tlscfg *tls.Config) error {
 				debug.Printf("Error accepting connection: %s. Closing socket.\n", err)
 				return
 			}
-			go MainInstance().RunControlSession(conn)
+			go s.RunControlSession(conn)
 		}
 	}()
 	return nil
@@ -332,8 +325,7 @@ func (cfg CmdlineConfigUnix) Run() error {
 	if err != nil {
 		return err
 	}
-	s := NewServer(true, nc)
-	err = s.RunControlSvc(cfg.Service, tlscfg)
+	err = MainInstance.RunControlSvc(cfg.Service, tlscfg)
 	if err != nil {
 		return err
 	}

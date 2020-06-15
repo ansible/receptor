@@ -12,8 +12,6 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - uses: actions/setup-go@v2
-    - run: |
-        export PATH=$PATH:$(go env GOPATH)/bin
-        go get -u golang.org/x/lint/golint
+    - run: go get -u golang.org/x/lint/golint
     - uses: actions/setup-python@v1
     - uses: pre-commit/action@v2.0.0

@@ -17,3 +17,4 @@
   - Group member selection by adding load average to path weight
   - Routing decision made at last node where routes are different
 - DTLS option for UDP and packetconn
+- Error out properly on connection to unknown service (ICMP Unreachable)

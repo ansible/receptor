@@ -8,3 +8,5 @@ format:
 	find cmd/ pkg/ -type f -name '*.go' -exec go fmt {} \;
 
 fmt: format
+
+.PHONY: lint format fmt

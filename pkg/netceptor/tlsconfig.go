@@ -169,6 +169,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	cmdline.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, false, configSection)
-	cmdline.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, false, configSection)
+	cmdline.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, false, false, false, configSection)
+	cmdline.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, false, false, false, configSection)
 }

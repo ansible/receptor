@@ -356,9 +356,9 @@ func (cfg CmdlineConfigWindows) Run() error {
 func init() {
 	if runtime.GOOS == "windows" {
 		cmdline.AddConfigType("control-service", "Run a control service",
-			CmdlineConfigWindows{}, false, nil)
+			CmdlineConfigWindows{}, false, false, false, nil)
 	} else {
 		cmdline.AddConfigType("control-service", "Run a control service",
-			CmdlineConfigUnix{}, false, nil)
+			CmdlineConfigUnix{}, false, false, false, nil)
 	}
 }

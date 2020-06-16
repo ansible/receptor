@@ -252,6 +252,6 @@ func (cfg WebsocketDialerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, false, backendSection)
-	cmdline.AddConfigType("ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, false, backendSection)
+	cmdline.AddConfigType("ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, false, false, false, backendSection)
+	cmdline.AddConfigType("ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, false, false, false, backendSection)
 }

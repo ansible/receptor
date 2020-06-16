@@ -1,13 +1,17 @@
 package workceptor
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"github.com/ghjm/sockceptor/pkg/controlsvc"
 	"github.com/ghjm/sockceptor/pkg/randstr"
+	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 	"sync"
+	"time"
 	//    "strings"
 )
 
@@ -30,7 +34,7 @@ type StatusInfo struct {
 
 // WorkType represents a unique type of worker
 type WorkType interface {
-	Start(params string, unitdir string, statusChan chan *StatusInfo) (err error)
+	Start(params string, unitdir string) (err error)
 	Results() (results chan []byte, err error)
 	Release() error
 }
@@ -55,6 +59,56 @@ type Workceptor struct {
 	workTypes       map[string]*workType
 	activeUnitsLock *sync.RWMutex
 	activeUnits     map[string]*workUnit
+}
+
+// Save saves a StatusInfo to a file
+func (si *StatusInfo) Save(filename string) error {
+	jsonBytes, err := json.Marshal(si)
+	if err != nil {
+		return err
+	}
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(jsonBytes)
+	if err != nil {
+		return err
+	}
+	err = file.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Load loads a StatusInfo from a file
+func (si *StatusInfo) Load(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	jsonBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+	err = file.Close()
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(jsonBytes, si)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func saveState(unitdir string, state int, detail string) error {
+	si := &StatusInfo{
+		State:  state,
+		Detail: detail,
+	}
+	return si.Save(path.Join(unitdir, "status"))
 }
 
 // WorkStateToString returns a string representation of a WorkState
@@ -108,6 +162,62 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorker NewWorkerFunc) er
 	return nil
 }
 
+func (w *Workceptor) updateStatus(filename string, unit *workUnit) {
+	si := &StatusInfo{}
+	err := si.Load(filename)
+	if err == nil {
+		unit.state = si.State
+		unit.detail = si.Detail
+	}
+}
+
+func (w *Workceptor) monitorStatus(unitdir string, unit *workUnit) {
+	statusFile := path.Join(unitdir, "status")
+	watcher, err := fsnotify.NewWatcher()
+	if err == nil {
+		err = watcher.Add(statusFile)
+		if err == nil {
+			defer func() {
+				_ = watcher.Close()
+			}()
+		} else {
+			_ = watcher.Close()
+			watcher = nil
+		}
+	} else {
+		watcher = nil
+	}
+	fi, err := os.Stat(statusFile)
+	if err != nil {
+		fi = nil
+	}
+	var watcherEvents chan fsnotify.Event
+	if watcher == nil {
+		watcherEvents = nil
+	} else {
+		watcherEvents = watcher.Events
+	}
+	for {
+		select {
+		case event := <-watcherEvents:
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				w.updateStatus(statusFile, unit)
+			}
+		case <-time.After(time.Second):
+			newFi, err := os.Stat(statusFile)
+			if err == nil {
+				if fi == nil || fi.ModTime() != newFi.ModTime() {
+					fi = newFi
+					w.updateStatus(statusFile, unit)
+				}
+			}
+		}
+		if unit.state == WorkStateSucceeded || unit.state == WorkStateFailed {
+			break
+		}
+	}
+}
+
 // PreStartUnit creates a new work unit and generates an identifier for it
 func (w *Workceptor) PreStartUnit(workType string) (string, error) {
 	wT, ok := w.workTypes[workType]
@@ -127,17 +237,10 @@ func (w *Workceptor) PreStartUnit(workType string) (string, error) {
 	w.activeUnits[ident] = &workUnit{
 		started: false,
 		worker:  wT.newWorker(),
-		state:   0,
-		detail:  "",
+		state:   WorkStatePending,
+		detail:  "Waiting for Input Data",
 	}
 	return ident, nil
-}
-
-func (w *Workceptor) monitorStatusChan(statusChan chan *StatusInfo, unit *workUnit) {
-	for status := range statusChan {
-		unit.state = status.State
-		unit.detail = status.Detail
-	}
 }
 
 // StartUnit starts a unit of work
@@ -151,13 +254,12 @@ func (w *Workceptor) StartUnit(unitID string, params string, unitdir string) err
 	if unit.started {
 		return fmt.Errorf("work unit %s was already started", unitID)
 	}
-	statusChan := make(chan *StatusInfo)
-	go w.monitorStatusChan(statusChan, unit)
-	err := unit.worker.Start(params, unitdir, statusChan)
+	err := unit.worker.Start(params, unitdir)
 	if err != nil {
 		return fmt.Errorf("error starting work: %s", err)
 	}
 	unit.started = true
+	go w.monitorStatus(unitdir, unit)
 	return nil
 }
 
@@ -241,6 +343,10 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		}
 		unitdir := path.Join(w.dataDir, ident)
 		err = os.MkdirAll(unitdir, 0700)
+		if err != nil {
+			return nil, err
+		}
+		err = saveState(unitdir, WorkStatePending, "Waiting for Input")
 		if err != nil {
 			return nil, err
 		}

@@ -123,7 +123,7 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 
 func init() {
 	cmdline.AddConfigType("tcp-server",
-		"Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, false, servicesSection)
+		"Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, false, false, false, servicesSection)
 	cmdline.AddConfigType("tcp-client",
-		"Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, false, servicesSection)
+		"Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, false, false, false, servicesSection)
 }

@@ -25,23 +25,30 @@ type param struct {
 	Description string
 	Type        reflect.Type
 	Required    bool
+	Exclusive   bool
+	Hidden      bool
 	Section     *Section
 }
 
 var configTypes []param
 
 // AddConfigType registers a new config type with the system
-func AddConfigType(name string, description string, configType interface{}, required bool, section *Section) {
+func AddConfigType(name string, description string, configType interface{}, required bool, exclusive bool, hidden bool, section *Section) {
 	configTypes = append(configTypes, param{
 		Name:        name,
 		Description: description,
 		Type:        reflect.TypeOf(configType),
 		Required:    required,
+		Exclusive:   exclusive,
+		Hidden:      hidden,
 		Section:     section,
 	})
 }
 
 func printCmdHelp(ct param) {
+	if ct.Hidden {
+		return
+	}
 	fmt.Printf("   --%s: %s", strings.ToLower(ct.Name), ct.Description)
 	if ct.Required {
 		fmt.Printf(" (required)")
@@ -79,7 +86,7 @@ func ShowHelp() {
 	}
 	for i := range configTypes {
 		ct := configTypes[i]
-		if ct.Section == nil {
+		if ct.Section == nil || ct.Hidden {
 			continue
 		}
 		found := false
@@ -111,22 +118,15 @@ func ShowHelp() {
 		if sect.Description != "" {
 			fmt.Printf("%s\n\n", sect.Description)
 		}
-		for i := range configTypes {
-			ct := configTypes[i]
-			if (s == 0 && ct.Section != nil) || (s != 0 && ct.Section != sect) {
-				continue
-			}
-			if ct.Required {
-				printCmdHelp(ct)
-			}
-		}
-		for i := range configTypes {
-			ct := configTypes[i]
-			if (s == 0 && ct.Section != nil) || (s != 0 && ct.Section != sect) {
-				continue
-			}
-			if !ct.Required {
-				printCmdHelp(ct)
+		for i := 0; i <= 1; i++ {
+			for j := range configTypes {
+				ct := configTypes[j]
+				if (s == 0 && ct.Section != nil) || (s != 0 && ct.Section != sect) || ct.Hidden {
+					continue
+				}
+				if (i == 0 && ct.Required) || (i == 1 && !ct.Required) {
+					printCmdHelp(ct)
+				}
 			}
 		}
 	}
@@ -573,7 +573,38 @@ func ParseAndRun(args []string) {
 		activeObjs = append(activeObjs, accumulator)
 	}
 
-	if len(requiredObjs) > 0 {
+	// Enforce exclusive objects
+	haveExclusive := false
+	exclusiveName := ""
+	for i := range activeObjs {
+		ao := activeObjs[i]
+		found := false
+		for j := range configTypes {
+			ct := configTypes[j]
+			if ao.obj.Type() == ct.Type {
+				if ct.Exclusive {
+					haveExclusive = true
+					exclusiveName = ct.Name
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			fmt.Printf("Internal error: type not found.\n")
+			os.Exit(1)
+		}
+		if haveExclusive {
+			break
+		}
+	}
+	if haveExclusive && len(activeObjs) > 1 {
+		fmt.Printf("Cannot specify any other options with %s.\n", exclusiveName)
+		os.Exit(1)
+	}
+
+	// Error out if we didn't get all required objects
+	if len(requiredObjs) > 0 && !haveExclusive {
 		sl := make([]string, 0, len(requiredObjs))
 		for p := range requiredObjs {
 			for i := range configTypes {

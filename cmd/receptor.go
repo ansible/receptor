@@ -60,10 +60,10 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, nil)
-	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false, nil)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, nil)
-	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, nil)
+	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, false, false, nil)
+	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false, false, false, nil)
+	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, false, false, nil)
+	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, false, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup

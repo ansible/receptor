@@ -918,7 +918,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 						debug.Printf("Error unpacking routing update\n")
 						continue
 					}
-					if ri.NodeID != remoteNodeID {
+					if ri.ForwardingNode != remoteNodeID {
 						return fmt.Errorf("remote node ID changed unexpectedly from %s to %s",
 							remoteNodeID, ri.NodeID)
 					}

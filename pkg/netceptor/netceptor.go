@@ -947,19 +947,6 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					remoteNodeID = ri.ForwardingNode
 					// Decide whether the remote node is acceptable
 					remoteNodeAccepted := true
-					s.routingTableLock.RLock()
-					for node := range s.routingTable {
-						if node == remoteNodeID {
-							remoteNodeAccepted = false
-							break
-						}
-					}
-					s.routingTableLock.RUnlock()
-					if !remoteNodeAccepted {
-						s.sendRejectMessage(ci.WriteChan)
-						return fmt.Errorf("Rejected connection attempt from node %s because "+
-							"this node ID already exists on the network.\n", remoteNodeID)
-					}
 					if s.allowedPeers != nil {
 						remoteNodeAccepted = false
 						for i := range s.allowedPeers {

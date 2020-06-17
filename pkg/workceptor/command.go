@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"github.com/ghjm/sockceptor/pkg/cmdline"
 	"github.com/ghjm/sockceptor/pkg/debug"
-	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"strings"
 	"syscall"
@@ -20,7 +20,17 @@ type commandUnit struct {
 	command string
 	cmd     *exec.Cmd
 	done    *bool
-	unitdir string
+}
+
+func termThenKill(cmd *exec.Cmd) {
+	if cmd.Process == nil {
+		return
+	}
+	_ = cmd.Process.Signal(os.Interrupt)
+	time.Sleep(1 * time.Second)
+	if cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
 }
 
 // commandRunner is run in a separate process, to monitor the subprocess and report back metadata
@@ -35,6 +45,16 @@ func commandRunner(command string, params string, unitdir string) error {
 	} else {
 		cmd = exec.Command(command, strings.Split(params, " ")...)
 	}
+	termChan := make(chan os.Signal)
+	sigKilled := false
+	go func() {
+		<-termChan
+		sigKilled = true
+		termThenKill(cmd)
+		_ = saveState(unitdir, WorkStateFailed, "Killed")
+		os.Exit(-1)
+	}()
+	signal.Notify(termChan, os.Interrupt, os.Kill)
 	stdin, err := os.Open(path.Join(unitdir, "stdin"))
 	if err != nil {
 		return err
@@ -50,20 +70,23 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	err = saveState(unitdir, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid))
-	if err != nil {
-		return err
-	}
+	_ = saveState(unitdir, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid))
 	err = cmd.Wait()
 	if err != nil {
+		if sigKilled {
+			time.Sleep(50 * time.Millisecond)
+		} else {
+			_ = saveState(unitdir, WorkStateFailed, fmt.Sprintf("Error: %s", err))
+		}
 		return err
 	}
 	if cmd.ProcessState.Success() {
-		err = saveState(unitdir, WorkStateSucceeded, cmd.ProcessState.String())
+		_ = saveState(unitdir, WorkStateSucceeded, cmd.ProcessState.String())
 	} else {
-		err = saveState(unitdir, WorkStateFailed, cmd.ProcessState.String())
+		_ = saveState(unitdir, WorkStateFailed, cmd.ProcessState.String())
 	}
-	return err
+	os.Exit(cmd.ProcessState.ExitCode())
+	return nil
 }
 
 // cmdWaiter hangs around and waits for the command to be done because apparently you
@@ -75,7 +98,6 @@ func cmdWaiter(cw *commandUnit) {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start(params string, unitdir string) error {
-	cw.unitdir = unitdir
 	cw.cmd = exec.Command(os.Args[0], "--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
 		fmt.Sprintf("params=%s", params),
@@ -93,60 +115,15 @@ func (cw *commandUnit) Start(params string, unitdir string) error {
 	return nil
 }
 
-// Release releases resources associated with a job, including cancelling it if running.
-func (cw *commandUnit) Release() error {
+// Cancel releases resources associated with a job, including cancelling it if running.
+func (cw *commandUnit) Cancel() error {
 	if cw.cmd != nil && !*cw.done {
-		err := cw.cmd.Process.Kill()
+		err := cw.cmd.Process.Signal(os.Interrupt)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// Results returns the results of the job.
-func (cw *commandUnit) Results() (results chan []byte, err error) {
-	resultChan := make(chan []byte)
-	go func() {
-		for cw.unitdir == "" {
-			time.Sleep(250 * time.Millisecond)
-		}
-		stdoutFilename := path.Join(cw.unitdir, "stdout")
-		var stdout *os.File
-		var filePos int64
-		buf := make([]byte, 1024)
-		for {
-			if stdout == nil {
-				stdout, err = os.Open(stdoutFilename)
-				if err != nil {
-					time.Sleep(250 * time.Millisecond)
-					continue
-				}
-			}
-			newPos, err := stdout.Seek(filePos, 0)
-			if newPos != filePos {
-				debug.Printf("Seek error processing stdout\n")
-				return
-			}
-			n, err := stdout.Read(buf)
-			if n > 0 {
-				filePos += int64(n)
-				resultChan <- buf[:n]
-			}
-			if err == io.EOF {
-				if *cw.done {
-					close(resultChan)
-					break
-				}
-				time.Sleep(50 * time.Millisecond)
-				continue
-			} else if err != nil {
-				debug.Printf("Error reading stdout: %s\n", err)
-				return
-			}
-		}
-	}()
-	return resultChan, nil
 }
 
 // **************************************************************************
@@ -180,7 +157,14 @@ type CommandRunnerCfg struct {
 
 // Run runs the action
 func (cfg CommandRunnerCfg) Run() error {
-	return commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
+	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
+	if err != nil {
+		debug.Printf("Command runner exited with error: %s\n", err)
+		os.Exit(-1)
+	} else {
+		os.Exit(0)
+	}
+	return nil
 }
 
 func init() {

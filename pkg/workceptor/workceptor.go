@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/ghjm/sockceptor/pkg/controlsvc"
+	"github.com/ghjm/sockceptor/pkg/debug"
 	"github.com/ghjm/sockceptor/pkg/randstr"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -35,8 +37,7 @@ type StatusInfo struct {
 // WorkType represents a unique type of worker
 type WorkType interface {
 	Start(params string, unitdir string) (err error)
-	Results() (results chan []byte, err error)
-	Release() error
+	Cancel() error
 }
 
 // Internal data for a registered worker type
@@ -254,17 +255,47 @@ func (w *Workceptor) StartUnit(unitID string, params string, unitdir string) err
 	if unit.started {
 		return fmt.Errorf("work unit %s was already started", unitID)
 	}
-	err := unit.worker.Start(params, unitdir)
-	if err != nil {
-		return fmt.Errorf("error starting work: %s", err)
+	if unit.worker != nil {
+		err := unit.worker.Start(params, unitdir)
+		if err != nil {
+			return fmt.Errorf("error starting work: %s", err)
+		}
+		unit.started = true
+		go w.monitorStatus(unitdir, unit)
+	} else {
+		return fmt.Errorf("tried to start work without worker")
 	}
-	unit.started = true
-	go w.monitorStatus(unitdir, unit)
 	return nil
 }
 
-// ListActiveUnitIDs returns a slice containing the active unit IDs
-func (w *Workceptor) ListActiveUnitIDs() []string {
+func (w *Workceptor) scanForUnits() {
+	files, err := ioutil.ReadDir(w.dataDir)
+	if err != nil {
+		return
+	}
+	w.activeUnitsLock.Lock()
+	defer w.activeUnitsLock.Unlock()
+	for i := range files {
+		fi := files[i]
+		if fi.IsDir() {
+			_, ok := w.activeUnits[fi.Name()]
+			if !ok {
+				si := &StatusInfo{}
+				_ = si.Load(path.Join(w.dataDir, fi.Name(), "status"))
+				w.activeUnits[fi.Name()] = &workUnit{
+					started: true, // If we're only finding it now, presumably it was once started
+					worker:  nil,
+					state:   si.State,
+					detail:  si.Detail,
+				}
+			}
+		}
+	}
+}
+
+// ListKnownUnitIDs returns a slice containing the known unit IDs
+func (w *Workceptor) ListKnownUnitIDs() []string {
+	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	defer w.activeUnitsLock.RUnlock()
 	result := make([]string, 0, len(w.activeUnits))
@@ -276,6 +307,7 @@ func (w *Workceptor) ListActiveUnitIDs() []string {
 
 // UnitStatus returns the state of a unit
 func (w *Workceptor) UnitStatus(unitID string) (state int, detail string, err error) {
+	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
 	w.activeUnitsLock.RUnlock()
@@ -285,20 +317,41 @@ func (w *Workceptor) UnitStatus(unitID string) (state int, detail string, err er
 	return unit.state, unit.detail, nil
 }
 
+// CancelUnit cancels a unit, killing it if it is still running
+func (w *Workceptor) CancelUnit(unitID string) error {
+	w.scanForUnits()
+	w.activeUnitsLock.RLock()
+	unit, ok := w.activeUnits[unitID]
+	if !ok {
+		w.activeUnitsLock.RUnlock()
+		return fmt.Errorf("unknown work unit %s", unitID)
+	}
+	w.activeUnitsLock.RUnlock()
+	if unit.worker != nil {
+		err := unit.worker.Cancel()
+		if err != nil {
+			return err
+		}
+	}
+	unit.state = WorkStateFailed
+	unit.detail = "Cancelled"
+	return nil
+}
+
 // ReleaseUnit releases a unit, canceling it if it is still running
 func (w *Workceptor) ReleaseUnit(unitID string) error {
+	err := w.CancelUnit(unitID)
+	if err != nil {
+		return err
+	}
 	w.activeUnitsLock.Lock()
-	unit, ok := w.activeUnits[unitID]
+	_, ok := w.activeUnits[unitID]
 	if !ok {
 		w.activeUnitsLock.Unlock()
 		return fmt.Errorf("unknown work unit %s", unitID)
 	}
 	delete(w.activeUnits, unitID)
 	w.activeUnitsLock.Unlock()
-	err := unit.worker.Release()
-	if err != nil {
-		return err
-	}
 	err = os.RemoveAll(path.Join(w.dataDir, unitID))
 	if err != nil {
 		return err
@@ -308,16 +361,52 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 
 // GetResults returns a live stream of the results of a unit
 func (w *Workceptor) GetResults(unitID string) (chan []byte, error) {
+	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
 	w.activeUnitsLock.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("unknown work unit %s", unitID)
 	}
-	resultChan, err := unit.worker.Results()
-	if err != nil {
-		return nil, err
-	}
+	resultChan := make(chan []byte)
+	go func() {
+		unitdir := path.Join(w.dataDir, unitID)
+		stdoutFilename := path.Join(unitdir, "stdout")
+		var stdout *os.File
+		var err error
+		var filePos int64
+		buf := make([]byte, 1024)
+		for {
+			if stdout == nil {
+				stdout, err = os.Open(stdoutFilename)
+				if err != nil {
+					time.Sleep(250 * time.Millisecond)
+				}
+				continue
+			}
+			newPos, err := stdout.Seek(filePos, 0)
+			if newPos != filePos {
+				debug.Printf("Seek error processing stdout\n")
+				return
+			}
+			n, err := stdout.Read(buf)
+			if n > 0 {
+				filePos += int64(n)
+				resultChan <- buf[:n]
+			}
+			if err == io.EOF {
+				if unit.state == WorkStateSucceeded || unit.state == WorkStateFailed {
+					close(resultChan)
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
+				continue
+			} else if err != nil {
+				debug.Printf("Error reading stdout: %s\n", err)
+				return
+			}
+		}
+	}()
 	return resultChan, nil
 }
 
@@ -371,7 +460,7 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		cfr["result"] = "Job Started"
 		return cfr, nil
 	case "list":
-		unitList := w.ListActiveUnitIDs()
+		unitList := w.ListKnownUnitIDs()
 		cfr := make(map[string]interface{})
 		for i := range unitList {
 			unitID := unitList[i]
@@ -407,6 +496,17 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		}
 		cfr := make(map[string]interface{})
 		cfr["released"] = tokens[1]
+		return cfr, nil
+	case "cancel":
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("bad command")
+		}
+		err := w.CancelUnit(tokens[1])
+		if err != nil {
+			return nil, err
+		}
+		cfr := make(map[string]interface{})
+		cfr["cancelled"] = tokens[1]
 		return cfr, nil
 	case "results":
 		// TODO: Take a parameter here to begin streaming results from a byte position

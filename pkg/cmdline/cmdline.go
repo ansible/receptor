@@ -162,6 +162,9 @@ func bashCompletion() {
 	fmt.Printf("        ;;\n")
 	for i := range configTypes {
 		ct := configTypes[i]
+		if ct.Hidden {
+			continue
+		}
 		fmt.Printf("      --%s)\n", strings.ToLower(ct.Name))
 		params := make([]string, 0)
 		for j := 0; j < ct.Type.NumField(); j++ {

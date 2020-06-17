@@ -380,6 +380,7 @@ func (w *Workceptor) GetResults(unitID string) (chan []byte, error) {
 			if stdout == nil {
 				stdout, err = os.Open(stdoutFilename)
 				if err != nil {
+					// Wait for stdout file to begin to exist
 					time.Sleep(250 * time.Millisecond)
 				}
 				continue
@@ -399,7 +400,8 @@ func (w *Workceptor) GetResults(unitID string) (chan []byte, error) {
 					close(resultChan)
 					break
 				}
-				time.Sleep(50 * time.Millisecond)
+				// Don't spin loop the CPU checking and re-checking for EOF
+				time.Sleep(100 * time.Millisecond)
 				continue
 			} else if err != nil {
 				debug.Printf("Error reading stdout: %s\n", err)

@@ -197,8 +197,9 @@ func (ns *UDPListenerSession) Close() error {
 
 // UDPListenerCfg is the cmdline configuration object for a UDP listener
 type UDPListenerCfg struct {
-	BindAddr string `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int    `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
+	BindAddr string  `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int     `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
+	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Run runs the action
@@ -211,7 +212,7 @@ func (cfg UDPListenerCfg) Run() error {
 		return err
 	}
 	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
 		fmt.Printf("Error in listener backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
@@ -222,8 +223,9 @@ func (cfg UDPListenerCfg) Run() error {
 
 // UDPDialerCfg is the cmdline configuration object for a UDP listener
 type UDPDialerCfg struct {
-	Address string `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
-	Redial  bool   `description:"Keep redialing on lost connection" default:"true"`
+	Address string  `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
+	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
+	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Run runs the action
@@ -235,7 +237,7 @@ func (cfg UDPDialerCfg) Run() error {
 		return err
 	}
 	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
 		fmt.Printf("Error in peer connection backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()

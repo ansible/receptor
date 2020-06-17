@@ -158,9 +158,10 @@ func (ns *TCPSession) Close() error {
 
 // TCPListenerCfg is the cmdline configuration object for a TCP listener
 type TCPListenerCfg struct {
-	BindAddr string `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int    `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
-	TLS      string `description:"Name of TLS server config"`
+	BindAddr string  `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int     `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
+	TLS      string  `description:"Name of TLS server config"`
+	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Run runs the action
@@ -177,7 +178,7 @@ func (cfg TCPListenerCfg) Run() error {
 		return err
 	}
 	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
 		fmt.Printf("Error in listener backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
@@ -188,9 +189,10 @@ func (cfg TCPListenerCfg) Run() error {
 
 // TCPDialerCfg is the cmdline configuration object for a TCP dialer
 type TCPDialerCfg struct {
-	Address string `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
-	Redial  bool   `description:"Keep redialing on lost connection" default:"true"`
-	TLS     string `description:"Name of TLS client config"`
+	Address string  `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
+	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
+	TLS     string  `description:"Name of TLS client config"`
+	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Run runs the action
@@ -210,7 +212,7 @@ func (cfg TCPDialerCfg) Run() error {
 		return err
 	}
 	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
 		fmt.Printf("Error in peer connection backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()

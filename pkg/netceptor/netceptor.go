@@ -12,6 +12,7 @@ import (
 	"github.com/minio/highwayhash"
 	"math"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -81,11 +82,17 @@ type Netceptor struct {
 	sendServiceAdsChan     chan time.Duration
 }
 
+// ConnStatus holds information about a single connection in the Status struct.
+type ConnStatus struct {
+	NodeID string
+	Cost   float64
+}
+
 // Status is the struct returned by Netceptor.Status().  It represents a public
 // view of the internal status of the Netceptor object.
 type Status struct {
 	NodeID         string
-	Connections    []string
+	Connections    []*ConnStatus
 	RoutingTable   map[string]string
 	Advertisements []*ServiceAdvertisement
 }
@@ -113,6 +120,7 @@ type connInfo struct {
 	ReadChan         chan []byte
 	WriteChan        chan []byte
 	ErrorChan        chan error
+	Cost             float64
 	lastReceivedData time.Time
 }
 
@@ -126,7 +134,7 @@ type routingUpdate struct {
 	UpdateID       string
 	UpdateEpoch    uint64
 	UpdateSequence uint64
-	Connections    []string
+	Connections    map[string]float64
 	ForwardingNode string
 }
 
@@ -223,9 +231,12 @@ func (s *Netceptor) NodeID() string {
 // Status returns the current state of the Netceptor object
 func (s *Netceptor) Status() Status {
 	s.connLock.RLock()
-	conns := make([]string, 0)
+	conns := make([]*ConnStatus, 0)
 	for conn := range s.connections {
-		conns = append(conns, conn)
+		conns = append(conns, &ConnStatus{
+			NodeID: conn,
+			Cost:   s.connections[conn].Cost,
+		})
 	}
 	s.connLock.RUnlock()
 	s.routingTableLock.RLock()
@@ -591,7 +602,7 @@ func (s *Netceptor) printRoutingTable() {
 	for conn := range s.knownConnectionCosts {
 		debug.Printf("   %s: ", conn)
 		for peer := range s.knownConnectionCosts[conn] {
-			debug.Printf("%s ", peer)
+			debug.Printf("%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
 		debug.Printf("\n")
 	}
@@ -606,11 +617,9 @@ func (s *Netceptor) printRoutingTable() {
 func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 	s.sequence++
 	s.connLock.RLock()
-	conns := make([]string, len(s.connections))
-	i := 0
+	conns := make(map[string]float64)
 	for conn := range s.connections {
-		conns[i] = conn
-		i++
+		conns[conn] = s.connections[conn].Cost
 	}
 	s.connLock.RUnlock()
 	update := &routingUpdate{
@@ -641,8 +650,13 @@ func (s *Netceptor) sendRoutingUpdate() {
 	if len(s.connections) == 0 {
 		return
 	}
-	debug.Printf("Sending routing update\n")
-	message, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate())
+	ru := s.makeRoutingUpdate()
+	sb := make([]string, 0)
+	for conn := range ru.Connections {
+		sb = append(sb, fmt.Sprintf("%s(%.2f)", conn, ru.Connections[conn]))
+	}
+	debug.Printf("Sending routing update. Connections: %s\n", strings.Join(sb, " "))
+	message, err := s.translateStructToNetwork(MsgTypeRoute, ru)
 	if err != nil {
 		return
 	}
@@ -678,13 +692,9 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 	ni.Epoch = ri.UpdateEpoch
 	ni.Sequence = ri.UpdateSequence
-	conns := make(map[string]float64)
-	for conn := range ri.Connections {
-		conns[ri.Connections[conn]] = 1.0
-	}
 	s.knownNodeLock.Lock()
 	changed := false
-	if !reflect.DeepEqual(conns, s.knownConnectionCosts[ri.NodeID]) {
+	if !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID]) {
 		changed = true
 	}
 	_, ok = s.knownNodeInfo[ri.NodeID]
@@ -692,12 +702,12 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		_ = s.addNameHash(ri.NodeID)
 	}
 	s.knownNodeInfo[ri.NodeID] = ni
-	s.knownConnectionCosts[ri.NodeID] = conns
+	s.knownConnectionCosts[ri.NodeID] = ri.Connections
 	for conn := range s.knownConnectionCosts {
 		if conn == s.nodeID {
 			continue
 		}
-		_, ok = conns[conn]
+		_, ok = ri.Connections[conn]
 		if !ok {
 			delete(s.knownConnectionCosts[conn], ri.NodeID)
 		}
@@ -867,8 +877,13 @@ func (s *Netceptor) sendRejectMessage(writeChan chan []byte) {
 	}
 }
 
+func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connInfo, reason string) error {
+	s.sendRejectMessage(ci.WriteChan)
+	return fmt.Errorf("rejected connection with node %s because %s", remoteNodeID, reason)
+}
+
 // Main Netceptor protocol loop
-func (s *Netceptor) runProtocol(sess BackendSession) error {
+func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) error {
 	established := false
 	remoteNodeID := ""
 	defer func() {
@@ -889,6 +904,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 		ReadChan:  make(chan []byte),
 		WriteChan: make(chan []byte),
 		ErrorChan: make(chan error),
+		Cost:      connectionCost,
 	}
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
@@ -919,8 +935,19 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 						continue
 					}
 					if ri.ForwardingNode != remoteNodeID {
-						return fmt.Errorf("remote node ID changed unexpectedly from %s to %s",
-							remoteNodeID, ri.NodeID)
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci,
+							fmt.Sprintf("remote node ID changed unexpectedly from %s to %s",
+								remoteNodeID, ri.NodeID))
+					}
+					if ri.NodeID == remoteNodeID {
+						// This is an update from our direct connection, so do some extra verification
+						remoteCost, ok := ri.Connections[s.nodeID]
+						if !ok {
+							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
+						}
+						if ok && remoteCost != connectionCost {
+							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
+						}
 					}
 					s.handleRoutingUpdate(ri, remoteNodeID)
 				} else if msgType == MsgTypeServiceAdvertisement {
@@ -957,9 +984,7 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 						}
 					}
 					if !remoteNodeAccepted {
-						s.sendRejectMessage(ci.WriteChan)
-						return fmt.Errorf("Rejected connection attempt from node %s because "+
-							"it is not in the allowed connections list.\n", remoteNodeID)
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the accepted connections list")
 					}
 					// Establish the connection
 					initDoneChan <- true
@@ -973,7 +998,12 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 					if !ok {
 						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
 					}
-					s.knownConnectionCosts[s.nodeID][remoteNodeID] = 1.0
+					s.knownConnectionCosts[s.nodeID][remoteNodeID] = connectionCost
+					_, ok = s.knownConnectionCosts[remoteNodeID]
+					if !ok {
+						s.knownConnectionCosts[remoteNodeID] = make(map[string]float64)
+					}
+					s.knownConnectionCosts[remoteNodeID][s.nodeID] = connectionCost
 					s.knownNodeLock.Unlock()
 					s.sendRouteFloodChan <- 0
 					s.updateRoutingTableChan <- 0
@@ -992,6 +1022,10 @@ func (s *Netceptor) runProtocol(sess BackendSession) error {
 }
 
 // RunBackend runs the Netceptor protocol on a backend object
-func (s *Netceptor) RunBackend(b Backend, errf func(error, bool)) {
-	b.Start(s.runProtocol, errf)
+func (s *Netceptor) RunBackend(b Backend, connectionCost float64, errf func(error, bool)) {
+	//TODO: Rework these interfaces, this level of indirection probably isn't necessary
+	runProtocol := func(sess BackendSession) error {
+		return s.runProtocol(sess, connectionCost)
+	}
+	b.Start(runProtocol, errf)
 }

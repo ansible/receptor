@@ -177,9 +177,10 @@ func (ns *WebsocketSession) Close() error {
 
 // WebsocketListenerCfg is the cmdline configuration object for a websocket listener
 type WebsocketListenerCfg struct {
-	BindAddr string `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int    `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
-	TLS      string `description:"Name of TLS server config"`
+	BindAddr string  `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int     `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
+	TLS      string  `description:"Name of TLS server config"`
+	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Run runs the action
@@ -196,7 +197,7 @@ func (cfg WebsocketListenerCfg) Run() error {
 		return err
 	}
 	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
 		fmt.Printf("Error in listener backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
@@ -207,10 +208,11 @@ func (cfg WebsocketListenerCfg) Run() error {
 
 // WebsocketDialerCfg is the cmdline configuration object for a Websocket listener
 type WebsocketDialerCfg struct {
-	Address     string `description:"URL to connect to" barevalue:"yes" required:"yes"`
-	Redial      bool   `description:"Keep redialing on lost connection" default:"true"`
-	ExtraHeader string `description:"Sends extra HTTP header on initial connection"`
-	TLS         string `description:"Name of TLS client config"`
+	Address     string  `description:"URL to connect to" barevalue:"yes" required:"yes"`
+	Redial      bool    `description:"Keep redialing on lost connection" default:"true"`
+	ExtraHeader string  `description:"Sends extra HTTP header on initial connection"`
+	TLS         string  `description:"Name of TLS client config"`
+	Cost        float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Prepare verifies that we are reasonably ready to go
@@ -242,7 +244,7 @@ func (cfg WebsocketDialerCfg) Run() error {
 		return err
 	}
 	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, func(err error, fatal bool) {
+	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
 		fmt.Printf("Error in peer connection backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()

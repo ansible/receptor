@@ -12,7 +12,6 @@
 - Change debug.printf stuff to proper logging
 - Write systemd unit file with an instance specifier like openvpn
 - Packaging
-- Connection weights
 - Group addresses
   - Group member selection by adding load average to path weight
   - Routing decision made at last node where routes are different

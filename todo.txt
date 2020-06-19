@@ -17,3 +17,5 @@
   - Routing decision made at last node where routes are different
 - DTLS option for UDP and packetconn
 - Error out properly on connection to unknown service (ICMP Unreachable)
+- We should probably always run a control service, even if not given on the command line
+- Add singleton enforcement to cmdline library, for control-service, node, etc

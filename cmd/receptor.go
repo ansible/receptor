@@ -30,7 +30,7 @@ func (cfg nodeCfg) Prepare() error {
 	netceptor.MainInstance = netceptor.New(cfg.ID, allowedPeers)
 	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
 	var err error
-	workceptor.MainInstance, err = workceptor.New(controlsvc.MainInstance, cfg.ID, cfg.DataDir)
+	workceptor.MainInstance, err = workceptor.New(controlsvc.MainInstance, netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
 		return err
 	}

@@ -647,7 +647,6 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 		buf := make([]byte, 1024)
 		for {
 			if stdout == nil {
-				time.Sleep(250 * time.Millisecond)
 				stdout, err = os.Open(stdoutFilename)
 				if err != nil {
 					continue
@@ -684,6 +683,9 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 					debug.Printf("Stdout complete - closing channel\n")
 					return
 				}
+				// We got to the end of the file but stdout isn't complete yet, so we need to wait
+				// until the running process writes more output.
+				time.Sleep(250 * time.Millisecond)
 				continue
 			} else if err != nil {
 				debug.Printf("Error reading stdout: %s\n", err)

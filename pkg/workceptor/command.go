@@ -19,7 +19,7 @@ import (
 type commandUnit struct {
 	command string
 	cmd     *exec.Cmd
-	done    *bool
+	done    bool
 }
 
 func termThenKill(cmd *exec.Cmd) {
@@ -33,9 +33,25 @@ func termThenKill(cmd *exec.Cmd) {
 	}
 }
 
+// Returns size of stdout, if it exists, or 0 otherwise
+func stdoutSize(unitdir string) int64 {
+	stat, err := os.Stat(path.Join(unitdir, "stdout"))
+	if err != nil {
+		return 0
+	}
+	return stat.Size()
+}
+
+// cmdWaiter hangs around and waits for the command to be done because apparently you
+// can't safely call exec.Cmd.Exited() unless you already know the command has exited.
+func cmdWaiter(cmd *exec.Cmd, doneChan chan bool) {
+	_ = cmd.Wait()
+	doneChan <- true
+}
+
 // commandRunner is run in a separate process, to monitor the subprocess and report back metadata
 func commandRunner(command string, params string, unitdir string) error {
-	err := saveState(unitdir, WorkStatePending, "Not started yet")
+	err := saveState(unitdir, WorkStatePending, "Not started yet", 0)
 	if err != nil {
 		return err
 	}
@@ -51,7 +67,7 @@ func commandRunner(command string, params string, unitdir string) error {
 		<-termChan
 		sigKilled = true
 		termThenKill(cmd)
-		_ = saveState(unitdir, WorkStateFailed, "Killed")
+		_ = saveState(unitdir, WorkStateFailed, "Killed", stdoutSize(unitdir))
 		os.Exit(-1)
 	}()
 	signal.Notify(termChan, os.Interrupt, os.Kill)
@@ -60,7 +76,7 @@ func commandRunner(command string, params string, unitdir string) error {
 		return err
 	}
 	cmd.Stdin = stdin
-	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY, 0700)
+	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0700)
 	if err != nil {
 		return err
 	}
@@ -70,30 +86,32 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	_ = saveState(unitdir, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid))
-	err = cmd.Wait()
+	doneChan := make(chan bool)
+	go cmdWaiter(cmd, doneChan)
+loop:
+	for {
+		select {
+		case <-doneChan:
+			break loop
+		case <-time.After(250 * time.Millisecond):
+			_ = saveState(unitdir, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
+		}
+	}
 	if err != nil {
 		if sigKilled {
 			time.Sleep(50 * time.Millisecond)
 		} else {
-			_ = saveState(unitdir, WorkStateFailed, fmt.Sprintf("Error: %s", err))
+			_ = saveState(unitdir, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
 		}
 		return err
 	}
 	if cmd.ProcessState.Success() {
-		_ = saveState(unitdir, WorkStateSucceeded, cmd.ProcessState.String())
+		_ = saveState(unitdir, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
 	} else {
-		_ = saveState(unitdir, WorkStateFailed, cmd.ProcessState.String())
+		_ = saveState(unitdir, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
 	return nil
-}
-
-// cmdWaiter hangs around and waits for the command to be done because apparently you
-// can't safely call exec.Cmd.Exited() unless you already know the command has exited.
-func cmdWaiter(cw *commandUnit) {
-	_ = cw.cmd.Wait()
-	*cw.done = true
 }
 
 // Start launches a job with given parameters.
@@ -105,19 +123,23 @@ func (cw *commandUnit) Start(params string, unitdir string) error {
 	cw.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setsid: true,
 	}
-	done := false
-	cw.done = &done
+	cw.done = false
 	err := cw.cmd.Start()
 	if err != nil {
 		return err
 	}
-	go cmdWaiter(cw)
+	doneChan := make(chan bool)
+	go func() {
+		<-doneChan
+		cw.done = true
+	}()
+	go cmdWaiter(cw.cmd, doneChan)
 	return nil
 }
 
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (cw *commandUnit) Cancel() error {
-	if cw.cmd != nil && !*cw.done {
+	if cw.cmd != nil && !cw.done {
 		err := cw.cmd.Process.Signal(os.Interrupt)
 		if err != nil {
 			return err

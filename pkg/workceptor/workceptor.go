@@ -627,15 +627,27 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 	}
 	resultChan := make(chan []byte)
 	go func() {
-		time.Sleep(250 * time.Millisecond)
 		unitdir := path.Join(w.dataDir, unitID)
 		stdoutFilename := path.Join(unitdir, "stdout")
+		// Wait for stdout file to exist
+		for {
+			_, err := os.Stat(stdoutFilename)
+			if err == nil {
+				break
+			} else if os.IsNotExist(err) {
+				time.Sleep(250 * time.Millisecond)
+			} else {
+				debug.Printf("Error accessing stdout file: %s\n", err)
+				return
+			}
+		}
 		var stdout *os.File
 		var err error
 		filePos := startPos
 		buf := make([]byte, 1024)
 		for {
 			if stdout == nil {
+				time.Sleep(250 * time.Millisecond)
 				stdout, err = os.Open(stdoutFilename)
 				if err != nil {
 					continue

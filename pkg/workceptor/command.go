@@ -18,6 +18,7 @@ import (
 // commandUnit implements the WorkUnit interface
 type commandUnit struct {
 	command string
+	params  string
 	cmd     *exec.Cmd
 	done    bool
 }
@@ -116,9 +117,17 @@ loop:
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start(params string, unitdir string) error {
+	var allParams string
+	if params == "" {
+		allParams = cw.params
+	} else if cw.params == "" {
+		allParams = params
+	} else {
+		allParams = strings.Join([]string{cw.params, params}, " ")
+	}
 	cw.cmd = exec.Command(os.Args[0], "--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
-		fmt.Sprintf("params=%s", params),
+		fmt.Sprintf("params=%s", allParams),
 		fmt.Sprintf("unitdir=%s", unitdir))
 	cw.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setsid: true,
@@ -156,11 +165,13 @@ func (cw *commandUnit) Cancel() error {
 type CommandCfg struct {
 	Service string `required:"true" description:"Local Receptor service name to bind to"`
 	Command string `required:"true" description:"Command to run to process units of work"`
+	Params  string `description:"Command-line parameters"`
 }
 
 func (cfg CommandCfg) newWorker() WorkType {
 	return &commandUnit{
 		command: cfg.Command,
+		params:  cfg.Params,
 	}
 }
 
@@ -181,6 +192,7 @@ type CommandRunnerCfg struct {
 func (cfg CommandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
+		_ = saveState(cfg.UnitDir, WorkStateFailed, err.Error(), 0)
 		debug.Printf("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
 	} else {

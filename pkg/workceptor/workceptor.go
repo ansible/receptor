@@ -473,6 +473,9 @@ func (w *Workceptor) startLocalUnit(unit *workUnit, unitdir string) error {
 	if unit.worker != nil {
 		err := unit.worker.Start(unit.status.Params, unitdir)
 		if err != nil {
+			unit.status.State = WorkStateFailed
+			unit.status.Detail = err.Error()
+			_ = unit.status.Save(path.Join(unitdir, "status"))
 			return fmt.Errorf("error starting work: %s", err)
 		}
 		unit.started = true
@@ -515,12 +518,18 @@ func (w *Workceptor) scanForUnits() {
 			_, ok := w.activeUnits[fi.Name()]
 			if !ok {
 				si := &StatusInfo{}
-				_ = si.Load(path.Join(w.dataDir, fi.Name(), "status"))
+				statusFilename := path.Join(w.dataDir, fi.Name(), "status")
+				_ = si.Load(statusFilename)
 				unit := &workUnit{
 					started:  true, // If we're finding it now, we don't want to start it again
 					released: false,
 					worker:   nil,
 					status:   si,
+				}
+				if unit.status.State == WorkStatePending {
+					unit.status.State = WorkStateFailed
+					unit.status.Detail = "Failed to start"
+					_ = unit.status.Save(statusFilename)
 				}
 				w.activeUnits[fi.Name()] = unit
 				if si.Node != "" && si.Node != w.nc.NodeID() {
@@ -616,8 +625,35 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 	return nil
 }
 
+// checkDone non-blockingly checks if the done channel is signaled
+func checkDone(doneChan chan struct{}) bool {
+	if doneChan == nil {
+		return false
+	}
+	select {
+	case <-doneChan:
+		return true
+	default:
+		return false
+	}
+}
+
+// sleepOrDone sleeps until a timeout or the done channel is signaled
+func sleepOrDone(doneChan chan struct{}, interval time.Duration) bool {
+	if doneChan == nil {
+		time.Sleep(interval)
+		return false
+	}
+	select {
+	case <-doneChan:
+		return true
+	case <-time.After(interval):
+		return false
+	}
+}
+
 // GetResults returns a live stream of the results of a unit
-func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, error) {
+func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan struct{}) (chan []byte, error) {
 	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
@@ -631,11 +667,16 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 		stdoutFilename := path.Join(unitdir, "stdout")
 		// Wait for stdout file to exist
 		for {
+			if checkDone(doneChan) {
+				return
+			}
 			_, err := os.Stat(stdoutFilename)
 			if err == nil {
 				break
 			} else if os.IsNotExist(err) {
-				time.Sleep(250 * time.Millisecond)
+				if sleepOrDone(doneChan, 250*time.Millisecond) {
+					return
+				}
 			} else {
 				debug.Printf("Error accessing stdout file: %s\n", err)
 				return
@@ -646,14 +687,14 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 		filePos := startPos
 		buf := make([]byte, 1024)
 		for {
+			if sleepOrDone(doneChan, 250*time.Millisecond) {
+				return
+			}
 			if stdout == nil {
 				stdout, err = os.Open(stdoutFilename)
 				if err != nil {
 					continue
 				}
-			}
-			if stdout == nil {
-				continue
 			}
 			newPos, err := stdout.Seek(filePos, 0)
 			if newPos != filePos {
@@ -671,6 +712,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 					debug.Printf("Error closing stdout\n")
 					return
 				}
+				stdout = nil
 				stat, err := os.Stat(stdoutFilename)
 				var stdoutSize int64
 				if err != nil {
@@ -683,9 +725,6 @@ func (w *Workceptor) GetResults(unitID string, startPos int64) (chan []byte, err
 					debug.Printf("Stdout complete - closing channel\n")
 					return
 				}
-				// We got to the end of the file but stdout isn't complete yet, so we need to wait
-				// until the running process writes more output.
-				time.Sleep(250 * time.Millisecond)
 				continue
 			} else if err != nil {
 				debug.Printf("Error reading stdout: %s\n", err)
@@ -810,7 +849,11 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 				return nil, fmt.Errorf("bad command")
 			}
 		}
-		resultChan, err := w.GetResults(tokens[1], startPos)
+		doneChan := make(chan struct{})
+		defer func() {
+			doneChan <- struct{}{}
+		}()
+		resultChan, err := w.GetResults(tokens[1], startPos, doneChan)
 		if err != nil {
 			return nil, err
 		}

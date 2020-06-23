@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -58,6 +59,49 @@ func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 	return nil
 }
 
+func connCheckSyscall(conn syscall.Conn) error {
+	var sysErr error = nil
+	rc, err := conn.SyscallConn()
+	if err != nil {
+		return err
+	}
+	err = rc.Read(func(fd uintptr) bool {
+		var buf []byte = []byte{0}
+		n, _, err := syscall.Recvfrom(int(fd), buf, syscall.MSG_PEEK|syscall.MSG_DONTWAIT)
+		switch {
+		case n == 0 && err == nil:
+			sysErr = io.EOF
+		case err == syscall.EAGAIN || err == syscall.EWOULDBLOCK:
+			sysErr = nil
+		default:
+			sysErr = err
+		}
+		return true
+	})
+	if err != nil {
+		return err
+	}
+	return sysErr
+}
+
+func connCheckNetceptor(conn *netceptor.Conn) error {
+	var buf []byte = []byte{0}
+	_, err := conn.Read(buf)
+	return err
+}
+
+func connCheck(conn net.Conn) error {
+	nc, ok := conn.(*netceptor.Conn)
+	if ok {
+		return connCheckNetceptor(nc)
+	}
+	sc, ok := conn.(syscall.Conn)
+	if ok {
+		return connCheckSyscall(sc)
+	}
+	return nil
+}
+
 func (s *sockControl) WriteToConn(message string, in chan []byte) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
@@ -65,13 +109,25 @@ func (s *sockControl) WriteToConn(message string, in chan []byte) error {
 			return err
 		}
 	}
-	for bytes := range in {
-		_, err := s.conn.Write(bytes)
-		if err != nil {
-			return err
+	for {
+		select {
+		case bytes, ok := <-in:
+			if !ok {
+				return nil
+			}
+			_, err := s.conn.Write(bytes)
+			if err != nil {
+				return err
+			}
+		case <-time.After(1 * time.Second):
+			err := connCheck(s.conn)
+			if err == io.EOF {
+				return nil
+			} else if err != nil {
+				return err
+			}
 		}
 	}
-	return nil
 }
 
 func (s *sockControl) Close() error {

@@ -35,18 +35,18 @@ type PacketConn struct {
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
-	s.listenerLock.Lock()
-	defer s.listenerLock.Unlock()
+	if len(service) > 8 {
+		return nil, fmt.Errorf("service name %s too long", service)
+	}
 	if service == "" {
 		service = s.getEphemeralService()
-	} else if len(service) > 8 {
-		return nil, fmt.Errorf("service name %s too long", service)
-	} else {
-		_, isReserved := s.reservedServices[service]
-		_, isListening := s.listenerRegistry[service]
-		if isReserved || isListening {
-			return nil, fmt.Errorf("service %s is already listening", service)
-		}
+	}
+	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
+	_, isReserved := s.reservedServices[service]
+	_, isListening := s.listenerRegistry[service]
+	if isReserved || isListening {
+		return nil, fmt.Errorf("service %s is already listening", service)
 	}
 	_ = s.addNameHash(service)
 	pc := &PacketConn{

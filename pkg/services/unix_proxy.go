@@ -2,11 +2,11 @@ package services
 
 import (
 	"crypto/tls"
-	"github.com/ghjm/sockceptor/pkg/cmdline"
-	"github.com/ghjm/sockceptor/pkg/debug"
-	"github.com/ghjm/sockceptor/pkg/netceptor"
-	"github.com/ghjm/sockceptor/pkg/sockutils"
 	"github.com/juju/fslock"
+	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/sockutils"
 	"net"
 	"os"
 	"runtime"

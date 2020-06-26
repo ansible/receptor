@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/cmdline"
+	"github.com/project-receptor/receptor/pkg/cmdline"
 	"io/ioutil"
 )
 

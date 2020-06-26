@@ -1,6 +1,6 @@
 package workceptor
 
-import "github.com/ghjm/sockceptor/pkg/cmdline"
+import "github.com/project-receptor/receptor/pkg/cmdline"
 
 var workersSection = &cmdline.Section{
 	Description: "Commands to configure workers that process units of work:",

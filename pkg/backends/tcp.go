@@ -3,10 +3,10 @@ package backends
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/cmdline"
-	"github.com/ghjm/sockceptor/pkg/debug"
-	"github.com/ghjm/sockceptor/pkg/framer"
-	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/framer"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
 	"time"
 )

@@ -4,9 +4,9 @@ package services
 
 import (
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/cmdline"
-	"github.com/ghjm/sockceptor/pkg/debug"
-	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 	"net"

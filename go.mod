@@ -1,4 +1,4 @@
-module github.com/ghjm/sockceptor
+module github.com/project-receptor/receptor
 
 go 1.14
 

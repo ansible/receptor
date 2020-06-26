@@ -24,18 +24,18 @@ type Listener struct {
 
 // Internal implementation of Listen and ListenAndAdvertise
 func (s *Netceptor) listen(service string, tls *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
-	s.listenerLock.Lock()
-	defer s.listenerLock.Unlock()
+	if len(service) > 8 {
+		return nil, fmt.Errorf("service name %s too long", service)
+	}
 	if service == "" {
 		service = s.getEphemeralService()
-	} else if len(service) > 8 {
-		return nil, fmt.Errorf("service name %s too long", service)
-	} else {
-		_, isReserved := s.reservedServices[service]
-		_, isListening := s.listenerRegistry[service]
-		if isReserved || isListening {
-			return nil, fmt.Errorf("service %s is already listening", service)
-		}
+	}
+	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
+	_, isReserved := s.reservedServices[service]
+	_, isListening := s.listenerRegistry[service]
+	if isReserved || isListening {
+		return nil, fmt.Errorf("service %s is already listening", service)
 	}
 	_ = s.addNameHash(service)
 	pc := &PacketConn{
@@ -130,8 +130,7 @@ type Conn struct {
 func (s *Netceptor) Dial(node string, service string, tls *tls.Config) (*Conn, error) {
 	_ = s.addNameHash(node)
 	_ = s.addNameHash(service)
-	lservice := s.getEphemeralService()
-	pc, err := s.ListenPacket(lservice)
+	pc, err := s.ListenPacket("")
 	if err != nil {
 		return nil, err
 	}

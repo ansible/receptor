@@ -576,8 +576,9 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 }
 
 // Returns an unused random service name to use as the equivalent of a TCP/IP ephemeral port number.
-// Caller must already have s.structLock at least read-locked.
 func (s *Netceptor) getEphemeralService() string {
+	s.listenerLock.RLock()
+	defer s.listenerLock.RUnlock()
 	for {
 		service := randstr.RandomString(8)
 		_, ok := s.reservedServices[service]

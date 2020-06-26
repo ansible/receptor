@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/backends"
-	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/backends"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"net"
 	"os"

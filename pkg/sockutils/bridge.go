@@ -1,8 +1,8 @@
 package sockutils
 
 import (
-	"github.com/ghjm/sockceptor/pkg/debug"
-	"github.com/ghjm/sockceptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"strings"
 )

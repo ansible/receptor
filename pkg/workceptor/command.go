@@ -4,8 +4,8 @@ package workceptor
 
 import (
 	"fmt"
-	"github.com/ghjm/sockceptor/pkg/cmdline"
-	"github.com/ghjm/sockceptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/project-receptor/receptor/pkg/debug"
 	"os"
 	"os/exec"
 	"os/signal"

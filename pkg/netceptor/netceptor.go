@@ -219,7 +219,12 @@ func New(NodeID string, AllowedPeers []string) *Netceptor {
 // Shutdown shuts down a Receptor network protocol instance
 func (s *Netceptor) Shutdown() {
 	for i := range s.shutdownChans {
-		s.shutdownChans[i] <- true
+		select {
+		case s.shutdownChans[i] <- true:
+		// This allows us to do non blocking send of shutdown signals in case
+		// nobody is listening on the other end
+		default:
+		}
 	}
 }
 

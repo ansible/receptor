@@ -4,6 +4,7 @@ package workceptor
 
 import (
 	"fmt"
+	"github.com/google/shlex"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/debug"
 	"os"
@@ -60,7 +61,11 @@ func commandRunner(command string, params string, unitdir string) error {
 	if params == "" {
 		cmd = exec.Command(command)
 	} else {
-		cmd = exec.Command(command, strings.Split(params, " ")...)
+		paramList, err := shlex.Split(params)
+		if err != nil {
+			return err
+		}
+		cmd = exec.Command(command, paramList...)
 	}
 	termChan := make(chan os.Signal)
 	sigKilled := false
@@ -77,7 +82,7 @@ func commandRunner(command string, params string, unitdir string) error {
 		return err
 	}
 	cmd.Stdin = stdin
-	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0700)
+	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0600)
 	if err != nil {
 		return err
 	}

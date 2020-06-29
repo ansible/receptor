@@ -2,6 +2,7 @@ package workceptor
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -69,6 +70,7 @@ type workType struct {
 
 // Internal data for a single unit of work
 type workUnit struct {
+	lock     *sync.RWMutex
 	started  bool
 	released bool
 	worker   WorkType
@@ -195,7 +197,9 @@ func (w *Workceptor) updateLocalStatus(filename string, unit *workUnit) {
 	si := &StatusInfo{}
 	err := si.Load(filename)
 	if err == nil {
+		unit.lock.Lock()
 		unit.status = si
+		unit.lock.Unlock()
 	}
 }
 
@@ -241,19 +245,165 @@ func (w *Workceptor) monitorLocalStatus(unitdir string, unit *workUnit) {
 				}
 			}
 		}
-		if IsComplete(unit.status.State) {
+		unit.lock.RLock()
+		complete := IsComplete(unit.status.State)
+		unit.lock.RUnlock()
+		if complete {
 			break
 		}
 	}
 }
 
-// monitorRemoteStatus watches a remote unit on another node and maintains local status
-func (w *Workceptor) monitorRemoteStatus(unit *workUnit, unitID string) {
+func (w *Workceptor) connectToRemote(node string) (net.Conn, *bufio.Reader, error) {
+	conn, err := w.nc.Dial(node, "control", nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	reader := bufio.NewReader(conn)
+	hello, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, nil, err
+	}
+	if !strings.Contains(hello, node) {
+		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", node,
+			strings.TrimRight(hello, "\n"))
+	}
+	return conn, reader, nil
+}
+
+// monitorRemoteStatus monitors the remote status file and copies results to the local one
+func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup,
+	unit *workUnit, unitdir string, conn net.Conn, reader *bufio.Reader) {
+	defer func() {
+		cancel()
+		wg.Done()
+	}()
+	unit.lock.RLock()
+	remoteNodeID := unit.status.Node
+	remoteUnitID := unit.status.RemoteUnitID
+	unit.lock.RUnlock()
+	for {
+		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
+		if err != nil {
+			debug.Printf("Write error sending to %s: %s\n", remoteNodeID, err)
+			return
+		}
+		status, err := reader.ReadString('\n')
+		if err != nil {
+			debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
+			return
+		}
+		if status[:5] == "ERROR" {
+			if strings.Contains(status, "unknown work unit") {
+				debug.Printf("Work unit %s on node %s appears to be gone.\n", remoteUnitID, remoteNodeID)
+				unit.lock.Lock()
+				unit.status.State = WorkStateFailed
+				unit.status.Detail = "Remote work unit is gone"
+				_ = unit.status.Save(path.Join(unitdir, "status"))
+				unit.lock.Unlock()
+				return
+			}
+			debug.Printf("Remote error%s\n", strings.TrimRight(status[5:], "\n"))
+			return
+		}
+		si := StatusInfo{}
+		err = json.Unmarshal([]byte(status), &si)
+		if err != nil {
+			debug.Printf("Error unmarshalling JSON: %s\n", status)
+			return
+		}
+		unit.lock.Lock()
+		unit.status.State = si.State
+		unit.status.Detail = si.Detail
+		unit.status.StdoutSize = si.StdoutSize
+		err = unit.status.Save(path.Join(unitdir, "status"))
+		unit.lock.Unlock()
+		if err != nil {
+			debug.Printf("Error saving local status file: %s\n", err)
+			return
+		}
+		sleepOrDone(ctx.Done(), 1*time.Second)
+	}
+}
+
+// monitorRemoteStdout copies the remote stdout stream to the local buffer
+func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup,
+	unit *workUnit, unitdir string) {
+	defer func() {
+		cancel()
+		wg.Done()
+	}()
+	stdoutFilename := path.Join(unitdir, "stdout")
+	unit.lock.RLock()
+	remoteNodeID := unit.status.Node
+	remoteUnitID := unit.status.RemoteUnitID
+	unit.lock.RUnlock()
+	firstTime := true
+	for {
+		if firstTime {
+			firstTime = false
+			if checkDone(ctx.Done()) {
+				return
+			}
+		} else {
+			if sleepOrDone(ctx.Done(), 1*time.Second) {
+				return
+			}
+		}
+		diskStdoutSize := fileSizeOrZero(stdoutFilename)
+		unit.lock.RLock()
+		remoteStdoutSize := unit.status.StdoutSize
+		unit.lock.RUnlock()
+		var conn net.Conn
+		if diskStdoutSize < remoteStdoutSize {
+			if conn != nil && !reflect.ValueOf(conn).IsNil() {
+				_ = conn.Close()
+			}
+			conn, reader, err := w.connectToRemote(remoteNodeID)
+			if err != nil {
+				debug.Printf("Connection failed to %s: %s\n", remoteNodeID, err)
+				continue
+			}
+			_, err = conn.Write([]byte(fmt.Sprintf("work results %s %d\n", remoteUnitID, diskStdoutSize)))
+			if err != nil {
+				debug.Printf("Write error sending to %s: %s\n", remoteNodeID, err)
+				continue
+			}
+			status, err := reader.ReadString('\n')
+			if err != nil {
+				debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
+				continue
+			}
+			if !strings.Contains(status, "Streaming results") {
+				debug.Printf("Remote node %s did not stream results\n", remoteNodeID)
+				continue
+			}
+			stdout, err := os.OpenFile(stdoutFilename, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)
+			if err != nil {
+				debug.Printf("Could not open stdout file %s: %s\n", stdoutFilename, err)
+				continue
+			}
+			_, err = io.Copy(stdout, conn)
+			if err != nil {
+				debug.Printf("Error copying to stdout file %s: %s\n", stdoutFilename, err)
+				continue
+			}
+		}
+	}
+}
+
+// monitorRemoteUnit watches a remote unit on another node and maintains local status
+func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
+	// TODO: handle cancellation of the overall monitor
 	var conn net.Conn
-	var err error
 	var nextDelay = SuccessWorkSleep
 	unitdir := path.Join(w.dataDir, unitID)
 	submitIDRegex := regexp.MustCompile("with ID ([a-zA-Z0-9]+)\\.")
+	unit.lock.RLock()
+	remoteNodeID := unit.status.Node
+	remoteUnitID := unit.status.RemoteUnitID
+	workType := unit.status.WorkType
+	unit.lock.RUnlock()
 	for {
 		if conn != nil && !reflect.ValueOf(conn).IsNil() {
 			_ = conn.Close()
@@ -263,33 +413,26 @@ func (w *Workceptor) monitorRemoteStatus(unit *workUnit, unitID string) {
 		if nextDelay > MaxWorkSleep {
 			nextDelay = MaxWorkSleep
 		}
-		if unit.released {
+		unit.lock.RLock()
+		released := unit.released
+		unit.lock.RUnlock()
+		if released {
 			return
 		}
-		//TODO: this assumes every work-processing node will have a control service named
-		//     "control." Perhaps we need to hardcode this as something we always start.
-		//     We also need to deal with authenticating this connection, supplying a TLS
-		//     client certificate and CA bundle, etc.
-		conn, err = w.nc.Dial(unit.status.Node, "control", nil)
+		conn, reader, err := w.connectToRemote(remoteNodeID)
 		if err != nil {
-			debug.Printf("Connection failed to %s: %s\n", unit.status.Node, err)
+			debug.Printf("Connection failed to %s: %s\n", remoteNodeID, err)
 			continue
 		}
-		reader := bufio.NewReader(conn)
-		hello, err := reader.ReadString('\n')
-		if !strings.Contains(hello, unit.status.Node) {
-			debug.Printf("While expecting node ID %s, got message: %s. Exiting.\n", unit.status.Node,
-				strings.TrimRight(hello, "\n"))
-		}
-		if unit.status.RemoteUnitID == "" {
-			_, err = conn.Write([]byte(fmt.Sprintf("work start %s\n", unit.status.WorkType)))
+		if remoteUnitID == "" {
+			_, err = conn.Write([]byte(fmt.Sprintf("work start %s\n", workType)))
 			if err != nil {
-				debug.Printf("Write error sending to %s: %s\n", unit.status.Node, err)
+				debug.Printf("Write error sending to %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			response, err := reader.ReadString('\n')
 			if err != nil {
-				debug.Printf("Read error reading from %s: %s\n", unit.status.Node, err)
+				debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			match := submitIDRegex.FindSubmatch([]byte(response))
@@ -297,8 +440,11 @@ func (w *Workceptor) monitorRemoteStatus(unit *workUnit, unitID string) {
 				debug.Printf("Could not parse response: %s\n", strings.TrimRight(response, "\n"))
 				continue
 			}
-			unit.status.RemoteUnitID = string(match[1])
+			remoteUnitID = string(match[1])
+			unit.lock.Lock()
+			unit.status.RemoteUnitID = remoteUnitID
 			err = unit.status.Save(path.Join(unitdir, "status"))
+			unit.lock.Unlock()
 			if err != nil {
 				debug.Printf("Error saving local status file: %s\n", err)
 				continue
@@ -313,6 +459,7 @@ func (w *Workceptor) monitorRemoteStatus(unit *workUnit, unitID string) {
 				debug.Printf("Error sending stdin file: %s\n", err)
 				continue
 			}
+			// TODO: Implement CloseWrite on netceptor.Conn
 			cw, ok := conn.(interface{ CloseWrite() error })
 			if ok {
 				err := cw.CloseWrite()
@@ -322,89 +469,32 @@ func (w *Workceptor) monitorRemoteStatus(unit *workUnit, unitID string) {
 				}
 				response, err = reader.ReadString('\n')
 				if err != nil {
-					debug.Printf("Read error reading from %s: %s\n", unit.status.Node, err)
+					debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
 					continue
 				}
-				debug.Printf(response)
+				// TODO: Maybe check that the returned unit ID is as expected
+			} else {
+				err = conn.Close()
+				conn = nil
+				if err != nil {
+					debug.Printf("Error closing connection: %s\n", err)
+					continue
+				}
 			}
 			continue
 		}
-		if !IsComplete(unit.status.State) {
-			// Check if remote job has completed yet
-			_, err = conn.Write([]byte(fmt.Sprintf("work status %s\n", unit.status.RemoteUnitID)))
-			if err != nil {
-				debug.Printf("Write error sending to %s: %s\n", unit.status.Node, err)
-				continue
-			}
-			status, err := reader.ReadString('\n')
-			if err != nil {
-				debug.Printf("Read error reading from %s: %s\n", unit.status.Node, err)
-				continue
-			}
-			if status[:5] == "ERROR" {
-				if strings.Contains(status, "unknown work unit") {
-					debug.Printf("Work unit %s on node %s appears to be gone.\n", unit.status.RemoteUnitID, unit.status.Node)
-					unit.status.State = WorkStateFailed
-					unit.status.Detail = "Remote work unit is gone"
-					_ = unit.status.Save(path.Join(unitdir, "status"))
-					return
-				}
-				debug.Printf("Remote error%s\n", strings.TrimRight(status[5:], "\n"))
-				continue
-			}
-			debug.Printf("%s\n", status)
-			si := StatusInfo{}
-			err = json.Unmarshal([]byte(status), &si)
-			if err != nil {
-				debug.Printf("Error unmarshalling JSON: %s\n", status)
-				continue
-			}
-			unit.status.State = si.State
-			unit.status.Detail = si.Detail
-			unit.status.StdoutSize = si.StdoutSize
-			err = unit.status.Save(path.Join(unitdir, "status"))
-			if err != nil {
-				debug.Printf("Error saving local status file: %s\n", err)
-				continue
-			}
-		}
-		stdoutFilename := path.Join(unitdir, "stdout")
-		stdoutStat, err := os.Stat(stdoutFilename)
-		var stdoutCurSize int64
-		if err != nil {
-			stdoutCurSize = 0
-		} else {
-			stdoutCurSize = stdoutStat.Size()
-		}
-		if IsComplete(unit.status.State) && err == nil && stdoutCurSize >= unit.status.StdoutSize {
-			debug.Printf("Transfer complete, monitor exiting\n")
+		ctx, cancel := context.WithCancel(context.Background())
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+		go w.monitorRemoteStatus(ctx, cancel, wg, unit, unitdir, conn, reader)
+		go w.monitorRemoteStdout(ctx, cancel, wg, unit, unitdir)
+		wg.Wait()
+		diskStdoutSize := fileSizeOrZero(path.Join(unitdir, "stdout"))
+		unit.lock.RLock()
+		complete := IsComplete(unit.status.State) && diskStdoutSize >= unit.status.StdoutSize
+		unit.lock.RUnlock()
+		if complete {
 			return
-		}
-		if !os.IsExist(err) || stdoutCurSize < unit.status.StdoutSize {
-			_, err = conn.Write([]byte(fmt.Sprintf("work results %s %d\n", unit.status.RemoteUnitID, stdoutCurSize)))
-			if err != nil {
-				debug.Printf("Write error sending to %s: %s\n", unit.status.Node, err)
-				continue
-			}
-			status, err := reader.ReadString('\n')
-			if err != nil {
-				debug.Printf("Read error reading from %s: %s\n", unit.status.Node, err)
-				continue
-			}
-			if !strings.Contains(status, "Streaming results") {
-				debug.Printf("Remote node %s did not stream results\n", unit.status.Node)
-				continue
-			}
-			stdout, err := os.OpenFile(stdoutFilename, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)
-			if err != nil {
-				debug.Printf("Could not open stdout file %s: %s\n", stdoutFilename, err)
-				continue
-			}
-			_, err = io.Copy(stdout, conn)
-			if err != nil {
-				debug.Printf("Error copying to stdout file %s: %s\n", stdoutFilename, err)
-				continue
-			}
 		}
 	}
 }
@@ -460,6 +550,7 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 	w.activeUnitsLock.Lock()
 	defer w.activeUnitsLock.Unlock()
 	w.activeUnits[ident] = &workUnit{
+		lock:     &sync.RWMutex{},
 		started:  false,
 		released: false,
 		worker:   worker,
@@ -470,6 +561,8 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 
 // startLocalUnit starts running a local unit of work
 func (w *Workceptor) startLocalUnit(unit *workUnit, unitdir string) error {
+	unit.lock.Lock()
+	defer unit.lock.Unlock()
 	if unit.worker != nil {
 		err := unit.worker.Start(unit.status.Params, unitdir)
 		if err != nil {
@@ -495,13 +588,17 @@ func (w *Workceptor) StartUnit(unitID string) error {
 	if !ok {
 		return fmt.Errorf("unknown work unit %s", unitID)
 	}
+	unit.lock.RLock()
 	if unit.started {
+		unit.lock.RUnlock()
 		return fmt.Errorf("work unit %s was already started", unitID)
 	}
 	if unit.status.Node == w.nc.NodeID() {
+		unit.lock.RUnlock()
 		return w.startLocalUnit(unit, unitdir)
 	}
-	go w.monitorRemoteStatus(unit, unitID)
+	unit.lock.RUnlock()
+	go w.monitorRemoteUnit(unit, unitID)
 	return nil
 }
 
@@ -521,6 +618,7 @@ func (w *Workceptor) scanForUnits() {
 				statusFilename := path.Join(w.dataDir, fi.Name(), "status")
 				_ = si.Load(statusFilename)
 				unit := &workUnit{
+					lock:     &sync.RWMutex{},
 					started:  true, // If we're finding it now, we don't want to start it again
 					released: false,
 					worker:   nil,
@@ -533,7 +631,7 @@ func (w *Workceptor) scanForUnits() {
 				}
 				w.activeUnits[fi.Name()] = unit
 				if si.Node != "" && si.Node != w.nc.NodeID() {
-					go w.monitorRemoteStatus(unit, fi.Name())
+					go w.monitorRemoteUnit(unit, fi.Name())
 				}
 			}
 		}
@@ -626,7 +724,7 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 }
 
 // checkDone non-blockingly checks if the done channel is signaled
-func checkDone(doneChan chan struct{}) bool {
+func checkDone(doneChan <-chan struct{}) bool {
 	if doneChan == nil {
 		return false
 	}
@@ -639,7 +737,7 @@ func checkDone(doneChan chan struct{}) bool {
 }
 
 // sleepOrDone sleeps until a timeout or the done channel is signaled
-func sleepOrDone(doneChan chan struct{}, interval time.Duration) bool {
+func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 	if doneChan == nil {
 		time.Sleep(interval)
 		return false
@@ -650,6 +748,15 @@ func sleepOrDone(doneChan chan struct{}, interval time.Duration) bool {
 	case <-time.After(interval):
 		return false
 	}
+}
+
+// Returns file size, or zero if the file does not exist
+func fileSizeOrZero(filename string) int64 {
+	stat, err := os.Stat(filename)
+	if err != nil {
+		return 0
+	}
+	return stat.Size()
 }
 
 // GetResults returns a live stream of the results of a unit
@@ -667,9 +774,6 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 		stdoutFilename := path.Join(unitdir, "stdout")
 		// Wait for stdout file to exist
 		for {
-			if checkDone(doneChan) {
-				return
-			}
 			_, err := os.Stat(stdoutFilename)
 			if err == nil {
 				break
@@ -713,13 +817,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 					return
 				}
 				stdout = nil
-				stat, err := os.Stat(stdoutFilename)
-				var stdoutSize int64
-				if err != nil {
-					stdoutSize = 0
-				} else {
-					stdoutSize = stat.Size()
-				}
+				stdoutSize := fileSizeOrZero(stdoutFilename)
 				if IsComplete(unit.status.State) && stdoutSize >= unit.status.StdoutSize {
 					close(resultChan)
 					debug.Printf("Stdout complete - closing channel\n")

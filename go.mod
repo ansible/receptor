@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/creack/pty v1.1.11
 	github.com/fsnotify/fsnotify v1.4.7
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
 	github.com/lucas-clemente/quic-go v0.15.8

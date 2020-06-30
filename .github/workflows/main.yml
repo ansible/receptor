@@ -1,19 +1,17 @@
-name: pre-commit
+---
+name: CI
 
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [devel]
 
 jobs:
   build:
-    name: Build
+    name: CI
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-go@v2
-    - run: |
-        go get -u golang.org/x/lint/golint
-        echo "::add-path::$(go env GOPATH)/bin"
-    - uses: actions/setup-python@v1
-    - uses: pre-commit/action@v2.0.0
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Run CI tasks in Docker
+        uses: ./build/ci/

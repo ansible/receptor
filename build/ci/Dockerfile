@@ -5,6 +5,5 @@ RUN dnf -y update && \
   dnf clean all
 RUN pip3 install pre-commit
 RUN go get -u golang.org/x/lint/golint
-RUN sed -i 's|$HOME/bin|$HOME/bin:$HOME/go/bin|' /root/.bash_profile
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

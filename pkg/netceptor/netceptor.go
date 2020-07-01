@@ -91,10 +91,11 @@ type ConnStatus struct {
 // Status is the struct returned by Netceptor.Status().  It represents a public
 // view of the internal status of the Netceptor object.
 type Status struct {
-	NodeID         string
-	Connections    []*ConnStatus
-	RoutingTable   map[string]string
-	Advertisements []*ServiceAdvertisement
+	NodeID               string
+	Connections          []*ConnStatus
+	RoutingTable         map[string]string
+	Advertisements       []*ServiceAdvertisement
+	KnownConnectionCosts map[string]map[string]float64
 }
 
 const (
@@ -258,10 +259,11 @@ func (s *Netceptor) Status() Status {
 	}
 	s.serviceAdsLock.RUnlock()
 	return Status{
-		NodeID:         s.nodeID,
-		Connections:    conns,
-		RoutingTable:   routes,
-		Advertisements: serviceAds,
+		NodeID:               s.nodeID,
+		Connections:          conns,
+		RoutingTable:         routes,
+		Advertisements:       serviceAds,
+		KnownConnectionCosts: s.knownConnectionCosts,
 	}
 }
 

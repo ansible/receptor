@@ -12,5 +12,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
+      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com -u $GITHUB_ACTOR --password-stdin
+      - run: docker pull docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner || true
+      - run: docker build . -t receptor-actions-ci-runner --cache-from=docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner
+      - run: docker tag receptor-actions-ci-runner docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner && docker push docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner || true
+
       - name: Run CI tasks in Docker
         uses: ./build/ci/

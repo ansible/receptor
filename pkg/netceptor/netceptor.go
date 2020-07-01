@@ -258,12 +258,21 @@ func (s *Netceptor) Status() Status {
 		}
 	}
 	s.serviceAdsLock.RUnlock()
+	s.knownNodeLock.RLock()
+	knownConnectionCosts := make(map[string]map[string]float64)
+	for k1, v1 := range s.knownConnectionCosts {
+		knownConnectionCosts[k1] = make(map[string]float64)
+		for k2, v2 := range v1 {
+			knownConnectionCosts[k1][k2] = v2
+		}
+	}
+	s.knownNodeLock.RUnlock()
 	return Status{
 		NodeID:               s.nodeID,
 		Connections:          conns,
 		RoutingTable:         routes,
 		Advertisements:       serviceAds,
-		KnownConnectionCosts: s.knownConnectionCosts,
+		KnownConnectionCosts: knownConnectionCosts,
 	}
 }
 

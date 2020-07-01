@@ -1,19 +1,30 @@
-name: pre-commit
+---
+name: CI
 
 on:
   pull_request:
   push:
-    branches: [master]
 
 jobs:
   build:
-    name: Build
+    name: CI
     runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: '1'
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-go@v2
-    - run: |
-        go get -u golang.org/x/lint/golint
-        echo "::add-path::$(go env GOPATH)/bin"
-    - uses: actions/setup-python@v1
-    - uses: pre-commit/action@v2.0.0
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - id: cache-docker
+        uses: actions/cache@v2
+        with:
+          path: /tmp/docker-registry
+          key: receptor-ci-local-registry-${{ hashFiles('build/ci/Dockerfile') }}
+
+      - run: docker run -d -p 5000:5000 --restart=always --name registry -v /tmp/docker-registry:/var/lib/registry registry:2 && npx wait-on tcp:5000
+      - run: docker build ./build/ci -t receptor-actions-ci-runner --cache-from=localhost:5000/receptor-actions-ci-runner --build-arg BUILDKIT_INLINE_CACHE=1
+      - run: docker tag receptor-actions-ci-runner localhost:5000/receptor-actions-ci-runner && docker push localhost:5000/receptor-actions-ci-runner
+        if: steps.cache-docker.outputs.cache-hit != 'true'
+
+      - name: Run CI tasks in Docker
+        uses: ./build/ci/

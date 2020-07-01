@@ -202,6 +202,14 @@ type UDPListenerCfg struct {
 	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
+// Prepare verifies the parameters are correct
+func (cfg UDPListenerCfg) Prepare() error {
+	if cfg.Cost <= 0.0 {
+		return fmt.Errorf("connection cost must be positive")
+	}
+	return nil
+}
+
 // Run runs the action
 func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
@@ -226,6 +234,14 @@ type UDPDialerCfg struct {
 	Address string  `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
 	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
 	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
+}
+
+// Prepare verifies the parameters are correct
+func (cfg UDPDialerCfg) Prepare() error {
+	if cfg.Cost <= 0.0 {
+		return fmt.Errorf("connection cost must be positive")
+	}
+	return nil
 }
 
 // Run runs the action

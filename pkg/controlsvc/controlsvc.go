@@ -153,6 +153,7 @@ func (s *Server) controlStatus(params string, cfo ControlFuncOperations) (map[st
 	cfr["Connections"] = status.Connections
 	cfr["RoutingTable"] = status.RoutingTable
 	cfr["Advertisements"] = status.Advertisements
+	cfr["KnownConnectionCosts"] = status.KnownConnectionCosts
 	return cfr, nil
 }
 

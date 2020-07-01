@@ -9,14 +9,22 @@ jobs:
   build:
     name: CI
     runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com -u $GITHUB_ACTOR --password-stdin
-      - run: docker pull docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner || true
-      - run: docker build ./build/ci -t receptor-actions-ci-runner --cache-from=docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner
-      - run: docker tag receptor-actions-ci-runner docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner && docker push docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner
+      - id: cache-docker
+        uses: actions/cache@v2
+        with:
+          path: /tmp/docker-registry
+          key: receptor-ci-local-registry-${{ hashFiles('build/ci/Dockerfile') }}
+
+      - run: docker run -d -p 5000:5000 --restart=always --name registry -v /tmp/docker-registry:/var/lib/registry registry:2 && npx wait-on tcp:5000
+      - run: docker build -t ./build/ci receptor-actions-ci-runner --cache-from=localhost:5000/receptor-actions-ci-runner --build-arg BUILDKIT_INLINE_CACHE=1
+      - run: docker tag receptor-actions-ci-runner localhost:5000/receptor-actions-ci-runner && docker push localhost:5000/receptor-actions-ci-runner
+        if: steps.cache-docker.outputs.cache-hit != 'true'
 
       - name: Run CI tasks in Docker
         uses: ./build/ci/

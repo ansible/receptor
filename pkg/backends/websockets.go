@@ -183,6 +183,14 @@ type WebsocketListenerCfg struct {
 	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
+// Prepare verifies the parameters are correct
+func (cfg WebsocketListenerCfg) Prepare() error {
+	if cfg.Cost <= 0.0 {
+		return fmt.Errorf("connection cost must be positive")
+	}
+	return nil
+}
+
 // Run runs the action
 func (cfg WebsocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
@@ -217,6 +225,9 @@ type WebsocketDialerCfg struct {
 
 // Prepare verifies that we are reasonably ready to go
 func (cfg WebsocketDialerCfg) Prepare() error {
+	if cfg.Cost <= 0.0 {
+		return fmt.Errorf("connection cost must be positive")
+	}
 	_, err := url.Parse(cfg.Address)
 	if err != nil {
 		return fmt.Errorf("address %s is not a valid URL: %s", cfg.Address, err)

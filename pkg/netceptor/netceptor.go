@@ -896,6 +896,9 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 
 // Main Netceptor protocol loop
 func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) error {
+	if connectionCost <= 0.0 {
+		return fmt.Errorf("connection cost must be positive")
+	}
 	established := false
 	remoteNodeID := ""
 	defer func() {

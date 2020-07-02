@@ -3,7 +3,6 @@ package netceptor
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"io/ioutil"
@@ -56,18 +55,6 @@ type TLSServerCfg struct {
 	ClientCAs         string `description:"Filename of CA bundle to verify client certs with"`
 }
 
-func readPEM(filename string) (*pem.Block, error) {
-	bytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("error reading cert file: %s", err)
-	}
-	block, _ := pem.Decode(bytes)
-	if block == nil {
-		return nil, fmt.Errorf("cert file did not include a certificate")
-	}
-	return block, nil
-}
-
 // Prepare creates the tls.config and stores it in the global map
 func (cfg TLSServerCfg) Prepare() error {
 	tlscfg := &tls.Config{}
@@ -92,7 +79,7 @@ func (cfg TLSServerCfg) Prepare() error {
 		if err != nil {
 			return fmt.Errorf("error reading client CAs file: %s", err)
 		}
-		clientCAs := &x509.CertPool{}
+		clientCAs := x509.NewCertPool()
 		clientCAs.AppendCertsFromPEM(bytes)
 		tlscfg.ClientCAs = clientCAs
 	}
@@ -126,15 +113,15 @@ func (cfg TLSClientCfg) Prepare() error {
 		if cfg.Cert == "" || cfg.Key == "" {
 			return fmt.Errorf("cert and key must both be supplied or neither")
 		}
-		certblock, err := readPEM(cfg.Cert)
+		certbytes, err := ioutil.ReadFile(cfg.Cert)
 		if err != nil {
 			return err
 		}
-		keyblock, err := readPEM(cfg.Key)
+		keybytes, err := ioutil.ReadFile(cfg.Key)
 		if err != nil {
 			return err
 		}
-		cert, err := tls.X509KeyPair(certblock.Bytes, keyblock.Bytes)
+		cert, err := tls.X509KeyPair(certbytes, keybytes)
 		if err != nil {
 			return err
 		}

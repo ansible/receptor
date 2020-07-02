@@ -3,20 +3,15 @@ package backends
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/debug"
-	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"golang.org/x/net/websocket"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
-
-//TODO: Switch to better supported websockets library
-//TODO: TLS Server
-//TODO: HTTP/HTTPS proxy support
 
 // WebsocketDialer implements Backend for outbound Websocket
 type WebsocketDialer struct {
@@ -33,9 +28,13 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 	if err != nil {
 		return nil, err
 	}
+	httpScheme := "http"
+	if addrURL.Scheme == "wss" {
+		httpScheme = "https"
+	}
 	wd := WebsocketDialer{
 		address:     address,
-		origin:      fmt.Sprintf("http://%s", addrURL.Host),
+		origin:      fmt.Sprintf("%s://%s", httpScheme, addrURL.Host),
 		redial:      redial,
 		tlscfg:      tlscfg,
 		extraHeader: extraHeader,
@@ -47,21 +46,18 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
-			cfg, err := websocket.NewConfig(b.address, b.origin)
-			if err != nil {
-				errf(fmt.Errorf("error creating websocket config"), true)
-				return
+			dialer := websocket.Dialer{
+				TLSClientConfig: b.tlscfg,
+				Proxy:           http.ProxyFromEnvironment,
 			}
-			if b.tlscfg != nil {
-				cfg.TlsConfig = b.tlscfg
-			}
+
+			header := make(http.Header, 0)
 			if b.extraHeader != "" {
 				extraHeaderParts := strings.SplitN(b.extraHeader, ":", 2)
-				header := make(http.Header, 0)
 				header.Add(http.CanonicalHeaderKey(extraHeaderParts[0]), extraHeaderParts[1])
-				cfg.Header = header
 			}
-			conn, err := websocket.DialConfig(cfg)
+			header.Add(http.CanonicalHeaderKey("origin"), b.origin)
+			conn, _, err := dialer.Dial(b.address, header)
 			if err == nil {
 				ns := newWebsocketSession(conn)
 				err = bsf(ns)
@@ -96,21 +92,29 @@ func NewWebsocketListener(address string, tlscfg *tls.Config) (*WebsocketListene
 
 // Start runs the given session function over the WebsocketListener backend
 func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	if b.tlscfg != nil {
-		errf(fmt.Errorf("websocket TLS server not implemented yet"), true)
-		return
-	}
 	mux := http.NewServeMux()
-	mux.Handle("/", websocket.Handler(func(conn *websocket.Conn) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var upgrader = websocket.Upgrader{}
+		conn, _ := upgrader.Upgrade(w, r, nil)
 		ws := newWebsocketSession(conn)
 		err := bsf(ws)
 		if err != nil {
 			errf(err, false)
 		}
-	}))
+	})
 	go func() {
 		var err error
-		err = http.ListenAndServe(b.address, mux)
+		server := http.Server{
+			Addr:    b.address,
+			Handler: mux,
+		}
+		if b.tlscfg == nil {
+			err = server.ListenAndServe()
+		} else {
+			server.TLSConfig = b.tlscfg
+			err = server.ListenAndServeTLS("", "")
+		}
+
 		if err != nil {
 			errf(err, true)
 			return
@@ -121,49 +125,33 @@ func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.
 
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener
 type WebsocketSession struct {
-	conn   *websocket.Conn
-	framer framer.Framer
+	conn *websocket.Conn
 }
 
 func newWebsocketSession(conn *websocket.Conn) *WebsocketSession {
 	ws := &WebsocketSession{
-		conn:   conn,
-		framer: framer.New(),
+		conn: conn,
 	}
 	return ws
 }
 
 // Send sends data over the session
 func (ns *WebsocketSession) Send(data []byte) error {
-	buf := ns.framer.SendData(data)
-	n, err := ns.conn.Write(buf)
+	err := ns.conn.WriteMessage(websocket.BinaryMessage, data)
 	if err != nil {
 		return err
 	}
-	if n != len(buf) {
-		return fmt.Errorf("partial data sent")
-	}
+
 	return nil
 }
 
 // Recv receives data via the session
 func (ns *WebsocketSession) Recv() ([]byte, error) {
-	buf := make([]byte, netceptor.MTU)
-	for {
-		if ns.framer.MessageReady() {
-			break
-		}
-		n, err := ns.conn.Read(buf)
-		if err != nil {
-			return nil, err
-		}
-		ns.framer.RecvData(buf[:n])
-	}
-	buf, err := ns.framer.GetMessage()
+	_, data, err := ns.conn.ReadMessage()
 	if err != nil {
 		return nil, err
 	}
-	return buf, nil
+	return data, nil
 }
 
 // Close closes the session
@@ -245,10 +233,16 @@ func (cfg WebsocketDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	tlscfg, err := netceptor.GetClientTLSConfig(cfg.TLS, u.Hostname())
+
+	tlsCfgName := cfg.TLS
+	if u.Scheme == "wss" && tlsCfgName == "" {
+		tlsCfgName = "default"
+	}
+	tlscfg, err := netceptor.GetClientTLSConfig(tlsCfgName, u.Hostname())
 	if err != nil {
 		return err
 	}
+
 	li, err := NewWebsocketDialer(cfg.Address, tlscfg, cfg.ExtraHeader, cfg.Redial)
 	if err != nil {
 		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)

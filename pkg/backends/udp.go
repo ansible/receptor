@@ -122,6 +122,14 @@ func NewUDPListener(address string) (*UDPListener, error) {
 	return &ul, nil
 }
 
+// LocalAddr returns the local address the listener is listening on
+func (b *UDPListener) LocalAddr() net.Addr {
+	if b.conn == nil {
+		return nil
+	}
+	return b.conn.LocalAddr()
+}
+
 // Start runs the given session function over the UDPListener backend
 func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {

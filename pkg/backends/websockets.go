@@ -7,6 +7,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/debug"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -79,6 +80,7 @@ func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.Er
 type WebsocketListener struct {
 	address string
 	tlscfg  *tls.Config
+	li      net.Listener
 }
 
 // NewWebsocketListener instantiates a new WebsocketListener backend
@@ -86,12 +88,22 @@ func NewWebsocketListener(address string, tlscfg *tls.Config) (*WebsocketListene
 	ul := WebsocketListener{
 		address: address,
 		tlscfg:  tlscfg,
+		li:      nil,
 	}
 	return &ul, nil
 }
 
+// Addr returns the network address the listener is listening on
+func (b *WebsocketListener) Addr() net.Addr {
+	if b.li == nil {
+		return nil
+	}
+	return b.li.Addr()
+}
+
 // Start runs the given session function over the WebsocketListener backend
 func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+	var err error
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var upgrader = websocket.Upgrader{}
@@ -102,6 +114,11 @@ func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.
 			errf(err, false)
 		}
 	})
+	b.li, err = net.Listen("tcp", b.address)
+	if err != nil {
+		errf(err, true)
+		return
+	}
 	go func() {
 		var err error
 		server := http.Server{
@@ -109,10 +126,10 @@ func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.
 			Handler: mux,
 		}
 		if b.tlscfg == nil {
-			err = server.ListenAndServe()
+			err = server.Serve(b.li)
 		} else {
 			server.TLSConfig = b.tlscfg
-			err = server.ListenAndServeTLS("", "")
+			err = server.ServeTLS(b.li, "", "")
 		}
 
 		if err != nil {

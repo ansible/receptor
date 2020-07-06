@@ -60,6 +60,7 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 type TCPListener struct {
 	address string
 	tls     *tls.Config
+	li      net.Listener
 }
 
 // NewTCPListener instantiates a new TCPListener backend
@@ -67,23 +68,33 @@ func NewTCPListener(address string, tls *tls.Config) (*TCPListener, error) {
 	tl := TCPListener{
 		address: address,
 		tls:     tls,
+		li:      nil,
 	}
 	return &tl, nil
 }
 
+// Addr returns the network address the listener is listening on
+func (b *TCPListener) Addr() net.Addr {
+	if b.li == nil {
+		return nil
+	}
+	return b.li.Addr()
+}
+
 // Start runs the given session function over the WebsocketListener backend
 func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	li, err := net.Listen("tcp", b.address)
+	var err error
+	b.li, err = net.Listen("tcp", b.address)
 	if err != nil {
 		errf(err, true)
 		return
 	}
 	if b.tls != nil {
-		li = tls.NewListener(li, b.tls)
+		b.li = tls.NewListener(b.li, b.tls)
 	}
 	go func() {
 		for {
-			c, err := li.Accept()
+			c, err := b.li.Accept()
 			if err != nil {
 				errf(err, true)
 				return

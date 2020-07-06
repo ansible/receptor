@@ -19,6 +19,9 @@ func TestMeshStartup(t *testing.T) {
 		{"mesh-definitions/flat-mesh-udp.yaml"},
 		{"mesh-definitions/random-mesh-udp.yaml"},
 		{"mesh-definitions/tree-mesh-udp.yaml"},
+		{"mesh-definitions/flat-mesh-ws.yaml"},
+		{"mesh-definitions/random-mesh-ws.yaml"},
+		{"mesh-definitions/tree-mesh-ws.yaml"},
 	}
 	t.Parallel()
 	for _, data := range testTable {
@@ -48,6 +51,9 @@ func TestMeshConnections(t *testing.T) {
 		{"mesh-definitions/flat-mesh-udp.yaml"},
 		{"mesh-definitions/random-mesh-udp.yaml"},
 		{"mesh-definitions/tree-mesh-udp.yaml"},
+		{"mesh-definitions/flat-mesh-ws.yaml"},
+		{"mesh-definitions/random-mesh-ws.yaml"},
+		{"mesh-definitions/tree-mesh-ws.yaml"},
 	}
 	t.Parallel()
 	for _, data := range testTable {

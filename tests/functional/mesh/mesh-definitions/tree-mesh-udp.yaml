@@ -1,0 +1,131 @@
+---
+nodes:
+  controller:
+    connections: {}
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: controller
+    stats_enable: true
+    stats_port: null
+  node1:
+    connections:
+      controller: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node1
+    stats_enable: true
+    stats_port: null
+  node10:
+    connections:
+      node9: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node10
+    stats_enable: true
+    stats_port: null
+  node11:
+    connections:
+      node9: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node11
+    stats_enable: true
+    stats_port: null
+  node12:
+    connections:
+      node9: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node12
+    stats_enable: true
+    stats_port: null
+  node2:
+    connections:
+      node1: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node2
+    stats_enable: true
+    stats_port: null
+  node3:
+    connections:
+      node1: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node3
+    stats_enable: true
+    stats_port: null
+  node4:
+    connections:
+      node1: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node4
+    stats_enable: true
+    stats_port: null
+  node5:
+    connections:
+      controller: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node5
+    stats_enable: true
+    stats_port: null
+  node6:
+    connections:
+      node5: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node6
+    stats_enable: true
+    stats_port: null
+  node7:
+    connections:
+      node5: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node7
+    stats_enable: true
+    stats_port: null
+  node8:
+    connections:
+      node5: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node8
+    stats_enable: true
+    stats_port: null
+  node9:
+    connections:
+      controller: 1
+    listen:
+      - addr: ""
+        protocol: udp
+        cost: 1
+    name: node9
+    stats_enable: true
+    stats_port: null

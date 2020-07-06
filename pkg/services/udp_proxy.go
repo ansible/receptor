@@ -157,7 +157,7 @@ type UDPProxyInboundCfg struct {
 
 // Run runs the action
 func (cfg UDPProxyInboundCfg) Run() error {
-	debug.Printf("Running UDP inbound proxy service %s\n", cfg)
+	debug.Printf("Running UDP inbound proxy service %v\n", cfg)
 	go UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService)
 	return nil
 }

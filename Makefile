@@ -9,12 +9,19 @@ format:
 
 fmt: format
 
-ci:
+pre-commit:
 	echo "Running pre-commit" && \
-	pre-commit run --all-files && \
+	pre-commit run --all-files
+
+build-all:
 	echo "Running Go builds" && \
 	go build cmd/*.go && \
-	go build example/*.go && \
+	go build example/*.go
+
+test:
+	go test ./... -count=1
+
+ci: pre-commit build-all test
 	echo "All done"
 
-.PHONY: lint format fmt ci
+.PHONY: lint format fmt ci pre-commit build-all test

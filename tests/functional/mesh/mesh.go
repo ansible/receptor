@@ -107,6 +107,31 @@ func (n *Node) UDPDial(address string, cost float64) error {
 	return err
 }
 
+// WebsocketListen helper function to create and start a WebsocketListener
+// This might be an unnecessary abstraction and maybe should be deleted
+func (n *Node) WebsocketListen(address string, cost float64) error {
+	// TODO: Add support for TLS
+	b1, err := backends.NewWebsocketListener(address, nil)
+	if err != nil {
+		return err
+	}
+	n.Backends = append(n.Backends, b1)
+	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	return err
+}
+
+// WebsocketDial helper function to create and start a WebsocketDialer
+// This might be an unnecessary abstraction and maybe should be deleted
+func (n *Node) WebsocketDial(address string, cost float64) error {
+	// TODO: Add support for TLS and extra headers
+	b1, err := backends.NewWebsocketDialer(address, nil, "", true)
+	if err != nil {
+		return err
+	}
+	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	return err
+}
+
 // NewMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
 func NewMeshFromFile(filename string) (*Mesh, error) {
@@ -147,6 +172,11 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 					if err != nil {
 						return nil, err
 					}
+				} else if listener.Protocol == "ws" {
+					err := node.WebsocketListen(listener.Addr, listener.Cost)
+					if err != nil {
+						return nil, err
+					}
 				}
 			} else {
 				retries := 5
@@ -170,6 +200,16 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 						}
 						retries--
 					}
+				} else if listener.Protocol == "ws" {
+					for retries > 0 {
+						addrString := "127.0.0.1:0"
+						err := node.WebsocketListen(addrString, listener.Cost)
+						if err == nil {
+							listener.Addr = "ws://" + node.Backends[len(node.Backends)-1].(*backends.WebsocketListener).Addr().String()
+							break
+						}
+						retries--
+					}
 				}
 				if retries == 0 {
 					return nil, fmt.Errorf("Failed to connect to %s://%s after trying 5 times", listener.Protocol, listener.Addr)
@@ -189,6 +229,11 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 				}
 			} else if MeshDefinition.Nodes[conn].Listen[0].Protocol == "udp" {
 				err := node.UDPDial(MeshDefinition.Nodes[conn].Listen[0].Addr, cost)
+				if err != nil {
+					return nil, err
+				}
+			} else if MeshDefinition.Nodes[conn].Listen[0].Protocol == "ws" {
+				err := node.WebsocketDial(MeshDefinition.Nodes[conn].Listen[0].Addr, cost)
 				if err != nil {
 					return nil, err
 				}

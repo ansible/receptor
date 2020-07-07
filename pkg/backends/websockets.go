@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/gorilla/websocket"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -44,7 +46,7 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 }
 
 // Start runs the given session function over this backend service
-func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *WebsocketDialer) Start(shutdownContext context.Context, wg sync.WaitGroup, bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
 			dialer := websocket.Dialer{
@@ -61,7 +63,14 @@ func (b *WebsocketDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.Er
 			conn, _, err := dialer.Dial(b.address, header)
 			if err == nil {
 				ns := newWebsocketSession(conn)
+				wg.Add(1)
 				err = bsf(ns)
+				wg.Done()
+			}
+			select {
+			case <-shutdownContext.Done():
+				return
+			default:
 			}
 			if err != nil {
 				if b.redial {
@@ -102,19 +111,26 @@ func (b *WebsocketListener) Addr() net.Addr {
 }
 
 // Start runs the given session function over the WebsocketListener backend
-func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *WebsocketListener) Start(shutdownContext context.Context, wg sync.WaitGroup, bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	var err error
+	var listenerCfg net.ListenConfig
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var upgrader = websocket.Upgrader{}
 		conn, _ := upgrader.Upgrade(w, r, nil)
 		ws := newWebsocketSession(conn)
+		wg.Add(1)
 		err := bsf(ws)
+		wg.Done()
+		select {
+		case <-shutdownContext.Done():
+			return
+		}
 		if err != nil {
 			errf(err, false)
 		}
 	})
-	b.li, err = net.Listen("tcp", b.address)
+	b.li, err = listenerCfg.Listen(shutdownContext, "tcp", b.address)
 	if err != nil {
 		errf(err, true)
 		return
@@ -125,13 +141,26 @@ func (b *WebsocketListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.
 			Addr:    b.address,
 			Handler: mux,
 		}
+		go func() {
+			select {
+			case <-shutdownContext.Done():
+				tempctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+				server.Shutdown(tempctx)
+			}
+		}()
+		wg.Add(1)
 		if b.tlscfg == nil {
 			err = server.Serve(b.li)
 		} else {
 			server.TLSConfig = b.tlscfg
 			err = server.ServeTLS(b.li, "", "")
 		}
+		wg.Done()
 
+		select {
+		case <-shutdownContext.Done():
+			return
+		}
 		if err != nil {
 			errf(err, true)
 			return

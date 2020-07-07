@@ -2,6 +2,7 @@
 package netceptor
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -39,7 +40,7 @@ type BackendSessFunc func(BackendSession) error
 
 // Backend is the interface for back-ends that the Receptor network can run over
 type Backend interface {
-	Start(sessFunc BackendSessFunc, errFunc ErrorFunc)
+	Start(shutdownContext context.Context, wg sync.WaitGroup, sessFunc BackendSessFunc, errFunc ErrorFunc)
 }
 
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function
@@ -73,13 +74,15 @@ type Netceptor struct {
 	listenerRegistry       map[string]*PacketConn
 	sendRouteFloodChan     chan time.Duration
 	updateRoutingTableChan chan time.Duration
-	shutdownChans          []chan bool
+	shutdownContext        context.Context
+	shutdownContextCancel  context.CancelFunc
 	hashLock               *sync.RWMutex
 	nameHashes             map[uint64]string
 	reservedServices       map[string]func(*messageData) error
 	serviceAdsLock         *sync.RWMutex
 	serviceAdsReceived     map[string]map[string]*ServiceAdvertisement
 	sendServiceAdsChan     chan time.Duration
+	wg                     sync.WaitGroup
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -180,6 +183,7 @@ func BackendWait() {
 
 // New constructs a new Receptor network protocol instance
 func New(NodeID string, AllowedPeers []string) *Netceptor {
+	shutdownContext, shutdownContextCancel := context.WithCancel(context.Background())
 	s := Netceptor{
 		nodeID:                 NodeID,
 		allowedPeers:           AllowedPeers,
@@ -197,7 +201,8 @@ func New(NodeID string, AllowedPeers []string) *Netceptor {
 		listenerRegistry:       make(map[string]*PacketConn),
 		sendRouteFloodChan:     nil,
 		updateRoutingTableChan: nil,
-		shutdownChans:          make([]chan bool, 6),
+		shutdownContext:        shutdownContext,
+		shutdownContextCancel:  shutdownContextCancel,
 		hashLock:               &sync.RWMutex{},
 		nameHashes:             make(map[uint64]string),
 		serviceAdsLock:         &sync.RWMutex{},
@@ -208,20 +213,22 @@ func New(NodeID string, AllowedPeers []string) *Netceptor {
 		"ping": s.handlePing,
 	}
 	s.addNameHash(NodeID)
-	// shutdownChans[0] is for the main protocol loop
-	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour*24, time.Second*1, s.shutdownChans[1])
-	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100, s.shutdownChans[2])
-	s.sendServiceAdsChan = tickrunner.Run(s.sendServiceAds, ServiceAdTime, time.Second*5, s.shutdownChans[3])
-	go s.monitorConnectionAging(s.shutdownChans[4])
-	go s.expireSeenUpdates(s.shutdownChans[5])
+	s.updateRoutingTableChan = tickrunner.Run(s.shutdownContext, s.updateRoutingTable, time.Hour*24, time.Second*1)
+	s.sendRouteFloodChan = tickrunner.Run(s.shutdownContext, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
+	s.sendServiceAdsChan = tickrunner.Run(s.shutdownContext, s.sendServiceAds, ServiceAdTime, time.Second*5)
+	go s.monitorConnectionAging(s.shutdownContext)
+	go s.expireSeenUpdates(s.shutdownContext)
 	return &s
 }
 
 // Shutdown shuts down a Receptor network protocol instance
 func (s *Netceptor) Shutdown() {
-	for i := range s.shutdownChans {
-		s.shutdownChans[i] <- true
-	}
+	s.shutdownContextCancel()
+}
+
+// WaitForShutdown waits for all connections to close
+func (s *Netceptor) WaitForShutdown() {
+	s.wg.Wait()
 }
 
 // NodeID returns the local Node ID of this Netceptor instance
@@ -357,7 +364,7 @@ func (s *Netceptor) sendServiceAds() {
 }
 
 // Watches connections and expires any that haven't seen traffic in too long
-func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
+func (s *Netceptor) monitorConnectionAging(shutdownContext context.Context) {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
@@ -373,14 +380,14 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 				debug.Printf("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
 			}
-		case <-shutdownChan:
+		case <-shutdownContext.Done():
 			return
 		}
 	}
 }
 
 // Expires old updates from the seenUpdates table
-func (s *Netceptor) expireSeenUpdates(shutdownChan chan bool) {
+func (s *Netceptor) expireSeenUpdates(shutdownContext context.Context) {
 	for {
 		select {
 		case <-time.After(SeenUpdateExpireTime / 2):
@@ -392,7 +399,7 @@ func (s *Netceptor) expireSeenUpdates(shutdownChan chan bool) {
 				}
 			}
 			s.knownNodeLock.Unlock()
-		case <-shutdownChan:
+		case <-shutdownContext.Done():
 			return
 		}
 	}
@@ -1033,8 +1040,9 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 			}
 		case err := <-ci.ErrorChan:
 			return err
-		case <-s.shutdownChans[0]:
-			return nil
+		case <-s.shutdownContext.Done():
+			err := sess.Close()
+			return err
 		}
 	}
 }
@@ -1045,5 +1053,5 @@ func (s *Netceptor) RunBackend(b Backend, connectionCost float64, errf func(erro
 	runProtocol := func(sess BackendSession) error {
 		return s.runProtocol(sess, connectionCost)
 	}
-	b.Start(runProtocol, errf)
+	b.Start(s.shutdownContext, s.wg, runProtocol, errf)
 }

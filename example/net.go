@@ -137,4 +137,6 @@ func main() {
 	// Wait for a reply
 	wg.Wait()
 
+	n1.Shutdown()
+	n2.Shutdown()
 }

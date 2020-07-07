@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/debug"
@@ -35,7 +36,7 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 }
 
 // Start runs the given session function over this backend service
-func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *UDPDialer) Start(shutdownContext context.Context, wg sync.WaitGroup, bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
 			conn, err := net.DialUDP("udp", nil, b.address)
@@ -43,7 +44,14 @@ func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 				ns := UDPDialerSession{
 					conn: conn,
 				}
+				wg.Add(1)
 				err = bsf(&ns)
+				wg.Done()
+			}
+			select {
+			case <-shutdownContext.Done():
+				return
+			default:
 			}
 			if err != nil {
 				if b.redial {
@@ -131,15 +139,29 @@ func (b *UDPListener) LocalAddr() net.Addr {
 }
 
 // Start runs the given session function over the UDPListener backend
-func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *UDPListener) Start(shutdownContext context.Context, wg sync.WaitGroup, bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		buf := make([]byte, netceptor.MTU)
+		go func() {
+			select {
+			case <-shutdownContext.Done():
+				b.conn.Close()
+			}
+		}()
+		wg.Add(1)
 		for {
 			n, addr, err := b.conn.ReadFromUDP(buf)
 			data := make([]byte, n)
 			copy(data, buf)
+			select {
+			case <-shutdownContext.Done():
+				wg.Done()
+				return
+			default:
+			}
 			if err != nil {
 				errf(err, true)
+				wg.Done()
 				return
 			}
 			addrStr := addr.String()
@@ -156,7 +178,9 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 				b.sessionRegistry[addrStr] = sess
 				b.sessRegLock.Unlock()
 				go func() {
+					wg.Add(1)
 					err := bsf(sess)
+					wg.Done()
 					if err != nil {
 						errf(err, false)
 					}

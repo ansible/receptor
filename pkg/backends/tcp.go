@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
@@ -8,6 +9,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -29,7 +31,7 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 }
 
 // Start runs the given session function over this backend service
-func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *TCPDialer) Start(shutdownContext context.Context, wg sync.WaitGroup, bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	go func() {
 		for {
 			var conn net.Conn
@@ -41,7 +43,14 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 			}
 			if err == nil {
 				ns := newTCPSession(conn)
+				wg.Add(1)
 				err = bsf(ns)
+				wg.Done()
+			}
+			select {
+			case <-shutdownContext.Done():
+				return
+			default:
 			}
 			if err != nil {
 				if b.redial {
@@ -82,9 +91,10 @@ func (b *TCPListener) Addr() net.Addr {
 }
 
 // Start runs the given session function over the WebsocketListener backend
-func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *TCPListener) Start(shutdownContext context.Context, wg sync.WaitGroup, bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
 	var err error
-	b.li, err = net.Listen("tcp", b.address)
+	var listenerCfg net.ListenConfig
+	b.li, err = listenerCfg.Listen(shutdownContext, "tcp", b.address)
 	if err != nil {
 		errf(err, true)
 		return
@@ -93,15 +103,31 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 		b.li = tls.NewListener(b.li, b.tls)
 	}
 	go func() {
+		go func() {
+			select {
+			case <-shutdownContext.Done():
+				b.li.Close()
+			}
+		}()
+		wg.Add(1)
 		for {
 			c, err := b.li.Accept()
+			select {
+			case <-shutdownContext.Done():
+				wg.Done()
+				return
+			default:
+			}
 			if err != nil {
 				errf(err, true)
+				wg.Done()
 				return
 			}
 			go func() {
 				sess := newTCPSession(c)
+				wg.Add(1)
 				err = bsf(sess)
+				wg.Done()
 				if err != nil {
 					errf(err, false)
 				}

@@ -51,6 +51,7 @@ type YamlListener struct {
 func handleError(err error, fatal bool) {
 	fmt.Printf("Error: %s\n", err)
 	if fatal {
+		fmt.Println("FATAL")
 		os.Exit(1)
 	}
 }
@@ -308,6 +309,9 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 func (m *Mesh) Shutdown() {
 	for _, node := range m.Nodes {
 		node.NetceptorInstance.Shutdown()
+	}
+	for _, node := range m.Nodes {
+		node.NetceptorInstance.WaitForShutdown()
 	}
 }
 

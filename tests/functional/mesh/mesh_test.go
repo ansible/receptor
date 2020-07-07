@@ -46,6 +46,7 @@ func TestMeshStartup(t *testing.T) {
 					t.Logf("%s->%s: %v", nodeIDSender, nodeIDResponder, response["Time"])
 				}
 			}
+			mesh.Shutdown()
 		})
 	}
 }
@@ -93,6 +94,7 @@ func TestMeshConnections(t *testing.T) {
 			if connectionsReady == false {
 				t.Error("Timed out while waiting for connections")
 			}
+			mesh.Shutdown()
 		})
 	}
 }
@@ -133,8 +135,9 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 		for k := range data.Nodes {
 			for _, listener := range data.Nodes[k].Listen {
 				// We have to reset our Addr to generate a new port for each
-				// run, otherwise we collide because we cant shutdown old
-				// meshes
+				// run, otherwise we might collide with something that takes
+				// our port from the time we shutdown the old mesh to the time
+				// we start the new one
 				listener.Addr = ""
 			}
 		}
@@ -147,6 +150,9 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 		if err != nil {
 			b.Error(err)
 		}
+		b.StopTimer()
+		mesh.Shutdown()
+		b.StartTimer()
 	}
 }
 

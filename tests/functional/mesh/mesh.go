@@ -1,12 +1,14 @@
 package mesh
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/backends"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"net"
 	"os"
 	"reflect"
 	"time"
@@ -130,6 +132,61 @@ func (n *Node) WebsocketDial(address string, cost float64) error {
 	}
 	n.NetceptorInstance.RunBackend(b1, cost, handleError)
 	return err
+}
+
+// Ping a node and wait for a response
+func (n *Node) Ping(node string) (map[string]interface{}, error) {
+	shutdownctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pc, err := n.NetceptorInstance.ListenPacket("")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = pc.Close()
+	}()
+	startTime := time.Now()
+	replyChan := make(chan net.Addr)
+	go func() {
+		buf := make([]byte, 8)
+		_, addr, err := pc.ReadFrom(buf)
+		if err == nil {
+			replyChan <- addr
+		}
+	}()
+
+	sendErrChan := make(chan error)
+	go func() {
+		_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(node, "ping"))
+		if err != nil {
+			sendErrChan <- err
+			return
+		}
+		select {
+		case <-time.After(100 * time.Millisecond):
+			_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(node, "ping"))
+			if err != nil {
+				sendErrChan <- err
+				return
+			}
+		case <-shutdownctx.Done():
+			return
+		}
+	}()
+	cfr := make(map[string]interface{})
+	select {
+	case addr := <-replyChan:
+		cfr["Result"] = fmt.Sprintf("Reply from %s in %s\n", addr.String(), time.Since(startTime))
+		cfr["Node"] = addr.String()
+		cfr["Time"] = time.Since(startTime)
+	case <-shutdownctx.Done():
+		cfr["Result"] = "Timed out waiting for response"
+		return cfr, err
+	case err := <-sendErrChan:
+		cfr["Result"] = err
+		return cfr, err
+	}
+	return cfr, nil
 }
 
 // NewMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
@@ -283,8 +340,7 @@ func (m *Mesh) CheckConnections() bool {
 	return false
 }
 
-// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh,
-// if they do, we can assume the routing is consistent across all nodes
+// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh
 func (m *Mesh) CheckKnownConnectionCosts() bool {
 	meshStatus := m.Status()
 	// If the mesh is empty we are done
@@ -296,6 +352,23 @@ func (m *Mesh) CheckKnownConnectionCosts() bool {
 	for _, status := range m.Status() {
 		if !reflect.DeepEqual(status.KnownConnectionCosts, knownConnectionCosts) {
 			return false
+		}
+	}
+	return true
+}
+
+// CheckRoutes returns true if every node has a route to every other node
+func (m *Mesh) CheckRoutes() bool {
+	for _, status := range m.Status() {
+		for nodeID := range m.Nodes {
+			// Dont check a route to ourselves
+			if status.NodeID == nodeID {
+				continue
+			}
+			_, ok := status.RoutingTable[nodeID]
+			if !ok {
+				return false
+			}
 		}
 	}
 	return true
@@ -313,13 +386,22 @@ func (m *Mesh) WaitForReady(timeout float64) error {
 		return errors.New("Timed out while waiting for connections")
 	}
 
-	routesReady := m.CheckKnownConnectionCosts()
-	for ; timeout > 0 && !routesReady; routesReady = m.CheckKnownConnectionCosts() {
+	costsConsistent := m.CheckKnownConnectionCosts()
+	for ; timeout > 0 && !costsConsistent; costsConsistent = m.CheckKnownConnectionCosts() {
 		time.Sleep(100 * time.Millisecond)
 		timeout -= 100
 	}
-	if routesReady == false {
-		return errors.New("Timed out while waiting for routes to settle")
+	if costsConsistent == false {
+		return errors.New("Timed out while waiting for connection costs to converge")
+	}
+
+	routesReady := m.CheckRoutes()
+	for ; timeout > 0 && !routesReady; routesReady = m.CheckRoutes() {
+		time.Sleep(100 * time.Millisecond)
+		timeout -= 100
+	}
+	if costsConsistent == false {
+		return errors.New("Timed out while waiting for every node to have a route to every other node")
 	}
 
 	return nil

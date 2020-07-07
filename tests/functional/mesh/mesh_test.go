@@ -36,6 +36,16 @@ func TestMeshStartup(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+			// Test that each Node can ping each Node
+			for nodeIDSender, nodeSender := range mesh.Nodes {
+				for nodeIDResponder := range mesh.Nodes {
+					response, err := nodeSender.Ping(nodeIDResponder)
+					if err != nil {
+						t.Error(err)
+					}
+					t.Logf("%s->%s: %v", nodeIDSender, nodeIDResponder, response["Time"])
+				}
+			}
 		})
 	}
 }

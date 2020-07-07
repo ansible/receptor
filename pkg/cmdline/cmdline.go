@@ -1,6 +1,7 @@
 package cmdline
 
 import (
+	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -184,85 +185,83 @@ func bashCompletion() {
 }
 
 func setValue(field *reflect.Value, value interface{}) error {
-	ftn := field.Type().Name()
-	if ftn == "string" {
-		str, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("type error: field must be a string")
-		}
-		field.SetString(str)
+	fieldType := field.Type()
+	fieldKind := fieldType.Kind()
+	valueType := reflect.TypeOf(value)
+
+	// If the value is directly convertible to the field, just set it
+	if valueType.ConvertibleTo(fieldType) {
+		field.Set(reflect.ValueOf(value))
 		return nil
 	}
-	if ftn == "int" || ftn == "int16" || ftn == "int32" || ftn == "int64" {
-		iv, ok := value.(int64)
-		if !ok {
-			var i int
-			i, ok = value.(int)
-			if ok {
-				iv = int64(i)
-			}
+
+	// Get string version of value
+	valueStr, isString := value.(string)
+
+	// If the field is a map, check if we were given a JSON-encoded string
+	if fieldKind == reflect.Map && valueType.Kind() == reflect.String && strings.HasPrefix(valueStr, "{") {
+		dest := reflect.MakeMap(reflect.MapOf(fieldType.Key(), fieldType.Elem()))
+		value = dest.Interface()
+		err := json.Unmarshal([]byte(valueStr), &value)
+		if err != nil {
+			return err
 		}
-		if !ok {
-			var i int32
-			i, ok = value.(int32)
-			if ok {
-				iv = int64(i)
-			}
+		valueType = reflect.TypeOf(value)
+		// We do not return here because we still need the map copy below
+	}
+
+	// If the field and value are a map type, attempt to copy the keys/values
+	if fieldKind == reflect.Map && valueType.Kind() == fieldKind {
+		fieldMap := reflect.MakeMap(reflect.MapOf(fieldType.Key(), fieldType.Elem()))
+		iter := reflect.ValueOf(value).MapRange()
+		for iter.Next() {
+			fieldMap.SetMapIndex(reflect.ValueOf(iter.Key().Interface()), reflect.ValueOf(iter.Value().Interface()))
 		}
+		field.Set(fieldMap)
+		return nil
+	}
+
+	// If the field and value are a slice type, attempt to copy the values
+	if fieldKind == reflect.Slice && valueType.Kind() == fieldKind {
+		valueSlice, ok := value.([]interface{})
 		if !ok {
-			var i int16
-			i, ok = value.(int16)
-			if ok {
-				iv = int64(i)
-			}
+			return fmt.Errorf("invalid value for slice type")
 		}
-		if !ok {
-			str, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("type error: field must be an integer or int-parseable string")
-			}
-			var err error
-			iv, err = strconv.ParseInt(str, 0, 64)
+		fieldSlice := reflect.MakeSlice(fieldType, 0, 0)
+		for i := range valueSlice {
+			reflect.Append(fieldSlice, reflect.ValueOf(valueSlice[i]))
+		}
+		field.Set(fieldSlice)
+		return nil
+	}
+
+	// No direct field conversions were possible, so let's try a string conversion
+	if isString {
+		switch fieldKind {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			v, err := strconv.ParseInt(valueStr, 0, 64)
 			if err != nil {
 				return err
 			}
-		}
-		field.SetInt(iv)
-		return nil
-	}
-	if ftn == "float32" || ftn == "float64" {
-		fv, ok := value.(float64)
-		if !ok {
-			str, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("type error: field must be a float or float-parseable string")
-			}
-			var err error
-			fv, err = strconv.ParseFloat(str, 64)
+			field.SetInt(v)
+			return nil
+		case reflect.Float32, reflect.Float64:
+			v, err := strconv.ParseFloat(valueStr, 64)
 			if err != nil {
 				return err
 			}
-		}
-		field.SetFloat(fv)
-		return nil
-	}
-	if ftn == "bool" {
-		bv, ok := value.(bool)
-		if !ok {
-			str, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("type error: field must be a bool or bool-parseable string")
-			}
-			var err error
-			bv, err = betterParseBool(str)
+			field.SetFloat(v)
+			return nil
+		case reflect.Bool:
+			v, err := betterParseBool(valueStr)
 			if err != nil {
 				return err
 			}
+			field.SetBool(v)
+			return nil
 		}
-		field.SetBool(bv)
-		return nil
 	}
-	return fmt.Errorf("unknown type in config object: %s", field.Type().Name())
+	return fmt.Errorf("type error")
 }
 
 func plural(count int, singular string, plural string) string {
@@ -543,7 +542,7 @@ func ParseAndRun(args []string) {
 				}
 				err = setValue(&f, sarg[0])
 				if err != nil {
-					fmt.Printf("Error setting config value: %s\n", err)
+					fmt.Printf("Error setting config value for field %s: %s\n", bp, err)
 					os.Exit(1)
 				}
 				accumulator.fieldsSet = append(accumulator.fieldsSet, bp)
@@ -562,7 +561,7 @@ func ParseAndRun(args []string) {
 				}
 				err = setValue(f, sarg[1])
 				if err != nil {
-					fmt.Printf("Error setting config value: %s\n", err)
+					fmt.Printf("Error setting config value for field %s: %s\n", lcname, err)
 					os.Exit(1)
 				}
 				accumulator.fieldsSet = append(accumulator.fieldsSet, lcname)
@@ -649,7 +648,7 @@ func ParseAndRun(args []string) {
 				if s.CanSet() {
 					err := setValue(&s, defaultValue)
 					if err != nil {
-						fmt.Printf("Error setting default value: %s\n", err)
+						fmt.Printf("Error setting default value for field %s: %s\n", f.Name, err)
 						os.Exit(1)
 					}
 				}

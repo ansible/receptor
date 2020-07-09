@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"github.com/juju/fslock"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/sockutils"
 	"net"
@@ -18,33 +18,33 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 	lock := fslock.New(filename + ".lock")
 	err := lock.TryLock()
 	if err != nil {
-		debug.Printf("Could not acquire lock on socket file: %s\n", err)
+		logger.Debug("Could not acquire lock on socket file: %s\n", err)
 		return
 	}
 	err = os.RemoveAll(filename)
 	if err != nil {
-		debug.Printf("Could not overwrite socket file: %s\n", err)
+		logger.Debug("Could not overwrite socket file: %s\n", err)
 		return
 	}
 	uli, err := net.Listen("unix", filename)
 	if err != nil {
-		debug.Printf("Could not listen on socket file: %s\n", err)
+		logger.Debug("Could not listen on socket file: %s\n", err)
 		return
 	}
 	err = os.Chmod(filename, permissions)
 	if err != nil {
-		debug.Printf("Error setting socket file permissions: %s\n", err)
+		logger.Error("Error setting socket file permissions: %s\n", err)
 		return
 	}
 	for {
 		uc, err := uli.Accept()
 		if err != nil {
-			debug.Printf("Error accepting Unix socket connection: %s\n", err)
+			logger.Error("Error accepting Unix socket connection: %s\n", err)
 			return
 		}
 		qc, err := s.Dial(node, rservice, tlscfg)
 		if err != nil {
-			debug.Printf("Error connecting on Receptor network: %s\n", err)
+			logger.Error("Error connecting on Receptor network: %s\n", err)
 			continue
 		}
 		go sockutils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
@@ -58,19 +58,19 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 		"filename": filename,
 	})
 	if err != nil {
-		debug.Printf("Error listening on Receptor network: %s\n", err)
+		logger.Error("Error listening on Receptor network: %s\n", err)
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
-			debug.Printf("Error accepting connection on Receptor network: %s\n", err)
+			logger.Error("Error accepting connection on Receptor network: %s\n", err)
 			return
 
 		}
 		uc, err := net.Dial("unix", filename)
 		if err != nil {
-			debug.Printf("Error connecting via Unix socket: %s\n", err)
+			logger.Error("Error connecting via Unix socket: %s\n", err)
 			continue
 		}
 		go sockutils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
@@ -88,7 +88,7 @@ type UnixProxyInboundCfg struct {
 
 // Run runs the action
 func (cfg UnixProxyInboundCfg) Run() error {
-	debug.Printf("Running Unix socket inbound proxy service %v\n", cfg)
+	logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
 	tlscfg, err := netceptor.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode)
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ type UnixProxyOutboundCfg struct {
 
 // Run runs the action
 func (cfg UnixProxyOutboundCfg) Run() error {
-	debug.Printf("Running Unix socket inbound proxy service %s\n", cfg)
+	logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
 	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/randstr"
 	"io"
@@ -285,17 +285,17 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 	for {
 		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
 		if err != nil {
-			debug.Printf("Write error sending to %s: %s\n", remoteNodeID, err)
+			logger.Error("Write error sending to %s: %s\n", remoteNodeID, err)
 			return
 		}
 		status, err := reader.ReadString('\n')
 		if err != nil {
-			debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
+			logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
 			return
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
-				debug.Printf("Work unit %s on node %s appears to be gone.\n", remoteUnitID, remoteNodeID)
+				logger.Warning("Work unit %s on node %s appears to be gone.\n", remoteUnitID, remoteNodeID)
 				unit.lock.Lock()
 				unit.status.State = WorkStateFailed
 				unit.status.Detail = "Remote work unit is gone"
@@ -303,13 +303,13 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 				unit.lock.Unlock()
 				return
 			}
-			debug.Printf("Remote error%s\n", strings.TrimRight(status[5:], "\n"))
+			logger.Error("Remote error%s\n", strings.TrimRight(status[5:], "\n"))
 			return
 		}
 		si := StatusInfo{}
 		err = json.Unmarshal([]byte(status), &si)
 		if err != nil {
-			debug.Printf("Error unmarshalling JSON: %s\n", status)
+			logger.Error("Error unmarshalling JSON: %s\n", status)
 			return
 		}
 		unit.lock.Lock()
@@ -319,7 +319,7 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 		err = unit.status.Save(path.Join(unitdir, "status"))
 		unit.lock.Unlock()
 		if err != nil {
-			debug.Printf("Error saving local status file: %s\n", err)
+			logger.Error("Error saving local status file: %s\n", err)
 			return
 		}
 		sleepOrDone(ctx.Done(), 1*time.Second)
@@ -361,31 +361,31 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 			}
 			conn, reader, err := w.connectToRemote(remoteNodeID)
 			if err != nil {
-				debug.Printf("Connection failed to %s: %s\n", remoteNodeID, err)
+				logger.Error("Connection failed to %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			_, err = conn.Write([]byte(fmt.Sprintf("work results %s %d\n", remoteUnitID, diskStdoutSize)))
 			if err != nil {
-				debug.Printf("Write error sending to %s: %s\n", remoteNodeID, err)
+				logger.Error("Write error sending to %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			status, err := reader.ReadString('\n')
 			if err != nil {
-				debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
+				logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
-				debug.Printf("Remote node %s did not stream results\n", remoteNodeID)
+				logger.Debug("Remote node %s did not stream results\n", remoteNodeID)
 				continue
 			}
 			stdout, err := os.OpenFile(stdoutFilename, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)
 			if err != nil {
-				debug.Printf("Could not open stdout file %s: %s\n", stdoutFilename, err)
+				logger.Debug("Could not open stdout file %s: %s\n", stdoutFilename, err)
 				continue
 			}
 			_, err = io.Copy(stdout, conn)
 			if err != nil {
-				debug.Printf("Error copying to stdout file %s: %s\n", stdoutFilename, err)
+				logger.Error("Error copying to stdout file %s: %s\n", stdoutFilename, err)
 				continue
 			}
 		}
@@ -421,23 +421,23 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 		}
 		conn, reader, err := w.connectToRemote(remoteNodeID)
 		if err != nil {
-			debug.Printf("Connection failed to %s: %s\n", remoteNodeID, err)
+			logger.Error("Connection failed to %s: %s\n", remoteNodeID, err)
 			continue
 		}
 		if remoteUnitID == "" {
 			_, err = conn.Write([]byte(fmt.Sprintf("work start %s\n", workType)))
 			if err != nil {
-				debug.Printf("Write error sending to %s: %s\n", remoteNodeID, err)
+				logger.Error("Write error sending to %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			response, err := reader.ReadString('\n')
 			if err != nil {
-				debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
+				logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
 				continue
 			}
 			match := submitIDRegex.FindSubmatch([]byte(response))
 			if match == nil || len(match) != 2 {
-				debug.Printf("Could not parse response: %s\n", strings.TrimRight(response, "\n"))
+				logger.Warning("Could not parse response: %s\n", strings.TrimRight(response, "\n"))
 				continue
 			}
 			remoteUnitID = string(match[1])
@@ -446,17 +446,17 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 			err = unit.status.Save(path.Join(unitdir, "status"))
 			unit.lock.Unlock()
 			if err != nil {
-				debug.Printf("Error saving local status file: %s\n", err)
+				logger.Error("Error saving local status file: %s\n", err)
 				continue
 			}
 			stdin, err := os.Open(path.Join(unitdir, "stdin"))
 			if err != nil {
-				debug.Printf("Error opening stdin file: %s\n", err)
+				logger.Error("Error opening stdin file: %s\n", err)
 				continue
 			}
 			_, err = io.Copy(conn, stdin)
 			if err != nil {
-				debug.Printf("Error sending stdin file: %s\n", err)
+				logger.Error("Error sending stdin file: %s\n", err)
 				continue
 			}
 			// TODO: Implement CloseWrite on netceptor.Conn
@@ -464,12 +464,12 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 			if ok {
 				err := cw.CloseWrite()
 				if err != nil {
-					debug.Printf("Error closing write: %s\n", err)
+					logger.Error("Error closing write: %s\n", err)
 					continue
 				}
 				response, err = reader.ReadString('\n')
 				if err != nil {
-					debug.Printf("Read error reading from %s: %s\n", remoteNodeID, err)
+					logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
 					continue
 				}
 				// TODO: Maybe check that the returned unit ID is as expected
@@ -477,7 +477,7 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 				err = conn.Close()
 				conn = nil
 				if err != nil {
-					debug.Printf("Error closing connection: %s\n", err)
+					logger.Error("Error closing connection: %s\n", err)
 					continue
 				}
 			}
@@ -782,7 +782,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 					return
 				}
 			} else {
-				debug.Printf("Error accessing stdout file: %s\n", err)
+				logger.Error("Error accessing stdout file: %s\n", err)
 				return
 			}
 		}
@@ -802,7 +802,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 			}
 			newPos, err := stdout.Seek(filePos, 0)
 			if newPos != filePos {
-				debug.Printf("Seek error processing stdout\n")
+				logger.Warning("Seek error processing stdout\n")
 				return
 			}
 			n, err := stdout.Read(buf)
@@ -813,19 +813,19 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 			if err == io.EOF {
 				err = stdout.Close()
 				if err != nil {
-					debug.Printf("Error closing stdout\n")
+					logger.Error("Error closing stdout\n")
 					return
 				}
 				stdout = nil
 				stdoutSize := fileSizeOrZero(stdoutFilename)
 				if IsComplete(unit.status.State) && stdoutSize >= unit.status.StdoutSize {
 					close(resultChan)
-					debug.Printf("Stdout complete - closing channel\n")
+					logger.Info("Stdout complete - closing channel\n")
 					return
 				}
 				continue
 			} else if err != nil {
-				debug.Printf("Error reading stdout: %s\n", err)
+				logger.Error("Error reading stdout: %s\n", err)
 				return
 			}
 		}

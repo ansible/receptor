@@ -6,7 +6,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
 	_ "github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	_ "github.com/project-receptor/receptor/pkg/services"
 	"github.com/project-receptor/receptor/pkg/workceptor"
@@ -37,17 +37,19 @@ func (cfg nodeCfg) Prepare() error {
 	return nil
 }
 
-type debugCfg struct{}
+type loglevelCfg struct {
+	Level string `description:"Log level to enable Error, Warning, Info, Debug" barevalue:"yes" required:"yes"`
+}
 
-func (cfg debugCfg) Prepare() error {
-	debug.Enable = true
+func (cfg loglevelCfg) Prepare() error {
+	logger.SetLogLevel(logger.GetLogLevelByName(cfg.Level))
 	return nil
 }
 
 type traceCfg struct{}
 
 func (cfg traceCfg) Prepare() error {
-	debug.Trace = true
+	logger.SetShowTrace(true)
 	return nil
 }
 
@@ -61,7 +63,7 @@ func (cfg nullBackendCfg) Run() error {
 
 func main() {
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, false, false, nil)
-	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false, false, false, nil)
+	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, false, false, false, nil)
 	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, false, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, false, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
@@ -75,15 +77,15 @@ func main() {
 	select {
 	case <-done:
 		if netceptor.BackendCount() > 0 {
-			fmt.Printf("All backends have failed. Exiting.\n")
+			logger.Error("All backends have failed. Exiting.\n")
 			os.Exit(1)
 		} else {
-			fmt.Printf("Nothing to do - no backends were specified.\n")
+			logger.Warning("Nothing to do - no backends were specified.\n")
 			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
 			os.Exit(1)
 		}
 	case <-time.After(100 * time.Millisecond):
 	}
-	debug.Printf("Initialization complete\n")
+	logger.Info("Initialization complete\n")
 	<-done
 }

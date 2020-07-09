@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/google/shlex"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -198,7 +198,7 @@ func (cfg CommandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
 		_ = saveState(cfg.UnitDir, WorkStateFailed, err.Error(), 0)
-		debug.Printf("Command runner exited with error: %s\n", err)
+		logger.Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
 	} else {
 		os.Exit(0)

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/services"
 	"github.com/project-receptor/receptor/pkg/sockutils"
@@ -185,17 +185,17 @@ func (s *Server) controlConnect(params string, cfo ControlFuncOperations) (map[s
 
 // RunControlSession runs the server protocol on the given connection
 func (s *Server) RunControlSession(conn net.Conn) {
-	debug.Printf("Client connected to control service\n")
+	logger.Info("Client connected to control service\n")
 	defer func() {
-		debug.Printf("Client disconnected from control service\n")
+		logger.Info("Client disconnected from control service\n")
 		err := conn.Close()
 		if err != nil {
-			debug.Printf("Error closing connection: %s\n", err)
+			logger.Error("Error closing connection: %s\n", err)
 		}
 	}()
 	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
 	if err != nil {
-		debug.Printf("Write error in control service: %s\n", err)
+		logger.Error("Write error in control service: %s\n", err)
 		return
 	}
 	done := false
@@ -207,11 +207,11 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		for {
 			n, err := conn.Read(buf)
 			if err == io.EOF {
-				debug.Printf("Control service closed\n")
+				logger.Info("Control service closed\n")
 				done = true
 				break
 			} else if err != nil {
-				debug.Printf("Read error in control service: %s\n", err)
+				logger.Error("Read error in control service: %s\n", err)
 				return
 			}
 			if n == 1 {
@@ -249,7 +249,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				if err != nil {
 					_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 					if err != nil {
-						debug.Printf("Write error in control service: %s\n", err)
+						logger.Error("Write error in control service: %s\n", err)
 						return
 					}
 				} else {
@@ -258,14 +258,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 						if err != nil {
 							_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
 							if err != nil {
-								debug.Printf("Write error in control service: %s\n", err)
+								logger.Error("Write error in control service: %s\n", err)
 								return
 							}
 						}
 						rbytes = append(rbytes, '\n')
 						_, err = conn.Write(rbytes)
 						if err != nil {
-							debug.Printf("Write error in control service: %s\n", err)
+							logger.Error("Write error in control service: %s\n", err)
 							return
 						}
 					}
@@ -273,7 +273,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			} else {
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: Unknown command\n")))
 				if err != nil {
-					debug.Printf("Write error in control service: %s\n", err)
+					logger.Error("Write error in control service: %s\n", err)
 					return
 				}
 			}
@@ -287,12 +287,12 @@ func (s *Server) RunControlSvc(service string, tlscfg *tls.Config) error {
 	if err != nil {
 		return err
 	}
-	debug.Printf("Running control service %s\n", service)
+	logger.Info("Running control service %s\n", service)
 	go func() {
 		for {
 			conn, err := li.Accept()
 			if err != nil {
-				debug.Printf("Error accepting connection: %s. Closing socket.\n", err)
+				logger.Error("Error accepting connection: %s. Closing socket.\n", err)
 				return
 			}
 			go s.RunControlSession(conn)

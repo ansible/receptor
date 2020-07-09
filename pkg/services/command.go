@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"github.com/creack/pty"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/sockutils"
 	"net"
@@ -31,19 +31,19 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 		"type": "Command Service",
 	})
 	if err != nil {
-		debug.Printf("Error listening on Receptor network: %s\n", err)
+		logger.Error("Error listening on Receptor network: %s\n", err)
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
-			debug.Printf("Error accepting connection on Receptor network: %s\n", err)
+			logger.Error("Error accepting connection on Receptor network: %s\n", err)
 			return
 		}
 		go func() {
 			err := runCommand(qc, command)
 			if err != nil {
-				debug.Printf("Error running command: %s\n", err)
+				logger.Error("Error running command: %s\n", err)
 			}
 			_ = qc.Close()
 		}()
@@ -59,7 +59,7 @@ type CommandSvcCfg struct {
 
 // Run runs the action
 func (cfg CommandSvcCfg) Run() error {
-	debug.Printf("Running command service %s\n", cfg)
+	logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

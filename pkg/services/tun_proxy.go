@@ -5,7 +5,7 @@ package services
 import (
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
@@ -13,41 +13,41 @@ import (
 )
 
 func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.PacketConn, remoteAddr netceptor.Addr) {
-	debug.Printf("Running tunnel-to-Receptor forwarder\n")
+	logger.Debug("Running tunnel-to-Receptor forwarder\n")
 	buf := make([]byte, netceptor.MTU)
 	for {
 		n, err := tunif.Read(buf)
 		if err != nil {
-			debug.Printf("Error reading from tun device: %s\n", err)
+			logger.Error("Error reading from tun device: %s\n", err)
 			continue
 		}
-		debug.Tracef("    Forwarding data length %d from %s to %s\n", n,
+		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
 			tunif.Name(), remoteAddr.String())
 		wn, err := nconn.WriteTo(buf[:n], remoteAddr)
 		if err != nil || wn != n {
-			debug.Printf("Error writing to Receptor network: %s\n", err)
+			logger.Error("Error writing to Receptor network: %s\n", err)
 		}
 	}
 }
 
 func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remoteAddr netceptor.Addr) {
-	debug.Printf("Running netceptor to tunnel forwarder\n")
+	logger.Debug("Running netceptor to tunnel forwarder\n")
 	buf := make([]byte, netceptor.MTU)
 	for {
 		n, addr, err := nconn.ReadFrom(buf)
 		if err != nil {
-			debug.Printf("Error reading from Receptor: %s\n", err)
+			logger.Error("Error reading from Receptor: %s\n", err)
 			continue
 		}
 		if addr != remoteAddr {
-			debug.Printf("Data received from unexpected source: %s\n", addr)
+			logger.Debug("Data received from unexpected source: %s\n", addr)
 			continue
 		}
-		debug.Tracef("    Forwarding data length %d from %s to %s\n", n,
+		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
 			addr.String(), tunif.Name())
 		wn, err := tunif.Write(buf[:n])
 		if err != nil || wn != n {
-			debug.Printf("Error writing to tun device: %s\n", err)
+			logger.Error("Error writing to tun device: %s\n", err)
 		}
 	}
 }
@@ -62,24 +62,24 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 	cfg.Name = tunInterface
 	iface, err := water.New(water.Config{DeviceType: water.TUN})
 	if err != nil {
-		debug.Printf("Error opening tun device: %s\n", err)
+		logger.Error("Error opening tun device: %s\n", err)
 		return
 	}
 
 	if ifaddress != "" {
 		link, err := netlink.LinkByName(iface.Name())
 		if err != nil {
-			debug.Printf("Error accessing link for tun device: %s\n", err)
+			logger.Error("Error accessing link for tun device: %s\n", err)
 			return
 		}
 		localaddr := net.ParseIP(ifaddress)
 		if localaddr == nil {
-			debug.Printf("Invalid IP address: %s\n", ifaddress)
+			logger.Debug("Invalid IP address: %s\n", ifaddress)
 			return
 		}
 		destaddr := net.ParseIP(destaddress)
 		if destaddr == nil {
-			debug.Printf("Invalid IP address: %s\n", ifaddress)
+			logger.Debug("Invalid IP address: %s\n", ifaddress)
 			return
 		}
 		addr := &netlink.Addr{
@@ -88,18 +88,18 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 		}
 		err = netlink.AddrAdd(link, addr)
 		if err != nil {
-			debug.Printf("Error adding IP address to link: %s\n", err)
+			logger.Error("Error adding IP address to link: %s\n", err)
 			return
 		}
 		err = netlink.LinkSetUp(link)
 		if err != nil {
-			debug.Printf("Error setting link up: %s\n", err)
+			logger.Error("Error setting link up: %s\n", err)
 			return
 		}
 		if route != "" {
 			ipnet, err := netlink.ParseIPNet(route)
 			if err != nil {
-				debug.Printf("Error parsing route address: %s\n", err)
+				logger.Error("Error parsing route address: %s\n", err)
 				return
 			}
 			err = netlink.RouteAdd(&netlink.Route{
@@ -109,13 +109,13 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 				Gw:        destaddr,
 			})
 			if err != nil {
-				debug.Printf("Error adding route to interface: %s\n", err)
+				logger.Error("Error adding route to interface: %s\n", err)
 				return
 			}
 		}
 	}
 
-	debug.Printf("Connecting to remote netceptor node %s service %s\n", node, rservice)
+	logger.Debug("Connecting to remote netceptor node %s service %s\n", node, rservice)
 	nconn, err := s.ListenPacketAndAdvertise(lservice, map[string]string{
 		"type":          "Tunnel Proxy",
 		"interface":     tunInterface,
@@ -126,7 +126,7 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 	})
 
 	if err != nil {
-		debug.Printf("Error listening on Receptor network\n")
+		logger.Error("Error listening on Receptor network\n")
 		return
 	}
 	raddr := netceptor.NewAddr(node, rservice)
@@ -158,7 +158,7 @@ func (cfg TunProxyCfg) Prepare() error {
 
 // Run runs the action
 func (cfg TunProxyCfg) Run() error {
-	debug.Printf("Running tun proxy service %s\n", cfg)
+	logger.Debug("Running tun proxy service %s\n", cfg)
 	go TunProxyService(netceptor.MainInstance, cfg.Interface, cfg.Service, cfg.RemoteNode, cfg.RemoteService,
 		cfg.IfAddress, cfg.DestAddress, cfg.Route)
 	return nil

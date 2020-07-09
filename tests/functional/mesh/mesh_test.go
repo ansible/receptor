@@ -3,6 +3,7 @@ package mesh
 import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -106,9 +107,9 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 	// if they exist
 	for i := 0; i < totalNodes; i++ {
 		connections := make(map[string]float64)
-		nodeID := "Node" + string(i)
+		nodeID := "Node" + strconv.Itoa(i)
 		if i > 0 {
-			prevNodeID := "Node" + string(i-1)
+			prevNodeID := "Node" + strconv.Itoa(i-1)
 			connections[prevNodeID] = 1
 		}
 		data.Nodes[nodeID] = &YamlNode{

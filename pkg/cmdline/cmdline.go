@@ -436,6 +436,7 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 		coi := newCOI()
 		coi.obj = reflect.New(ct.Type).Elem()
 		coi.arg = command
+		requiredParams := buildRequiredParams(ct.Type)
 		for k, v := range params {
 			f, err := getFieldByName(&coi.obj, k)
 			if err != nil {
@@ -449,7 +450,9 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 				return nil, fmt.Errorf("error setting field %s in command %s: %s", k, command, err)
 			}
 			coi.fieldsSet = append(coi.fieldsSet, k)
+			delete(requiredParams, strings.ToLower(k))
 		}
+		checkRequiredParams(requiredParams, command)
 		cfgObjs = append(cfgObjs, coi)
 	}
 	return cfgObjs, nil

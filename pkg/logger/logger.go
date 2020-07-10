@@ -1,6 +1,8 @@
 package logger
 
 import (
+	"fmt"
+	"github.com/project-receptor/receptor/pkg/cmdline"
 	"log"
 	"os"
 )
@@ -27,8 +29,13 @@ func SetShowTrace(trace bool) {
 
 // GetLogLevelByName is a helper function for returning level associated with log
 // level string
-func GetLogLevelByName(logName string) int {
-	return LogLevelMap[logName]
+func GetLogLevelByName(logName string) (int, error) {
+	var err error
+	if val, hasKey := LogLevelMap[logName]; hasKey {
+		return val, nil
+	}
+	err = fmt.Errorf("%s is not a valid log level name", logName)
+	return 0, err
 }
 
 // GetLogLevel returns current log level
@@ -85,9 +92,33 @@ func Trace(format string, v ...interface{}) {
 	}
 }
 
+type loglevelCfg struct {
+	Level string `description:"Log level to enable Error, Warning, Info, Debug" barevalue:"yes" required:"yes"`
+}
+
+func (cfg loglevelCfg) Prepare() error {
+	var err error
+	val, err := GetLogLevelByName(cfg.Level)
+	if err != nil {
+		return err
+	}
+	SetLogLevel(val)
+	return nil
+}
+
+type traceCfg struct{}
+
+func (cfg traceCfg) Prepare() error {
+	SetShowTrace(true)
+	return nil
+}
+
 func init() {
 	logLevel = infoLevel
 	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
+
+	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, false, false, false, nil)
+	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, false, false, nil)
 }

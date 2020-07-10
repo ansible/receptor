@@ -607,7 +607,8 @@ func (s *Netceptor) getEphemeralService() string {
 // Prints the routing table.  Only used for debugging.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	if logger.GetLogLevel() >= logger.GetLogLevelByName("Debug") {
+	logLevel, _ := logger.GetLogLevelByName("Debug")
+	if logger.GetLogLevel() >= logLevel {
 		return
 	}
 	logger.Debug("Known Connections:\n")

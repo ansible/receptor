@@ -37,22 +37,6 @@ func (cfg nodeCfg) Prepare() error {
 	return nil
 }
 
-type loglevelCfg struct {
-	Level string `description:"Log level to enable Error, Warning, Info, Debug" barevalue:"yes" required:"yes"`
-}
-
-func (cfg loglevelCfg) Prepare() error {
-	logger.SetLogLevel(logger.GetLogLevelByName(cfg.Level))
-	return nil
-}
-
-type traceCfg struct{}
-
-func (cfg traceCfg) Prepare() error {
-	logger.SetShowTrace(true)
-	return nil
-}
-
 type nullBackendCfg struct{}
 
 func (cfg nullBackendCfg) Run() error {
@@ -63,8 +47,6 @@ func (cfg nullBackendCfg) Run() error {
 
 func main() {
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, false, false, nil)
-	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, false, false, false, nil)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, false, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, false, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
 

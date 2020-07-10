@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
 	"github.com/project-receptor/receptor/pkg/framer"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
 	"time"
@@ -108,7 +108,7 @@ func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 			}()
 		}
 	}()
-	debug.Printf("Listening on %s\n", b.address)
+	logger.Debug("Listening on %s\n", b.address)
 }
 
 // TCPSession implements BackendSession for TCP backend
@@ -186,19 +186,18 @@ func (cfg TCPListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg TCPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	debug.Printf("Running TCP listener on %s\n", address)
+	logger.Debug("Running TCP listener on %s\n", address)
 	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
 	}
 	li, err := NewTCPListener(address, tlscfg)
 	if err != nil {
-		debug.Printf("Error creating listener %s: %s\n", address, err)
+		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
 	netceptor.AddBackend()
 	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		fmt.Printf("Error in listener backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
 		}
@@ -224,7 +223,7 @@ func (cfg TCPDialerCfg) Prepare() error {
 
 // Run runs the action
 func (cfg TCPDialerCfg) Run() error {
-	debug.Printf("Running TCP peer connection %s\n", cfg.Address)
+	logger.Debug("Running TCP peer connection %s\n", cfg.Address)
 	host, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
 		return err
@@ -235,12 +234,11 @@ func (cfg TCPDialerCfg) Run() error {
 	}
 	li, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
 	if err != nil {
-		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
+		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
 	netceptor.AddBackend()
 	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		fmt.Printf("Error in peer connection backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
 		}

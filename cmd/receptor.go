@@ -6,7 +6,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
 	_ "github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	_ "github.com/project-receptor/receptor/pkg/services"
 	"github.com/project-receptor/receptor/pkg/workceptor"
@@ -37,20 +37,6 @@ func (cfg nodeCfg) Prepare() error {
 	return nil
 }
 
-type debugCfg struct{}
-
-func (cfg debugCfg) Prepare() error {
-	debug.Enable = true
-	return nil
-}
-
-type traceCfg struct{}
-
-func (cfg traceCfg) Prepare() error {
-	debug.Trace = true
-	return nil
-}
-
 type nullBackendCfg struct{}
 
 func (cfg nullBackendCfg) Run() error {
@@ -61,8 +47,6 @@ func (cfg nullBackendCfg) Run() error {
 
 func main() {
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, false, false, nil)
-	cmdline.AddConfigType("debug", "Enables debug output", debugCfg{}, false, false, false, nil)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, false, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, false, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
 
@@ -75,15 +59,15 @@ func main() {
 	select {
 	case <-done:
 		if netceptor.BackendCount() > 0 {
-			fmt.Printf("All backends have failed. Exiting.\n")
+			logger.Error("All backends have failed. Exiting.\n")
 			os.Exit(1)
 		} else {
-			fmt.Printf("Nothing to do - no backends were specified.\n")
+			logger.Warning("Nothing to do - no backends were specified.\n")
 			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
 			os.Exit(1)
 		}
 	case <-time.After(100 * time.Millisecond):
 	}
-	debug.Printf("Initialization complete\n")
+	logger.Info("Initialization complete\n")
 	<-done
 }

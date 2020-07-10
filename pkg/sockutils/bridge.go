@@ -1,7 +1,7 @@
 package sockutils
 
 import (
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"strings"
@@ -17,7 +17,7 @@ func BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2
 
 // BridgeHalf bridges the read side of c1 to the write side of c2.
 func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, done chan bool) {
-	debug.Tracef("    Bridging %s to %s\n", c1Name, c2Name)
+	logger.Trace("    Bridging %s to %s\n", c1Name, c2Name)
 	defer func() {
 		done <- true
 	}()
@@ -27,24 +27,24 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 		n, err := c1.Read(buf)
 		if err != nil {
 			if err.Error() != "EOF" && !strings.Contains(err.Error(), "use of closed network connection") {
-				debug.Printf("Connection read error: %s\n", err)
+				logger.Error("Connection read error: %s\n", err)
 			}
 			shouldClose = true
 		}
 		if n > 0 {
-			debug.Tracef("    Copied %d bytes from %s to %s\n", n, c1Name, c2Name)
+			logger.Trace("    Copied %d bytes from %s to %s\n", n, c1Name, c2Name)
 			wn, err := c2.Write(buf[:n])
 			if err != nil {
-				debug.Printf("Connection write error: %s\n", err)
+				logger.Error("Connection write error: %s\n", err)
 				shouldClose = true
 			}
 			if wn != n {
-				debug.Printf("Not all bytes written\n")
+				logger.Error("Not all bytes written\n")
 				shouldClose = true
 			}
 		}
 		if shouldClose {
-			debug.Tracef("    Stopping bridge %s to %s\n", c1Name, c2Name)
+			logger.Trace("    Stopping bridge %s to %s\n", c1Name, c2Name)
 			_ = c2.Close()
 			return
 		}

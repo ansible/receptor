@@ -3,7 +3,7 @@ package services
 import (
 	"crypto/tls"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/sockutils"
 	"net"
@@ -18,18 +18,18 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 		tli = tls.NewListener(tli, tlsServer)
 	}
 	if err != nil {
-		debug.Printf("Error listening on TCP: %s\n", err)
+		logger.Error("Error listening on TCP: %s\n", err)
 		return
 	}
 	for {
 		tc, err := tli.Accept()
 		if err != nil {
-			debug.Printf("Error accepting TCP connection: %s\n", err)
+			logger.Error("Error accepting TCP connection: %s\n", err)
 			return
 		}
 		qc, err := s.Dial(node, rservice, tlsClient)
 		if err != nil {
-			debug.Printf("Error connecting on Receptor network: %s\n", err)
+			logger.Error("Error connecting on Receptor network: %s\n", err)
 			continue
 		}
 		go sockutils.BridgeConns(tc, "tcp service", qc, "receptor connection")
@@ -44,13 +44,13 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 		"address": address,
 	})
 	if err != nil {
-		debug.Printf("Error listening on Receptor network: %s\n", err)
+		logger.Error("Error listening on Receptor network: %s\n", err)
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
-			debug.Printf("Error accepting connection on Receptor network: %s\n", err)
+			logger.Error("Error accepting connection on Receptor network: %s\n", err)
 			return
 
 		}
@@ -61,7 +61,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 			tc, err = tls.Dial("tcp", address, tlsClient)
 		}
 		if err != nil {
-			debug.Printf("Error connecting via TCP: %s\n", err)
+			logger.Error("Error connecting via TCP: %s\n", err)
 			continue
 		}
 		go sockutils.BridgeConns(qc, "receptor service", tc, "tcp connection")
@@ -80,7 +80,7 @@ type TCPProxyInboundCfg struct {
 
 // Run runs the action
 func (cfg TCPProxyInboundCfg) Run() error {
-	debug.Printf("Running TCP inbound proxy service %v\n", cfg)
+	logger.Debug("Running TCP inbound proxy service %v\n", cfg)
 	tlsClientCfg, err := netceptor.GetClientTLSConfig(cfg.TLSClient, cfg.RemoteNode)
 	if err != nil {
 		return err
@@ -104,7 +104,7 @@ type TCPProxyOutboundCfg struct {
 
 // Run runs the action
 func (cfg TCPProxyOutboundCfg) Run() error {
-	debug.Printf("Running TCP inbound proxy service %s\n", cfg)
+	logger.Debug("Running TCP inbound proxy service %s\n", cfg)
 	tlsServerCfg, err := netceptor.GetServerTLSConfig(cfg.TLSServer)
 	if err != nil {
 		return err

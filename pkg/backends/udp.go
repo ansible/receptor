@@ -3,7 +3,7 @@ package backends
 import (
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
 	"sync"
@@ -221,15 +221,14 @@ func (cfg UDPListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	debug.Printf("Running listener %s\n", address)
+	logger.Debug("Running listener %s\n", address)
 	li, err := NewUDPListener(address)
 	if err != nil {
-		debug.Printf("Error creating listener %s: %s\n", address, err)
+		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
 	netceptor.AddBackend()
 	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		fmt.Printf("Error in listener backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
 		}
@@ -254,15 +253,14 @@ func (cfg UDPDialerCfg) Prepare() error {
 
 // Run runs the action
 func (cfg UDPDialerCfg) Run() error {
-	debug.Printf("Running UDP peer connection %s\n", cfg.Address)
+	logger.Debug("Running UDP peer connection %s\n", cfg.Address)
 	li, err := NewUDPDialer(cfg.Address, cfg.Redial)
 	if err != nil {
-		debug.Printf("Error creating peer %s: %s\n", cfg.Address, err)
+		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
 	netceptor.AddBackend()
 	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		fmt.Printf("Error in peer connection backend: %s\n", err)
 		if fatal {
 			netceptor.DoneBackend()
 		}

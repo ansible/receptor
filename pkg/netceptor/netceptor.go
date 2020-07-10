@@ -7,7 +7,7 @@ import (
 	"fmt"
 	priorityQueue "github.com/jupp0r/go-priority-queue"
 	"github.com/minio/highwayhash"
-	"github.com/project-receptor/receptor/pkg/debug"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/randstr"
 	"github.com/project-receptor/receptor/pkg/tickrunner"
 	"math"
@@ -319,7 +319,7 @@ func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
 
 // Send a single service broadcast
 func (s *Netceptor) sendServiceAd(si *ServiceAdvertisement) error {
-	debug.Printf("Sending service advertisement: %s\n", si)
+	logger.Debug("Sending service advertisement: %s\n", si)
 	sf := serviceAdvertisementFull{
 		ServiceAdvertisement: si,
 		Cancel:               false,
@@ -351,7 +351,7 @@ func (s *Netceptor) sendServiceAds() {
 	for i := range ads {
 		err := s.sendServiceAd(&ads[i])
 		if err != nil {
-			debug.Printf("Error sending service advertisement: %s\n", err)
+			logger.Error("Error sending service advertisement: %s\n", err)
 		}
 	}
 }
@@ -370,7 +370,7 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 			}
 			s.connLock.RUnlock()
 			for i := range timedOut {
-				debug.Printf("Timing out connection\n")
+				logger.Warning("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
 			}
 		case <-shutdownChan:
@@ -402,7 +402,7 @@ func (s *Netceptor) expireSeenUpdates(shutdownChan chan bool) {
 func (s *Netceptor) updateRoutingTable() {
 	s.knownNodeLock.RLock()
 	defer s.knownNodeLock.RUnlock()
-	debug.Printf("Re-calculating routing table\n")
+	logger.Debug("Re-calculating routing table\n")
 
 	// Dijkstra's algorithm
 	Q := priorityQueue.New()
@@ -564,7 +564,7 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	if err != nil {
 		return err
 	}
-	debug.Tracef("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
+	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
 	c.WriteChan <- message
 	return nil
 }
@@ -581,7 +581,7 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 		ToService:   toService,
 		Data:        data,
 	}
-	debug.Tracef("--- Sending data length %d from %s:%s to %s:%s\n", len(md.Data),
+	logger.Trace("--- Sending data length %d from %s:%s to %s:%s\n", len(md.Data),
 		md.FromNode, md.FromService, md.ToNode, md.ToService)
 	return s.handleMessageData(md)
 }
@@ -607,22 +607,23 @@ func (s *Netceptor) getEphemeralService() string {
 // Prints the routing table.  Only used for debugging.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	if !debug.Enable {
+	logLevel, _ := logger.GetLogLevelByName("Debug")
+	if logger.GetLogLevel() >= logLevel {
 		return
 	}
-	debug.Printf("Known Connections:\n")
+	logger.Debug("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
-		debug.Printf("   %s: ", conn)
+		logger.Debug("   %s: ", conn)
 		for peer := range s.knownConnectionCosts[conn] {
-			debug.Printf("%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
+			logger.Debug("%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
-		debug.Printf("\n")
+		logger.Debug("\n")
 	}
-	debug.Printf("Routing Table:\n")
+	logger.Debug("Routing Table:\n")
 	for node := range s.routingTable {
-		debug.Printf("   %s via %s\n", node, s.routingTable[node])
+		logger.Debug("   %s via %s\n", node, s.routingTable[node])
 	}
-	debug.Printf("\n")
+	logger.Debug("\n")
 }
 
 // Constructs a routing update message
@@ -667,7 +668,7 @@ func (s *Netceptor) sendRoutingUpdate() {
 	for conn := range ru.Connections {
 		sb = append(sb, fmt.Sprintf("%s(%.2f)", conn, ru.Connections[conn]))
 	}
-	debug.Printf("Sending routing update. Connections: %s\n", strings.Join(sb, " "))
+	logger.Debug("Sending routing update. Connections: %s\n", strings.Join(sb, " "))
 	message, err := s.translateStructToNetwork(MsgTypeRoute, ru)
 	if err != nil {
 		return
@@ -677,7 +678,7 @@ func (s *Netceptor) sendRoutingUpdate() {
 
 // Processes a routing update received from a connection.
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
-	debug.Printf("Received routing update from %s via %s\n", ri.NodeID, recvConn)
+	logger.Debug("Received routing update from %s via %s\n", ri.NodeID, recvConn)
 	if ri.NodeID == s.nodeID || ri.NodeID == "" {
 		return
 	}
@@ -799,7 +800,7 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 	if err != nil {
 		return err
 	}
-	debug.Printf("Received service advertisement %v\n", si)
+	logger.Debug("Received service advertisement %v\n", si)
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[si.NodeID]
@@ -833,7 +834,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv()
 		if err != nil {
-			debug.Printf("Backend receiving error %s\n", err)
+			logger.Error("Backend receiving error %s\n", err)
 			ci.ErrorChan <- err
 			return
 		}
@@ -851,7 +852,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 		}
 		err := sess.Send(message)
 		if err != nil {
-			debug.Printf("Backend sending error %s\n", err)
+			logger.Error("Backend sending error %s\n", err)
 			ci.ErrorChan <- err
 			return
 		}
@@ -864,14 +865,14 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 	for {
 		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate())
 		if err != nil {
-			debug.Printf("Error Sending initial connection message: %s\n", err)
+			logger.Error("Error Sending initial connection message: %s\n", err)
 			return
 		}
-		debug.Printf("Sending initial connection message\n")
+		logger.Debug("Sending initial connection message\n")
 		ci.WriteChan <- ri
 		count++
 		if count > 10 {
-			debug.Printf("Giving up on connection initialization\n")
+			logger.Warning("Giving up on connection initialization\n")
 			ci.ErrorChan <- fmt.Errorf("initial connection failed")
 			return
 		}
@@ -879,7 +880,7 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 		case <-time.After(1 * time.Second):
 			continue
 		case <-initDoneChan:
-			debug.Printf("Stopping initial updates\n")
+			logger.Debug("Stopping initial updates\n")
 			return
 		}
 	}
@@ -936,20 +937,20 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 				if msgType == MsgTypeData {
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
-						debug.Printf("Error translating data to message struct\n")
+						logger.Error("Error translating data to message struct\n")
 						continue
 					}
-					debug.Tracef("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
+					logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
 						message.FromNode, message.FromService, message.ToNode, message.ToService, remoteNodeID)
 					err = s.handleMessageData(message)
 					if err != nil {
-						debug.Printf("Error handling message data: %s\n", err)
+						logger.Error("Error handling message data: %s\n", err)
 					}
 				} else if msgType == MsgTypeRoute {
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
-						debug.Printf("Error unpacking routing update\n")
+						logger.Error("Error unpacking routing update\n")
 						continue
 					}
 					if ri.ForwardingNode != remoteNodeID {
@@ -971,14 +972,14 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 				} else if msgType == MsgTypeServiceAdvertisement {
 					err := s.handleServiceAdvertisement(data, remoteNodeID)
 					if err != nil {
-						debug.Printf("Error handling service advertisement: %s\n", err)
+						logger.Error("Error handling service advertisement: %s\n", err)
 						continue
 					}
 				} else if msgType == MsgTypeReject {
-					debug.Printf("Received a rejection message from peer.")
+					logger.Warning("Received a rejection message from peer.")
 					return fmt.Errorf("remote node rejected the connection")
 				} else {
-					debug.Printf("Unknown message type %d\n", msgType)
+					logger.Warning("Unknown message type %d\n", msgType)
 				}
 			} else {
 				// Connection not established
@@ -986,7 +987,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
-						debug.Printf("Error unpacking routing update\n")
+						logger.Error("Error unpacking routing update\n")
 						continue
 					}
 					remoteNodeID = ri.ForwardingNode
@@ -1006,7 +1007,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					}
 					// Establish the connection
 					initDoneChan <- true
-					debug.Printf("Connection established with %s\n", remoteNodeID)
+					logger.Info("Connection established with %s\n", remoteNodeID)
 					s.addNameHash(remoteNodeID)
 					s.connLock.Lock()
 					s.connections[remoteNodeID] = ci
@@ -1027,7 +1028,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					s.updateRoutingTableChan <- 0
 					established = true
 				} else if msgType == MsgTypeReject {
-					debug.Printf("Received a rejection message from peer.")
+					logger.Warning("Received a rejection message from peer.")
 					return fmt.Errorf("remote node rejected the connection")
 				}
 			}

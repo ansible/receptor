@@ -129,8 +129,8 @@ func (si *StatusInfo) Load(filename string) error {
 	return nil
 }
 
-// saveState updates the status metadata file in the unitdir
-func saveState(unitdir string, state int, detail string, stdoutSize int64) error {
+// saveStatus updates the status metadata file in the unitdir
+func saveStatus(unitdir string, state int, detail string, stdoutSize int64) error {
 	statusFilename := path.Join(unitdir, "status")
 	si := &StatusInfo{}
 	_ = si.Load(statusFilename)

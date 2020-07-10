@@ -53,7 +53,7 @@ func cmdWaiter(cmd *exec.Cmd, doneChan chan bool) {
 
 // commandRunner is run in a separate process, to monitor the subprocess and report back metadata
 func commandRunner(command string, params string, unitdir string) error {
-	err := saveState(unitdir, WorkStatePending, "Not started yet", 0)
+	err := saveStatus(unitdir, WorkStatePending, "Not started yet", 0)
 	if err != nil {
 		return err
 	}
@@ -73,10 +73,10 @@ func commandRunner(command string, params string, unitdir string) error {
 		<-termChan
 		sigKilled = true
 		termThenKill(cmd)
-		_ = saveState(unitdir, WorkStateFailed, "Killed", stdoutSize(unitdir))
+		_ = saveStatus(unitdir, WorkStateFailed, "Killed", stdoutSize(unitdir))
 		os.Exit(-1)
 	}()
-	signal.Notify(termChan, os.Interrupt, os.Kill)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	stdin, err := os.Open(path.Join(unitdir, "stdin"))
 	if err != nil {
 		return err
@@ -100,21 +100,21 @@ loop:
 		case <-doneChan:
 			break loop
 		case <-time.After(250 * time.Millisecond):
-			_ = saveState(unitdir, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
+			_ = saveStatus(unitdir, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 		}
 	}
 	if err != nil {
 		if sigKilled {
 			time.Sleep(50 * time.Millisecond)
 		} else {
-			_ = saveState(unitdir, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
+			_ = saveStatus(unitdir, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
 		}
 		return err
 	}
 	if cmd.ProcessState.Success() {
-		_ = saveState(unitdir, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
+		_ = saveStatus(unitdir, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
 	} else {
-		_ = saveState(unitdir, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
+		_ = saveStatus(unitdir, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
 	return nil
@@ -122,6 +122,7 @@ loop:
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start(params string, unitdir string) error {
+	_ = saveStatus(unitdir, WorkStatePending, "Launching process", 0)
 	var allParams string
 	if params == "" {
 		allParams = cw.params
@@ -197,7 +198,7 @@ type CommandRunnerCfg struct {
 func (cfg CommandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
-		_ = saveState(cfg.UnitDir, WorkStateFailed, err.Error(), 0)
+		_ = saveStatus(cfg.UnitDir, WorkStateFailed, err.Error(), 0)
 		logger.Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
 	} else {

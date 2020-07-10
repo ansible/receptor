@@ -100,13 +100,13 @@ class WorkPluginRunner:
         self.save_status(WorkStateSucceeded, "Complete")
 
 
-def run(stdout=sys.stdout, stderr=sys.stderr, argv=None):
-    if argv is None or len(argv) != 4:
+def run():
+    if len(sys.argv) != 4:
         print("Invalid command line usage")
         sys.exit(1)
 
     try:
-        wpr = WorkPluginRunner(argv[1], argv[2], json.loads(argv[3]))
+        wpr = WorkPluginRunner(sys.argv[1], sys.argv[2], json.loads(sys.argv[3]))
     except Exception as e:
         print(f"Error initializing worker object: {repr(e)}")
         sys.exit(1)

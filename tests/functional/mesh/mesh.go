@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/backends"
@@ -45,6 +46,10 @@ type YamlListener struct {
 	Cost     float64
 	Addr     string
 	Protocol string
+	// Filenames to a ssl key and cert, relative to the executable, for tests that is
+	// in the directory of the test source
+	Sslkey  string
+	Sslcert string
 }
 
 // Error handler that gets called for backend errors
@@ -65,7 +70,7 @@ func NewNode(name string) Node {
 
 // TCPListen helper function to create and start a TCPListener
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *Node) TCPListen(address string, cost float64) error {
+func (n *Node) TCPListen(address string, cost float64, tlsCfg *tls.Config) error {
 	b1, err := backends.NewTCPListener(address, nil)
 	if err != nil {
 		return err
@@ -77,7 +82,7 @@ func (n *Node) TCPListen(address string, cost float64) error {
 
 // TCPDial helper function to create and start a TCPDialer
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *Node) TCPDial(address string, cost float64) error {
+func (n *Node) TCPDial(address string, cost float64, tlsCfg *tls.Config) error {
 	b1, err := backends.NewTCPDialer(address, true, nil)
 	if err != nil {
 		return err
@@ -111,7 +116,7 @@ func (n *Node) UDPDial(address string, cost float64) error {
 
 // WebsocketListen helper function to create and start a WebsocketListener
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *Node) WebsocketListen(address string, cost float64) error {
+func (n *Node) WebsocketListen(address string, cost float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS
 	b1, err := backends.NewWebsocketListener(address, nil)
 	if err != nil {
@@ -124,7 +129,7 @@ func (n *Node) WebsocketListen(address string, cost float64) error {
 
 // WebsocketDial helper function to create and start a WebsocketDialer
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *Node) WebsocketDial(address string, cost float64) error {
+func (n *Node) WebsocketDial(address string, cost float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS and extra headers
 	b1, err := backends.NewWebsocketDialer(address, nil, "", true)
 	if err != nil {
@@ -218,9 +223,18 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 	for k := range MeshDefinition.Nodes {
 		node := NewNode(MeshDefinition.Nodes[k].Name)
 		for _, listener := range MeshDefinition.Nodes[k].Listen {
+			var tlsConfig *tls.Config
+			var err error
+			if listener.Sslcert != "" && listener.Sslkey != "" {
+				cert, err := tls.LoadX509KeyPair(listener.Sslcert, listener.Sslkey)
+				if err != nil {
+					return nil, err
+				}
+				tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+			}
 			if listener.Addr != "" {
 				if listener.Protocol == "tcp" {
-					err := node.TCPListen(listener.Addr, listener.Cost)
+					err = node.TCPListen(listener.Addr, listener.Cost, tlsConfig)
 					if err != nil {
 						return nil, err
 					}
@@ -230,7 +244,7 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 						return nil, err
 					}
 				} else if listener.Protocol == "ws" {
-					err := node.WebsocketListen(listener.Addr, listener.Cost)
+					err := node.WebsocketListen(listener.Addr, listener.Cost, tlsConfig)
 					if err != nil {
 						return nil, err
 					}
@@ -240,7 +254,7 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 				if listener.Protocol == "tcp" {
 					for retries > 0 {
 						addrString := "127.0.0.1:0"
-						err := node.TCPListen(addrString, listener.Cost)
+						err := node.TCPListen(addrString, listener.Cost, tlsConfig)
 						if err == nil {
 							listener.Addr = node.Backends[len(node.Backends)-1].(*backends.TCPListener).Addr().String()
 							break
@@ -260,7 +274,7 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 				} else if listener.Protocol == "ws" {
 					for retries > 0 {
 						addrString := "127.0.0.1:0"
-						err := node.WebsocketListen(addrString, listener.Cost)
+						err := node.WebsocketListen(addrString, listener.Cost, tlsConfig)
 						if err == nil {
 							listener.Addr = "ws://" + node.Backends[len(node.Backends)-1].(*backends.WebsocketListener).Addr().String()
 							break
@@ -277,20 +291,20 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 	}
 	for k := range MeshDefinition.Nodes {
 		node := Nodes[MeshDefinition.Nodes[k].Name]
-		for conn, cost := range MeshDefinition.Nodes[k].Connections {
+		for connNode, cost := range MeshDefinition.Nodes[k].Connections {
 			// Update this to choose which listener to dial into
-			if MeshDefinition.Nodes[conn].Listen[0].Protocol == "tcp" {
-				err := node.TCPDial(MeshDefinition.Nodes[conn].Listen[0].Addr, cost)
+			if MeshDefinition.Nodes[connNode].Listen[0].Protocol == "tcp" {
+				err := node.TCPDial(MeshDefinition.Nodes[connNode].Listen[0].Addr, cost, nil)
 				if err != nil {
 					return nil, err
 				}
-			} else if MeshDefinition.Nodes[conn].Listen[0].Protocol == "udp" {
-				err := node.UDPDial(MeshDefinition.Nodes[conn].Listen[0].Addr, cost)
+			} else if MeshDefinition.Nodes[connNode].Listen[0].Protocol == "udp" {
+				err := node.UDPDial(MeshDefinition.Nodes[connNode].Listen[0].Addr, cost)
 				if err != nil {
 					return nil, err
 				}
-			} else if MeshDefinition.Nodes[conn].Listen[0].Protocol == "ws" {
-				err := node.WebsocketDial(MeshDefinition.Nodes[conn].Listen[0].Addr, cost)
+			} else if MeshDefinition.Nodes[connNode].Listen[0].Protocol == "ws" {
+				err := node.WebsocketDial(MeshDefinition.Nodes[connNode].Listen[0].Addr, cost, nil)
 				if err != nil {
 					return nil, err
 				}

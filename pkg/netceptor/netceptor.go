@@ -237,11 +237,6 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64) error {
 	return nil
 }
 
-// DoneBackend signals to the wait group that the backend is done
-func (s *Netceptor) DoneBackend() {
-	s.backendWaitGroup.Done()
-}
-
 // BackendWait waits for the backend wait group
 func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()

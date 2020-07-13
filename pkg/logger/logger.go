@@ -11,11 +11,12 @@ import (
 var logLevel int
 var showTrace bool
 
+// Log level constants
 const (
-	errorLevel = iota + 1
-	warningLevel
-	infoLevel
-	debugLevel
+	ErrorLevel = iota + 1
+	WarningLevel
+	InfoLevel
+	DebugLevel
 )
 
 // SetLogLevel is a helper function for setting logLevel int
@@ -32,7 +33,7 @@ func SetShowTrace(trace bool) {
 // level string
 func GetLogLevelByName(logName string) (int, error) {
 	var err error
-	if val, hasKey := LogLevelMap[strings.ToLower(logName)]; hasKey {
+	if val, hasKey := logLevelMap[strings.ToLower(logName)]; hasKey {
 		return val, nil
 	}
 	err = fmt.Errorf("%s is not a valid log level name", logName)
@@ -44,45 +45,52 @@ func GetLogLevel() int {
 	return logLevel
 }
 
-// LogLevelMap maps strings to log level int
+// logLevelMap maps strings to log level int
 // allows for --LogLevel Debug at command line
-var LogLevelMap = map[string]int{
-	"error":   errorLevel,
-	"warning": warningLevel,
-	"info":    infoLevel,
-	"debug":   debugLevel,
+var logLevelMap = map[string]int{
+	"error":   ErrorLevel,
+	"warning": WarningLevel,
+	"info":    InfoLevel,
+	"debug":   DebugLevel,
+}
+
+// Log sends a log message at a given level
+func Log(level int, format string, v ...interface{}) {
+	var prefix string
+	for k, v := range logLevelMap {
+		if v == level {
+			prefix = strings.ToUpper(k)
+			break
+		}
+	}
+	if prefix == "" {
+		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
+		return
+	}
+	if logLevel >= level {
+		log.SetPrefix(prefix)
+		log.Printf(format, v...)
+	}
 }
 
 // Error reports unexpected behavior, likely to result in termination
 func Error(format string, v ...interface{}) {
-	if logLevel >= errorLevel {
-		log.SetPrefix("ERROR ")
-		log.Printf(format, v...)
-	}
+	Log(ErrorLevel, format, v...)
 }
 
 // Warning reports unexpected behavior, not necessarily resulting in termination
 func Warning(format string, v ...interface{}) {
-	if logLevel >= warningLevel {
-		log.SetPrefix("WARNING ")
-		log.Printf(format, v...)
-	}
+	Log(WarningLevel, format, v...)
 }
 
 // Info provides general purpose statements useful to end user
 func Info(format string, v ...interface{}) {
-	if logLevel >= infoLevel {
-		log.SetPrefix("INFO ")
-		log.Printf(format, v...)
-	}
+	Log(InfoLevel, format, v...)
 }
 
 // Debug contains extra information helpful to developers
 func Debug(format string, v ...interface{}) {
-	if logLevel >= debugLevel {
-		log.SetPrefix("DEBUG ")
-		log.Printf(format, v...)
-	}
+	Log(DebugLevel, format, v...)
 }
 
 // Trace outputs detailed packet traversal
@@ -115,7 +123,7 @@ func (cfg traceCfg) Prepare() error {
 }
 
 func init() {
-	logLevel = infoLevel
+	logLevel = InfoLevel
 	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)

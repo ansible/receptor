@@ -59,7 +59,7 @@ func Log(level int, format string, v ...interface{}) {
 	var prefix string
 	for k, v := range logLevelMap {
 		if v == level {
-			prefix = strings.ToUpper(k)
+			prefix = fmt.Sprintf("%s ", strings.ToUpper(k))
 			break
 		}
 	}

@@ -16,13 +16,9 @@ import (
 */
 
 func main() {
-	// Create contexts so we can shut down the nodes
-	ctx1, _ := context.WithCancel(context.Background())
-	ctx2, _ := context.WithCancel(context.Background())
-
 	// Create two nodes of the Receptor network-layer protocol (Netceptors).
-	n1 := netceptor.New(ctx1, "node1", nil)
-	n2 := netceptor.New(ctx2, "node2", nil)
+	n1 := netceptor.New(context.Background(), "node1", nil)
+	n2 := netceptor.New(context.Background(), "node2", nil)
 
 	// Start a TCP listener on the first node
 	b1, err := backends.NewTCPListener("localhost:3333", nil)

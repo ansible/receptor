@@ -5,6 +5,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"log"
 	"os"
+	"strings"
 )
 
 var logLevel int
@@ -31,7 +32,7 @@ func SetShowTrace(trace bool) {
 // level string
 func GetLogLevelByName(logName string) (int, error) {
 	var err error
-	if val, hasKey := LogLevelMap[logName]; hasKey {
+	if val, hasKey := LogLevelMap[strings.ToLower(logName)]; hasKey {
 		return val, nil
 	}
 	err = fmt.Errorf("%s is not a valid log level name", logName)
@@ -46,10 +47,10 @@ func GetLogLevel() int {
 // LogLevelMap maps strings to log level int
 // allows for --LogLevel Debug at command line
 var LogLevelMap = map[string]int{
-	"Error":   errorLevel,
-	"Warning": warningLevel,
-	"Info":    infoLevel,
-	"Debug":   debugLevel,
+	"error":   errorLevel,
+	"warning": warningLevel,
+	"info":    infoLevel,
+	"debug":   debugLevel,
 }
 
 // Error reports unexpected behavior, likely to result in termination

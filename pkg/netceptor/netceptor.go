@@ -622,15 +622,14 @@ func (s *Netceptor) getEphemeralService() string {
 	}
 }
 
-// Prints the routing table.  Only used for debugging.
+// Prints the routing table.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	debugLevel, _ := logger.GetLogLevelByName("Debug")
-	curLevel := logger.GetLogLevel()
-	if curLevel < debugLevel {
+	logLevel, _ := logger.GetLogLevelByName("Info")
+	if logger.GetLogLevel() < logLevel {
 		return
 	}
-	logger.Debug("Known Connections:\n")
+	logger.Log(logLevel, "Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
 		sb := &strings.Builder{}
 		_, _ = fmt.Fprintf(sb, "   %s: ", conn)
@@ -638,11 +637,11 @@ func (s *Netceptor) printRoutingTable() {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
 		_, _ = fmt.Fprintf(sb, "\n")
-		logger.Debug(sb.String())
+		logger.Log(logLevel, sb.String())
 	}
-	logger.Debug("Routing Table:\n")
+	logger.Log(logLevel, "Routing Table:\n")
 	for node := range s.routingTable {
-		logger.Debug("   %s via %s\n", node, s.routingTable[node])
+		logger.Log(logLevel, "   %s via %s\n", node, s.routingTable[node])
 	}
 }
 

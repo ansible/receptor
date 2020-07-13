@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
@@ -9,8 +10,6 @@ import (
 	"sync"
 	"time"
 )
-
-//TODO: DTLS?
 
 // UDPMaxPacketLen is the maximum size of a message that can be sent over UDP
 const UDPMaxPacketLen = 65507
@@ -35,32 +34,25 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 }
 
 // Start runs the given session function over this backend service
-func (b *UDPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	go func() {
-		for {
+func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+	return dialerSession(ctx, b.redial, 5*time.Second,
+		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			conn, err := net.DialUDP("udp", nil, b.address)
-			if err == nil {
-				ns := UDPDialerSession{
-					conn: conn,
-				}
-				err = bsf(&ns)
-			}
 			if err != nil {
-				if b.redial {
-					errf(err, false)
-					time.Sleep(5 * time.Second)
-				} else {
-					errf(err, true)
-					return
-				}
+				return nil, err
 			}
-		}
-	}()
+			ns := &UDPDialerSession{
+				conn:      conn,
+				closeChan: closeChan,
+			}
+			return ns, nil
+		})
 }
 
 // UDPDialerSession implements BackendSession for UDPDialer
 type UDPDialerSession struct {
-	conn *net.UDPConn
+	conn      *net.UDPConn
+	closeChan chan struct{}
 }
 
 // Send sends data over the session
@@ -90,6 +82,10 @@ func (ns *UDPDialerSession) Recv() ([]byte, error) {
 
 // Close closes the session
 func (ns *UDPDialerSession) Close() error {
+	if ns.closeChan != nil {
+		close(ns.closeChan)
+		ns.closeChan = nil
+	}
 	return ns.conn.Close()
 }
 
@@ -131,17 +127,32 @@ func (b *UDPListener) LocalAddr() net.Addr {
 }
 
 // Start runs the given session function over the UDPListener backend
-func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
+func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+	sessChan := make(chan netceptor.BackendSession)
 	go func() {
 		buf := make([]byte, netceptor.MTU)
 		for {
-			n, addr, err := b.conn.ReadFromUDP(buf)
-			data := make([]byte, n)
-			copy(data, buf)
+			select {
+			case <-ctx.Done():
+				_ = b.conn.Close()
+				return
+			default:
+			}
+			err := b.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 			if err != nil {
-				errf(err, true)
+				logger.Error("Error setting UDP timeout: %s\n", err)
 				return
 			}
+			n, addr, err := b.conn.ReadFromUDP(buf)
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				continue
+			}
+			if err != nil {
+				logger.Error("UDP read error: %s\n", err)
+				return
+			}
+			data := make([]byte, n)
+			copy(data, buf)
 			addrStr := addr.String()
 			b.sessRegLock.RLock()
 			sess, ok := b.sessionRegistry[addrStr]
@@ -155,16 +166,12 @@ func (b *UDPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorF
 				}
 				b.sessionRegistry[addrStr] = sess
 				b.sessRegLock.Unlock()
-				go func() {
-					err := bsf(sess)
-					if err != nil {
-						errf(err, false)
-					}
-				}()
+				sessChan <- sess
 			}
 			sess.recvChan <- data
 		}
 	}()
+	return sessChan, nil
 }
 
 // UDPListenerSession implements BackendSession for UDPListener
@@ -222,17 +229,16 @@ func (cfg UDPListenerCfg) Prepare() error {
 func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	logger.Debug("Running listener %s\n", address)
-	li, err := NewUDPListener(address)
+	b, err := NewUDPListener(address)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		if fatal {
-			netceptor.DoneBackend()
-		}
-	})
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost)
+	if err != nil {
+		logger.Error("Error creating backend for %s: %s\n", address, err)
+		return err
+	}
 	return nil
 }
 
@@ -254,17 +260,16 @@ func (cfg UDPDialerCfg) Prepare() error {
 // Run runs the action
 func (cfg UDPDialerCfg) Run() error {
 	logger.Debug("Running UDP peer connection %s\n", cfg.Address)
-	li, err := NewUDPDialer(cfg.Address, cfg.Redial)
+	b, err := NewUDPDialer(cfg.Address, cfg.Redial)
 	if err != nil {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		if fatal {
-			netceptor.DoneBackend()
-		}
-	})
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost)
+	if err != nil {
+		logger.Error("Error creating backend for %s: %s\n", cfg.Address, err)
+		return err
+	}
 	return nil
 }
 

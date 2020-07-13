@@ -1,6 +1,7 @@
 package tickrunner
 
 import (
+	"context"
 	"time"
 )
 
@@ -8,8 +9,7 @@ import (
 // If many requests come in close to the same time, only run the task once.
 // Callers can ask for the task to be run within a given amount of time, which
 // overrides defaltReqDelay. Sending a zero to the channel runs it immediately.
-func Run(f func(), periodicInterval time.Duration, defaultReqDelay time.Duration,
-	shutdownChan chan bool) chan time.Duration {
+func Run(ctx context.Context, f func(), periodicInterval time.Duration, defaultReqDelay time.Duration) chan time.Duration {
 	runChan := make(chan time.Duration)
 	go func() {
 		nextRunTime := time.Now().Add(periodicInterval)
@@ -28,7 +28,7 @@ func Run(f func(), periodicInterval time.Duration, defaultReqDelay time.Duration
 				if proposedTime.Before(nextRunTime) {
 					nextRunTime = proposedTime
 				}
-			case <-shutdownChan:
+			case <-ctx.Done():
 				return
 			}
 		}

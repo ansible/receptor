@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
@@ -29,9 +30,9 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 }
 
 // Start runs the given session function over this backend service
-func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	go func() {
-		for {
+func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+	return dialerSession(ctx, b.redial, 5*time.Second,
+		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			var conn net.Conn
 			var err error
 			if b.tls == nil {
@@ -39,21 +40,11 @@ func (b *TCPDialer) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFun
 			} else {
 				conn, err = tls.Dial("tcp", b.address, b.tls)
 			}
-			if err == nil {
-				ns := newTCPSession(conn)
-				err = bsf(ns)
-			}
 			if err != nil {
-				if b.redial {
-					errf(err, false)
-					time.Sleep(5 * time.Second)
-				} else {
-					errf(err, true)
-					return
-				}
+				return nil, err
 			}
-		}
-	}()
+			return newTCPSession(conn, closeChan), nil
+		})
 }
 
 // TCPListener implements Backend for inbound TCP
@@ -82,47 +73,48 @@ func (b *TCPListener) Addr() net.Addr {
 }
 
 // Start runs the given session function over the WebsocketListener backend
-func (b *TCPListener) Start(bsf netceptor.BackendSessFunc, errf netceptor.ErrorFunc) {
-	var err error
-	b.li, err = net.Listen("tcp", b.address)
-	if err != nil {
-		errf(err, true)
-		return
-	}
-	if b.tls != nil {
-		b.li = tls.NewListener(b.li, b.tls)
-	}
-	go func() {
-		for {
+func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+	sessChan, err := listenerSession(ctx,
+		func() error {
+			var err error
+			b.li, err = net.Listen("tcp", b.address)
+			if err != nil {
+				return err
+			}
+			if b.tls != nil {
+				b.li = tls.NewListener(b.li, b.tls)
+			}
+			return nil
+		}, func() (netceptor.BackendSession, error) {
 			c, err := b.li.Accept()
 			if err != nil {
-				errf(err, true)
-				return
+				return nil, err
 			}
-			go func() {
-				sess := newTCPSession(c)
-				err = bsf(sess)
-				if err != nil {
-					errf(err, false)
-				}
-			}()
-		}
-	}()
-	logger.Debug("Listening on %s\n", b.address)
+			return newTCPSession(c, nil), nil
+		}, func() {
+			_ = b.li.Close()
+		})
+	if err == nil {
+		logger.Debug("Listening on %s\n", b.address)
+	}
+	return sessChan, err
 }
 
 // TCPSession implements BackendSession for TCP backend
 type TCPSession struct {
-	conn   net.Conn
-	framer framer.Framer
+	conn      net.Conn
+	framer    framer.Framer
+	closeChan chan struct{}
 }
 
-func newTCPSession(conn net.Conn) *TCPSession {
-	ws := &TCPSession{
-		conn:   conn,
-		framer: framer.New(),
+// newTCPSession allocates a new TCPSession
+func newTCPSession(conn net.Conn, closeChan chan struct{}) *TCPSession {
+	ts := &TCPSession{
+		conn:      conn,
+		framer:    framer.New(),
+		closeChan: closeChan,
 	}
-	return ws
+	return ts
 }
 
 // Send sends data over the session
@@ -160,6 +152,10 @@ func (ns *TCPSession) Recv() ([]byte, error) {
 
 // Close closes the session
 func (ns *TCPSession) Close() error {
+	if ns.closeChan != nil {
+		close(ns.closeChan)
+		ns.closeChan = nil
+	}
 	return ns.conn.Close()
 }
 
@@ -191,17 +187,15 @@ func (cfg TCPListenerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	li, err := NewTCPListener(address, tlscfg)
+	b, err := NewTCPListener(address, tlscfg)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		if fatal {
-			netceptor.DoneBackend()
-		}
-	})
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -232,17 +226,15 @@ func (cfg TCPDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	li, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
+	b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
 	if err != nil {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	netceptor.AddBackend()
-	netceptor.MainInstance.RunBackend(li, cfg.Cost, func(err error, fatal bool) {
-		if fatal {
-			netceptor.DoneBackend()
-		}
-	})
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -2,6 +2,7 @@
 package netceptor
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -30,20 +30,17 @@ const ServiceAdTime = 60 * time.Second
 // SeenUpdateExpireTime is the age after which routing update IDs can be discarded
 const SeenUpdateExpireTime = 1 * time.Hour
 
+// MainInstance is the global instance of Netceptor instantiated by the command-line main() function
+var MainInstance *Netceptor
+
 // ErrorFunc is a function parameter used to process errors. The boolean parameter
 // indicates whether the error is fatal (i.e. the associated process is going to exit).
 type ErrorFunc func(error, bool)
 
-// BackendSessFunc is a function run by a backend, that runs the Netceptor protocol (or some other protocol)
-type BackendSessFunc func(BackendSession) error
-
 // Backend is the interface for back-ends that the Receptor network can run over
 type Backend interface {
-	Start(sessFunc BackendSessFunc, errFunc ErrorFunc)
+	Start(context.Context) (chan BackendSession, error)
 }
-
-// MainInstance is the global instance of Netceptor instantiated by the command-line main() function
-var MainInstance *Netceptor
 
 // BackendSession is the interface for a single session of a back-end
 // Backends must be DATAGRAM ORIENTED, meaning that Recv() must return
@@ -73,13 +70,16 @@ type Netceptor struct {
 	listenerRegistry       map[string]*PacketConn
 	sendRouteFloodChan     chan time.Duration
 	updateRoutingTableChan chan time.Duration
-	shutdownChans          []chan bool
+	context                context.Context
+	cancelFunc             context.CancelFunc
 	hashLock               *sync.RWMutex
 	nameHashes             map[uint64]string
 	reservedServices       map[string]func(*messageData) error
 	serviceAdsLock         *sync.RWMutex
 	serviceAdsReceived     map[string]map[string]*ServiceAdvertisement
 	sendServiceAdsChan     chan time.Duration
+	backendWaitGroup       sync.WaitGroup
+	backendCount           int
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -153,33 +153,8 @@ type serviceAdvertisementFull struct {
 	Cancel bool
 }
 
-// The backend wait group keeps the application from exiting while a backend is running
-var backendWaitGroup = sync.WaitGroup{}
-var backendCount int32 = 0
-
-// AddBackend adds a backend to the wait group
-func AddBackend() {
-	backendWaitGroup.Add(1)
-	atomic.AddInt32(&backendCount, 1)
-}
-
-// DoneBackend signals to the wait group that the backend is done
-func DoneBackend() {
-	backendWaitGroup.Done()
-}
-
-// BackendCount returns the number of backends that ever registered
-func BackendCount() int32 {
-	return backendCount
-}
-
-// BackendWait waits for the backend wait group
-func BackendWait() {
-	backendWaitGroup.Wait()
-}
-
 // New constructs a new Receptor network protocol instance
-func New(NodeID string, AllowedPeers []string) *Netceptor {
+func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s := Netceptor{
 		nodeID:                 NodeID,
 		allowedPeers:           AllowedPeers,
@@ -197,36 +172,84 @@ func New(NodeID string, AllowedPeers []string) *Netceptor {
 		listenerRegistry:       make(map[string]*PacketConn),
 		sendRouteFloodChan:     nil,
 		updateRoutingTableChan: nil,
-		shutdownChans:          make([]chan bool, 6),
 		hashLock:               &sync.RWMutex{},
 		nameHashes:             make(map[uint64]string),
 		serviceAdsLock:         &sync.RWMutex{},
 		serviceAdsReceived:     make(map[string]map[string]*ServiceAdvertisement),
 		sendServiceAdsChan:     nil,
+		backendWaitGroup:       sync.WaitGroup{},
+		backendCount:           0,
 	}
 	s.reservedServices = map[string]func(*messageData) error{
 		"ping": s.handlePing,
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	s.addNameHash(NodeID)
-	// shutdownChans[0] is for the main protocol loop
-	s.updateRoutingTableChan = tickrunner.Run(s.updateRoutingTable, time.Hour*24, time.Second*1, s.shutdownChans[1])
-	s.sendRouteFloodChan = tickrunner.Run(s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100, s.shutdownChans[2])
-	s.sendServiceAdsChan = tickrunner.Run(s.sendServiceAds, ServiceAdTime, time.Second*5, s.shutdownChans[3])
-	go s.monitorConnectionAging(s.shutdownChans[4])
-	go s.expireSeenUpdates(s.shutdownChans[5])
+	s.context, s.cancelFunc = context.WithCancel(ctx)
+	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Second*1)
+	s.sendRouteFloodChan = tickrunner.Run(s.context, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
+	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
+	go s.monitorConnectionAging()
+	go s.expireSeenUpdates()
 	return &s
 }
 
 // Shutdown shuts down a Receptor network protocol instance
 func (s *Netceptor) Shutdown() {
-	for i := range s.shutdownChans {
-		s.shutdownChans[i] <- true
-	}
+	s.cancelFunc()
 }
 
 // NodeID returns the local Node ID of this Netceptor instance
 func (s *Netceptor) NodeID() string {
 	return s.nodeID
+}
+
+// AddBackend adds a backend to the Netceptor system
+func (s *Netceptor) AddBackend(backend Backend, connectionCost float64) error {
+	sessChan, err := backend.Start(s.context)
+	if err != nil {
+		return err
+	}
+	s.backendWaitGroup.Add(1)
+	s.backendCount++
+	go func() {
+		defer s.backendWaitGroup.Done()
+		for {
+			select {
+			case sess, ok := <-sessChan:
+				if ok {
+					go func() {
+						err := s.runProtocol(sess, connectionCost)
+						if err != nil {
+							logger.Error("Backend error: %s\n", err)
+						}
+					}()
+				} else {
+					return
+				}
+			case <-s.context.Done():
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+// DoneBackend signals to the wait group that the backend is done
+func (s *Netceptor) DoneBackend() {
+	s.backendWaitGroup.Done()
+}
+
+// BackendWait waits for the backend wait group
+func (s *Netceptor) BackendWait() {
+	s.backendWaitGroup.Wait()
+}
+
+// BackendCount returns the number of backends that ever registered with this Netceptor
+func (s *Netceptor) BackendCount() int {
+	return s.backendCount
 }
 
 // Status returns the current state of the Netceptor object
@@ -357,7 +380,7 @@ func (s *Netceptor) sendServiceAds() {
 }
 
 // Watches connections and expires any that haven't seen traffic in too long
-func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
+func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
@@ -373,14 +396,14 @@ func (s *Netceptor) monitorConnectionAging(shutdownChan chan bool) {
 				logger.Warning("Timing out connection\n")
 				timedOut[i] <- fmt.Errorf("connection timed out")
 			}
-		case <-shutdownChan:
+		case <-s.context.Done():
 			return
 		}
 	}
 }
 
 // Expires old updates from the seenUpdates table
-func (s *Netceptor) expireSeenUpdates(shutdownChan chan bool) {
+func (s *Netceptor) expireSeenUpdates() {
 	for {
 		select {
 		case <-time.After(SeenUpdateExpireTime / 2):
@@ -392,7 +415,7 @@ func (s *Netceptor) expireSeenUpdates(shutdownChan chan bool) {
 				}
 			}
 			s.knownNodeLock.Unlock()
-		case <-shutdownChan:
+		case <-s.context.Done():
 			return
 		}
 	}
@@ -607,23 +630,25 @@ func (s *Netceptor) getEphemeralService() string {
 // Prints the routing table.  Only used for debugging.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	logLevel, _ := logger.GetLogLevelByName("Debug")
-	if logger.GetLogLevel() >= logLevel {
+	debugLevel, _ := logger.GetLogLevelByName("Debug")
+	curLevel := logger.GetLogLevel()
+	if curLevel < debugLevel {
 		return
 	}
 	logger.Debug("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
-		logger.Debug("   %s: ", conn)
+		sb := &strings.Builder{}
+		_, _ = fmt.Fprintf(sb, "   %s: ", conn)
 		for peer := range s.knownConnectionCosts[conn] {
-			logger.Debug("%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
+			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
-		logger.Debug("\n")
+		_, _ = fmt.Fprintf(sb, "\n")
+		logger.Debug(sb.String())
 	}
 	logger.Debug("Routing Table:\n")
 	for node := range s.routingTable {
 		logger.Debug("   %s via %s\n", node, s.routingTable[node])
 	}
-	logger.Debug("\n")
 }
 
 // Constructs a routing update message
@@ -1034,17 +1059,8 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 			}
 		case err := <-ci.ErrorChan:
 			return err
-		case <-s.shutdownChans[0]:
+		case <-s.context.Done():
 			return nil
 		}
 	}
-}
-
-// RunBackend runs the Netceptor protocol on a backend object
-func (s *Netceptor) RunBackend(b Backend, connectionCost float64, errf func(error, bool)) {
-	//TODO: Rework these interfaces, this level of indirection probably isn't necessary
-	runProtocol := func(sess BackendSession) error {
-		return s.runProtocol(sess, connectionCost)
-	}
-	b.Start(runProtocol, errf)
 }

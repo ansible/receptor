@@ -1,13 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/backends"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"net"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -15,18 +15,14 @@ import (
    This is an example of the use of Receptor as a Go library.
 */
 
-// Error handler that gets called for backend errors
-func handleError(err error, fatal bool) {
-	fmt.Printf("Error: %s\n", err)
-	if fatal {
-		os.Exit(1)
-	}
-}
-
 func main() {
+	// Create contexts so we can shut down the nodes
+	ctx1, _ := context.WithCancel(context.Background())
+	ctx2, _ := context.WithCancel(context.Background())
+
 	// Create two nodes of the Receptor network-layer protocol (Netceptors).
-	n1 := netceptor.New("node1", nil)
-	n2 := netceptor.New("node2", nil)
+	n1 := netceptor.New(ctx1, "node1", nil)
+	n2 := netceptor.New(ctx2, "node2", nil)
 
 	// Start a TCP listener on the first node
 	b1, err := backends.NewTCPListener("localhost:3333", nil)
@@ -34,7 +30,11 @@ func main() {
 		fmt.Printf("Error listening on TCP: %s\n", err)
 		os.Exit(1)
 	}
-	n1.RunBackend(b1, 1.0, handleError)
+	err = n1.AddBackend(b1, 1.0)
+	if err != nil {
+		fmt.Printf("Error starting backend: %s\n", err)
+		os.Exit(1)
+	}
 
 	// Start a TCP dialer on the second node - this will connect to the listener we just started
 	b2, err := backends.NewTCPDialer("localhost:3333", false, nil)
@@ -42,7 +42,7 @@ func main() {
 		fmt.Printf("Error dialing on TCP: %s\n", err)
 		os.Exit(1)
 	}
-	n2.RunBackend(b2, 1.0, handleError)
+	err = n2.AddBackend(b2, 1.0)
 
 	// Start an echo server on node 1
 	l1, err := n1.Listen("echo", nil)
@@ -101,10 +101,7 @@ func main() {
 	// Note that because net.Conn is a stream connection, it is not guaranteed
 	// that received messages will be the same size as the messages that are sent.
 	// For datagram use, Receptor also provides a net.PacketConn.
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		rbuf := make([]byte, 1024)
 		for {
 			n, err := c2.Read(rbuf)
@@ -112,6 +109,8 @@ func main() {
 				fmt.Printf("Received data: %s\n", rbuf[:n])
 			}
 			if err == io.EOF {
+				// Shut down the whole Netceptor when any connection closes, because this is just a demo
+				n2.Shutdown()
 				return
 			}
 			if err != nil {
@@ -124,17 +123,18 @@ func main() {
 	// Send some data, which should be processed through the echo server back to our
 	// receive function and printed to the screen.
 	_, err = c2.Write([]byte("Hello, world!"))
-	if err == io.EOF {
-		return
-	}
-	if err != nil {
+	if err != nil && err != io.EOF {
 		fmt.Printf("Write error in Receptor dialer: %s\n", err)
 	}
 
 	// Close our end of the connection
 	_ = c2.Close()
 
-	// Wait for a reply
-	wg.Wait()
+	// Wait for n2 to shut down
+	n2.BackendWait()
+
+	// Gracefully shut down n1
+	n1.Shutdown()
+	n1.BackendWait()
 
 }

@@ -57,7 +57,7 @@ func handleError(err error, fatal bool) {
 
 // NewNode builds a node with the name passed as the argument
 func NewNode(name string) Node {
-	n1 := netceptor.New(name, nil)
+	n1 := netceptor.New(context.Background(), name, nil)
 	return Node{
 		NetceptorInstance: n1,
 	}
@@ -71,7 +71,7 @@ func (n *Node) TCPListen(address string, cost float64) error {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	err = n.NetceptorInstance.AddBackend(b1, cost)
 	return err
 }
 
@@ -82,7 +82,7 @@ func (n *Node) TCPDial(address string, cost float64) error {
 	if err != nil {
 		return err
 	}
-	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	err = n.NetceptorInstance.AddBackend(b1, cost)
 	return err
 }
 
@@ -94,7 +94,7 @@ func (n *Node) UDPListen(address string, cost float64) error {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	err = n.NetceptorInstance.AddBackend(b1, cost)
 	return err
 }
 
@@ -105,7 +105,7 @@ func (n *Node) UDPDial(address string, cost float64) error {
 	if err != nil {
 		return err
 	}
-	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	err = n.NetceptorInstance.AddBackend(b1, cost)
 	return err
 }
 
@@ -118,7 +118,7 @@ func (n *Node) WebsocketListen(address string, cost float64) error {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	err = n.NetceptorInstance.AddBackend(b1, cost)
 	return err
 }
 
@@ -130,7 +130,7 @@ func (n *Node) WebsocketDial(address string, cost float64) error {
 	if err != nil {
 		return err
 	}
-	n.NetceptorInstance.RunBackend(b1, cost, handleError)
+	err = n.NetceptorInstance.AddBackend(b1, cost)
 	return err
 }
 

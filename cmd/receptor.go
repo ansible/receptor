@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	"github.com/project-receptor/receptor/pkg/cmdline"
@@ -27,7 +28,7 @@ func (cfg nodeCfg) Prepare() error {
 	if cfg.AllowedPeers != "" {
 		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
 	}
-	netceptor.MainInstance = netceptor.New(cfg.ID, allowedPeers)
+	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
 	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
 	var err error
 	workceptor.MainInstance, err = workceptor.New(controlsvc.MainInstance, netceptor.MainInstance, cfg.DataDir)
@@ -39,9 +40,17 @@ func (cfg nodeCfg) Prepare() error {
 
 type nullBackendCfg struct{}
 
+// make the nullBackendCfg object be usable as a do-nothing Backend
+func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+	return make(chan netceptor.BackendSession), nil
+}
+
+// Run runs the action, in this case adding a null backend to keep the wait group alive
 func (cfg nullBackendCfg) Run() error {
-	// This is a null backend that doesn't do anything
-	netceptor.AddBackend()
+	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -53,12 +62,12 @@ func main() {
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})
 	go func() {
-		netceptor.BackendWait()
+		netceptor.MainInstance.BackendWait()
 		close(done)
 	}()
 	select {
 	case <-done:
-		if netceptor.BackendCount() > 0 {
+		if netceptor.MainInstance.BackendCount() > 0 {
 			logger.Error("All backends have failed. Exiting.\n")
 			os.Exit(1)
 		} else {

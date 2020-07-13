@@ -98,6 +98,77 @@ func TestMeshConnections(t *testing.T) {
 	}
 }
 
+func TestTCPSSLConnections(t *testing.T) {
+	t.Parallel()
+	// Setup our mesh yaml data
+	data := YamlData{}
+	data.Nodes = make(map[string]*YamlNode)
+
+	// Generate a mesh where each node n is connected to only n+1 and n-1
+	// if they exist
+	data.Nodes["node1"] = &YamlNode{
+		Connections: map[string]float64{},
+		Listen: []*YamlListener{
+			&YamlListener{
+				Addr:     "",
+				Cost:     1,
+				Sslkey:   "certs/private1.key",
+				Sslcert:  "certs/public1.crt",
+				Protocol: "tcp",
+			},
+		},
+		Name: "node1",
+	}
+	data.Nodes["node2"] = &YamlNode{
+		Connections: map[string]float64{
+			"node1": 1,
+		},
+		Listen: []*YamlListener{
+			&YamlListener{
+				Addr:     "",
+				Cost:     1,
+				Sslkey:   "certs/private2.key",
+				Sslcert:  "certs/public2.crt",
+				Protocol: "tcp",
+			},
+		},
+		Name: "node2",
+	}
+	data.Nodes["node3"] = &YamlNode{
+		Connections: map[string]float64{
+			"node2": 1,
+		},
+		Listen: []*YamlListener{
+			&YamlListener{
+				Addr:     "",
+				Cost:     1,
+				Sslkey:   "",
+				Protocol: "tcp",
+			},
+		},
+		Name: "node3",
+	}
+	mesh, err := NewMeshFromYaml(&data)
+	if err != nil {
+		t.Error(err)
+	}
+	err = mesh.WaitForReady(10000)
+	if err != nil {
+		t.Error(err)
+	}
+	// Test that each Node can ping each Node
+	for nodeIDSender, nodeSender := range mesh.Nodes {
+		for nodeIDResponder := range mesh.Nodes {
+			response, err := nodeSender.Ping(nodeIDResponder)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Logf("%s->%s: %v", nodeIDSender, nodeIDResponder, response["Time"])
+		}
+	}
+
+}
+
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 	// Setup our mesh yaml data
 	data := YamlData{}

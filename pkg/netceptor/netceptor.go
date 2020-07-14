@@ -956,7 +956,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 				if msgType == MsgTypeData {
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
-						logger.Error("Error translating data to message struct\n")
+						logger.Error("Error translating data to message struct: %s\n", err)
 						continue
 					}
 					logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
@@ -969,7 +969,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
-						logger.Error("Error unpacking routing update\n")
+						logger.Error("Error unpacking routing update: %s\n", err)
 						continue
 					}
 					if ri.ForwardingNode != remoteNodeID {
@@ -1006,7 +1006,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
-						logger.Error("Error unpacking routing update\n")
+						logger.Error("Error unpacking routing update: %s\n", err)
 						continue
 					}
 					remoteNodeID = ri.ForwardingNode

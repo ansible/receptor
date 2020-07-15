@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -138,14 +139,16 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener
 type WebsocketSession struct {
-	conn      *websocket.Conn
-	closeChan chan struct{}
+	conn            *websocket.Conn
+	closeChan       chan struct{}
+	closeChanCloser sync.Once
 }
 
 func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
-		conn:      conn,
-		closeChan: closeChan,
+		conn:            conn,
+		closeChan:       closeChan,
+		closeChanCloser: sync.Once{},
 	}
 	return ws
 }
@@ -171,8 +174,10 @@ func (ns *WebsocketSession) Recv() ([]byte, error) {
 // Close closes the session
 func (ns *WebsocketSession) Close() error {
 	if ns.closeChan != nil {
-		close(ns.closeChan)
-		ns.closeChan = nil
+		ns.closeChanCloser.Do(func() {
+			close(ns.closeChan)
+			ns.closeChan = nil
+		})
 	}
 	return ns.conn.Close()
 }

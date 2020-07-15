@@ -317,11 +317,17 @@ func NewMeshFromYaml(MeshDefinition *YamlData) (*Mesh, error) {
 	}, nil
 }
 
-// Shutdown This is broken and causes the thread to hang, dont use until
-// netceptor.Shutdown is fixed
+// Shutdown stops all running Netceptors and their backends
 func (m *Mesh) Shutdown() {
 	for _, node := range m.Nodes {
 		node.NetceptorInstance.Shutdown()
+	}
+}
+
+// WaitForShutdown Waits for all running Netceptors and their backends to stop
+func (m *Mesh) WaitForShutdown() {
+	for _, node := range m.Nodes {
+		node.NetceptorInstance.BackendWait()
 	}
 }
 

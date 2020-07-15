@@ -1,9 +1,13 @@
 package mesh
 
 import (
+	"bytes"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -47,6 +51,7 @@ func TestMeshStartup(t *testing.T) {
 					t.Logf("%s->%s: %v", nodeIDSender, nodeIDResponder, response["Time"])
 				}
 			}
+			mesh.Shutdown()
 		})
 	}
 }
@@ -92,7 +97,58 @@ func TestMeshConnections(t *testing.T) {
 				timeout -= 100
 			}
 			if connectionsReady == false {
-				t.Error("Timed out while waiting for connections")
+				t.Error("Timed out while waiting for connections:")
+			}
+			mesh.Shutdown()
+		})
+	}
+}
+
+// Test that a mesh starts and that connections are what we expect
+func TestMeshShutdown(t *testing.T) {
+	testTable := []struct {
+		filename string
+	}{
+		{"mesh-definitions/random-mesh-tcp.yaml"},
+		{"mesh-definitions/random-mesh-udp.yaml"},
+		{"mesh-definitions/random-mesh-ws.yaml"},
+	}
+	for _, data := range testTable {
+		filename := data.filename
+		t.Run(filename, func(t *testing.T) {
+			mesh, err := NewMeshFromFile(filename)
+			if err != nil {
+				t.Error(err)
+			}
+			err = mesh.WaitForReady(10000)
+			if err != nil {
+				t.Error(err)
+			}
+			mesh.Shutdown()
+			mesh.WaitForShutdown()
+
+			// Check that the connections are closed
+			pid := os.Getpid()
+			pidString := strconv.Itoa(pid)
+			done := false
+			var out bytes.Buffer
+			for timeout := 2 * time.Second; timeout > 0 && !done; {
+				out = bytes.Buffer{}
+				cmd := exec.Command("ss", "-tuanp")
+				cmd.Stdout = &out
+				err := cmd.Run()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(out.String(), pidString) {
+					done = true
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+				timeout -= 100 * time.Millisecond
+			}
+			if done == false {
+				t.Errorf("Timed out while waiting for backends to close:\n%s", out.String())
 			}
 		})
 	}
@@ -219,6 +275,9 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 		if err != nil {
 			b.Error(err)
 		}
+		b.StopTimer()
+		mesh.Shutdown()
+		b.StartTimer()
 	}
 }
 

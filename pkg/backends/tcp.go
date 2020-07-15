@@ -9,6 +9,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -102,17 +103,19 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 
 // TCPSession implements BackendSession for TCP backend
 type TCPSession struct {
-	conn      net.Conn
-	framer    framer.Framer
-	closeChan chan struct{}
+	conn            net.Conn
+	framer          framer.Framer
+	closeChan       chan struct{}
+	closeChanCloser sync.Once
 }
 
 // newTCPSession allocates a new TCPSession
 func newTCPSession(conn net.Conn, closeChan chan struct{}) *TCPSession {
 	ts := &TCPSession{
-		conn:      conn,
-		framer:    framer.New(),
-		closeChan: closeChan,
+		conn:            conn,
+		framer:          framer.New(),
+		closeChan:       closeChan,
+		closeChanCloser: sync.Once{},
 	}
 	return ts
 }
@@ -153,8 +156,10 @@ func (ns *TCPSession) Recv() ([]byte, error) {
 // Close closes the session
 func (ns *TCPSession) Close() error {
 	if ns.closeChan != nil {
-		close(ns.closeChan)
-		ns.closeChan = nil
+		ns.closeChanCloser.Do(func() {
+			close(ns.closeChan)
+			ns.closeChan = nil
+		})
 	}
 	return ns.conn.Close()
 }

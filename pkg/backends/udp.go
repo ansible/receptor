@@ -42,8 +42,9 @@ func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 				return nil, err
 			}
 			ns := &UDPDialerSession{
-				conn:      conn,
-				closeChan: closeChan,
+				conn:            conn,
+				closeChan:       closeChan,
+				closeChanCloser: sync.Once{},
 			}
 			return ns, nil
 		})
@@ -51,8 +52,9 @@ func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 
 // UDPDialerSession implements BackendSession for UDPDialer
 type UDPDialerSession struct {
-	conn      *net.UDPConn
-	closeChan chan struct{}
+	conn            *net.UDPConn
+	closeChan       chan struct{}
+	closeChanCloser sync.Once
 }
 
 // Send sends data over the session
@@ -83,8 +85,10 @@ func (ns *UDPDialerSession) Recv() ([]byte, error) {
 // Close closes the session
 func (ns *UDPDialerSession) Close() error {
 	if ns.closeChan != nil {
-		close(ns.closeChan)
-		ns.closeChan = nil
+		ns.closeChanCloser.Do(func() {
+			close(ns.closeChan)
+			ns.closeChan = nil
+		})
 	}
 	return ns.conn.Close()
 }

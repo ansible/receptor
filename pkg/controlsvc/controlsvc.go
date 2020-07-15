@@ -139,7 +139,7 @@ func (s *Server) controlPing(params string, cfo ControlFuncOperations) (map[stri
 	cfr := make(map[string]interface{})
 	select {
 	case addr := <-replyChan:
-		cfr["Result"] = fmt.Sprintf("Reply from %s in %s\n", addr.String(), time.Since(startTime))
+		cfr["Result"] = fmt.Sprintf("Reply from %s in %s", addr.String(), time.Since(startTime))
 	case <-time.After(10 * time.Second):
 		cfr["Result"] = "Timeout waiting for ping response"
 	}

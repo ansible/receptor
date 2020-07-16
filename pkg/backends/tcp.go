@@ -8,6 +8,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 // Start runs the given session function over this backend service
 func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, b.redial, 5*time.Second,
-		func(ctx context.Context, closeChan chan struct{}) (netceptor.BackendSession, error) {
+		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			var conn net.Conn
 			var err error
 			dialer := &net.Dialer{}
@@ -54,7 +55,7 @@ func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 type TCPListener struct {
 	address string
 	tls     *tls.Config
-	li      net.Listener
+	li      *net.TCPListener
 }
 
 // NewTCPListener instantiates a new TCPListener backend
@@ -78,21 +79,39 @@ func (b *TCPListener) Addr() net.Addr {
 // Start runs the given session function over the WebsocketListener backend
 func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	sessChan, err := listenerSession(ctx,
-		func(ctx context.Context) error {
+		func() error {
 			var err error
 			lc := net.ListenConfig{}
-			b.li, err = lc.Listen(ctx, "tcp", b.address)
+			li, err := lc.Listen(ctx, "tcp", b.address)
 			if err != nil {
 				return err
 			}
-			if b.tls != nil {
-				b.li = tls.NewListener(b.li, b.tls)
+			var ok bool
+			b.li, ok = li.(*net.TCPListener)
+			if !ok {
+				return fmt.Errorf("Listen returned a non-TCP listener")
 			}
 			return nil
 		}, func() (netceptor.BackendSession, error) {
-			c, err := b.li.Accept()
-			if err != nil {
-				return nil, err
+			var c net.Conn
+			for {
+				err := b.li.SetDeadline(time.Now().Add(1 * time.Second))
+				if err != nil {
+					return nil, err
+				}
+				c, err = b.li.Accept()
+				select {
+				case <-ctx.Done():
+					return nil, io.EOF
+				default:
+				}
+				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				break
 			}
 			return newTCPSession(c, nil), nil
 		}, func() {

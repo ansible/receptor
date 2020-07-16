@@ -48,7 +48,7 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 // Start runs the given session function over this backend service
 func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, b.redial, 5*time.Second,
-		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
+		func(ctx context.Context, closeChan chan struct{}) (netceptor.BackendSession, error) {
 			dialer := websocket.Dialer{
 				TLSClientConfig: b.tlscfg,
 				Proxy:           http.ProxyFromEnvironment,
@@ -59,7 +59,7 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 				header.Add(http.CanonicalHeaderKey(extraHeaderParts[0]), extraHeaderParts[1])
 			}
 			header.Add(http.CanonicalHeaderKey("origin"), b.origin)
-			conn, _, err := dialer.Dial(b.address, header)
+			conn, _, err := dialer.DialContext(ctx, b.address, header)
 			if err != nil {
 				return nil, err
 			}

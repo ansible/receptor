@@ -11,6 +11,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/randstr"
 	"github.com/project-receptor/receptor/pkg/tickrunner"
+	"io"
 	"math"
 	"reflect"
 	"strings"
@@ -120,7 +121,8 @@ type messageData struct {
 type connInfo struct {
 	ReadChan         chan []byte
 	WriteChan        chan []byte
-	ErrorChan        chan error
+	Context          context.Context
+	CancelFunc       context.CancelFunc
 	Cost             float64
 	lastReceivedData time.Time
 }
@@ -220,8 +222,10 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64) error {
 			select {
 			case sess, ok := <-sessChan:
 				if ok {
+					s.backendWaitGroup.Add(1)
 					go func() {
 						err := s.runProtocol(sess, connectionCost)
+						s.backendWaitGroup.Done()
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
 						}
@@ -379,17 +383,17 @@ func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			timedOut := make([]chan error, 0)
+			timedOut := make([]context.CancelFunc, 0)
 			s.connLock.RLock()
 			for i := range s.connections {
 				if time.Since(s.connections[i].lastReceivedData) > (2*RouteUpdateTime + 1*time.Second) {
-					timedOut = append(timedOut, s.connections[i].ErrorChan)
+					timedOut = append(timedOut, s.connections[i].CancelFunc)
 				}
 			}
 			s.connLock.RUnlock()
 			for i := range timedOut {
 				logger.Warning("Timing out connection\n")
-				timedOut[i] <- fmt.Errorf("connection timed out")
+				timedOut[i]()
 			}
 		case <-s.context.Done():
 			return
@@ -852,9 +856,16 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv()
+		select {
+		case <-ci.Context.Done():
+			return
+		default:
+		}
 		if err != nil {
-			logger.Error("Backend receiving error %s\n", err)
-			ci.ErrorChan <- err
+			if err != io.EOF {
+				logger.Error("Backend receiving error %s\n", err)
+			}
+			ci.CancelFunc()
 			return
 		}
 		ci.lastReceivedData = time.Now()
@@ -865,16 +876,22 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 // Goroutine to send data from the connection's WriteChan to the backend
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
-		message, more := <-ci.WriteChan
-		if !more {
+		select {
+		case <-ci.Context.Done():
 			return
+		case message, more := <-ci.WriteChan:
+			if !more {
+				return
+			}
+			err := sess.Send(message)
+			if err != nil {
+				logger.Error("Backend sending error %s\n", err)
+				ci.CancelFunc()
+				return
+			}
+		default:
 		}
-		err := sess.Send(message)
-		if err != nil {
-			logger.Error("Backend sending error %s\n", err)
-			ci.ErrorChan <- err
-			return
-		}
+
 	}
 }
 
@@ -892,7 +909,7 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 		count++
 		if count > 10 {
 			logger.Warning("Giving up on connection initialization\n")
-			ci.ErrorChan <- fmt.Errorf("initial connection failed")
+			ci.CancelFunc()
 			return
 		}
 		select {
@@ -934,16 +951,24 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
 			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
 			s.knownNodeLock.Unlock()
-			s.updateRoutingTableChan <- 0
-			s.sendRouteFloodChan <- 0
+			done := false
+			select {
+			case <-s.context.Done():
+				done = true
+			default:
+			}
+			if !done {
+				s.updateRoutingTableChan <- 0
+				s.sendRouteFloodChan <- 0
+			}
 		}
 	}()
 	ci := &connInfo{
 		ReadChan:  make(chan []byte),
 		WriteChan: make(chan []byte),
-		ErrorChan: make(chan error),
 		Cost:      connectionCost,
 	}
+	ci.Context, ci.CancelFunc = context.WithCancel(s.context)
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
 	initDoneChan := make(chan bool)
@@ -1051,8 +1076,6 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					return fmt.Errorf("remote node rejected the connection")
 				}
 			}
-		case err := <-ci.ErrorChan:
-			return err
 		case <-s.context.Done():
 			return nil
 		}

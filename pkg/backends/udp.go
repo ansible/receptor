@@ -16,18 +16,18 @@ const UDPMaxPacketLen = 65507
 
 // UDPDialer implements Backend for outbound UDP
 type UDPDialer struct {
-	address *net.UDPAddr
+	address string
 	redial  bool
 }
 
 // NewUDPDialer instantiates a new UDPDialer backend
 func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
-	ua, err := net.ResolveUDPAddr("udp", address)
+	_, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return nil, err
 	}
 	nd := UDPDialer{
-		address: ua,
+		address: address,
 		redial:  redial,
 	}
 	return &nd, nil
@@ -36,13 +36,18 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 // Start runs the given session function over this backend service
 func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, b.redial, 5*time.Second,
-		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
-			conn, err := net.DialUDP("udp", nil, b.address)
+		func(ctx context.Context, closeChan chan struct{}) (netceptor.BackendSession, error) {
+			dialer := net.Dialer{}
+			conn, err := dialer.DialContext(ctx, "udp", b.address)
 			if err != nil {
 				return nil, err
 			}
+			udpconn, ok := conn.(*net.UDPConn)
+			if !ok {
+				return nil, fmt.Errorf("DialContext returned a non-UDP connection")
+			}
 			ns := &UDPDialerSession{
-				conn:            conn,
+				conn:            udpconn,
 				closeChan:       closeChan,
 				closeChanCloser: sync.Once{},
 			}

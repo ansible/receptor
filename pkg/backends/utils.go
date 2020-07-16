@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
+type dialerFunc func(context.Context, chan struct{}) (netceptor.BackendSession, error)
 
 // dialerSession is a convenience function for backends that use dial/retry logic
 func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
@@ -17,9 +17,14 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 		defer close(sessChan)
 		for {
 			closeChan := make(chan struct{})
-			sess, err := df(closeChan)
+			sess, err := df(ctx, closeChan)
 			if err == nil {
-				sessChan <- sess
+				select {
+				case sessChan <- sess:
+					// continue
+				case <-ctx.Done():
+					return
+				}
 				select {
 				case <-closeChan:
 					// continue
@@ -28,7 +33,13 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					return
 				}
 			}
-			if redial {
+			done := false
+			select {
+			case <-ctx.Done():
+				done = true
+			default:
+			}
+			if redial && !done {
 				if err != nil {
 					logger.Warning("Backend connection failed (will retry): %s\n", err)
 				} else {
@@ -43,7 +54,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 			} else {
 				if err != nil {
 					logger.Error("Backend connection failed: %s\n", err)
-				} else {
+				} else if !done {
 					logger.Error("Backend connection exited\n")
 				}
 				return
@@ -53,13 +64,13 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 	return sessChan, nil
 }
 
-type listenFunc func() error
+type listenFunc func(context.Context) error
 type acceptFunc func() (netceptor.BackendSession, error)
 type listenerCancelFunc func()
 
 // listenerSession is a convenience function for backends that use listen/accept logic
 func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
-	err := lf()
+	err := lf(ctx)
 	if err != nil {
 		return nil, err
 	}

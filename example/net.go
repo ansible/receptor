@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/backends"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"net"
@@ -16,6 +17,9 @@ import (
 */
 
 func main() {
+	// Suppress log output.  Remove this if you want to see log information.
+	logger.QuietMode()
+
 	// Create two nodes of the Receptor network-layer protocol (Netceptors).
 	n1 := netceptor.New(context.Background(), "node1", nil)
 	n2 := netceptor.New(context.Background(), "node2", nil)

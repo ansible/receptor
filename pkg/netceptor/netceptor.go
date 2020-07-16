@@ -889,7 +889,6 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 				ci.CancelFunc()
 				return
 			}
-		default:
 		}
 
 	}

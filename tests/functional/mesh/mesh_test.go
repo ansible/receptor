@@ -131,7 +131,7 @@ func TestMeshShutdown(t *testing.T) {
 
 			// Check that the connections are closed
 			pid := os.Getpid()
-			pidString := strconv.Itoa(pid)
+			pidString := "pid=" + strconv.Itoa(pid)
 			done := false
 			var out bytes.Buffer
 			for timeout := 2 * time.Second; timeout > 0 && !done; {

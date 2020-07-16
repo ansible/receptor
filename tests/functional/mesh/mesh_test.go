@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"bytes"
+	"github.com/fortytw2/leaktest"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -106,6 +107,7 @@ func TestMeshConnections(t *testing.T) {
 
 // Test that a mesh starts and that connections are what we expect
 func TestMeshShutdown(t *testing.T) {
+	defer leaktest.Check(t)()
 	testTable := []struct {
 		filename string
 	}{

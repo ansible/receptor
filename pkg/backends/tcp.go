@@ -33,13 +33,15 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 // Start runs the given session function over this backend service
 func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, b.redial, 5*time.Second,
-		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
+		func(ctx context.Context, closeChan chan struct{}) (netceptor.BackendSession, error) {
 			var conn net.Conn
 			var err error
+			dialer := &net.Dialer{}
 			if b.tls == nil {
-				conn, err = net.Dial("tcp", b.address)
+				conn, err = dialer.DialContext(ctx, "tcp", b.address)
 			} else {
-				conn, err = tls.Dial("tcp", b.address, b.tls)
+				dialer.Timeout = 15 // tls library does not have a DialContext equivalent
+				conn, err = tls.DialWithDialer(dialer, "tcp", b.address, b.tls)
 			}
 			if err != nil {
 				return nil, err
@@ -76,9 +78,10 @@ func (b *TCPListener) Addr() net.Addr {
 // Start runs the given session function over the WebsocketListener backend
 func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	sessChan, err := listenerSession(ctx,
-		func() error {
+		func(ctx context.Context) error {
 			var err error
-			b.li, err = net.Listen("tcp", b.address)
+			lc := net.ListenConfig{}
+			b.li, err = lc.Listen(ctx, "tcp", b.address)
 			if err != nil {
 				return err
 			}

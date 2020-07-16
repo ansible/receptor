@@ -19,6 +19,11 @@ const (
 	DebugLevel
 )
 
+// QuietMode turns off all log output
+func QuietMode() {
+	logLevel = 0
+}
+
 // SetLogLevel is a helper function for setting logLevel int
 func SetLogLevel(level int) {
 	logLevel = level

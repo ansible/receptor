@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/creack/pty v1.1.11
+	github.com/fortytw2/leaktest v1.3.0
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.4.2

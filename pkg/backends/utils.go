@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type dialerFunc func(context.Context, chan struct{}) (netceptor.BackendSession, error)
+type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
 // dialerSession is a convenience function for backends that use dial/retry logic
 func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
@@ -17,7 +17,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 		defer close(sessChan)
 		for {
 			closeChan := make(chan struct{})
-			sess, err := df(ctx, closeChan)
+			sess, err := df(closeChan)
 			if err == nil {
 				select {
 				case sessChan <- sess:
@@ -64,13 +64,13 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 	return sessChan, nil
 }
 
-type listenFunc func(context.Context) error
+type listenFunc func() error
 type acceptFunc func() (netceptor.BackendSession, error)
 type listenerCancelFunc func()
 
 // listenerSession is a convenience function for backends that use listen/accept logic
 func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
-	err := lf(ctx)
+	err := lf()
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,11 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 				logger.Error("Error accepting connection: %s\n", err)
 				return
 			}
-			sessChan <- c
+			select {
+			case sessChan <- c:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return sessChan, nil

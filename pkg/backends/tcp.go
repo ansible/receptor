@@ -156,13 +156,20 @@ func (ns *TCPSession) Send(data []byte) error {
 }
 
 // Recv receives data via the session
-func (ns *TCPSession) Recv() ([]byte, error) {
+func (ns *TCPSession) Recv(timeout time.Duration) ([]byte, error) {
 	buf := make([]byte, netceptor.MTU)
 	for {
 		if ns.framer.MessageReady() {
 			break
 		}
+		err := ns.conn.SetReadDeadline(time.Now().Add(timeout))
+		if err != nil {
+			return nil, err
+		}
 		n, err := ns.conn.Read(buf)
+		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+			return nil, netceptor.ErrTimeout
+		}
 		if err != nil {
 			return nil, err
 		}

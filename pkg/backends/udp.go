@@ -78,9 +78,16 @@ func (ns *UDPDialerSession) Send(data []byte) error {
 }
 
 // Recv receives data via the session
-func (ns *UDPDialerSession) Recv() ([]byte, error) {
+func (ns *UDPDialerSession) Recv(timeout time.Duration) ([]byte, error) {
+	err := ns.conn.SetReadDeadline(time.Now().Add(timeout))
+	if err != nil {
+		return nil, err
+	}
 	buf := make([]byte, netceptor.MTU)
 	n, err := ns.conn.Read(buf)
+	if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+		return nil, netceptor.ErrTimeout
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -202,9 +209,13 @@ func (ns *UDPListenerSession) Send(data []byte) error {
 }
 
 // Recv receives data from the session
-func (ns *UDPListenerSession) Recv() ([]byte, error) {
-	data := <-ns.recvChan
-	return data, nil
+func (ns *UDPListenerSession) Recv(timeout time.Duration) ([]byte, error) {
+	select {
+	case data := <-ns.recvChan:
+		return data, nil
+	case <-time.After(timeout):
+		return nil, netceptor.ErrTimeout
+	}
 }
 
 // Close closes the session

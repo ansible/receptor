@@ -140,17 +140,39 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener
 type WebsocketSession struct {
 	conn            *websocket.Conn
+	recvChan        chan *recvResult
 	closeChan       chan struct{}
 	closeChanCloser sync.Once
+}
+
+type recvResult struct {
+	data []byte
+	err  error
 }
 
 func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
+		recvChan:        make(chan *recvResult),
 		closeChan:       closeChan,
 		closeChanCloser: sync.Once{},
 	}
+	go ws.recvChannelizer()
 	return ws
+}
+
+//
+func (ns *WebsocketSession) recvChannelizer() {
+	for {
+		_, data, err := ns.conn.ReadMessage()
+		ns.recvChan <- &recvResult{
+			data: data,
+			err:  err,
+		}
+		if err != nil {
+			return
+		}
+	}
 }
 
 // Send sends data over the session
@@ -163,12 +185,13 @@ func (ns *WebsocketSession) Send(data []byte) error {
 }
 
 // Recv receives data via the session
-func (ns *WebsocketSession) Recv() ([]byte, error) {
-	_, data, err := ns.conn.ReadMessage()
-	if err != nil {
-		return nil, err
+func (ns *WebsocketSession) Recv(timeout time.Duration) ([]byte, error) {
+	select {
+	case rr := <-ns.recvChan:
+		return rr.data, rr.err
+	case <-time.After(timeout):
+		return nil, netceptor.ErrTimeout
 	}
-	return data, nil
 }
 
 // Close closes the session

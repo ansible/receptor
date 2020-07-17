@@ -38,18 +38,33 @@ var MainInstance *Netceptor
 // indicates whether the error is fatal (i.e. the associated process is going to exit).
 type ErrorFunc func(error, bool)
 
+// ErrTimeout is returned for an expired deadline.
+var ErrTimeout error = &TimeoutError{}
+
+// TimeoutError is returned for an expired deadline.
+type TimeoutError struct{}
+
+// Error returns a string describing the error.
+func (e *TimeoutError) Error() string { return "i/o timeout" }
+
+// Timeout returns true if this error was a timeout.
+func (e *TimeoutError) Timeout() bool { return true }
+
+// Temporary returns true if a retry is likely a good idea.
+func (e *TimeoutError) Temporary() bool { return true }
+
 // Backend is the interface for back-ends that the Receptor network can run over
 type Backend interface {
 	Start(context.Context) (chan BackendSession, error)
 }
 
-// BackendSession is the interface for a single session of a back-end
+// BackendSession is the interface for a single session of a back-end.
 // Backends must be DATAGRAM ORIENTED, meaning that Recv() must return
 // whole packets sent by Send(). If the underlying protocol is stream
 // oriented, then the backend must deal with any required buffering.
 type BackendSession interface {
 	Send([]byte) error
-	Recv() ([]byte, error)
+	Recv(time.Duration) ([]byte, error) // Must return netceptor.ErrTimeout if the timeout is exceeded
 	Close() error
 }
 
@@ -855,11 +870,14 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 // Goroutine to send data from the backend to the connection's ReadChan
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
-		buf, err := sess.Recv()
+		buf, err := sess.Recv(1 * time.Second)
 		select {
 		case <-ci.Context.Done():
 			return
 		default:
+		}
+		if err == ErrTimeout {
+			continue
 		}
 		if err != nil {
 			if err != io.EOF {

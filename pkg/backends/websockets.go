@@ -161,7 +161,7 @@ func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *Websock
 	return ws
 }
 
-//
+// recvChannelizer receives messages and pushes them to a channel.
 func (ns *WebsocketSession) recvChannelizer() {
 	for {
 		_, data, err := ns.conn.ReadMessage()

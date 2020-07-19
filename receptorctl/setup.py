@@ -17,6 +17,7 @@ setup(
     install_requires=[
         "setuptools",
         "python-dateutil",
+        "click",
     ],
     zip_safe=False,
     entry_points={

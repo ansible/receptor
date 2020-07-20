@@ -118,7 +118,7 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			_ = b.li.Close()
 		})
 	if err == nil {
-		logger.Debug("Listening on %s\n", b.address)
+		logger.Debug("Listening on TCP %s\n", b.Addr().String())
 	}
 	return sessChan, err
 }
@@ -216,7 +216,6 @@ func (cfg TCPListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg TCPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	logger.Debug("Running TCP listener on %s\n", address)
 	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

@@ -187,6 +187,9 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			sess.recvChan <- data
 		}
 	}()
+	if b.conn != nil {
+		logger.Debug("Listening on UDP %s\n", b.LocalAddr().String())
+	}
 	return sessChan, nil
 }
 
@@ -248,7 +251,6 @@ func (cfg UDPListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	logger.Debug("Running listener %s\n", address)
 	b, err := NewUDPListener(address)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)

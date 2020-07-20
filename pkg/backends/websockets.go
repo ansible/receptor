@@ -133,7 +133,9 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 		<-ctx.Done()
 		_ = b.server.Close()
 	}()
-	logger.Debug("Listening on %s\n", b.address)
+	if err == nil {
+		logger.Debug("Listening on Websocket %s\n", b.Addr().String())
+	}
 	return sessChan, nil
 }
 
@@ -228,7 +230,6 @@ func (cfg WebsocketListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg WebsocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	logger.Debug("Running listener %s\n", address)
 	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

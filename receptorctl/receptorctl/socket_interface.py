@@ -1,11 +1,10 @@
 import sys
 import os
 import re
+import io
 import socket
+import shutil
 import json
-import time
-import dateutil.parser
-from pprint import pprint
 
 
 class ReceptorControl:
@@ -15,10 +14,10 @@ class ReceptorControl:
         self.remote_node = None
 
     def readstr(self):
-        return self.sockfile.readline().strip()
+        return self.sockfile.readline().decode().strip()
 
     def writestr(self, str):
-        self.sockfile.write(str)
+        self.sockfile.write(str.encode())
         self.sockfile.flush()
 
     def handshake(self):
@@ -49,7 +48,7 @@ class ReceptorControl:
                     raise ValueError(f"Socket path does not exist: {path}")
                 self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self.socket.connect(path)
-                self.sockfile = self.socket.makefile('rw')
+                self.sockfile = self.socket.makefile('rwb')
                 self.handshake()
                 return
             elif m[2] and m[3]:
@@ -62,69 +61,18 @@ class ReceptorControl:
 
     def close(self):
         if self.sockfile is not None:
-            self.sockfile.close()
+            try:
+                self.sockfile.close()
+            except:
+                pass
             self.sockfile = None
 
         if self.socket is not None:
-            self.socket.close()
+            try:
+                self.socket.close()
+            except:
+                pass
             self.socket = None
-
-    def print_status(self):
-        status = self.simple_command("status")
-        node_id = status.pop('NodeID')
-        print(f"Node ID: {node_id}")
-
-        longest_node = 12
-
-        connections = status.pop('Connections', None)
-        if connections:
-            for conn in connections:
-                l = len(conn['NodeID'])
-                if l > longest_node:
-                    longest_node = l
-
-        costs = status.pop('KnownConnectionCosts', None)
-        if costs:
-            for node in costs:
-                if len(node) > longest_node:
-                    longest_node = len(node)
-
-        if connections:
-            for conn in connections:
-                l = len(conn['NodeID'])
-                if l > longest_node:
-                    longest_node = l
-            print()
-            print(f"{'Connection':<{longest_node}} Cost")
-            for conn in connections:
-                print(f"{conn['NodeID']:<{longest_node}} {conn['Cost']}")
-
-        if costs:
-            print()
-            print(f"{'Known Node':<{longest_node}} Known Connections")
-            for node in costs:
-                print(f"{node:<{longest_node}} ", end="")
-                pprint(costs[node])
-
-        routes = status.pop('RoutingTable', None)
-        if routes:
-            print()
-            print(f"{'Route':<{longest_node}} Via")
-            for node in routes:
-                print(f"{node:<{longest_node}} {routes[node]}")
-
-        ads = status.pop('Advertisements', None)
-        if ads:
-            print()
-            print(f"{'Node':<{longest_node}} Service   Last Seen            Tags")
-            for ad in ads:
-                time = dateutil.parser.parse(ad['Time'])
-                print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<8}  {time:%Y-%m-%d %H:%M:%S}  ", end="")
-                pprint(ad['Tags'])
-
-        if status:
-            print("Additional data returned from Receptor:")
-            pprint(status)
 
     def ping(self, node):
         try:
@@ -139,3 +87,43 @@ class ReceptorControl:
         text = self.readstr()
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
+
+    def submit_work(self, node, worktype, params, payload):
+        if node is None:
+            command = f"work start {worktype} {params}\n"
+        else:
+            command = f"work submit {node} {worktype} {params}\n"
+        self.writestr(command)
+        text = self.readstr()
+        m = re.compile("Work unit created with ID (.+). Send stdin data and EOF.").fullmatch(text)
+        if not m:
+            errmsg = "Failed to start work unit"
+            if str.startswith(text, "ERROR: "):
+                errmsg = errmsg + ": " + text[7:]
+            raise RuntimeError(errmsg)
+        if isinstance(payload, io.IOBase):
+            shutil.copyfileobj(payload, self.sockfile)
+        elif isinstance(payload, str):
+            self.writestr(str)
+        elif isinstance(payload, bytes):
+            self.sockfile.write(payload)
+        else:
+            raise RuntimeError("Unknown payload type")
+        self.sockfile.flush()
+        self.socket.shutdown(socket.SHUT_WR)
+        text = self.readstr()
+        self.close()
+        result = json.loads(text)
+        return result
+
+    def get_work_results(self, unit_id):
+        self.writestr(f"work results {unit_id}\n")
+        text = self.readstr()
+        m = re.compile("Streaming results for work unit (.+)").fullmatch(text)
+        if not m:
+            errmsg = "Failed to get results"
+            if str.startswith(text, "ERROR: "):
+                errmsg = errmsg + ": " + text[7:]
+            raise RuntimeError(errmsg)
+        self.socket.shutdown(socket.SHUT_WR)
+        return self.sockfile

@@ -2,7 +2,8 @@ package mesh
 
 import (
 	"bytes"
-	"github.com/fortytw2/leaktest"
+	_ "github.com/fortytw2/leaktest"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -34,25 +35,36 @@ func TestMeshStartup(t *testing.T) {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
-			mesh, err := NewMeshFromFile(filename)
+			t.Logf("starting mesh")
+			mesh, err := NewCLIMeshFromFile(filename)
 			if err != nil {
 				t.Error(err)
 			}
-			err = mesh.WaitForReady(10000)
+			t.Logf("waiting for mesh")
+			err = mesh.WaitForReady(60000)
 			if err != nil {
 				t.Error(err)
 			}
 			// Test that each Node can ping each Node
-			for nodeIDSender, nodeSender := range mesh.Nodes {
-				for nodeIDResponder := range mesh.Nodes {
-					response, err := nodeSender.Ping(nodeIDResponder)
+			for _, nodeSender := range mesh.Nodes() {
+				controller := receptorcontrol.New()
+				t.Logf("connecting to %s", nodeSender.ControlSocket())
+				err = controller.Connect(nodeSender.ControlSocket())
+				if err != nil {
+					t.Error(err)
+				}
+				for nodeIDResponder := range mesh.Nodes() {
+					t.Logf("pinging %s", nodeIDResponder)
+					response, err := controller.Ping(nodeIDResponder)
 					if err != nil {
 						t.Error(err)
 					}
-					t.Logf("%s->%s: %v", nodeIDSender, nodeIDResponder, response["Time"])
+					t.Logf("%v", response)
 				}
+				controller.Close()
 			}
 			mesh.Shutdown()
+			mesh.WaitForShutdown()
 		})
 	}
 }
@@ -77,7 +89,7 @@ func TestMeshConnections(t *testing.T) {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
-			mesh, err := NewMeshFromFile(filename)
+			mesh, err := NewCLIMeshFromFile(filename)
 			if err != nil {
 				t.Error(err)
 			}
@@ -93,7 +105,7 @@ func TestMeshConnections(t *testing.T) {
 				t.Error(err)
 			}
 			connectionsReady := false
-			for timeout := 1000; timeout > 0 && !connectionsReady; connectionsReady = mesh.CheckConnections() {
+			for timeout := 10000; timeout > 0 && !connectionsReady; connectionsReady = mesh.CheckConnections() {
 				time.Sleep(100 * time.Millisecond)
 				timeout -= 100
 			}
@@ -101,13 +113,14 @@ func TestMeshConnections(t *testing.T) {
 				t.Error("Timed out while waiting for connections:")
 			}
 			mesh.Shutdown()
+			mesh.WaitForShutdown()
 		})
 	}
 }
 
 // Test that a mesh starts and that connections are what we expect
 func TestMeshShutdown(t *testing.T) {
-	defer leaktest.Check(t)()
+	//defer leaktest.Check(t)()
 	testTable := []struct {
 		filename string
 	}{
@@ -118,11 +131,11 @@ func TestMeshShutdown(t *testing.T) {
 	for _, data := range testTable {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
-			mesh, err := NewMeshFromFile(filename)
+			mesh, err := NewLibMeshFromFile(filename)
 			if err != nil {
 				t.Error(err)
 			}
-			err = mesh.WaitForReady(10000)
+			err = mesh.WaitForReady(60000)
 			if err != nil {
 				t.Error(err)
 			}
@@ -134,7 +147,7 @@ func TestMeshShutdown(t *testing.T) {
 			pidString := "pid=" + strconv.Itoa(pid)
 			done := false
 			var out bytes.Buffer
-			for timeout := 2 * time.Second; timeout > 0 && !done; {
+			for timeout := 10 * time.Second; timeout > 0 && !done; {
 				out = bytes.Buffer{}
 				cmd := exec.Command("ss", "-tuanp")
 				cmd.Stdout = &out
@@ -165,120 +178,120 @@ func TestTCPSSLConnections(t *testing.T) {
 	// Generate a mesh where each node n is connected to only n+1 and n-1
 	// if they exist
 	data.Nodes["node1"] = &YamlNode{
-		Connections: map[string]float64{},
-		Listen: []*YamlListener{
-			&YamlListener{
-				Addr:     "",
-				Cost:     1,
-				Sslkey:   "certs/private1.key",
-				Sslcert:  "certs/public1.crt",
-				Protocol: "tcp",
+		Connections: map[string]int{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tls-server": map[interface{}]interface{}{
+					"name": "cert1",
+					"key":  "certs/private1.key",
+					"cert": "certs/public1.crt",
+				},
+			},
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{
+					"tls": "cert1",
+				},
 			},
 		},
-		Name: "node1",
 	}
 	data.Nodes["node2"] = &YamlNode{
-		Connections: map[string]float64{
+		Connections: map[string]int{
 			"node1": 1,
 		},
-		Listen: []*YamlListener{
-			&YamlListener{
-				Addr:     "",
-				Cost:     1,
-				Sslkey:   "certs/private2.key",
-				Sslcert:  "certs/public2.crt",
-				Protocol: "tcp",
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tls-server": map[interface{}]interface{}{
+					"name": "cert2",
+					"key":  "certs/private2.key",
+					"cert": "certs/public2.crt",
+				},
+			},
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{
+					"tls": "cert2",
+				},
 			},
 		},
-		Name: "node2",
 	}
 	data.Nodes["node3"] = &YamlNode{
-		Connections: map[string]float64{
+		Connections: map[string]int{
 			"node2": 1,
 		},
-		Listen: []*YamlListener{
-			&YamlListener{
-				Addr:     "",
-				Cost:     1,
-				Sslkey:   "",
-				Protocol: "tcp",
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
 			},
 		},
-		Name: "node3",
 	}
-	mesh, err := NewMeshFromYaml(&data)
+	mesh, err := NewCLIMeshFromYaml(data)
 	if err != nil {
 		t.Error(err)
 	}
-	err = mesh.WaitForReady(10000)
+	err = mesh.WaitForReady(60000)
 	if err != nil {
 		t.Error(err)
 	}
 	// Test that each Node can ping each Node
-	for nodeIDSender, nodeSender := range mesh.Nodes {
-		for nodeIDResponder := range mesh.Nodes {
-			response, err := nodeSender.Ping(nodeIDResponder)
+	for _, nodeSender := range mesh.Nodes() {
+		controller := receptorcontrol.New()
+		err = controller.Connect(nodeSender.ControlSocket())
+		if err != nil {
+			t.Error(err)
+		}
+		for nodeIDResponder := range mesh.Nodes() {
+			response, err := controller.Ping(nodeIDResponder)
 			if err != nil {
 				t.Error(err)
 			}
-			t.Logf("%s->%s: %v", nodeIDSender, nodeIDResponder, response["Time"])
+			t.Logf("%v", response)
 		}
+		controller.Close()
 	}
 
+	mesh.Shutdown()
+	mesh.WaitForShutdown()
 }
 
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
-	// Setup our mesh yaml data
-	data := YamlData{}
-	data.Nodes = make(map[string]*YamlNode)
-
-	// Generate a mesh where each node n is connected to only n+1 and n-1
-	// if they exist
-	for i := 0; i < totalNodes; i++ {
-		connections := make(map[string]float64)
-		nodeID := "Node" + strconv.Itoa(i)
-		if i > 0 {
-			prevNodeID := "Node" + strconv.Itoa(i-1)
-			connections[prevNodeID] = 1
-		}
-		data.Nodes[nodeID] = &YamlNode{
-			Connections: connections,
-			Listen: []*YamlListener{
-				&YamlListener{
-					Addr:     "",
-					Cost:     1,
-					Protocol: "tcp",
-				},
-			},
-			Name: nodeID,
-		}
-	}
-
-	// Reset the Timer because building the yaml data for the mesh may have
-	// taken a bit
-	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// We probably dont need to stop the timer for this
+		// Setup our mesh yaml data
 		b.StopTimer()
-		for k := range data.Nodes {
-			for _, listener := range data.Nodes[k].Listen {
-				// We have to reset our Addr to generate a new port for each
-				// run, otherwise we collide because we cant shutdown old
-				// meshes
-				listener.Addr = ""
+		data := YamlData{}
+		data.Nodes = make(map[string]*YamlNode)
+
+		// Generate a mesh where each node n is connected to only n+1 and n-1
+		// if they exist
+		for i := 0; i < totalNodes; i++ {
+			connections := make(map[string]int)
+			nodeID := "Node" + strconv.Itoa(i)
+			if i > 0 {
+				prevNodeID := "Node" + strconv.Itoa(i-1)
+				connections[prevNodeID] = 0
+			}
+			data.Nodes[nodeID] = &YamlNode{
+				Connections: connections,
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tcp-listener": map[interface{}]interface{}{},
+					},
+				},
 			}
 		}
 		b.StartTimer()
-		mesh, err := NewMeshFromYaml(&data)
+
+		// Reset the Timer because building the yaml data for the mesh may have
+		// taken a bit
+		mesh, err := NewLibMeshFromYaml(data)
 		if err != nil {
 			b.Error(err)
 		}
-		err = mesh.WaitForReady(10000)
+		err = mesh.WaitForReady(60000)
 		if err != nil {
 			b.Error(err)
 		}
 		b.StopTimer()
 		mesh.Shutdown()
+		mesh.WaitForShutdown()
 		b.StartTimer()
 	}
 }

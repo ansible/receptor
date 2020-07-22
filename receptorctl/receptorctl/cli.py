@@ -186,6 +186,7 @@ def submit(ctx, worktype, node, payload, payload_literal, follow, rm, params):
             payload_data = sys.stdin.buffer
         else:
             payload_data = open(payload, 'rb')
+    unitid = None
     try:
         rc = get_rc(ctx)
         if node == "":
@@ -199,7 +200,7 @@ def submit(ctx, worktype, node, payload, payload_literal, follow, rm, params):
             print("Result: ", result)
             print("Unit ID:", unitid)
     finally:
-        if rm:
+        if rm and unitid:
             op_on_unit_ids(ctx, "release", [unitid])
 
 
@@ -221,8 +222,7 @@ def op_on_unit_ids(ctx, op, unit_ids):
     rc = get_rc(ctx)
     for unit_id in unit_ids:
         try:
-            result = rc.simple_command(f"work {op} {unit_id}")
-            return result
+            rc.simple_command(f"work {op} {unit_id}")
         except Exception as e:
             print(f"{unit_id}: ERROR: {e}")
 

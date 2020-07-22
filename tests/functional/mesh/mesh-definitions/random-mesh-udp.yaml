@@ -2,138 +2,73 @@
 nodes:
   controller:
     connections: {}
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: controller
-    stats_enable: true
-    stats_port: null
+    nodedef:
+      - udp-listener: {}
   node1:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node1
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - udp-listener: {}
   node10:
     connections:
-      node12: 1
-      node4: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node10
-    stats_enable: true
-    stats_port: null
+      node12: 0
+      node4: 0
+    nodedef:
+      - udp-listener: {}
   node11:
     connections:
-      node1: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node11
-    stats_enable: true
-    stats_port: null
+      node1: 0
+    nodedef:
+      - udp-listener: {}
   node12:
     connections:
-      node11: 1
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node12
-    stats_enable: true
-    stats_port: null
+      node11: 0
+      controller: 0
+    nodedef:
+      - udp-listener: {}
   node2:
     connections:
-      node1: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node2
-    stats_enable: true
-    stats_port: null
+      node1: 0
+    nodedef:
+      - udp-listener: {}
   node3:
     connections:
-      node6: 1
-      node4: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node3
-    stats_enable: true
-    stats_port: null
+      node6: 0
+      node4: 0
+    nodedef:
+      - udp-listener: {}
   node4:
     connections:
-      node7: 1
-      node2: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node4
-    stats_enable: true
-    stats_port: null
+      node7: 0
+      node2: 0
+    nodedef:
+      - udp-listener: {}
   node5:
     connections:
-      node8: 1
-      node12: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node5
-    stats_enable: true
-    stats_port: null
+      node8: 0
+      node12: 0
+    nodedef:
+      - udp-listener: {}
   node6:
     connections:
-      node10: 1
-      node3: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node6
-    stats_enable: true
-    stats_port: null
+      node10: 0
+      node3: 0
+    nodedef:
+      - udp-listener: {}
   node7:
     connections:
-      node3: 1
-      node1: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node7
-    stats_enable: true
-    stats_port: null
+      node3: 0
+      node1: 0
+    nodedef:
+      - udp-listener: {}
   node8:
     connections:
-      node1: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node8
-    stats_enable: true
-    stats_port: null
+      node1: 0
+    nodedef:
+      - udp-listener: {}
   node9:
     connections:
-      node10: 1
-      node5: 1
-    listen:
-      - addr: ""
-        protocol: udp
-        cost: 1
-    name: node9
-    stats_enable: true
-    stats_port: null
+      node10: 0
+      node5: 0
+    nodedef:
+      - udp-listener: {}

@@ -1,33 +1,29 @@
 package receptorcontrol
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v2"
-	_ "io/ioutil"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
-	_ "os"
-	_ "path/filepath"
-	_ "reflect"
 	"regexp"
 	"strings"
-	_ "time"
 )
 
-type JsonResponse struct {
-	data interface{}
-}
-
+// ReceptorControl Connects to a control socket and provides basic commands
 type ReceptorControl struct {
 	socketConn *net.UnixConn
 }
 
+// New Returns an empty ReceptorControl
 func New() *ReceptorControl {
 	return &ReceptorControl{
 		socketConn: nil,
 	}
 }
 
+// Connect connects to the socket at the specified filename and checks the
+// handshake with the control service
 func (r *ReceptorControl) Connect(filename string) error {
 	if r.socketConn != nil {
 		return errors.New("Tried to connect to a socket after already being connected to a socket")
@@ -47,6 +43,7 @@ func (r *ReceptorControl) Connect(filename string) error {
 	return nil
 }
 
+// Read reads a line from the socket
 func (r *ReceptorControl) Read() ([]byte, error) {
 	dataBytes := make([]byte, 0)
 	buf := make([]byte, 1)
@@ -65,10 +62,12 @@ func (r *ReceptorControl) Read() ([]byte, error) {
 	return dataBytes, nil
 }
 
+// Write writes some data to the socket
 func (r *ReceptorControl) Write(data []byte) (int, error) {
 	return r.socketConn.Write(data)
 }
 
+// ReadStr reads some data from the socket and converts it to a string
 func (r *ReceptorControl) ReadStr() (string, error) {
 	data, err := r.Read()
 	if err != nil {
@@ -77,6 +76,7 @@ func (r *ReceptorControl) ReadStr() (string, error) {
 	return string(data), nil
 }
 
+// WriteStr writes string data to the socket
 func (r *ReceptorControl) WriteStr(data string) (int, error) {
 	return r.Write([]byte(data))
 }
@@ -96,42 +96,65 @@ func (r *ReceptorControl) handshake() error {
 	return nil
 }
 
+// Close closes the connection to the socket
 func (r *ReceptorControl) Close() error {
 	err := r.socketConn.Close()
 	r.socketConn = nil
 	return err
 }
 
-func (r *ReceptorControl) ReadAndParseJson() (map[string]interface{}, error) {
+// ReadAndParseJSON reads data from the socket and parses it as json
+func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	data, err := r.Read()
 	if err != nil {
 		return nil, err
 	}
-	yamlData := make(map[string]interface{})
+	jsonData := make(map[string]interface{})
 
-	err = yaml.Unmarshal(data, &yamlData)
+	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
 		return nil, err
 	}
-	return yamlData, nil
+	return jsonData, nil
 }
 
+// Ping pings the specified node
 func (r *ReceptorControl) Ping(node string) (map[string]string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("ping %s\n", node))
 	if err != nil {
 		return nil, err
 	}
-	yamlData, err := r.ReadAndParseJson()
+	jsonData, err := r.ReadAndParseJSON()
 	if err != nil {
 		return nil, err
 	}
 	pingData := make(map[string]string)
 	// Convert to map[string]string
-	for k, v := range yamlData {
+	for k, v := range jsonData {
 		pingData[k] = v.(string)
 	}
 	if strings.HasPrefix(pingData["Result"], "Reply") != true {
 		return nil, errors.New(pingData["Result"])
 	}
 	return pingData, nil
+}
+
+// Status retrieves the status of the current node
+func (r *ReceptorControl) Status() (*netceptor.Status, error) {
+	_, err := r.WriteStr("status\n")
+	if err != nil {
+		return nil, err
+	}
+	data, err := r.Read()
+	if err != nil {
+		return nil, err
+	}
+	status := netceptor.Status{}
+	err = json.Unmarshal(data, &status)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &status, nil
 }

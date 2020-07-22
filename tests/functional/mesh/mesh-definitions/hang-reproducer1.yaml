@@ -1,0 +1,11 @@
+---
+nodes:
+  controller:
+    connections: {}
+    nodedef:
+      - tcp-listener: {}
+  node1:
+    connections:
+      controller: 0
+    nodedef:
+      - tcp-listener: {}

@@ -2,130 +2,65 @@
 nodes:
   controller:
     connections: {}
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: controller
-    stats_enable: true
-    stats_port: null
+    nodedef:
+      - tcp-listener: {}
   node1:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node1
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node10:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node10
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node11:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node11
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node12:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node12
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node2:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node2
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node3:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node3
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node4:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node4
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node5:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node5
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node6:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node6
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node7:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node7
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node8:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node8
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}
   node9:
     connections:
-      controller: 1
-    listen:
-      - addr: ""
-        protocol: tcp
-        cost: 1
-    name: node9
-    stats_enable: true
-    stats_port: null
+      controller: 0
+    nodedef:
+      - tcp-listener: {}

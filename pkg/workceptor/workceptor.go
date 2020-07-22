@@ -779,6 +779,11 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 			if err == nil {
 				break
 			} else if os.IsNotExist(err) {
+				if IsComplete(unit.status.State) {
+					close(resultChan)
+					logger.Warning("Unit completed without producing any stdout\n")
+					return
+				}
 				if sleepOrDone(doneChan, 250*time.Millisecond) {
 					return
 				}

@@ -147,7 +147,7 @@ func (s *Server) controlPing(params string, cfo ControlFuncOperations) (map[stri
 }
 
 func (s *Server) controlStatus(params string, cfo ControlFuncOperations) (map[string]interface{}, error) {
-	status := netceptor.MainInstance.Status()
+	status := s.nc.Status()
 	cfr := make(map[string]interface{})
 	cfr["NodeID"] = status.NodeID
 	cfr["Connections"] = status.Connections

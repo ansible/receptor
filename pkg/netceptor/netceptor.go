@@ -802,7 +802,9 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 		if handled {
 			return nil
 		}
+		s.listenerLock.RLock()
 		pc, ok := s.listenerRegistry[md.ToService]
+		s.listenerLock.RUnlock()
 		if !ok {
 			return fmt.Errorf("received message for unknown service")
 		}

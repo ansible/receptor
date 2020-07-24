@@ -1095,7 +1095,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					return fmt.Errorf("remote node rejected the connection")
 				}
 			}
-		case <-s.context.Done():
+		case <-ci.Context.Done():
 			return nil
 		}
 	}

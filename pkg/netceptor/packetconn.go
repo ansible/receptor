@@ -70,6 +70,9 @@ func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 			return 0, nil, ErrTimeout
 		}
 	}
+	if m == nil {
+		return 0, nil, fmt.Errorf("connection closed")
+	}
 	nCopied := copy(p, m.Data)
 	fromAddr := Addr{
 		node:    m.FromNode,
@@ -109,6 +112,7 @@ func (nc *PacketConn) Close() error {
 	nc.s.listenerLock.Lock()
 	defer nc.s.listenerLock.Unlock()
 	delete(nc.s.listenerRegistry, nc.localService)
+	close(nc.recvChan)
 	if nc.advertise {
 		err := nc.s.removeLocalServiceAdvertisement(nc.localService)
 		if err != nil {

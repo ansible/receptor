@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
-	github.com/lucas-clemente/quic-go v0.15.8
+	github.com/lucas-clemente/quic-go v0.17.3
 	github.com/minio/highwayhash v1.0.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.3.0 // indirect

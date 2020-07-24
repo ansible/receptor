@@ -128,6 +128,11 @@ type Conn struct {
 
 // Dial returns a stream connection compatible with Go's net.Conn.
 func (s *Netceptor) Dial(node string, service string, tls *tls.Config) (*Conn, error) {
+	return s.DialContext(context.Background(), node, service, tls)
+}
+
+// DialContext is like Dial but uses a context to allow timeout or cancellation.
+func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tls *tls.Config) (*Conn, error) {
 	_ = s.addNameHash(node)
 	_ = s.addNameHash(service)
 	pc, err := s.ListenPacket("")
@@ -136,7 +141,8 @@ func (s *Netceptor) Dial(node string, service string, tls *tls.Config) (*Conn, e
 	}
 	rAddr := NewAddr(node, service)
 	cfg := &quic.Config{
-		KeepAlive: true,
+		HandshakeTimeout: 15 * time.Second,
+		KeepAlive:        true,
 	}
 	if tls == nil {
 		tls = generateClientTLSConfig()
@@ -144,7 +150,17 @@ func (s *Netceptor) Dial(node string, service string, tls *tls.Config) (*Conn, e
 		tls = tls.Clone()
 		tls.NextProtos = []string{"netceptor"}
 	}
-	qc, err := quic.Dial(pc, rAddr, s.nodeID, tls, cfg)
+	okChan := make(chan struct{})
+	go func() {
+		select {
+		case <-okChan:
+			return
+		case <-ctx.Done():
+			_ = pc.Close()
+		}
+	}()
+	qc, err := quic.DialContext(ctx, pc, rAddr, s.nodeID, tls, cfg)
+	close(okChan)
 	if err != nil {
 		return nil, err
 	}

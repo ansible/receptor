@@ -17,13 +17,14 @@ import (
 
 // Listener implements the net.Listener interface via the Receptor network
 type Listener struct {
-	s  *Netceptor
-	pc *PacketConn
-	ql quic.Listener
+	s        *Netceptor
+	pc       *PacketConn
+	ql       quic.Listener
+	doneChan chan struct{}
 }
 
 // Internal implementation of Listen and ListenAndAdvertise
-func (s *Netceptor) listen(service string, tls *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
+func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
@@ -59,22 +60,45 @@ func (s *Netceptor) listen(service string, tls *tls.Config, advertise bool, adTa
 	if advertise {
 		s.addLocalServiceAdvertisement(service, adTags)
 	}
+	okChan := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-s.context.Done():
+			_ = ql.Close()
+		case <-ctx.Done():
+			_ = ql.Close()
+		case <-okChan:
+			return
+		}
+	}()
 	return &Listener{
-		s:  s,
-		pc: pc,
-		ql: ql,
+		s:        s,
+		pc:       pc,
+		ql:       ql,
+		doneChan: okChan,
 	}, nil
 }
 
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tls *tls.Config) (*Listener, error) {
-	return s.listen(service, tls, false, nil)
+	return s.listen(context.Background(), service, tls, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tls *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(service, tls, true, tags)
+	return s.listen(context.Background(), service, tls, true, tags)
+}
+
+// ListenContext returns a stream listener compatible with Go's net.Listener.
+// If service is blank, generates and uses an ephemeral service name.
+func (s *Netceptor) ListenContext(ctx context.Context, service string, tls *tls.Config) (*Listener, error) {
+	return s.listen(ctx, service, tls, false, nil)
+}
+
+// ListenContextAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
+func (s *Netceptor) ListenContextAndAdvertise(ctx context.Context, service string, tls *tls.Config, tags map[string]string) (*Listener, error) {
+	return s.listen(ctx, service, tls, true, tags)
 }
 
 // Accept accepts a connection via the listener
@@ -87,6 +111,24 @@ func (li *Listener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	doneChan := make(chan struct{}, 1)
+	conn := &Conn{
+		s:        li.s,
+		pc:       li.pc,
+		qc:       qc,
+		qs:       qs,
+		doneChan: doneChan,
+	}
+	go func() {
+		select {
+		case <-li.doneChan:
+			_ = conn.Close()
+		case <-li.s.context.Done():
+			_ = conn.Close()
+		case <-doneChan:
+			return
+		}
+	}()
 	buf := make([]byte, 1)
 	n, err := qs.Read(buf)
 	if err != nil {
@@ -95,16 +137,12 @@ func (li *Listener) Accept() (net.Conn, error) {
 	if n != 1 || buf[0] != 0 {
 		return nil, fmt.Errorf("stream failed to initialize")
 	}
-	return &Conn{
-		s:  li.s,
-		pc: li.pc,
-		qc: qc,
-		qs: qs,
-	}, nil
+	return conn, nil
 }
 
 // Close closes the listener
 func (li *Listener) Close() error {
+	close(li.doneChan)
 	qerr := li.ql.Close()
 	perr := li.pc.Close()
 	if qerr != nil {
@@ -120,10 +158,11 @@ func (li *Listener) Addr() net.Addr {
 
 // Conn implements the net.Conn interface via the Receptor network
 type Conn struct {
-	s  *Netceptor
-	pc *PacketConn
-	qc quic.Session
-	qs quic.Stream
+	s        *Netceptor
+	pc       *PacketConn
+	qc       quic.Session
+	qs       quic.Stream
+	doneChan chan struct{}
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -157,6 +196,8 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			return
 		case <-ctx.Done():
 			_ = pc.Close()
+		case <-s.context.Done():
+			_ = pc.Close()
 		}
 	}()
 	qc, err := quic.DialContext(ctx, pc, rAddr, s.nodeID, tls, cfg)
@@ -164,6 +205,17 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	if err != nil {
 		return nil, err
 	}
+	doneChan := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-qc.Context().Done():
+			_ = pc.Close()
+		case <-s.context.Done():
+			_ = pc.Close()
+		case <-doneChan:
+			return
+		}
+	}()
 	qs, err := qc.OpenStream()
 	if err != nil {
 		return nil, err
@@ -174,10 +226,11 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	return &Conn{
-		s:  s,
-		pc: pc,
-		qc: qc,
-		qs: qs,
+		s:        s,
+		pc:       pc,
+		qc:       qc,
+		qs:       qs,
+		doneChan: doneChan,
 	}, nil
 }
 
@@ -193,6 +246,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 
 // Close closes the writer side of the connection
 func (c *Conn) Close() error {
+	close(c.doneChan)
 	return c.qs.Close()
 }
 

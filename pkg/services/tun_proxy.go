@@ -129,7 +129,7 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 		logger.Error("Error listening on Receptor network\n")
 		return
 	}
-	raddr := netceptor.NewAddr(node, rservice)
+	raddr := s.NewAddr(node, rservice)
 	go runTunToNetceptor(iface, nconn, raddr)
 	go runNetceptorToTun(nconn, iface, raddr)
 }

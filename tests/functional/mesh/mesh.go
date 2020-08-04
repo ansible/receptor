@@ -162,14 +162,14 @@ func (n *Node) Ping(node string) (map[string]interface{}, error) {
 
 	sendErrChan := make(chan error)
 	go func() {
-		_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(node, "ping"))
+		_, err = pc.WriteTo([]byte{}, n.NetceptorInstance.NewAddr(node, "ping"))
 		if err != nil {
 			sendErrChan <- err
 			return
 		}
 		select {
 		case <-time.After(100 * time.Millisecond):
-			_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(node, "ping"))
+			_, err = pc.WriteTo([]byte{}, n.NetceptorInstance.NewAddr(node, "ping"))
 			if err != nil {
 				sendErrChan <- err
 				return

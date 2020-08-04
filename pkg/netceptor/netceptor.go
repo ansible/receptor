@@ -96,6 +96,7 @@ type Netceptor struct {
 	sendServiceAdsChan     chan time.Duration
 	backendWaitGroup       sync.WaitGroup
 	backendCount           int
+	networkName            string
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -170,6 +171,32 @@ type serviceAdvertisementFull struct {
 	Cancel bool
 }
 
+var networkNames = make([]string, 0)
+var networkNamesLock = sync.Mutex{}
+
+//makeNetworkName returns a network name that is unique within global scope
+func makeNetworkName(nodeID string) string {
+	networkNamesLock.Lock()
+	defer networkNamesLock.Unlock()
+	nameCounter := 1
+	proposedName := fmt.Sprintf("netceptor-%s", nodeID)
+	for {
+		good := true
+		for i := range networkNames {
+			if networkNames[i] == proposedName {
+				good = false
+				break
+			}
+		}
+		if good {
+			networkNames = append(networkNames, proposedName)
+			return proposedName
+		}
+		nameCounter++
+		proposedName = fmt.Sprintf("netceptor-%s-%d", nodeID, nameCounter)
+	}
+}
+
 // New constructs a new Receptor network protocol instance
 func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s := Netceptor{
@@ -196,6 +223,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 		sendServiceAdsChan:     nil,
 		backendWaitGroup:       sync.WaitGroup{},
 		backendCount:           0,
+		networkName:            makeNetworkName(NodeID),
 	}
 	s.reservedServices = map[string]func(*messageData) error{
 		"ping": s.handlePing,
@@ -211,6 +239,15 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	go s.monitorConnectionAging()
 	go s.expireSeenUpdates()
 	return &s
+}
+
+// NewAddr generates a Receptor network address from a node ID and service name
+func (s *Netceptor) NewAddr(node string, service string) Addr {
+	return Addr{
+		network: s.networkName,
+		node:    node,
+		service: service,
+	}
 }
 
 // Shutdown shuts down a Receptor network protocol instance

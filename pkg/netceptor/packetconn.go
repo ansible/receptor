@@ -75,6 +75,7 @@ func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	}
 	nCopied := copy(p, m.Data)
 	fromAddr := Addr{
+		network: nc.s.networkName,
 		node:    m.FromNode,
 		service: m.FromService,
 	}
@@ -102,6 +103,7 @@ func (nc *PacketConn) LocalService() string {
 // LocalAddr returns the local address the connection is bound to.
 func (nc *PacketConn) LocalAddr() net.Addr {
 	return Addr{
+		network: nc.s.networkName,
 		node:    nc.s.nodeID,
 		service: nc.localService,
 	}

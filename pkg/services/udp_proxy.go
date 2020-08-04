@@ -26,7 +26,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 		return
 	}
 
-	ncAddr := netceptor.NewAddr(node, service)
+	ncAddr := s.NewAddr(node, service)
 
 	for {
 		n, addr, err := uc.ReadFrom(buffer)
@@ -40,7 +40,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			}
 			logger.Debug("Received new UDP connection from %s\n", raddrStr)
 			connMap[raddrStr] = pc
-			go runNetceptorToUDPInbound(pc, uc, addr, netceptor.NewAddr(node, service))
+			go runNetceptorToUDPInbound(pc, uc, addr, s.NewAddr(node, service))
 		}
 		wn, err := pc.WriteTo(buffer[:n], ncAddr)
 		if err != nil {

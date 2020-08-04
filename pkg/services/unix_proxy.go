@@ -42,12 +42,17 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 			logger.Error("Error accepting Unix socket connection: %s\n", err)
 			return
 		}
-		qc, err := s.Dial(node, rservice, tlscfg)
-		if err != nil {
-			logger.Error("Error connecting on Receptor network: %s\n", err)
-			continue
-		}
-		go sockutils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
+		go func() {
+			defer func() {
+				_ = uc.Close()
+			}()
+			qc, err := s.Dial(node, rservice, tlscfg)
+			if err != nil {
+				logger.Error("Error connecting on Receptor network: %s\n", err)
+				return
+			}
+			sockutils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
+		}()
 	}
 }
 

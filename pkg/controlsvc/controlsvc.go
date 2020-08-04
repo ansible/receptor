@@ -132,7 +132,7 @@ func (s *Server) controlPing(params string, cfo ControlFuncOperations) (map[stri
 			replyChan <- addr
 		}
 	}()
-	_, err = pc.WriteTo([]byte{}, netceptor.NewAddr(params, "ping"))
+	_, err = pc.WriteTo([]byte{}, s.nc.NewAddr(params, "ping"))
 	if err != nil {
 		return nil, err
 	}

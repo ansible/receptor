@@ -12,6 +12,7 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	"math/big"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Listener struct {
 	pc       *PacketConn
 	ql       quic.Listener
 	doneChan chan struct{}
+	doneOnce *sync.Once
 }
 
 // Internal implementation of Listen and ListenAndAdvertise
@@ -60,14 +62,14 @@ func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config,
 	if advertise {
 		s.addLocalServiceAdvertisement(service, adTags)
 	}
-	okChan := make(chan struct{}, 1)
+	doneChan := make(chan struct{})
 	go func() {
 		select {
 		case <-s.context.Done():
 			_ = ql.Close()
 		case <-ctx.Done():
 			_ = ql.Close()
-		case <-okChan:
+		case <-doneChan:
 			return
 		}
 	}()
@@ -75,7 +77,8 @@ func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config,
 		s:        s,
 		pc:       pc,
 		ql:       ql,
-		doneChan: okChan,
+		doneChan: doneChan,
+		doneOnce: &sync.Once{},
 	}, nil
 }
 
@@ -118,6 +121,7 @@ func (li *Listener) Accept() (net.Conn, error) {
 		qc:       qc,
 		qs:       qs,
 		doneChan: doneChan,
+		doneOnce: &sync.Once{},
 	}
 	go func() {
 		select {
@@ -142,7 +146,9 @@ func (li *Listener) Accept() (net.Conn, error) {
 
 // Close closes the listener
 func (li *Listener) Close() error {
-	close(li.doneChan)
+	li.doneOnce.Do(func() {
+		close(li.doneChan)
+	})
 	qerr := li.ql.Close()
 	perr := li.pc.Close()
 	if qerr != nil {
@@ -163,6 +169,7 @@ type Conn struct {
 	qc       quic.Session
 	qs       quic.Stream
 	doneChan chan struct{}
+	doneOnce *sync.Once
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -178,7 +185,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	if err != nil {
 		return nil, err
 	}
-	rAddr := NewAddr(node, service)
+	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
 		HandshakeTimeout: 15 * time.Second,
 		KeepAlive:        true,
@@ -231,6 +238,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		qc:       qc,
 		qs:       qs,
 		doneChan: doneChan,
+		doneOnce: &sync.Once{},
 	}, nil
 }
 
@@ -246,7 +254,9 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 
 // Close closes the writer side of the connection
 func (c *Conn) Close() error {
-	close(c.doneChan)
+	c.doneOnce.Do(func() {
+		close(c.doneChan)
+	})
 	return c.qs.Close()
 }
 

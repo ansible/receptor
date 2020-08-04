@@ -21,6 +21,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 		logger.Debug("Could not acquire lock on socket file: %s\n", err)
 		return
 	}
+	defer lock.Unlock()
 	err = os.RemoveAll(filename)
 	if err != nil {
 		logger.Debug("Could not overwrite socket file: %s\n", err)

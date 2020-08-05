@@ -44,9 +44,6 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 			return
 		}
 		go func() {
-			defer func() {
-				_ = uc.Close()
-			}()
 			qc, err := s.Dial(node, rservice, tlscfg)
 			if err != nil {
 				logger.Error("Error connecting on Receptor network: %s\n", err)

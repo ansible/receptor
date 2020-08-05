@@ -21,7 +21,7 @@ build-all:
 	go build example/*.go
 
 test:
-	go test ./... -count=1
+	go test ./... -p 1 -count=1
 
 ci: pre-commit build-all test
 	echo "All done"

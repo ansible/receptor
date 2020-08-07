@@ -322,7 +322,9 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 			logger.Error("Error saving local status file: %s\n", err)
 			return
 		}
-		sleepOrDone(ctx.Done(), 1*time.Second)
+		if sleepOrDone(ctx.Done(), 1*time.Second) {
+			return
+		}
 	}
 }
 
@@ -383,7 +385,22 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 				logger.Debug("Could not open stdout file %s: %s\n", stdoutFilename, err)
 				continue
 			}
+			doneChan := make(chan struct{})
+			go func() {
+				select {
+				case <-doneChan:
+					return
+				case <-ctx.Done():
+					cr, ok := conn.(interface{ CancelRead() })
+					if ok {
+						cr.CancelRead()
+					}
+					_ = conn.Close()
+					return
+				}
+			}()
 			_, err = io.Copy(stdout, conn)
+			close(doneChan)
 			if err != nil {
 				logger.Error("Error copying to stdout file %s: %s\n", stdoutFilename, err)
 				continue
@@ -459,27 +476,11 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 				logger.Error("Error sending stdin file: %s\n", err)
 				continue
 			}
-			// TODO: Implement CloseWrite on netceptor.Conn
-			cw, ok := conn.(interface{ CloseWrite() error })
-			if ok {
-				err := cw.CloseWrite()
-				if err != nil {
-					logger.Error("Error closing write: %s\n", err)
-					continue
-				}
-				response, err = reader.ReadString('\n')
-				if err != nil {
-					logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
-					continue
-				}
-				// TODO: Maybe check that the returned unit ID is as expected
-			} else {
-				err = conn.Close()
-				conn = nil
-				if err != nil {
-					logger.Error("Error closing connection: %s\n", err)
-					continue
-				}
+			err = conn.Close()
+			conn = nil
+			if err != nil {
+				logger.Error("Error closing connection: %s\n", err)
+				continue
 			}
 			continue
 		}

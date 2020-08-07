@@ -247,6 +247,11 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	return c.qs.Read(b)
 }
 
+// CancelRead cancels a pending read operation
+func (c *Conn) CancelRead() {
+	c.qs.CancelRead(499)
+}
+
 // Write writes data to the connection
 func (c *Conn) Write(b []byte) (n int, err error) {
 	return c.qs.Write(b)

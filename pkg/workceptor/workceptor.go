@@ -662,7 +662,7 @@ func (w *Workceptor) scanForUnits() {
 				}
 				w.activeUnits[fi.Name()] = unit
 				if si.Node != "" && si.Node != w.nc.NodeID() {
-					if si.LocalCancel && si.State == WorkStateRunning {
+					if si.LocalCancel && !IsComplete(si.State) {
 						remoteNodeID := si.Node
 						remoteUnitID := si.RemoteUnitID
 						go w.cancelRemote(remoteNodeID, remoteUnitID, unit)

@@ -326,15 +326,12 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 			logger.Error("Error saving local status file: %s\n", err)
 			return
 		}
-
 		if IsComplete(state) {
 			return
 		}
-
 		if released {
 			return
 		}
-
 		if sleepOrDone(ctx.Done(), 1*time.Second) {
 			return
 		}
@@ -365,7 +362,6 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 				return
 			}
 		}
-
 		diskStdoutSize := fileSizeOrZero(stdoutFilename)
 		unit.lock.RLock()
 		remoteStdoutSize := unit.status.StdoutSize
@@ -416,7 +412,6 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 			_, err = io.Copy(stdout, conn)
 			close(doneChan)
 
-
 			unit.lock.RLock()
 			released := unit.released
 			unit.lock.RUnlock()
@@ -447,7 +442,6 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 	workType := unit.status.WorkType
 	unit.monitoringRemote = true
 	unit.lock.Unlock()
-
 	for {
 		if conn != nil && !reflect.ValueOf(conn).IsNil() {
 			_ = conn.Close()
@@ -457,14 +451,12 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 		if nextDelay > MaxWorkSleep {
 			nextDelay = MaxWorkSleep
 		}
-
 		unit.lock.RLock()
 		released := unit.released
 		unit.lock.RUnlock()
 		if released {
 			return
 		}
-
 		conn, reader, err := w.connectToRemote(remoteNodeID)
 		if err != nil {
 			logger.Error("Connection failed to %s: %s\n", remoteNodeID, err)
@@ -732,12 +724,10 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 		if released {
 			return nil
 		}
-
 		conn, _, err := w.connectToRemote(remoteNodeID)
 		if err != nil {
 			logger.Error("Connection failed to %s: %s\n", remoteNodeID, err)
 		}
-
 		if conn != nil {
 			_, err = conn.Write([]byte(fmt.Sprintf("work cancel %s\n", remoteUnitID)))
 			if err != nil {
@@ -749,16 +739,13 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 			conn.Close()
 		}
 		time.Sleep(retryInterval)
-
 		// backoff scheme, increase retryInterval
 		retryInterval = time.Duration(1.5 * float64(retryInterval))
 		if retryInterval > MaxWorkSleep {
 			retryInterval = MaxWorkSleep
 		}
 	}
-
 	retryInterval = 500 * time.Millisecond
-
 	var state int
 	for {
 		// check that unit still exists, could have been released
@@ -768,14 +755,12 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 		if released {
 			return nil
 		}
-
 		unit.lock.RLock()
 		state = unit.status.State
 		unit.lock.RUnlock()
 		if IsComplete(state) {
 			return nil
 		}
-
 		time.Sleep(retryInterval)
 	}
 }
@@ -869,7 +854,6 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 	w.activeUnitsLock.Lock()
 	delete(w.activeUnits, unitID)
 	w.activeUnitsLock.Unlock()
-
 	err = os.RemoveAll(path.Join(w.dataDir, unitID))
 	if err != nil {
 		return err

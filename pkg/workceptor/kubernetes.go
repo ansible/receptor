@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	watch2 "k8s.io/client-go/tools/watch"
 	"strings"
+	"sync"
 )
 
 // kubeUnit implements the WorkUnit interface
@@ -94,7 +95,7 @@ func (kw *kubeUnit) runWork() {
 	}, metav1.CreateOptions{})
 	if err != nil {
 		errStr := fmt.Sprintf("Error creating pod: %s", err)
-		logger.Warning(errStr)
+		logger.Error(errStr)
 		err = saveStatus(kw.unitdir, WorkStateFailed, errStr, 0)
 		if err != nil {
 			logger.Error("Unable to save status: %s", err)
@@ -128,7 +129,10 @@ func (kw *kubeUnit) runWork() {
 		},
 	}
 	ev, err := watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
-	if err != nil {
+	skipStdin := false
+	if err == ErrPodCompleted {
+		skipStdin = true
+	} else if err != nil {
 		errStr := fmt.Sprintf("Error waiting for pod to be running: %s", err)
 		logger.Error(errStr)
 		err = saveStatus(kw.unitdir, WorkStateFailed, errStr, 0)
@@ -148,27 +152,46 @@ func (kw *kubeUnit) runWork() {
 	}
 	kw.pod = ev.Object.(*corev1.Pod)
 
-	// Attach stdin/stdout streams to the pod
-	req := kw.clientset.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(kw.pod.Name).
-		Namespace(kw.pod.Namespace).
-		SubResource("attach")
-	req.VersionedParams(&corev1.PodExecOptions{
-		Container: "worker",
-		Stdin:     true,
-		Stdout:    true,
-		Stderr:    false,
-		TTY:       false,
-	}, scheme.ParameterCodec)
-	exec, err := remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
+	// Attach stdin stream to the pod
+	var exec remotecommand.Executor
+	if !skipStdin {
+		req := kw.clientset.CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(kw.pod.Name).
+			Namespace(kw.pod.Namespace).
+			SubResource("attach")
+		req.VersionedParams(&corev1.PodExecOptions{
+			Container: "worker",
+			Stdin:     true,
+			Stdout:    false,
+			Stderr:    false,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+		exec, err = remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
+		if err != nil {
+			err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Error attaching to pod: %s", err), 0)
+			if err != nil {
+				logger.Error("Unable to save status: %s", err)
+			}
+			return
+		}
+	}
+
+	// Open the pod log for stdout
+	logreq := kw.clientset.CoreV1().Pods(kw.namespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
+		Follow: true,
+	})
+	logStream, err := logreq.Stream(kw.ctx)
 	if err != nil {
-		err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Error attaching to pod: %s", err), 0)
+		err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Error opening pod stream: %s", err), 0)
 		if err != nil {
 			logger.Error("Unable to save status: %s", err)
 		}
 		return
 	}
+	defer logStream.Close()
+
+	// Check if we were cancelled before starting the streams
 	select {
 	case <-kw.ctx.Done():
 		err = saveStatus(kw.unitdir, WorkStateFailed, "Cancelled", 0)
@@ -180,15 +203,18 @@ func (kw *kubeUnit) runWork() {
 	}
 
 	// Open stdin reader
-	stdin, err := newStdinReader(kw.unitdir)
-	if err != nil {
-		errStr := fmt.Sprintf("Error opening stdin file: %s", err)
-		logger.Error(errStr)
-		err = saveStatus(kw.unitdir, WorkStateFailed, errStr, 0)
+	var stdin *stdinReader
+	if !skipStdin {
+		stdin, err = newStdinReader(kw.unitdir)
 		if err != nil {
-			logger.Error("Unable to save status: %s", err)
+			errStr := fmt.Sprintf("Error opening stdin file: %s", err)
+			logger.Error(errStr)
+			err = saveStatus(kw.unitdir, WorkStateFailed, errStr, 0)
+			if err != nil {
+				logger.Error("Unable to save status: %s", err)
+			}
+			return
 		}
-		return
 	}
 
 	// Open stdout writer
@@ -210,33 +236,58 @@ func (kw *kubeUnit) runWork() {
 	// Goroutine to update status when stdin is fully sent to the pod, which is when we
 	// update from WorkStatePending to WorkStateRunning.
 	finishedChan := make(chan struct{})
-	go func() {
-		select {
-		case <-finishedChan:
-			return
-		case <-stdin.Done():
-			serr := stdin.Error()
-			var err error
-			if serr == io.EOF {
-				err = saveStatus(kw.unitdir, WorkStateRunning, "Pod Running", stdout.Size())
-			} else {
-				err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", serr), stdout.Size())
+	if !skipStdin {
+		go func() {
+			select {
+			case <-finishedChan:
+				return
+			case <-stdin.Done():
+				serr := stdin.Error()
+				var err error
+				if serr == io.EOF {
+					err = saveStatus(kw.unitdir, WorkStateRunning, "Pod Running", stdout.Size())
+				} else {
+					err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", serr), stdout.Size())
+				}
+				if err != nil {
+					logger.Error("Unable to save status: %s", err)
+				}
 			}
-			if err != nil {
-				logger.Error("Unable to save status: %s", err)
-			}
-		}
-	}()
+		}()
+	}
 
 	// Actually run the streams.  This blocks until the pod finishes.
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Tty:    false,
-	})
+	var errStdin error
+	var errStdout error
+	streamWait := sync.WaitGroup{}
+	streamWait.Add(2)
+	if skipStdin {
+		streamWait.Done()
+	} else {
+		go func() {
+			errStdin = exec.Stream(remotecommand.StreamOptions{
+				Stdin: stdin,
+				Tty:   false,
+			})
+			streamWait.Done()
+		}()
+	}
+	go func() {
+		_, errStdout = io.Copy(stdout, logStream)
+		streamWait.Done()
+	}()
+	streamWait.Wait()
 	close(finishedChan)
-	if err != nil {
-		err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Error running pod: %s", err), stdout.Size())
+	if errStdin != nil || errStdout != nil {
+		var errDetail string
+		if errStdin == nil {
+			errDetail = fmt.Sprintf("%s", errStdout)
+		} else if errStdout == nil {
+			errDetail = fmt.Sprintf("%s", errStdin)
+		} else {
+			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", errStdin, errStdout)
+		}
+		err = saveStatus(kw.unitdir, WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
 		if err != nil {
 			logger.Error("Unable to save status: %s", err)
 		}

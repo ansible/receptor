@@ -963,6 +963,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 				stdoutSize := fileSizeOrZero(stdoutFilename)
 				if IsComplete(unit.status.State) && stdoutSize >= unit.status.StdoutSize {
 					close(resultChan)
+					logger.Info("Stdout complete - closing channel\n")
 					return
 				}
 				continue

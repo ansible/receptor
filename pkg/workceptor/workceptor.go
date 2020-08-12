@@ -71,12 +71,12 @@ type workType struct {
 
 // Internal data for a single unit of work
 type workUnit struct {
-	lock         *sync.RWMutex
-	started      bool
-	released     bool
-	waitRemote   *sync.WaitGroup
-	worker       WorkType
-	status       *StatusInfo
+	lock       *sync.RWMutex
+	started    bool
+	released   bool
+	waitRemote *sync.WaitGroup
+	worker     WorkType
+	status     *StatusInfo
 }
 
 // Workceptor is the main object that handles unit-of-work management
@@ -574,12 +574,12 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 	w.activeUnitsLock.Lock()
 	defer w.activeUnitsLock.Unlock()
 	w.activeUnits[ident] = &workUnit{
-		lock:     &sync.RWMutex{},
-		started:  false,
-		released: false,
+		lock:       &sync.RWMutex{},
+		started:    false,
+		released:   false,
 		waitRemote: &sync.WaitGroup{},
-		worker:   worker,
-		status:   status,
+		worker:     worker,
+		status:     status,
 	}
 	return ident, nil
 }
@@ -643,12 +643,12 @@ func (w *Workceptor) scanForUnits() {
 				statusFilename := path.Join(w.dataDir, fi.Name(), "status")
 				_ = si.Load(statusFilename)
 				unit := &workUnit{
-					lock:     &sync.RWMutex{},
-					started:  true, // If we're finding it now, we don't want to start it again
-					released: false,
+					lock:       &sync.RWMutex{},
+					started:    true, // If we're finding it now, we don't want to start it again
+					released:   false,
 					waitRemote: &sync.WaitGroup{},
-					worker:   nil,
-					status:   si,
+					worker:     nil,
+					status:     si,
 				}
 				if unit.status.State == WorkStatePending {
 					unit.status.State = WorkStateFailed
@@ -792,7 +792,7 @@ func (w *Workceptor) CancelUnit(unitID string) (bool, error) {
 		unit.lock.Unlock()
 		firstAttemptSuccess := make(chan bool)
 		go w.cancelRemote(nodeID, remoteUnitID, unit, firstAttemptSuccess)
-		if !<- firstAttemptSuccess {
+		if !<-firstAttemptSuccess {
 			isPending = true
 		}
 	} else {

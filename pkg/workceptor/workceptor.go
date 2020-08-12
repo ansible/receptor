@@ -412,11 +412,7 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 			_, err = io.Copy(stdout, conn)
 			close(doneChan)
 
-			unit.lock.RLock()
-			released := unit.released
-			unit.lock.RUnlock()
-
-			if err != nil && !released {
+			if err != nil {
 				logger.Error("Error copying to stdout file %s: %s\n", stdoutFilename, err)
 				continue
 			}
@@ -662,9 +658,7 @@ func (w *Workceptor) scanForUnits() {
 				w.activeUnits[fi.Name()] = unit
 				if si.Node != "" && si.Node != w.nc.NodeID() {
 					if si.LocalCancel && !IsComplete(si.State) {
-						remoteNodeID := si.Node
-						remoteUnitID := si.RemoteUnitID
-						go w.cancelRemote(remoteNodeID, remoteUnitID, unit)
+						go w.CancelUnit(fi.Name())
 					}
 					go w.monitorRemoteUnit(unit, fi.Name())
 				}
@@ -713,54 +707,58 @@ func (w *Workceptor) unitStatusForCFR(unitID string) (map[string]interface{}, er
 	return retMap, nil
 }
 
-func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workUnit) error {
-	retryInterval := 500 * time.Millisecond
+func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workUnit, firstAttemptSuccess chan bool) {
+	retryInterval := SuccessWorkSleep
+	firstTime := true
 	for {
+		if firstTime {
+			firstTime = false
+		} else {
+			select {
+			case firstAttemptSuccess <- false:
+			default:
+			}
+			time.Sleep(retryInterval)
+			retryInterval = time.Duration(1.5 * float64(retryInterval))
+			if retryInterval > MaxWorkSleep {
+				retryInterval = MaxWorkSleep
+			}
+		}
 		// check that unit still exists, could have been released
 		unit.lock.RLock()
 		released := unit.released
 		unit.lock.RUnlock()
 		if released {
-			return nil
+			select {
+			case firstAttemptSuccess <- true:
+			default:
+			}
+			return
 		}
-		conn, _, err := w.connectToRemote(remoteNodeID)
+		conn, reader, err := w.connectToRemote(remoteNodeID)
 		if err != nil {
 			logger.Error("Connection failed to %s: %s\n", remoteNodeID, err)
+			continue
 		}
-		if conn != nil {
-			_, err = conn.Write([]byte(fmt.Sprintf("work cancel %s\n", remoteUnitID)))
-			if err != nil {
-				logger.Error("Write error sending to %s: %s\n", remoteNodeID, err)
-			} else {
-				conn.Close()
-				break
+		_, err = conn.Write([]byte(fmt.Sprintf("work cancel %s\n", remoteUnitID)))
+		if err != nil {
+			logger.Error("Write error sending to %s: %s\n", remoteNodeID, err)
+			conn.Close()
+			continue
+		}
+
+		response, err := reader.ReadString('\n')
+		if response[:5] == "ERROR" {
+			conn.Close()
+			continue
+		} else {
+			select {
+			case firstAttemptSuccess <- true:
+			default:
 			}
 			conn.Close()
+			return
 		}
-		time.Sleep(retryInterval)
-		// backoff scheme, increase retryInterval
-		retryInterval = time.Duration(1.5 * float64(retryInterval))
-		if retryInterval > MaxWorkSleep {
-			retryInterval = MaxWorkSleep
-		}
-	}
-	retryInterval = 500 * time.Millisecond
-	var state int
-	for {
-		// check that unit still exists, could have been released
-		unit.lock.RLock()
-		released := unit.released
-		unit.lock.RUnlock()
-		if released {
-			return nil
-		}
-		unit.lock.RLock()
-		state = unit.status.State
-		unit.lock.RUnlock()
-		if IsComplete(state) {
-			return nil
-		}
-		time.Sleep(retryInterval)
 	}
 }
 
@@ -785,26 +783,25 @@ func (w *Workceptor) CancelUnit(unitID string) (bool, error) {
 	nodeID := unit.status.Node
 	remoteUnitID := unit.status.RemoteUnitID
 	released := unit.released
-	unit.lock.Unlock()
 	if remoteUnitID != "" && !released {
-		unit.lock.Lock()
 		unit.status.Detail = "Cancel Pending"
 		unit.lock.Unlock()
-		go w.cancelRemote(nodeID, remoteUnitID, unit)
-		isPending = true
+		firstAttemptSuccess := make(chan bool)
+		go w.cancelRemote(nodeID, remoteUnitID, unit, firstAttemptSuccess)
+		if !<- firstAttemptSuccess {
+			isPending = true
+		}
 	} else {
-		unit.lock.Lock()
 		unit.status.State = WorkStateFailed
 		unit.status.Detail = "Cancelled"
 		unit.lock.Unlock()
 	}
 	unitdir := path.Join(w.dataDir, unitID)
-	w.activeUnitsLock.RLock()
+	unit.lock.RLock()
 	err := unit.status.Save(path.Join(unitdir, "status"))
-	w.activeUnitsLock.RUnlock()
+	unit.lock.RUnlock()
 	if err != nil {
-		logger.Error("Error saving local status file: %s\n", err)
-		return isPending, nil
+		return isPending, fmt.Errorf("Error saving local status file: %s\n", err)
 	}
 	return isPending, nil
 }

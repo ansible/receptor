@@ -2,6 +2,7 @@ package services
 
 import (
 	"crypto/tls"
+	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
@@ -12,60 +13,63 @@ import (
 
 // TCPProxyServiceInbound listens on a TCP port and forwards the connection over the Receptor network
 func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsServer *tls.Config,
-	node string, rservice string, tlsClient *tls.Config) {
+	node string, rservice string, tlsClient *tls.Config) error {
 	tli, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if tlsServer != nil {
 		tli = tls.NewListener(tli, tlsServer)
 	}
 	if err != nil {
-		logger.Error("Error listening on TCP: %s\n", err)
-		return
+		return fmt.Errorf("error listening on TCP: %s", err)
 	}
-	for {
-		tc, err := tli.Accept()
-		if err != nil {
-			logger.Error("Error accepting TCP connection: %s\n", err)
-			return
+	go func() {
+		for {
+			tc, err := tli.Accept()
+			if err != nil {
+				logger.Error("Error accepting TCP connection: %s\n", err)
+				return
+			}
+			qc, err := s.Dial(node, rservice, tlsClient)
+			if err != nil {
+				logger.Error("Error connecting on Receptor network: %s\n", err)
+				continue
+			}
+			go sockutils.BridgeConns(tc, "tcp service", qc, "receptor connection")
 		}
-		qc, err := s.Dial(node, rservice, tlsClient)
-		if err != nil {
-			logger.Error("Error connecting on Receptor network: %s\n", err)
-			continue
-		}
-		go sockutils.BridgeConns(tc, "tcp service", qc, "receptor connection")
-	}
+	}()
+	return nil
 }
 
 // TCPProxyServiceOutbound listens on the Receptor network and forwards the connection via TCP
 func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *tls.Config,
-	address string, tlsClient *tls.Config) {
+	address string, tlsClient *tls.Config) error {
 	qli, err := s.ListenAndAdvertise(service, tlsServer, map[string]string{
 		"type":    "TCP Proxy",
 		"address": address,
 	})
 	if err != nil {
-		logger.Error("Error listening on Receptor network: %s\n", err)
-		return
+		return fmt.Errorf("error listening on Receptor network: %s", err)
 	}
-	for {
-		qc, err := qli.Accept()
-		if err != nil {
-			logger.Error("Error accepting connection on Receptor network: %s\n", err)
-			return
-
+	go func() {
+		for {
+			qc, err := qli.Accept()
+			if err != nil {
+				logger.Error("Error accepting connection on Receptor network: %s\n", err)
+				return
+			}
+			var tc net.Conn
+			if tlsClient == nil {
+				tc, err = net.Dial("tcp", address)
+			} else {
+				tc, err = tls.Dial("tcp", address, tlsClient)
+			}
+			if err != nil {
+				logger.Error("Error connecting via TCP: %s\n", err)
+				continue
+			}
+			go sockutils.BridgeConns(qc, "receptor service", tc, "tcp connection")
 		}
-		var tc net.Conn
-		if tlsClient == nil {
-			tc, err = net.Dial("tcp", address)
-		} else {
-			tc, err = tls.Dial("tcp", address, tlsClient)
-		}
-		if err != nil {
-			logger.Error("Error connecting via TCP: %s\n", err)
-			continue
-		}
-		go sockutils.BridgeConns(qc, "receptor service", tc, "tcp connection")
-	}
+	}()
+	return nil
 }
 
 // TCPProxyInboundCfg is the cmdline configuration object for a TCP inbound proxy
@@ -89,9 +93,8 @@ func (cfg TCPProxyInboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	go TCPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, tlsServerCfg,
+	return TCPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, tlsServerCfg,
 		cfg.RemoteNode, cfg.RemoteService, tlsClientCfg)
-	return nil
 }
 
 // TCPProxyOutboundCfg is the cmdline configuration object for a TCP outbound proxy
@@ -117,8 +120,7 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	go TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, tlsServerCfg, cfg.Address, tlsClientCfg)
-	return nil
+	return TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, tlsServerCfg, cfg.Address, tlsClientCfg)
 }
 
 func init() {

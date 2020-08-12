@@ -54,33 +54,27 @@ func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remo
 
 // TunProxyService runs the Receptor to tun interface proxy.
 func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice string,
-	node string, rservice string, ifaddress string, destaddress string, route string) {
-
+	node string, rservice string, ifaddress string, destaddress string, route string) error {
 	cfg := water.Config{
 		DeviceType: water.TUN,
 	}
 	cfg.Name = tunInterface
 	iface, err := water.New(water.Config{DeviceType: water.TUN})
 	if err != nil {
-		logger.Error("Error opening tun device: %s\n", err)
-		return
+		return fmt.Errorf("error opening tun device: %s", err)
 	}
-
 	if ifaddress != "" {
 		link, err := netlink.LinkByName(iface.Name())
 		if err != nil {
-			logger.Error("Error accessing link for tun device: %s\n", err)
-			return
+			return fmt.Errorf("error accessing link for tun device: %s", err)
 		}
 		localaddr := net.ParseIP(ifaddress)
 		if localaddr == nil {
-			logger.Debug("Invalid IP address: %s\n", ifaddress)
-			return
+			return fmt.Errorf("invalid IP address: %s", ifaddress)
 		}
 		destaddr := net.ParseIP(destaddress)
 		if destaddr == nil {
-			logger.Debug("Invalid IP address: %s\n", ifaddress)
-			return
+			return fmt.Errorf("invalid IP address: %s", ifaddress)
 		}
 		addr := &netlink.Addr{
 			IPNet: netlink.NewIPNet(localaddr),
@@ -88,19 +82,16 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 		}
 		err = netlink.AddrAdd(link, addr)
 		if err != nil {
-			logger.Error("Error adding IP address to link: %s\n", err)
-			return
+			return fmt.Errorf("error adding IP address to link: %s", err)
 		}
 		err = netlink.LinkSetUp(link)
 		if err != nil {
-			logger.Error("Error setting link up: %s\n", err)
-			return
+			return fmt.Errorf("error setting link up: %s", err)
 		}
 		if route != "" {
 			ipnet, err := netlink.ParseIPNet(route)
 			if err != nil {
-				logger.Error("Error parsing route address: %s\n", err)
-				return
+				return fmt.Errorf("error parsing route address: %s", err)
 			}
 			err = netlink.RouteAdd(&netlink.Route{
 				LinkIndex: link.Attrs().Index,
@@ -109,13 +100,11 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 				Gw:        destaddr,
 			})
 			if err != nil {
-				logger.Error("Error adding route to interface: %s\n", err)
-				return
+				return fmt.Errorf("error adding route to interface: %s", err)
 			}
 		}
 	}
 
-	logger.Debug("Connecting to remote netceptor node %s service %s\n", node, rservice)
 	nconn, err := s.ListenPacketAndAdvertise(lservice, map[string]string{
 		"type":          "Tunnel Proxy",
 		"interface":     tunInterface,
@@ -126,12 +115,12 @@ func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice strin
 	})
 
 	if err != nil {
-		logger.Error("Error listening on Receptor network\n")
-		return
+		return fmt.Errorf("error listening for service %s: %s", lservice, err)
 	}
 	raddr := s.NewAddr(node, rservice)
 	go runTunToNetceptor(iface, nconn, raddr)
 	go runNetceptorToTun(nconn, iface, raddr)
+	return nil
 }
 
 // TunProxyCfg is the cmdline configuration object for a tun proxy
@@ -159,9 +148,8 @@ func (cfg TunProxyCfg) Prepare() error {
 // Run runs the action
 func (cfg TunProxyCfg) Run() error {
 	logger.Debug("Running tun proxy service %s\n", cfg)
-	go TunProxyService(netceptor.MainInstance, cfg.Interface, cfg.Service, cfg.RemoteNode, cfg.RemoteService,
+	return TunProxyService(netceptor.MainInstance, cfg.Interface, cfg.Service, cfg.RemoteNode, cfg.RemoteService,
 		cfg.IfAddress, cfg.DestAddress, cfg.Route)
-	return nil
 }
 
 func init() {

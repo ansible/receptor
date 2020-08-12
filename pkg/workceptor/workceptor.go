@@ -71,12 +71,12 @@ type workType struct {
 
 // Internal data for a single unit of work
 type workUnit struct {
-	lock             *sync.RWMutex
-	started          bool
-	released         bool
-	monitoringRemote bool
-	worker           WorkType
-	status           *StatusInfo
+	lock         *sync.RWMutex
+	started      bool
+	released     bool
+	waitRemote   *sync.WaitGroup
+	worker       WorkType
+	status       *StatusInfo
 }
 
 // Workceptor is the main object that handles unit-of-work management
@@ -428,9 +428,7 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 	// TODO: handle cancellation of the overall monitor
 	defer func() {
-		unit.lock.Lock()
-		unit.monitoringRemote = false
-		unit.lock.Unlock()
+		unit.waitRemote.Done()
 	}()
 	var conn net.Conn
 	var nextDelay = SuccessWorkSleep
@@ -440,8 +438,8 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 	remoteNodeID := unit.status.Node
 	remoteUnitID := unit.status.RemoteUnitID
 	workType := unit.status.WorkType
-	unit.monitoringRemote = true
 	unit.lock.Unlock()
+	unit.waitRemote.Add(1)
 	for {
 		if conn != nil && !reflect.ValueOf(conn).IsNil() {
 			_ = conn.Close()
@@ -583,6 +581,7 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 		lock:     &sync.RWMutex{},
 		started:  false,
 		released: false,
+		waitRemote: &sync.WaitGroup{},
 		worker:   worker,
 		status:   status,
 	}
@@ -651,7 +650,7 @@ func (w *Workceptor) scanForUnits() {
 					lock:     &sync.RWMutex{},
 					started:  true, // If we're finding it now, we don't want to start it again
 					released: false,
-					monitoringRemote: false,
+					waitRemote: &sync.WaitGroup{},
 					worker:   nil,
 					status:   si,
 				}
@@ -766,19 +765,19 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 }
 
 // CancelUnit cancels a unit, killing it if it is still running
-func (w *Workceptor) CancelUnit(unitID string) error {
-	//TODO: Handle remote cancellation
+func (w *Workceptor) CancelUnit(unitID string) (bool, error) {
+	isPending := false
 	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
 	w.activeUnitsLock.RUnlock()
 	if !ok {
-		return fmt.Errorf("unknown work unit %s", unitID)
+		return isPending, fmt.Errorf("unknown work unit %s", unitID)
 	}
 	if unit.worker != nil {
 		err := unit.worker.Cancel()
 		if err != nil {
-			return err
+			return isPending, err
 		}
 	}
 	unit.lock.Lock()
@@ -792,6 +791,7 @@ func (w *Workceptor) CancelUnit(unitID string) error {
 		unit.status.Detail = "Cancel Pending"
 		unit.lock.Unlock()
 		go w.cancelRemote(nodeID, remoteUnitID, unit)
+		isPending = true
 	} else {
 		unit.lock.Lock()
 		unit.status.State = WorkStateFailed
@@ -804,9 +804,9 @@ func (w *Workceptor) CancelUnit(unitID string) error {
 	w.activeUnitsLock.RUnlock()
 	if err != nil {
 		logger.Error("Error saving local status file: %s\n", err)
-		return nil
+		return isPending, nil
 	}
-	return nil
+	return isPending, nil
 }
 
 // ReleaseUnit releases a unit, canceling it if it is still running
@@ -823,20 +823,13 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 		return fmt.Errorf("unknown work unit %s", unitID)
 	}
 
-	err := w.CancelUnit(unitID)
+	_, err := w.CancelUnit(unitID)
 	if err != nil {
 		return err
 	}
 
-	for {
-		unit.lock.RLock()
-		monitoringRemote := unit.monitoringRemote
-		unit.lock.RUnlock()
-		if !monitoringRemote {
-			break
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
+	// wait for monitoringRemoteUnit to return
+	unit.waitRemote.Wait()
 
 	if remoteUnitID != "" {
 		conn, _, err := w.connectToRemote(nodeID)
@@ -1071,12 +1064,16 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		if len(tokens) != 2 {
 			return nil, fmt.Errorf("bad command")
 		}
-		err := w.CancelUnit(tokens[1])
+		isPending, err := w.CancelUnit(tokens[1])
 		if err != nil {
 			return nil, err
 		}
 		cfr := make(map[string]interface{})
-		cfr["cancelled"] = tokens[1]
+		if isPending {
+			cfr["cancel pending"] = tokens[1]
+		} else {
+			cfr["cancelled"] = tokens[1]
+		}
 		return cfr, nil
 	case "results":
 		if len(tokens) < 2 || len(tokens) > 3 {

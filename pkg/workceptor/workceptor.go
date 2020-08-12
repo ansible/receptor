@@ -756,6 +756,7 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 			continue
 		}
 		if response[:5] == "ERROR" {
+			logger.Warning("Error cancelling remote unit: %s\n", response[6:])
 			conn.Close()
 			continue
 		} else {

@@ -54,6 +54,7 @@ type StatusInfo struct {
 	Node         string
 	WorkType     string
 	RemoteUnitID string
+	LocalCancel  bool
 	Params       string
 }
 
@@ -70,11 +71,12 @@ type workType struct {
 
 // Internal data for a single unit of work
 type workUnit struct {
-	lock     *sync.RWMutex
-	started  bool
-	released bool
-	worker   WorkType
-	status   *StatusInfo
+	lock       *sync.RWMutex
+	started    bool
+	released   bool
+	waitRemote *sync.WaitGroup
+	worker     WorkType
+	status     *StatusInfo
 }
 
 // Workceptor is the main object that handles unit-of-work management
@@ -295,7 +297,7 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
-				logger.Warning("Work unit %s on node %s appears to be gone.\n", remoteUnitID, remoteNodeID)
+				logger.Debug("Work unit %s on node %s appears to be gone.\n", remoteUnitID, remoteNodeID)
 				unit.lock.Lock()
 				unit.status.State = WorkStateFailed
 				unit.status.Detail = "Remote work unit is gone"
@@ -317,9 +319,17 @@ func (w *Workceptor) monitorRemoteStatus(ctx context.Context, cancel context.Can
 		unit.status.Detail = si.Detail
 		unit.status.StdoutSize = si.StdoutSize
 		err = unit.status.Save(path.Join(unitdir, "status"))
+		state := unit.status.State
+		released := unit.released
 		unit.lock.Unlock()
 		if err != nil {
 			logger.Error("Error saving local status file: %s\n", err)
+			return
+		}
+		if IsComplete(state) {
+			return
+		}
+		if released {
 			return
 		}
 		if sleepOrDone(ctx.Done(), 1*time.Second) {
@@ -401,6 +411,7 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 			}()
 			_, err = io.Copy(stdout, conn)
 			close(doneChan)
+
 			if err != nil {
 				logger.Error("Error copying to stdout file %s: %s\n", stdoutFilename, err)
 				continue
@@ -412,15 +423,19 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 // monitorRemoteUnit watches a remote unit on another node and maintains local status
 func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 	// TODO: handle cancellation of the overall monitor
+	defer func() {
+		unit.waitRemote.Done()
+	}()
 	var conn net.Conn
 	var nextDelay = SuccessWorkSleep
 	unitdir := path.Join(w.dataDir, unitID)
 	submitIDRegex := regexp.MustCompile("with ID ([a-zA-Z0-9]+)\\.")
-	unit.lock.RLock()
+	unit.lock.Lock()
 	remoteNodeID := unit.status.Node
 	remoteUnitID := unit.status.RemoteUnitID
 	workType := unit.status.WorkType
-	unit.lock.RUnlock()
+	unit.lock.Unlock()
+	unit.waitRemote.Add(1)
 	for {
 		if conn != nil && !reflect.ValueOf(conn).IsNil() {
 			_ = conn.Close()
@@ -492,17 +507,24 @@ func (w *Workceptor) monitorRemoteUnit(unit *workUnit, unitID string) {
 		wg.Wait()
 		diskStdoutSize := fileSizeOrZero(path.Join(unitdir, "stdout"))
 		unit.lock.RLock()
-		complete := IsComplete(unit.status.State) && diskStdoutSize >= unit.status.StdoutSize
+		stdoutSize := unit.status.StdoutSize
+		localCancel := unit.status.LocalCancel
+		released = unit.released
+		state := unit.status.State
 		unit.lock.RUnlock()
+		complete := IsComplete(state) && diskStdoutSize >= stdoutSize
 		if complete {
+			return
+		}
+		if localCancel || released {
 			return
 		}
 	}
 }
 
 func (w *Workceptor) generateUnitID() (string, error) {
-	w.activeUnitsLock.Lock()
-	defer w.activeUnitsLock.Unlock()
+	w.activeUnitsLock.RLock()
+	defer w.activeUnitsLock.RUnlock()
 	var ident string
 	for {
 		ident = randstr.RandomString(8)
@@ -537,12 +559,13 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 		worker = wT.newWorker()
 	}
 	status := &StatusInfo{
-		State:      WorkStatePending,
-		Detail:     "Waiting for Input Data",
-		StdoutSize: 0,
-		Node:       nodeID,
-		WorkType:   workTypeName,
-		Params:     params,
+		State:       WorkStatePending,
+		Detail:      "Waiting for Input Data",
+		LocalCancel: false,
+		StdoutSize:  0,
+		Node:        nodeID,
+		WorkType:    workTypeName,
+		Params:      params,
 	}
 	err = status.Save(path.Join(w.dataDir, ident, "status"))
 	if err != nil {
@@ -551,11 +574,12 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 	w.activeUnitsLock.Lock()
 	defer w.activeUnitsLock.Unlock()
 	w.activeUnits[ident] = &workUnit{
-		lock:     &sync.RWMutex{},
-		started:  false,
-		released: false,
-		worker:   worker,
-		status:   status,
+		lock:       &sync.RWMutex{},
+		started:    false,
+		released:   false,
+		waitRemote: &sync.WaitGroup{},
+		worker:     worker,
+		status:     status,
 	}
 	return ident, nil
 }
@@ -619,11 +643,12 @@ func (w *Workceptor) scanForUnits() {
 				statusFilename := path.Join(w.dataDir, fi.Name(), "status")
 				_ = si.Load(statusFilename)
 				unit := &workUnit{
-					lock:     &sync.RWMutex{},
-					started:  true, // If we're finding it now, we don't want to start it again
-					released: false,
-					worker:   nil,
-					status:   si,
+					lock:       &sync.RWMutex{},
+					started:    true, // If we're finding it now, we don't want to start it again
+					released:   false,
+					waitRemote: &sync.WaitGroup{},
+					worker:     nil,
+					status:     si,
 				}
 				if unit.status.State == WorkStatePending {
 					unit.status.State = WorkStateFailed
@@ -632,6 +657,9 @@ func (w *Workceptor) scanForUnits() {
 				}
 				w.activeUnits[fi.Name()] = unit
 				if si.Node != "" && si.Node != w.nc.NodeID() {
+					if si.LocalCancel && !IsComplete(si.State) {
+						go w.CancelUnit(fi.Name())
+					}
 					go w.monitorRemoteUnit(unit, fi.Name())
 				}
 			}
@@ -679,44 +707,155 @@ func (w *Workceptor) unitStatusForCFR(unitID string) (map[string]interface{}, er
 	return retMap, nil
 }
 
+func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workUnit, firstAttemptSuccess chan bool) {
+	// to prevent blocking on sending to channel firstAttemptSuccess
+	firstAttemptOnce := sync.Once{}
+	reportFirstResult := func(success bool) {
+		firstAttemptOnce.Do(func() {
+			if firstAttemptSuccess != nil {
+				firstAttemptSuccess <- success
+			}
+		})
+	}
+	retryInterval := SuccessWorkSleep
+	firstTime := true
+	for {
+		if firstTime {
+			firstTime = false
+		} else {
+			reportFirstResult(false)
+			time.Sleep(retryInterval)
+			retryInterval = time.Duration(1.5 * float64(retryInterval))
+			if retryInterval > MaxWorkSleep {
+				retryInterval = MaxWorkSleep
+			}
+		}
+		// check that unit still exists, could have been released
+		unit.lock.RLock()
+		released := unit.released
+		unit.lock.RUnlock()
+		if released {
+			reportFirstResult(true)
+			return
+		}
+		conn, reader, err := w.connectToRemote(remoteNodeID)
+		if err != nil {
+			logger.Error("Connection failed to %s: %s\n", remoteNodeID, err)
+			continue
+		}
+		_, err = conn.Write([]byte(fmt.Sprintf("work cancel %s\n", remoteUnitID)))
+		if err != nil {
+			logger.Error("Write error sending to %s: %s\n", remoteNodeID, err)
+			conn.Close()
+			continue
+		}
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
+			conn.Close()
+			continue
+		}
+		if response[:5] == "ERROR" {
+			logger.Warning("Error cancelling remote unit: %s\n", response[6:])
+			conn.Close()
+			continue
+		} else {
+			reportFirstResult(true)
+			conn.Close()
+			return
+		}
+	}
+}
+
 // CancelUnit cancels a unit, killing it if it is still running
-func (w *Workceptor) CancelUnit(unitID string) error {
-	//TODO: Handle remote cancellation
+func (w *Workceptor) CancelUnit(unitID string) (bool, error) {
+	isPending := false
 	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
-	if !ok {
-		w.activeUnitsLock.RUnlock()
-		return fmt.Errorf("unknown work unit %s", unitID)
-	}
 	w.activeUnitsLock.RUnlock()
+	if !ok {
+		return isPending, fmt.Errorf("unknown work unit %s", unitID)
+	}
 	if unit.worker != nil {
 		err := unit.worker.Cancel()
 		if err != nil {
-			return err
+			return isPending, err
 		}
 	}
-	unit.status.State = WorkStateFailed
-	unit.status.Detail = "Cancelled"
-	return nil
+	unit.lock.Lock()
+	unit.status.LocalCancel = true
+	nodeID := unit.status.Node
+	remoteUnitID := unit.status.RemoteUnitID
+	released := unit.released
+	if remoteUnitID != "" && !released {
+		unit.status.Detail = "Cancel Pending"
+		unit.lock.Unlock()
+		firstAttemptSuccess := make(chan bool)
+		go w.cancelRemote(nodeID, remoteUnitID, unit, firstAttemptSuccess)
+		if !<-firstAttemptSuccess {
+			isPending = true
+		}
+	} else {
+		unit.status.State = WorkStateFailed
+		unit.status.Detail = "Cancelled"
+		unit.lock.Unlock()
+	}
+	unitdir := path.Join(w.dataDir, unitID)
+	unit.lock.RLock()
+	err := unit.status.Save(path.Join(unitdir, "status"))
+	unit.lock.RUnlock()
+	if err != nil {
+		return isPending, fmt.Errorf("saving local status file: %s", err)
+	}
+	return isPending, nil
 }
 
 // ReleaseUnit releases a unit, canceling it if it is still running
 func (w *Workceptor) ReleaseUnit(unitID string) error {
-	//TODO: Handle remote release
-	err := w.CancelUnit(unitID)
+	w.activeUnitsLock.RLock()
+	unit, ok := w.activeUnits[unitID]
+	w.activeUnitsLock.RUnlock()
+	unit.lock.Lock()
+	nodeID := unit.status.Node
+	remoteUnitID := unit.status.RemoteUnitID
+	unit.released = true
+	unit.lock.Unlock()
+	if !ok {
+		return fmt.Errorf("unknown work unit %s", unitID)
+	}
+
+	_, err := w.CancelUnit(unitID)
 	if err != nil {
 		return err
 	}
-	w.activeUnitsLock.Lock()
-	unit, ok := w.activeUnits[unitID]
-	if !ok {
-		w.activeUnitsLock.Unlock()
-		return fmt.Errorf("unknown work unit %s", unitID)
+
+	// wait for monitoringRemoteUnit to return
+	unit.waitRemote.Wait()
+
+	if remoteUnitID != "" {
+		conn, reader, err := w.connectToRemote(nodeID)
+		if err != nil {
+			logger.Error("Connection failed to %s: %s\n", nodeID, err)
+		} else {
+			_, err = conn.Write([]byte(fmt.Sprintf("work release %s\n", remoteUnitID)))
+			if err != nil {
+				logger.Error("Write error sending to %s: %s\n", nodeID, err)
+			} else {
+				response, err := reader.ReadString('\n')
+				if err != nil {
+					logger.Error("Read error reading from %s: %s\n", nodeID, err)
+				}
+				if response[:5] == "ERROR" {
+					logger.Error("Failed to release %s on remote node %s", remoteUnitID, nodeID)
+				}
+			}
+			conn.Close()
+		}
 	}
+	w.activeUnitsLock.Lock()
 	delete(w.activeUnits, unitID)
 	w.activeUnitsLock.Unlock()
-	unit.released = true
 	err = os.RemoveAll(path.Join(w.dataDir, unitID))
 	if err != nil {
 		return err
@@ -934,12 +1073,16 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		if len(tokens) != 2 {
 			return nil, fmt.Errorf("bad command")
 		}
-		err := w.CancelUnit(tokens[1])
+		isPending, err := w.CancelUnit(tokens[1])
 		if err != nil {
 			return nil, err
 		}
 		cfr := make(map[string]interface{})
-		cfr["cancelled"] = tokens[1]
+		if isPending {
+			cfr["cancel pending"] = tokens[1]
+		} else {
+			cfr["cancelled"] = tokens[1]
+		}
 		return cfr, nil
 	case "results":
 		if len(tokens) < 2 || len(tokens) > 3 {

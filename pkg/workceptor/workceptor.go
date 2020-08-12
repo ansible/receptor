@@ -805,7 +805,7 @@ func (w *Workceptor) CancelUnit(unitID string) (bool, error) {
 	err := unit.status.Save(path.Join(unitdir, "status"))
 	unit.lock.RUnlock()
 	if err != nil {
-		return isPending, fmt.Errorf("Error saving local status file: %s\n", err)
+		return isPending, fmt.Errorf("saving local status file: %s", err)
 	}
 	return isPending, nil
 }

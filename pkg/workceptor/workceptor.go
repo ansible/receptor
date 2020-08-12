@@ -708,16 +708,22 @@ func (w *Workceptor) unitStatusForCFR(unitID string) (map[string]interface{}, er
 }
 
 func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workUnit, firstAttemptSuccess chan bool) {
+	// to prevent blocking on sending to channel firstAttemptSuccess
+	firstAttemptOnce := sync.Once{}
+	reportFirstResult := func(success bool) {
+		firstAttemptOnce.Do(func() {
+			if firstAttemptSuccess != nil {
+				firstAttemptSuccess <- success
+			}
+		})
+	}
 	retryInterval := SuccessWorkSleep
 	firstTime := true
 	for {
 		if firstTime {
 			firstTime = false
 		} else {
-			select {
-			case firstAttemptSuccess <- false:
-			default:
-			}
+			reportFirstResult(false)
 			time.Sleep(retryInterval)
 			retryInterval = time.Duration(1.5 * float64(retryInterval))
 			if retryInterval > MaxWorkSleep {
@@ -729,10 +735,7 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 		released := unit.released
 		unit.lock.RUnlock()
 		if released {
-			select {
-			case firstAttemptSuccess <- true:
-			default:
-			}
+			reportFirstResult(true)
 			return
 		}
 		conn, reader, err := w.connectToRemote(remoteNodeID)
@@ -746,16 +749,17 @@ func (w *Workceptor) cancelRemote(remoteNodeID, remoteUnitID string, unit *workU
 			conn.Close()
 			continue
 		}
-
 		response, err := reader.ReadString('\n')
+		if err != nil {
+			logger.Error("Read error reading from %s: %s\n", remoteNodeID, err)
+			conn.Close()
+			continue
+		}
 		if response[:5] == "ERROR" {
 			conn.Close()
 			continue
 		} else {
-			select {
-			case firstAttemptSuccess <- true:
-			default:
-			}
+			reportFirstResult(true)
 			conn.Close()
 			return
 		}
@@ -829,14 +833,21 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 	unit.waitRemote.Wait()
 
 	if remoteUnitID != "" {
-		conn, _, err := w.connectToRemote(nodeID)
+		conn, reader, err := w.connectToRemote(nodeID)
 		if err != nil {
 			logger.Error("Connection failed to %s: %s\n", nodeID, err)
-		}
-		if conn != nil {
+		} else {
 			_, err = conn.Write([]byte(fmt.Sprintf("work release %s\n", remoteUnitID)))
 			if err != nil {
 				logger.Error("Write error sending to %s: %s\n", nodeID, err)
+			} else {
+				response, err := reader.ReadString('\n')
+				if err != nil {
+					logger.Error("Read error reading from %s: %s\n", nodeID, err)
+				}
+				if response[:5] == "ERROR" {
+					logger.Error("Failed to release %s on remote node %s", remoteUnitID, nodeID)
+				}
 			}
 			conn.Close()
 		}

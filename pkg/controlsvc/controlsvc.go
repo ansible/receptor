@@ -340,8 +340,11 @@ func (cfg CmdlineConfigUnix) Run() error {
 				return err
 			}
 		}
-		go services.UnixProxyServiceInbound(nc, cfg.Filename, os.FileMode(cfg.Permissions),
+		err = services.UnixProxyServiceInbound(nc, cfg.Filename, os.FileMode(cfg.Permissions),
 			nc.NodeID(), cfg.Service, clientTLS)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

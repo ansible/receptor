@@ -12,17 +12,24 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	"math/big"
 	"net"
+	"os"
 	"sync"
 	"time"
 )
 
+type acceptResult struct {
+	conn net.Conn
+	err  error
+}
+
 // Listener implements the net.Listener interface via the Receptor network
 type Listener struct {
-	s        *Netceptor
-	pc       *PacketConn
-	ql       quic.Listener
-	doneChan chan struct{}
-	doneOnce *sync.Once
+	s          *Netceptor
+	pc         *PacketConn
+	ql         quic.Listener
+	acceptChan chan *acceptResult
+	doneChan   chan struct{}
+	doneOnce   *sync.Once
 }
 
 // Internal implementation of Listen and ListenAndAdvertise
@@ -73,13 +80,16 @@ func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config,
 			return
 		}
 	}()
-	return &Listener{
-		s:        s,
-		pc:       pc,
-		ql:       ql,
-		doneChan: doneChan,
-		doneOnce: &sync.Once{},
-	}, nil
+	li := &Listener{
+		s:          s,
+		pc:         pc,
+		ql:         ql,
+		acceptChan: make(chan *acceptResult),
+		doneChan:   doneChan,
+		doneOnce:   &sync.Once{},
+	}
+	go li.acceptLoop()
+	return li, nil
 }
 
 // Listen returns a stream listener compatible with Go's net.Listener.
@@ -104,44 +114,89 @@ func (s *Netceptor) ListenContextAndAdvertise(ctx context.Context, service strin
 	return s.listen(ctx, service, tls, true, tags)
 }
 
-// Accept accepts a connection via the listener
-func (li *Listener) Accept() (net.Conn, error) {
-	qc, err := li.ql.Accept(context.Background())
-	if err != nil {
-		return nil, err
+func (li *Listener) sendResult(conn net.Conn, err error) {
+	select {
+	case li.acceptChan <- &acceptResult{
+		conn: conn,
+		err:  err,
+	}:
+	case <-li.doneChan:
 	}
-	qs, err := qc.AcceptStream(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	doneChan := make(chan struct{}, 1)
-	conn := &Conn{
-		s:        li.s,
-		pc:       li.pc,
-		qc:       qc,
-		qs:       qs,
-		doneChan: doneChan,
-		doneOnce: &sync.Once{},
-	}
-	go func() {
+}
+
+func (li *Listener) acceptLoop() {
+	for {
 		select {
 		case <-li.doneChan:
-			_ = conn.Close()
-		case <-li.s.context.Done():
-			_ = conn.Close()
-		case <-doneChan:
 			return
+		default:
 		}
-	}()
-	buf := make([]byte, 1)
-	n, err := qs.Read(buf)
-	if err != nil {
-		return nil, err
+		qc, err := li.ql.Accept(context.Background())
+		select {
+		case <-li.doneChan:
+			return
+		default:
+		}
+		if err != nil {
+			li.sendResult(nil, err)
+			continue
+		}
+		go func() {
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			qs, err := qc.AcceptStream(ctx)
+			select {
+			case <-li.doneChan:
+				return
+			default:
+			}
+			if os.IsTimeout(err) {
+				return
+			} else if err != nil {
+				li.sendResult(nil, err)
+				return
+			}
+			doneChan := make(chan struct{}, 1)
+			conn := &Conn{
+				s:        li.s,
+				pc:       li.pc,
+				qc:       qc,
+				qs:       qs,
+				doneChan: doneChan,
+				doneOnce: &sync.Once{},
+			}
+			go func() {
+				select {
+				case <-li.doneChan:
+					_ = conn.Close()
+				case <-li.s.context.Done():
+					_ = conn.Close()
+				case <-doneChan:
+					return
+				}
+			}()
+			buf := make([]byte, 1)
+			n, err := qs.Read(buf)
+			if err != nil {
+				li.sendResult(nil, err)
+				return
+			}
+			if n != 1 || buf[0] != 0 {
+				li.sendResult(nil, fmt.Errorf("stream failed to initialize"))
+				return
+			}
+			li.sendResult(conn, err)
+		}()
 	}
-	if n != 1 || buf[0] != 0 {
-		return nil, fmt.Errorf("stream failed to initialize")
+}
+
+// Accept accepts a connection via the listener
+func (li *Listener) Accept() (net.Conn, error) {
+	select {
+	case ar := <-li.acceptChan:
+		return ar.conn, ar.err
+	case <-li.doneChan:
+		return nil, fmt.Errorf("listener closed")
 	}
-	return conn, nil
 }
 
 // Close closes the listener

@@ -127,3 +127,22 @@ func TestListenUDP(t *testing.T) {
 		t.Fatalf("Timed out while waiting for UDP backend to start:\n%s", receptorStdOut.String())
 	}
 }
+
+func TestNegativeCost(t *testing.T) {
+	t.Parallel()
+	tcpPort := utils.ReserveTCPPort()
+	defer utils.FreeTCPPort(tcpPort)
+	receptorStdOut := bytes.Buffer{}
+	cmd := exec.Command("receptor", "--node", "id=test", "--tcp-listener", fmt.Sprintf("port=%d", tcpPort), "cost=-1")
+	cmd.Stdout = &receptorStdOut
+	err := cmd.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd.Process.Kill()
+	cmd.Process.Wait()
+	if cmd.ProcessState.ExitCode() == 0 {
+		t.Fatalf("receptor exited with exitcode: 0\nreceptor Stdout:\n%s", receptorStdOut.String())
+	}
+}

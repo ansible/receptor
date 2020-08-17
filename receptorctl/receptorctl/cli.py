@@ -12,7 +12,22 @@ import dateutil.parser
 from .socket_interface import ReceptorControl
 
 
-@click.group()
+class IgnoreRequiredWithHelp(click.Group):
+    # allows user to call --help without needing to provide required=true parameters
+    def parse_args(self, ctx, args):
+        try:
+            return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
+        except click.MissingParameter as exc:
+            if '--help' not in args:
+                raise
+
+            # remove the required params so that help can display
+            for param in self.params:
+                param.required = False
+            return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
+
+
+@click.group(cls=IgnoreRequiredWithHelp)
 @click.pass_context
 @click.option('--socket', envvar='RECEPTORCTL_SOCKET', required=True, show_envvar=True,
               help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)")

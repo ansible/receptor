@@ -13,6 +13,7 @@ from .socket_interface import ReceptorControl
 
 
 class IgnoreRequiredWithHelp(click.Group):
+    # allows user to call --help without needing to provide required=true parameters
     def parse_args(self, ctx, args):
         try:
             return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
@@ -25,7 +26,7 @@ class IgnoreRequiredWithHelp(click.Group):
                 param.required = False
             return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
 
-            
+
 @click.group(cls=IgnoreRequiredWithHelp)
 @click.pass_context
 @click.option('--socket', envvar='RECEPTORCTL_SOCKET', required=True, show_envvar=True,

@@ -121,6 +121,7 @@ func (li *Listener) sendResult(conn net.Conn, err error) {
 		err:  err,
 	}:
 	case <-li.doneChan:
+	case <-li.doneChan:
 	}
 }
 
@@ -146,13 +147,28 @@ func (li *Listener) acceptLoop() {
 			qs, err := qc.AcceptStream(ctx)
 			select {
 			case <-li.doneChan:
+				_ = qc.CloseWithError(500, "Listener Closed")
 				return
 			default:
 			}
 			if os.IsTimeout(err) {
+				_ = qc.CloseWithError(500, "Accept Timeout")
 				return
 			} else if err != nil {
+				_ = qc.CloseWithError(500, fmt.Sprintf("AcceptStream Error: %s", err.Error()))
 				li.sendResult(nil, err)
+				return
+			}
+			buf := make([]byte, 1)
+			n, err := qs.Read(buf)
+			if err != nil {
+				_ = qc.CloseWithError(500, fmt.Sprintf("Read Error: %s", err.Error()))
+				li.sendResult(nil, err)
+				return
+			}
+			if n != 1 || buf[0] != 0 {
+				_ = qc.CloseWithError(500, "Read Data Error")
+				li.sendResult(nil, fmt.Errorf("stream failed to initialize"))
 				return
 			}
 			doneChan := make(chan struct{}, 1)
@@ -174,16 +190,6 @@ func (li *Listener) acceptLoop() {
 					return
 				}
 			}()
-			buf := make([]byte, 1)
-			n, err := qs.Read(buf)
-			if err != nil {
-				li.sendResult(nil, err)
-				return
-			}
-			if n != 1 || buf[0] != 0 {
-				li.sendResult(nil, fmt.Errorf("stream failed to initialize"))
-				return
-			}
 			li.sendResult(conn, err)
 		}()
 	}
@@ -263,30 +269,40 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		}
 	}()
 	qc, err := quic.DialContext(ctx, pc, rAddr, s.nodeID, tls, cfg)
-	close(okChan)
 	if err != nil {
+		close(okChan)
+		_ = pc.Close()
 		return nil, err
 	}
-	doneChan := make(chan struct{}, 1)
-	go func() {
-		select {
-		case <-qc.Context().Done():
-			_ = pc.Close()
-		case <-s.context.Done():
-			_ = pc.Close()
-		case <-doneChan:
-			return
-		}
-	}()
-	qs, err := qc.OpenStream()
+	qs, err := qc.OpenStreamSync(ctx)
 	if err != nil {
+		close(okChan)
+		_ = qc.CloseWithError(500, err.Error())
+		_ = pc.Close()
 		return nil, err
 	}
 	// We need to write something to the stream to trigger the Accept() to happen
 	_, err = qs.Write([]byte{0})
 	if err != nil {
+		close(okChan)
+		_ = qs.Close()
+		_ = pc.Close()
 		return nil, err
 	}
+	close(okChan)
+	doneChan := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-qc.Context().Done():
+			_ = qs.Close()
+			_ = pc.Close()
+		case <-s.context.Done():
+			_ = qs.Close()
+			_ = pc.Close()
+		case <-doneChan:
+			return
+		}
+	}()
 	return &Conn{
 		s:        s,
 		pc:       pc,

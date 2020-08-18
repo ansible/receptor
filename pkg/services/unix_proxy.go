@@ -10,18 +10,17 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"syscall"
 )
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
 	node string, rservice string, tlscfg *tls.Config) error {
-	uli, lockFd, err := sockutils.UnixSocketListen(filename, permissions)
+	uli, lock, err := sockutils.UnixSocketListen(filename, permissions)
 	if err != nil {
 		return fmt.Errorf("error opening Unix socket: %s", err)
 	}
 	go func() {
-		defer syscall.Close(lockFd)
+		defer lock.Unlock()
 		for {
 			uc, err := uli.Accept()
 			if err != nil {

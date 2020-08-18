@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -286,10 +285,10 @@ func (s *Server) RunControlSession(conn net.Conn) {
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
 	unixSocket string, unixSocketPermissions os.FileMode) error {
 	var uli net.Listener
-	var lockFd int
+	var lock *sockutils.FLock
 	var err error
 	if unixSocket != "" {
-		uli, lockFd, err = sockutils.UnixSocketListen(unixSocket, unixSocketPermissions)
+		uli, lock, err = sockutils.UnixSocketListen(unixSocket, unixSocketPermissions)
 		if err != nil {
 			return fmt.Errorf("error opening Unix socket: %s", err)
 		}
@@ -314,7 +313,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		case <-ctx.Done():
 			if uli != nil {
 				_ = uli.Close()
-				_ = syscall.Close(lockFd)
+				_ = lock.Unlock()
 			}
 			if li != nil {
 				_ = li.Close()

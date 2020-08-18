@@ -1,13 +1,13 @@
 package controlsvc
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/services"
 	"github.com/project-receptor/receptor/pkg/sockutils"
 	"io"
 	"net"
@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -282,22 +283,69 @@ func (s *Server) RunControlSession(conn net.Conn) {
 }
 
 // RunControlSvc runs the main accept loop of the control service
-func (s *Server) RunControlSvc(service string, tlscfg *tls.Config) error {
-	li, err := s.nc.ListenAndAdvertise(service, tlscfg, nil)
-	if err != nil {
-		return err
+func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
+	unixSocket string, unixSocketPermissions os.FileMode) error {
+	var uli net.Listener
+	var lockFd int
+	var err error
+	if unixSocket != "" {
+		uli, lockFd, err = sockutils.UnixSocketListen(unixSocket, unixSocketPermissions)
+		if err != nil {
+			return fmt.Errorf("error opening Unix socket: %s", err)
+		}
+	} else {
+		uli = nil
+	}
+	var li *netceptor.Listener
+	if service != "" {
+		li, err = s.nc.ListenAndAdvertise(service, tlscfg, nil)
+		if err != nil {
+			return fmt.Errorf("error opening Unix socket: %s", err)
+		}
+	} else {
+		li = nil
+	}
+	if uli == nil && li == nil {
+		return fmt.Errorf("no listeners specified")
 	}
 	logger.Info("Running control service %s\n", service)
 	go func() {
-		for {
-			conn, err := li.Accept()
-			if err != nil {
-				logger.Error("Error accepting connection: %s. Closing socket.\n", err)
-				return
+		select {
+		case <-ctx.Done():
+			if uli != nil {
+				_ = uli.Close()
+				_ = syscall.Close(lockFd)
 			}
-			go s.RunControlSession(conn)
+			if li != nil {
+				_ = li.Close()
+			}
+			return
 		}
 	}()
+	if uli != nil {
+		go func() {
+			for {
+				conn, err := uli.Accept()
+				if err != nil {
+					logger.Error("Error accepting Unix socket connection: %s. Closing socket.\n", err)
+					return
+				}
+				go s.RunControlSession(conn)
+			}
+		}()
+	}
+	if li != nil {
+		go func() {
+			for {
+				conn, err := li.Accept()
+				if err != nil {
+					logger.Error("Error accepting connection: %s. Closing socket.\n", err)
+					return
+				}
+				go s.RunControlSession(conn)
+			}
+		}()
+	}
 	return nil
 }
 
@@ -321,30 +369,13 @@ type CmdlineConfigUnix struct {
 
 // Run runs the action
 func (cfg CmdlineConfigUnix) Run() error {
-	nc := netceptor.MainInstance
 	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
 	}
-	err = MainInstance.RunControlSvc(cfg.Service, tlscfg)
+	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename, os.FileMode(cfg.Permissions))
 	if err != nil {
 		return err
-	}
-	if cfg.Filename != "" {
-		var clientTLS *tls.Config
-		if cfg.TLS == "" {
-			clientTLS = nil
-		} else {
-			clientTLS, err = netceptor.GetClientTLSConfig("default", nc.NodeID())
-			if err != nil {
-				return err
-			}
-		}
-		err = services.UnixProxyServiceInbound(nc, cfg.Filename, os.FileMode(cfg.Permissions),
-			nc.NodeID(), cfg.Service, clientTLS)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

@@ -13,44 +13,12 @@ import (
 	"syscall"
 )
 
-// errLocked is returned when the flock is already held
-var errLocked = fmt.Errorf("fslock is already locked")
-
-// tryFLock non-blockingly attempts to acquire a lock on the file
-func tryFLock(filename string) (int, error) {
-	fd, err := syscall.Open(filename, syscall.O_CREAT|syscall.O_RDONLY|syscall.O_CLOEXEC, 0600)
-	if err != nil {
-		return 0, err
-	}
-	err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
-	if err == syscall.EWOULDBLOCK {
-		err = errLocked
-	}
-	if err != nil {
-		syscall.Close(fd)
-		return 0, err
-	}
-	return fd, nil
-}
-
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
 	node string, rservice string, tlscfg *tls.Config) error {
-	lockFd, err := tryFLock(filename + ".lock")
+	uli, lockFd, err := sockutils.UnixSocketListen(filename, permissions)
 	if err != nil {
-		return fmt.Errorf("could not acquire lock on socket file: %s", err)
-	}
-	err = os.RemoveAll(filename)
-	if err != nil {
-		return fmt.Errorf("could not overwrite socket file: %s", err)
-	}
-	uli, err := net.Listen("unix", filename)
-	if err != nil {
-		return fmt.Errorf("could not listen on socket file: %s", err)
-	}
-	err = os.Chmod(filename, permissions)
-	if err != nil {
-		return fmt.Errorf("error setting socket file permissions: %s", err)
+		return fmt.Errorf("error opening Unix socket: %s", err)
 	}
 	go func() {
 		defer syscall.Close(lockFd)

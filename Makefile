@@ -16,6 +16,8 @@ pre-commit:
 build-all:
 	echo "Running Go builds" && \
 	go build cmd/*.go && \
+	GOOS=windows go build -o receptor.exe cmd/receptor.go && \
+	GOOS=darwin go build -o receptor.app cmd/receptor.go && \
 	go build example/*.go
 
 test:
@@ -24,4 +26,7 @@ test:
 ci: pre-commit build-all test
 	echo "All done"
 
-.PHONY: lint format fmt ci pre-commit build-all test
+clean:
+	rm receptor receptor.exe receptor.app
+
+.PHONY: lint format fmt ci pre-commit build-all test clean

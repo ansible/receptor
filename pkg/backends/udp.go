@@ -235,15 +235,21 @@ func (ns *UDPListenerSession) Close() error {
 
 // UDPListenerCfg is the cmdline configuration object for a UDP listener
 type UDPListenerCfg struct {
-	BindAddr string  `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int     `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
-	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
+	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
+	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
+	NodeCost map[string]float64 `description:"Connection cost (weight) for each node"`
 }
 
 // Prepare verifies the parameters are correct
 func (cfg UDPListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
+	}
+	for node, cost := range cfg.NodeCost {
+		if cost <= 0.0 {
+			return fmt.Errorf("connection cost must be positive for %s", node)
+		}
 	}
 	return nil
 }
@@ -256,7 +262,7 @@ func (cfg UDPListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, make(map[string]float64))
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		logger.Error("Error creating backend for %s: %s\n", address, err)
 		return err
@@ -287,7 +293,7 @@ func (cfg UDPDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, make(map[string]float64))
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		logger.Error("Error creating backend for %s: %s\n", cfg.Address, err)
 		return err

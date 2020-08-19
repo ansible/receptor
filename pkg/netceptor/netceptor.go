@@ -261,7 +261,7 @@ func (s *Netceptor) NodeID() string {
 }
 
 // AddBackend adds a backend to the Netceptor system
-func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCostMap map[string]float64) error {
+func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
 	sessChan, err := backend.Start(s.context)
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 				if ok {
 					s.backendWaitGroup.Add(1)
 					go func() {
-						err := s.runProtocol(sess, connectionCost, nodeCostMap)
+						err := s.runProtocol(sess, connectionCost, nodeCost)
 						s.backendWaitGroup.Done()
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
@@ -991,7 +991,7 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 }
 
 // Main Netceptor protocol loop
-func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nodeCostMap map[string]float64) error {
+func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
 	if connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -1106,7 +1106,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the accepted connections list")
 					}
 
-					remoteNodeCost, ok := nodeCostMap[remoteNodeID]
+					remoteNodeCost, ok := nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost

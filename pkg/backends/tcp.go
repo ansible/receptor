@@ -199,17 +199,22 @@ func (ns *TCPSession) Close() error {
 
 // TCPListenerCfg is the cmdline configuration object for a TCP listener
 type TCPListenerCfg struct {
-	BindAddr string  `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int     `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
-	TLS      string  `description:"Name of TLS server config"`
-	Cost     float64 `description:"Connection cost (weight)" default:"1.0"`
-	NodeCostMap map[string]float64 `description:"Connection cost (weight) for specific node"`
+	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
+	Port     int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
+	TLS      string             `description:"Name of TLS server config"`
+	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
+	NodeCost map[string]float64 `description:"Connection cost (weight) for each node"`
 }
 
 // Prepare verifies the parameters are correct
 func (cfg TCPListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
+	}
+	for node, cost := range cfg.NodeCost {
+		if cost <= 0.0 {
+			return fmt.Errorf("connection cost must be positive for %s", node)
+		}
 	}
 	return nil
 }
@@ -226,7 +231,7 @@ func (cfg TCPListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCostMap)
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		return err
 	}
@@ -265,7 +270,7 @@ func (cfg TCPDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, make(map[string]float64))
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		return err
 	}

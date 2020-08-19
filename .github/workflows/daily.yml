@@ -22,7 +22,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Image
-        run: docker build ./build/ci-image -t receptor-actions-ci-runner
+        run: "docker build ./build/ci-image -t receptor-actions-ci-runner"
 
       - name: Push Image
-        run: docker tag receptor-actions-ci-runner docker.pkg.github.com/project-receptor/receptor/receptor-actions-ci-runner:latest && docker push docker.pkg.github.com/project-receptor/receptor/receptor-actions-ci-runner:latest
+        run: "docker tag receptor-actions-ci-runner docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest && docker push docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"

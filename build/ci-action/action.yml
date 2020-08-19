@@ -1,0 +1,4 @@
+name: CI
+runs:
+  using: 'docker'
+  image: 'docker.pkg.github.com/project-receptor/receptor/receptor-actions-ci-runner:latest'

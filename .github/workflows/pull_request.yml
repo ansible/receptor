@@ -20,5 +20,11 @@ jobs:
           username: $GITHUB_ACTOR
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Pull Image
+        run: "docker pull docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
+
+      - name: Tag Image
+        run: "docker tag docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest receptor-actions-ci-runner:latest"
+
       - name: Run CI tasks in Docker
         uses: ./build/ci-action/

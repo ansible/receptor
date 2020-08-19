@@ -1,0 +1,24 @@
+---
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Docker Login
+        uses: azure/docker-login@v1
+        with:
+          login-server: docker.pkg.github.com
+          username: $GITHUB_ACTOR
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run CI tasks in Docker
+        uses: ./build/ci-action/

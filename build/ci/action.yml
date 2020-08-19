@@ -1,5 +1,0 @@
----
-name: "Run CI in Docker"
-runs:
-  using: "docker"
-  image: "receptor-actions-ci-runner"

@@ -47,7 +47,7 @@ func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSess
 
 // Run runs the action, in this case adding a null backend to keep the wait group alive
 func (cfg nullBackendCfg) Run() error {
-	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0)
+	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, make(map[string]float64))
 	if err != nil {
 		return err
 	}

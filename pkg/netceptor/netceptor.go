@@ -261,7 +261,7 @@ func (s *Netceptor) NodeID() string {
 }
 
 // AddBackend adds a backend to the Netceptor system
-func (s *Netceptor) AddBackend(backend Backend, connectionCost float64) error {
+func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, costPerNode map[string]float64) error {
 	sessChan, err := backend.Start(s.context)
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64) error {
 				if ok {
 					s.backendWaitGroup.Add(1)
 					go func() {
-						err := s.runProtocol(sess, connectionCost)
+						err := s.runProtocol(sess, connectionCost, costPerNode)
 						s.backendWaitGroup.Done()
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
@@ -991,7 +991,7 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 }
 
 // Main Netceptor protocol loop
-func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) error {
+func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, costPerNode map[string]float64) error {
 	if connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -1105,6 +1105,13 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					if !remoteNodeAccepted {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the accepted connections list")
 					}
+
+					remoteNodeCost, ok := costPerNode[remoteNodeID]
+					if ok {
+						ci.Cost = remoteNodeCost
+						connectionCost = remoteNodeCost
+					}
+
 					// Establish the connection
 					initDoneChan <- true
 					logger.Info("Connection established with %s\n", remoteNodeID)
@@ -1113,7 +1120,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64) err
 					s.connections[remoteNodeID] = ci
 					s.connLock.Unlock()
 					s.knownNodeLock.Lock()
-					_, ok := s.knownConnectionCosts[s.nodeID]
+					_, ok = s.knownConnectionCosts[s.nodeID]
 					if !ok {
 						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
 					}

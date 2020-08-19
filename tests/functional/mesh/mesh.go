@@ -76,7 +76,7 @@ func (n *Node) TCPListen(address string, cost float64, tlsCfg *tls.Config) error
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
 	return err
 }
 
@@ -87,7 +87,7 @@ func (n *Node) TCPDial(address string, cost float64, tlsCfg *tls.Config) error {
 	if err != nil {
 		return err
 	}
-	err = n.NetceptorInstance.AddBackend(b1, cost)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
 	return err
 }
 
@@ -99,7 +99,7 @@ func (n *Node) UDPListen(address string, cost float64) error {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
 	return err
 }
 
@@ -110,7 +110,7 @@ func (n *Node) UDPDial(address string, cost float64) error {
 	if err != nil {
 		return err
 	}
-	err = n.NetceptorInstance.AddBackend(b1, cost)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
 	return err
 }
 
@@ -123,7 +123,7 @@ func (n *Node) WebsocketListen(address string, cost float64, tlsCfg *tls.Config)
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
 	return err
 }
 
@@ -135,7 +135,7 @@ func (n *Node) WebsocketDial(address string, cost float64, tlsCfg *tls.Config) e
 	if err != nil {
 		return err
 	}
-	err = n.NetceptorInstance.AddBackend(b1, cost)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
 	return err
 }
 

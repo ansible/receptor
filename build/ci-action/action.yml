@@ -1,4 +1,0 @@
-name: CI
-runs:
-  using: docker
-  image: receptor-actions-ci-runner:latest

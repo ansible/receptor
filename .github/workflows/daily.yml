@@ -1,9 +1,10 @@
 ---
-name: CI
+name: Build CI Runner Image
 
 on:
+  workflow_dispatch:
   schedule:
-    - '4 30 * * *'
+    - cron: '30 4 * * *'
 
 jobs:
   build:

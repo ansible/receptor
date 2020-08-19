@@ -624,7 +624,9 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 
 // Forwards a message to its next hop
 func (s *Netceptor) forwardMessage(md *messageData) error {
+	s.routingTableLock.RLock()
 	nextHop, ok := s.routingTable[md.ToNode]
+	s.routingTableLock.RUnlock()
 	if !ok {
 		return fmt.Errorf("no route to node")
 	}

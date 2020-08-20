@@ -38,12 +38,14 @@ func TestMeshStartup(t *testing.T) {
 			t.Logf("starting mesh")
 			mesh, err := NewCLIMeshFromFile(filename)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
+			defer mesh.Shutdown()
+			defer mesh.WaitForShutdown()
 			t.Logf("waiting for mesh")
 			err = mesh.WaitForReady(60000)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 			// Test that each Node can ping each Node
 			for _, nodeSender := range mesh.Nodes() {
@@ -51,7 +53,7 @@ func TestMeshStartup(t *testing.T) {
 				t.Logf("connecting to %s", nodeSender.ControlSocket())
 				err = controller.Connect(nodeSender.ControlSocket())
 				if err != nil {
-					t.Error(err)
+					t.Fatal(err)
 				}
 				for nodeIDResponder := range mesh.Nodes() {
 					t.Logf("pinging %s", nodeIDResponder)
@@ -63,8 +65,6 @@ func TestMeshStartup(t *testing.T) {
 				}
 				controller.Close()
 			}
-			mesh.Shutdown()
-			mesh.WaitForShutdown()
 		})
 	}
 }
@@ -91,18 +91,20 @@ func TestMeshConnections(t *testing.T) {
 			t.Parallel()
 			mesh, err := NewCLIMeshFromFile(filename)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
+			defer mesh.Shutdown()
+			defer mesh.WaitForShutdown()
 			yamlDat, err := ioutil.ReadFile(filename)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 
 			data := YamlData{}
 
 			err = yaml.Unmarshal(yamlDat, &data)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 			connectionsReady := false
 			for timeout := 10000; timeout > 0 && !connectionsReady; connectionsReady = mesh.CheckConnections() {
@@ -112,8 +114,6 @@ func TestMeshConnections(t *testing.T) {
 			if connectionsReady == false {
 				t.Error("Timed out while waiting for connections:")
 			}
-			mesh.Shutdown()
-			mesh.WaitForShutdown()
 		})
 	}
 }
@@ -133,11 +133,11 @@ func TestMeshShutdown(t *testing.T) {
 		t.Run(filename, func(t *testing.T) {
 			mesh, err := NewLibMeshFromFile(filename)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 			err = mesh.WaitForReady(60000)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 			mesh.Shutdown()
 			mesh.WaitForShutdown()
@@ -225,18 +225,21 @@ func TestTCPSSLConnections(t *testing.T) {
 	}
 	mesh, err := NewCLIMeshFromYaml(data)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	defer mesh.Shutdown()
+	defer mesh.WaitForShutdown()
+
 	err = mesh.WaitForReady(60000)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	// Test that each Node can ping each Node
 	for _, nodeSender := range mesh.Nodes() {
 		controller := receptorcontrol.New()
 		err = controller.Connect(nodeSender.ControlSocket())
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		for nodeIDResponder := range mesh.Nodes() {
 			response, err := controller.Ping(nodeIDResponder)
@@ -248,8 +251,6 @@ func TestTCPSSLConnections(t *testing.T) {
 		controller.Close()
 	}
 
-	mesh.Shutdown()
-	mesh.WaitForShutdown()
 }
 
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
@@ -283,11 +284,11 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 		// taken a bit
 		mesh, err := NewLibMeshFromYaml(data)
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 		err = mesh.WaitForReady(60000)
 		if err != nil {
-			b.Error(err)
+			b.Fatal(err)
 		}
 		b.StopTimer()
 		mesh.Shutdown()

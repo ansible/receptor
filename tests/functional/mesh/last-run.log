@@ -1,0 +1,3255 @@
+=== RUN   TestMeshStartup
+=== PAUSE TestMeshStartup
+=== CONT  TestMeshStartup
+=== RUN   TestMeshStartup/mesh-definitions/flat-mesh-tcp.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/flat-mesh-tcp.yaml
+=== RUN   TestMeshStartup/mesh-definitions/random-mesh-tcp.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/random-mesh-tcp.yaml
+=== RUN   TestMeshStartup/mesh-definitions/tree-mesh-tcp.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/tree-mesh-tcp.yaml
+=== RUN   TestMeshStartup/mesh-definitions/flat-mesh-udp.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/flat-mesh-udp.yaml
+=== RUN   TestMeshStartup/mesh-definitions/random-mesh-udp.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/random-mesh-udp.yaml
+=== RUN   TestMeshStartup/mesh-definitions/tree-mesh-udp.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/tree-mesh-udp.yaml
+=== RUN   TestMeshStartup/mesh-definitions/flat-mesh-ws.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/flat-mesh-ws.yaml
+=== RUN   TestMeshStartup/mesh-definitions/random-mesh-ws.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/random-mesh-ws.yaml
+=== RUN   TestMeshStartup/mesh-definitions/tree-mesh-ws.yaml
+=== PAUSE TestMeshStartup/mesh-definitions/tree-mesh-ws.yaml
+=== CONT  TestMeshStartup/mesh-definitions/flat-mesh-tcp.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node12-680117153/controlsock
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 383.639µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 318.778µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 269.655µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 240.601µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 304.441µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 238.217µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 252.243µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 217.097µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 197.45µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 238.087µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 704.311µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 215.945µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 15.82µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node8-233541346/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 218.941µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 13.926µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 224.11µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 201.949µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 200.716µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 183.504µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 188.553µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 227.526µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 163.667µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 217.508µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 154.36µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 230.372µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 120.596µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node4-975929049/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 188.223µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 266.69µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 22.261µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 210.836µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 231.253µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 205.275µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 229.831µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 330.64µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 300.524µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 105.107µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 234.239µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 240.672µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 203.071µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node7-084663923/controlsock
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 232.196µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 243.907µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 97.512µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 14.918µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 289.533µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 274.675µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 251.171µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 288.221µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 278.432µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 287.99µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 203.712µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 187.352µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 789.921µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node1-971953974/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 328.235µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 187.201µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 978.555µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 194.214µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 293.63µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 247.183µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 15.789µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 274.364µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 277.671µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 262.562µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 238.677µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 221.104µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 255.839µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node10-290723541/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 251.091µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 223.389µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 13.345µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 241.432µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 220.864µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 224.771µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 93.335µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 298.38µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 237.064µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 292.028µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 248.196µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 187.12µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 300.533µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node11-024780848/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 230.963µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 216.947µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 167.595µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 162.575µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 148.338µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 170.429µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 144.171µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 9.998µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 113.873µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 180.759µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 90.971µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 143.889µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 855.353µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node6-227072472/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 204.584µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 14.357µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 187.001µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 228.899µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 199.084µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 204.113µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 164.529µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 172.955µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 196.348µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 103.835µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 239.93µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 213.901µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 225.443µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node3-697545167/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 263.815µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 247.854µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 112.681µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 273.373µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 214.232µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 224.271µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 239.469µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 10.71µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 220.072µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 239.669µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 234.099µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 198.242µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 228.158µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node5-438129252/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 229.16µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 207.329µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 179.857µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 223.88µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 175.318µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 233.568µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 170.059µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 257.362µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 170.559µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 9.308µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 767.318µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 292.248µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 137.407µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node2-536517405/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 241.312µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 196.699µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 216.486µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 242.104µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 82.244µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 263.373µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 208.33µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 181.27µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 186.38µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 173.405µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 167.484µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 200.356µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 11.472µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/node9-647910743/controlsock
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 275.055µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 296.165µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 202.039µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 207.92µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 197.901µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 235.862µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 228.258µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 124.052µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 362.009µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 183.524µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 163.817µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 257.142µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 16.982µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-524612558/controller-650337994/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 104.866µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 153.427µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 147.968µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 16.191µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 97.813µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 166.151µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 106.459µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 137.027µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 133.49µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 114.955µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 141.395µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 138.159µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 117.089µs]
+=== CONT  TestMeshStartup/mesh-definitions/tree-mesh-udp.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node1-970919811/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 595.386µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 429.295µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 18.614µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 253.545µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 124.303µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 273.112µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 408.306µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 129.112µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 384.14µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 157.635µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 497.452µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 283.481µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 655.058µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node11-466950066/controlsock
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 538.449µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 103.464µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 230.963µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 338.485µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 509.114µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 536.626µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 15.54µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 362.68µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 513.914µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 227.336µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 539.061µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 512.721µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 299.852µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node6-743672222/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 377.718µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 521.889µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 447.789µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 566.442µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 13.646µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 222.968µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 407.293µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 573.275µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 414.436µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 269.165µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 586.269µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 120.977µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 492.844µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node12-805928576/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 617.297µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 627.436µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 276.288µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 365.125µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 536.636µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 445.165µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 280.816µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 428.733µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 528.772µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 190.447µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 14.437µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 153.137µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 305.553µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node9-274537000/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 428.143µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 14.688µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 268.924µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 387.426µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 118.923µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 127.669µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 250.88µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 346.79µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 124.373µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 382.147µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 297.178µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 155.732µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 297.618µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/controller-154082228/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 54.051µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 73.547µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 222.026µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 215.394µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 158.487µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 254.757µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 94.257µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 280.686µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 271.509µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 200.336µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 114.123µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 241.312µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 210.775µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node2-262736134/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 340.288µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 330.58µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 372.248µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 432µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 566.111µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 1.094813ms]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 140.674µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 18.735µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 221.755µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 582.351µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 441.238µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 480.852µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 372.258µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node3-170437805/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 438.262µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 328.205µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 391.664µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 220.574µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 144.21µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 171.672µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 180.779µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 471.414µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 343.725µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 21.029µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 256.39µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 91.161µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 521.007µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node8-486605279/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 386.875µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 14.447µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 149.089µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 264.977µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 399.63µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 388.007µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 485.871µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 246.452µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 432.601µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 513.502µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 221.906µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 322.404µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 354.615µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node5-469224571/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 327.524µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 13.616µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 126.317µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 187.411µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 352.751µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 316.203µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 290.935µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 113.202µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 105.488µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 278.192µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 337.152µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 102.122µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 181.01µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node7-278947941/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 464.41µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 339.186µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 372.669µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 460.162µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 188.113µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 96.01µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 11.281µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 211.717µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 266.209µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 416.862µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 444.283µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 184.105µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 347.06µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node10-452470631/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 503.584µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 295.363µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 499.527µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 527.048µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 14.457µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 520.536µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 289.643µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 503.164µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 591.99µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 128.18µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 382.497µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 448.811µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 226.144µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-243154572/node4-099891561/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 250.83µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 207.228µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 524.053µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 502.041µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 288.691µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 462.707µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 389.581µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 489.177µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 94.287µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 200.866µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 257.923µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 402.094µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 12.694µs]
+=== CONT  TestMeshStartup/mesh-definitions/tree-mesh-ws.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node4-709309941/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 427.241µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 605.245µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 362.841µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 294.282µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 294.632µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 92.223µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 534.552µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 576.691µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 513.463µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 13.806µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 564.187µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 409.177µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 511.519µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node2-777614544/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 192.802µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 517.821µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 224.301µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 533.901µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 184.957µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 300.303µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 436.489µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 314.94µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 513.903µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 12.594µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 251.742µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 341.52µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 344.435µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node3-957164015/controlsock
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 453.46µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 321.493µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 97.633µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 523.912µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 373.861µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 157.305µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 149.841µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 8.196µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 432.191µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 391.043µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 179.086µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 230.001µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 331.271µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node6-241088130/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 226.384µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 14.387µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 203.992µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 322.555µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 330.229µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 380.263µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 387.487µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 463.238µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 79.64µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 153.238µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 321.503µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 398.557µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 546.114µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node12-845352196/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 17.322µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 441.688µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 90.81µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 258.865µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 205.545µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 392.025µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 504.476µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 455.885µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 525.506µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 302.157µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 822.652µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 356.028µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 380.934µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node1-467692537/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 120.676µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 147.136µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 409.998µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 487.534µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 362.409µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 260.759µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 313.327µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 355.306µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 252.263µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 11.892µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 100.588µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 821.45µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 84.118µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node11-480883054/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 341.1µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 439.995µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 211.156µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 13.856µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 528.33µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 1.250093ms]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 263.675µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 276.679µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 449.492µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 418.665µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 456.376µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 335.399µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 125.155µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node8-986126897/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 318.507µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 309.339µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 427.011µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 404.308µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 171.882µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 14.658µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 184.176µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 388.438µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 466.023µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 440.947µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 434.825µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 187.181µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 111.409µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node9-300317660/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 352.911µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 406.362µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 212.599µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 162.454µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 133.72µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 193.262µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 303.068µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 148.288µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 400.301µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 10.78µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 174.427µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 366.817µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 430.327µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node10-987302795/controlsock
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 16.892µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 557.756µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 140.603µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 250.179µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 419.316µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 551.394µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 339.156µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 324.048µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 250.379µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 523.351µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 599.494µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 513.442µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 508.192µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/controller-490904723/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 282.159µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 259.387µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 275.858µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 286.186µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 138.51µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 265.328µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 130.765µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 226.525µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 235.952µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 227.877µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 240.932µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 10.81µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 105.919µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node5-583459030/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 349.365µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 102.933µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 16.451µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 133.571µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 264.957µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 439.955µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 397.976µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 373.259µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 335.76µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 342.653µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 132.839µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 103.714µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 281.508µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-779846042/node7-064410685/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 496.992µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 526.968µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 260.398µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 204.934µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 260.919µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 374.362µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 480.27µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 500.429µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 13.395µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 361.759µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 497.463µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 104.787µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 498.996µs]
+=== CONT  TestMeshStartup/mesh-definitions/random-mesh-ws.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node3-175718593/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 591.108µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 459.802µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 123.752µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 319.169µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 499.427µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 18.665µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 377.528µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 159.038µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 130.124µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 292.909µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 238.658µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 585.969µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 234.079µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node2-186109829/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 304.971µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 278.211µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 10.85µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 325.44µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 116.027µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 203.982µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 260.819µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 388.869µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 429.455µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 252.343µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 293.14µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 386.905µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 128.31µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node4-370861856/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 106.76µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 17.443µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 381.135µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 374.742µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 121.357µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 132.298µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 355.396µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 239.238µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 267.522µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 244.659µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 111.68µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 424.025µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 231.544µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node1-848552073/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 374.983µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 325.049µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 150.282µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 396.213µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 280.727µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 202.86µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 111.95µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 145.493µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 297.668µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 135.554µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 24.305µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 397.185µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 229.881µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node10-798186580/controlsock
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 141.616µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 294.011µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 119.665µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 232.706µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 145.292µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 251.882µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 209.944µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 254.948µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 379.271µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 12.103µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 149.491µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 296.566µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 282.7µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node5-016635299/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 143.028µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 382.978µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 357.54µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 140.965µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 205.285µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 88.846µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 370.215µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 378.099µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 383.539µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 216.375µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 13.556µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 493.916µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 235.061µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node11-975589019/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 371.867µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 148.598µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 281.999µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 11.842µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 387.917µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 479.338µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 204.694µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 117.881µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 234.049µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 417.102µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 256.19µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 558.177µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 274.535µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node7-759410494/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 439.714µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 160.27µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 162.805µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 267.601µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 291.957µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 400.24µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 250.599µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 127.769µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 283.071µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 471.504µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 233.949µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 200.275µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 18.335µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node6-159277055/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 246.823µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 221.626µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 346.38µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 80.441µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 324.047µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 179.436µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 565.27µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 329.818µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 351.669µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 6.733µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 234.93µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 109.636µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 362.108µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node8-286664530/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 138.75µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 327.353µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 292.047µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 355.647µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 249.829µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 256.822µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 218.319µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 191.999µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 207.569µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 517.571µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 13.616µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 130.575µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 237.695µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node9-078912375/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 463.088µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 279.594µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 387.847µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 351.9µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 130.965µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 263.905µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 343.394µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 13.957µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 363.582µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 135.063µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 417.963µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 248.105µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 344.707µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/node12-484588138/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 417.763µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 132.378µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 15.369µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 257.252µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 358.122µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 105.488µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 399.279µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 283.642µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 300.443µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 205.265µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 142.717µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 110.257µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 237.495µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-609745016/controller-480127788/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 280.827µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 211.497µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 221.094µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 4.939µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 203.822µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 169.538µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 397.245µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 330.88µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 203.762µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 802.915µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 92.694µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 263.694µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 106.54µs]
+=== CONT  TestMeshStartup/mesh-definitions/flat-mesh-ws.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/controller-987925453/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 211.386µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 155.832µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 106.459µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 105.378µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 132.318µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 98.024µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 100.709µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 176.662µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 242.615µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 151.083µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 130.736µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 14.397µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 151.474µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node6-174697230/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 131.136µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 329.318µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 24.797µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 222.587µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 223.8µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 206.948µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 191.749µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 258.975µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 221.355µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 191.459µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 227.296µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 194.915µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 259.046µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node8-150425456/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 13.666µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 307.958µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 251.772µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 269.074µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 232.346µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 112.912µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 225.833µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 240.902µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 225.162µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 176.721µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 241.372µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 210.094µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 235.272µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node10-717046306/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 222.498µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 211.005µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 248.636µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 235.872µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 220.895µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 211.497µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 156.173µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 18.875µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 195.246µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 256.581µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 185.488µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 82.505µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 186.369µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node3-169611545/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 125.686µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 195.406µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 178.465µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 148.388µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 297.478µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 269.996µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 230.382µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 217.778µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 13.224µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 241.473µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 186.209µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 212.889µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 169.257µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node12-753964459/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 235.431µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 167.574µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 154.82µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 155.281µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 200.686µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 130.104µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 112.19µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 122.099µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 54.442µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 158.908µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 154.349µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 133.49µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 4.538µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node4-352632145/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 15.98µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 185.819µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 205.105µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 207.358µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 180.679µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 258.635µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 190.286µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 99.196µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 170.75µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 198.051µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 161.313µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 168.746µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 152.566µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node7-289362197/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 258.445µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 248.717µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 212.218µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 244.077µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 171.05µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 112.752µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 12.744µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 181.02µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 162.184µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 177.472µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 150.482µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 195.256µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 166.181µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node1-985665551/controlsock
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 188.414µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 164.518µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 217.678µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 9.909µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 159.529µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 155.912µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 172.934µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 161.041µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 92.554µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 204.624µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 173.626µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 169.087µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 212.579µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node9-293521020/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 175.81µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 183.554µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 153.127µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 180.208µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 123.461µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 119.414µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 71.224µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 149µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 155.702µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 8.065µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 160.13µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 179.767µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 172.092µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node5-833779079/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 176.812µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 221.745µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 168.095µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 84.449µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 172.613µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 7.284µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 170.559µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 216.095µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 163.206µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 218.129µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 169.728µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 161.673µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 174.016µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node2-676652858/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 252.573µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 138.139µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 201.318µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 161.503µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 732.613µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 103.294µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 168.796µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 171.622µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 150.683µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 14.487µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 143.9µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 202.63µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 178.905µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-065315494/node11-284038856/controlsock
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 229.06µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 286.858µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 220.433µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 233.878µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 225.453µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 218.479µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 214.031µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 194.104µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 107.602µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 27.181µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 260.157µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 242.294µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 264.075µs]
+=== CONT  TestMeshStartup/mesh-definitions/tree-mesh-tcp.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/controller-863898060/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 346.048µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 193.953µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 327.263µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 151.575µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 335.619µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 275.106µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 228.368µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 110.146µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 221.204µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 263.113µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 13.926µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 118.573µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 1.005835ms]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node11-780722363/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 137.468µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 504.706µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 590.617µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 27.892µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 265.628µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 1.148994ms]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 402.003µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 324.319µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 485.25µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 296.897µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 442.529µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 257.032µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 470.923µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node4-746074789/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 535.002µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 156.152µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 383.509µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 493.886µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 471.514µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 227.236µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 388.227µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 203.121µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 476.032µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 243.777µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 15.108µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 517.57µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 362.149µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node10-378176919/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 287.83µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 548.348µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 456.275µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 408.556µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 380.623µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 147.777µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 6.773µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 546.925µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 303.62µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 499.206µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 448.832µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 174.246µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 388.027µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node8-809224371/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 151.744µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 504.286µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 498.465µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 11.622µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 362.379µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 443.131µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 278.653µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 415.368µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 517.721µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 457.358µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 511.178µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 296.466µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 263.474µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node9-531261208/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 278.833µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 20.679µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 140.704µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 378.259µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 117.67µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 378.029µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 309.34µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 169.988µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 295.283µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 69.571µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 376.416µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 335.259µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 123.632µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node12-658199050/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 582.542µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 425.137µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 218.921µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 405.68µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 600.747µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 280.165µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 574.376µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 461.345µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 362.8µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 323.236µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 78.988µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 6.252µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 460.564µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node3-133971937/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 15.94µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 118.021µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 443.712µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 264.075µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 545.763µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 569.768µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 473.027µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 505.478µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 340.318µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 562.935µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 256.571µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 254.447µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 443.761µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node2-563993310/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 462.948µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 184.916µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 446.898µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 429.916µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 80.722µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 302.367µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 339.126µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 521.739µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 8.285µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 280.125µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 619.942µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 436.488µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 251.903µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node6-797231040/controlsock
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 487.073µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 457.227µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 748.052µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 227.226µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 388.829µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 430.316µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 436.207µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 484.919µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 10.62µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 236.323µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 308.298µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 128.541µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 796.623µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node7-260282399/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 469.119µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 836.167µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 645.54µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 509.435µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 106.149µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 1.071589ms]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 273.021µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 235.601µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 582.652µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 267.882µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 369.442µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 370.695µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 11.521µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node1-451573366/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 417.803µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 163.497µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 93.094µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 314.399µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 313.207µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 264.667µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 1.378875ms]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 342.352µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 379.532µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 109.535µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 111.98µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 12.984µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 204.734µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-125110692/node5-534407005/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 16.39µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 258.835µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 359.524µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 102.572µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 202.429µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 372.248µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 286.788µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 98.464µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 339.857µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 279.023µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 313.017µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 167.474µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 97.663µs]
+=== CONT  TestMeshStartup/mesh-definitions/random-mesh-tcp.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node10-751983529/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 593.302µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 369.543µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 336.942µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 141.656µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 267.291µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 357.701µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 367.248µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 259.867µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 161.323µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 511.228µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 15.459µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 156.243µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 142.597µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node5-472138310/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 141.345µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 134.001µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 409.227µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 142.477µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 407.394µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 256.21µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 282.68µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 24.967µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 594.925µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 452.408µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 382.998µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 256.32µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 330.41µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/controller-717004013/controlsock
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 378.61µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 256.591µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 398.216µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 311.785µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 247.424µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 186.37µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 195.396µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 282.62µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 12.103µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 421.861µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 489.778µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 524.363µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 307.537µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node3-611116762/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 467.136µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 191.779µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 333.766µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 471.925µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 354.845µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 158.377µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 374.472µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 12.664µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 172.403µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 365.145µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 128.941µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 540.102µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 682.189µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node4-296322161/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 568.516µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 264.857µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 17.002µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 105.187µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 184.416µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 169.518µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 358.221µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 271.739µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 220.764µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 412.112µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 232.596µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 98.925µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 356.438µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node7-626036171/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 353.693µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 153.888µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 272.661µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 408.907µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 1.01338ms]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 17.122µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 285.344µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 107.462µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 328.446µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 233.307µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 451.526µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 328.195µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 329.037µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node8-316147886/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 305.362µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 17.623µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 625.353µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 395.412µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 378.049µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 252.162µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 166.923µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 228.178µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 320.28µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 141.295µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 272.12µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 453.851µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 251.221µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node12-402072308/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 126.467µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 15.099µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 236.784µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 449.392µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 182.061µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 170.72µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 375.905µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 158.968µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 394.921µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 482.305µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 471.855µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 361.548µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 287.97µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node11-812479939/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 465.944µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 300.864µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 110.046µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 414.518µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 148.899µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 393.157µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 459.562µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 430.667µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 208.05µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 13.947µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 276.949µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 276.187µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 993.923µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node1-699866984/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 17.552µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 423.554µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 178.334µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 108.083µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 406.011µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 298.67µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 124.444µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 303.459µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 313.578µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 148.919µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 405.701µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 293.591µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 154.179µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node9-650916263/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 313.487µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 374.722µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 337.343µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 279.855µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 311.995µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 363.702µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 511.389µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 11.201µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 421.02µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 406.843µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 249.688µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 134.973µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 123.802µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node2-154203420/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 316.213µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 144.361µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 265.277µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 346.089µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 10.901µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 280.917µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 255.89µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 385.202µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 225.503µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 318.938µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 122.54µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 263.093µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 265.327µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-338050290/node6-500873269/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 143.378µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 408.816µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 296.967µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 719.369µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 488.345µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 345.818µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 16.071µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 260.258µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 145.994µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 283.672µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 541.525µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 442.219µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 217.278µs]
+=== CONT  TestMeshStartup/mesh-definitions/random-mesh-udp.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node9-806242515/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 547.286µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 111.369µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 358.662µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 362.84µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 206.297µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 546.094µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 13.325µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 157.796µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 450.795µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 394.85µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 403.907µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 245.841µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 649.057µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node7-204638845/controlsock
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 281.568µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 415.459µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 16.852µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 463.649µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 114.454µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 360.786µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 296.887µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 227.437µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 158.567µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 270.587µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 105.839µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 264.857µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 250.56µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node3-666502401/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 178.574µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 12.824µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 401.112µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 651.662µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 278.662µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 293.67µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 408.295µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 379.562µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 247.063µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 855.584µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 444.734µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 139.381µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 141.806µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node2-125296859/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 837.67µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 905.237µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 834.184µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 233.147µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 8.095µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 111.008µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 395.702µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 199.333µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 501.881µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 271.159µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 284.102µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 220.774µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 172.854µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node5-776551471/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 14.186µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 319.239µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 210.434µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 337.753µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 236.874µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 399.038µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 235.1µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 160.671µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 234.66µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 332.354µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 342.522µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 462.246µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 154.781µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node1-137604034/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 136.255µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 8.165µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 362.079µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 269.044µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 134.332µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 193.663µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 314.5µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 111.76µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 131.877µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 484.618µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 873.898µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 119.474µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 239.248µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node10-726670905/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 246.061µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 12.062µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 227.126µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 391.734µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 340.899µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 132.919µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 127.65µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 210.956µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 129.944µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 122.64µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 238.757µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 301.455µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 192.962µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node12-535782468/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 114.164µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 221.495µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 122.55µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 334.377µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 360.927µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 258.885µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 229.911µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 389.48µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 112.04µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 134.412µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 10.69µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 286.176µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 295.464µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node8-604069996/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 293.33µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 344.245µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 375.975µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 311.584µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 758.482µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 327.263µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 412.945µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 134.532µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 12.113µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 224.701µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 575.629µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 250.99µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 125.395µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/controller-268443670/controlsock
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 121.417µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 351.549µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 89.347µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 234.279µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 234.56µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 199.745µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 286.467µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 232.706µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 222.257µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 328.265µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 328.246µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 15.579µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 232.335µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node4-595100600/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 98.445µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 226.004µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 397.074µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 128.881µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 380.834µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 144.401µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 1.998617ms]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 216.236µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 102.291µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 253.114µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 293.751µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 205.405µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 16.561µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node6-482241463/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 235.552µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 262.643µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 286.287µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 181.33µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 12.884µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 413.947µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 110.708µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 212.748µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 184.035µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 230.612µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 345.087µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 335.709µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 163.036µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-810290704/node11-201786282/controlsock
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 347.823µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 12.844µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 283.682µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 139.442µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 255.349µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 223.489µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 381.084µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 240.23µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 332.613µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 331.822µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 213.641µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 228.429µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 129.492µs]
+=== CONT  TestMeshStartup/mesh-definitions/flat-mesh-udp.yaml
+    mesh_test.go:38: starting mesh
+    mesh_test.go:43: waiting for mesh
+Checking control sockets
+Checking connections
+Checking connection costs
+Checking Routes
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node4-040420553/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 492.473µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 135.864µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 10.69µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 231.544µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 287.128µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 243.787µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 187.562µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 254.066µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 263.544µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 213.6µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 238.367µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 271.469µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 201.017µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node5-580729236/controlsock
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 17.172µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 239.83µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 246.372µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 234.81µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 208.662µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 191.228µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 208.461µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 259.587µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 198.903µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 194.815µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 154.21µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 99.667µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 232.876µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node10-657083845/controlsock
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 115.907µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 168.546µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 199.333µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 209.833µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 213.28µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 248.406µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 226.535µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 200.556µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 249.808µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 13.765µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 301.275µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 291.226µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 252.073µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node12-899207264/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 209.713µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 164.789µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 130.345µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 155.221µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 9.458µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 162.675µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 142.877µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 288.03µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 202.941µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 244.278µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 215.654µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 213.15µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 86.061µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node7-622828557/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 784.16µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 107.061µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 19.427µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 188.093µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 219.051µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 214.853µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 225.763µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 195.417µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 224.01µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 205.085µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 226.264µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 226.735µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 279.985µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node9-660673658/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 326.512µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 226.705µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 21.41µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 244.017µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 306.484µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 233.668µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 285.756µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 258.915µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 320.682µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 307.056µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 175.248µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 309.55µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 268.353µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/controller-472715665/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 151.864µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 146.705µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 128.27µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 188.824µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 21µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 99.406µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 86.833µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 77.736µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 118.552µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 89.006µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 111.199µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 103.073µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 111.74µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node2-480439442/controlsock
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 240.391µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 227.397µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 235.722µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 219.07µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 229.901µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 212.639µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 22.713µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 252.964µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 147.326µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 214.552µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 174.647µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 255.569µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 257.844µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node6-494951395/controlsock
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 226.915µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 222.046µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 239.72µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 262.803µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 13.455µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 204.914µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 221.626µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 175.248µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 75.922µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 226.464µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 203.171µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 137.318µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 177.723µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node8-652915174/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 227.096µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 77.575µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 166.342µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 168.065µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 13.025µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 178.745µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 158.507µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 169.698µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 217.829µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 223.729µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 245.48µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 246.803µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 233.287µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node1-206064703/controlsock
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 212.498µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 15.89µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 213.26µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 171.181µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 135.484µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 167.474µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 121.719µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 177.082µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 249.387µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 222.888µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 255.148µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 215.224µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 108.032µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node11-641304072/controlsock
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 249.508µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 18.846µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 252.143µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 282.37µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 220.343µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 218.499µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 224.181µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 270.567µs]
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 212.037µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 109.736µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 295.664µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 266.54µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 210.715µs]
+    mesh_test.go:51: connecting to /tmp/receptor-testing/mesh-451204734/node3-632070087/controlsock
+    mesh_test.go:57: pinging node9
+    mesh_test.go:62: map[Result:Reply from node9:ping in 240.851µs]
+    mesh_test.go:57: pinging controller
+    mesh_test.go:62: map[Result:Reply from controller:ping in 102.422µs]
+    mesh_test.go:57: pinging node1
+    mesh_test.go:62: map[Result:Reply from node1:ping in 269.074µs]
+    mesh_test.go:57: pinging node2
+    mesh_test.go:62: map[Result:Reply from node2:ping in 283.982µs]
+    mesh_test.go:57: pinging node4
+    mesh_test.go:62: map[Result:Reply from node4:ping in 250.45µs]
+    mesh_test.go:57: pinging node5
+    mesh_test.go:62: map[Result:Reply from node5:ping in 220.143µs]
+    mesh_test.go:57: pinging node6
+    mesh_test.go:62: map[Result:Reply from node6:ping in 210.324µs]
+    mesh_test.go:57: pinging node3
+    mesh_test.go:62: map[Result:Reply from node3:ping in 10.8µs]
+    mesh_test.go:57: pinging node10
+    mesh_test.go:62: map[Result:Reply from node10:ping in 170.7µs]
+    mesh_test.go:57: pinging node12
+    mesh_test.go:62: map[Result:Reply from node12:ping in 210.275µs]
+    mesh_test.go:57: pinging node8
+    mesh_test.go:62: map[Result:Reply from node8:ping in 250.349µs]
+    mesh_test.go:57: pinging node7
+    mesh_test.go:62: map[Result:Reply from node7:ping in 163.467µs]
+    mesh_test.go:57: pinging node11
+    mesh_test.go:62: map[Result:Reply from node11:ping in 227.186µs]
+--- PASS: TestMeshStartup (0.00s)
+    --- PASS: TestMeshStartup/mesh-definitions/flat-mesh-tcp.yaml (1.53s)
+    --- PASS: TestMeshStartup/mesh-definitions/tree-mesh-udp.yaml (6.33s)
+    --- PASS: TestMeshStartup/mesh-definitions/tree-mesh-ws.yaml (6.26s)
+    --- PASS: TestMeshStartup/mesh-definitions/random-mesh-ws.yaml (6.32s)
+    --- PASS: TestMeshStartup/mesh-definitions/flat-mesh-ws.yaml (1.50s)
+    --- PASS: TestMeshStartup/mesh-definitions/tree-mesh-tcp.yaml (6.31s)
+    --- PASS: TestMeshStartup/mesh-definitions/random-mesh-tcp.yaml (6.25s)
+    --- PASS: TestMeshStartup/mesh-definitions/random-mesh-udp.yaml (6.32s)
+    --- PASS: TestMeshStartup/mesh-definitions/flat-mesh-udp.yaml (6.21s)
+PASS
+ok  	github.com/project-receptor/receptor/tests/functional/mesh	47.041s

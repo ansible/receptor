@@ -191,7 +191,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 
 	// If the value is directly convertible to the field, just set it
 	if valueType.ConvertibleTo(fieldType) {
-		field.Set(reflect.ValueOf(value))
+		field.Set(reflect.ValueOf(value).Convert(fieldType))
 		return nil
 	}
 
@@ -211,25 +211,37 @@ func setValue(field *reflect.Value, value interface{}) error {
 	}
 
 	// If the field and value are a map type, attempt to copy the keys/values
-	if fieldKind == reflect.Map && valueType.Kind() == fieldKind {
+	if fieldKind == reflect.Map && valueType.Kind() == reflect.Map {
 		fieldMap := reflect.MakeMap(reflect.MapOf(fieldType.Key(), fieldType.Elem()))
 		iter := reflect.ValueOf(value).MapRange()
 		for iter.Next() {
-			fieldMap.SetMapIndex(reflect.ValueOf(iter.Key().Interface()), reflect.ValueOf(iter.Value().Interface()))
+			itemKey := reflect.ValueOf(iter.Key().Interface())
+			if !itemKey.Type().ConvertibleTo(fieldType.Key()) {
+				return fmt.Errorf("invalid key %s: must be type %s", itemKey, fieldType.Key())
+			}
+			itemValue := reflect.ValueOf(iter.Value().Interface())
+			if !itemValue.Type().ConvertibleTo(fieldType.Elem()) {
+				return fmt.Errorf("invalid value %s: must be type %s", itemValue, fieldType.Elem())
+			}
+			fieldMap.SetMapIndex(itemKey.Convert(fieldType.Key()), itemValue.Convert(fieldType.Elem()))
 		}
 		field.Set(fieldMap)
 		return nil
 	}
 
 	// If the field and value are a slice type, attempt to copy the values
-	if fieldKind == reflect.Slice && valueType.Kind() == fieldKind {
+	if fieldKind == reflect.Slice && valueType.Kind() == reflect.Slice {
 		valueSlice, ok := value.([]interface{})
 		if !ok {
 			return fmt.Errorf("invalid value for slice type")
 		}
 		fieldSlice := reflect.MakeSlice(fieldType, 0, 0)
 		for i := range valueSlice {
-			reflect.Append(fieldSlice, reflect.ValueOf(valueSlice[i]))
+			item := reflect.ValueOf(valueSlice[i])
+			if !item.Type().ConvertibleTo(fieldType.Elem()) {
+				return fmt.Errorf("invalid value %s: must be type %s", item, fieldType.Elem())
+			}
+			reflect.Append(fieldSlice, item.Convert(fieldType.Elem()))
 		}
 		field.Set(fieldSlice)
 		return nil
@@ -261,7 +273,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("type error")
+	return fmt.Errorf("type error (expected %s)", fieldType)
 }
 
 func plural(count int, singular string, plural string) string {

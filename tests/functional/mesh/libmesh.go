@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -90,20 +89,20 @@ func (m *LibMesh) Nodes() map[string]Node {
 
 // TCPListen helper function to create and start a TCPListener
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *LibNode) TCPListen(address string, cost float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewTCPListener(address, nil)
+func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
+	b1, err := backends.NewTCPListener(address, tlsCfg)
 	if err != nil {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
 	return err
 }
 
 // TCPDial helper function to create and start a TCPDialer
 // This might be an unnecessary abstraction and maybe should be deleted
 func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewTCPDialer(address, true, nil)
+	b1, err := backends.NewTCPDialer(address, true, tlsCfg)
 	if err != nil {
 		return err
 	}
@@ -113,13 +112,13 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 
 // UDPListen helper function to create and start a UDPListener
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *LibNode) UDPListen(address string, cost float64) error {
+func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]float64) error {
 	b1, err := backends.NewUDPListener(address)
 	if err != nil {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
 	return err
 }
 
@@ -136,14 +135,14 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 
 // WebsocketListen helper function to create and start a WebsocketListener
 // This might be an unnecessary abstraction and maybe should be deleted
-func (n *LibNode) WebsocketListen(address string, cost float64, tlsCfg *tls.Config) error {
+func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS
-	b1, err := backends.NewWebsocketListener(address, nil)
+	b1, err := backends.NewWebsocketListener(address, tlsCfg)
 	if err != nil {
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
 	return err
 }
 
@@ -291,14 +290,34 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 					if !ok {
 						port = "0"
 					}
-					costStr, ok := vMap["cost"].(string)
+					cost, ok := vMap["cost"].(float64)
 					if !ok {
-						costStr = "1.0"
+						cost = 1.0
 					}
-					cost, err := strconv.ParseFloat(costStr, 64)
 					if err != nil {
 						return nil, fmt.Errorf("Unable to determine cost for %s", k)
 					}
+					nodeCost := make(map[string]float64)
+
+					// Use nodeCost map if possible
+					interfaceNodeCost, ok := vMap["nodecost"].(map[interface{}]interface{})
+					for k, v := range interfaceNodeCost {
+						kStr, ok := k.(string)
+						if !ok {
+							return nil, errors.New("nodecost map key was not a string")
+						}
+						//vStr, ok := v.(string)
+						vFloat, ok := v.(float64)
+						if !ok {
+							return nil, errors.New("nodecost map value was not a float")
+						}
+						//vFloat, err := strconv.ParseFloat(vStr, 64)
+						if err != nil {
+							return nil, err
+						}
+						nodeCost[kStr] = vFloat
+					}
+
 					bindaddr, ok := vMap["bindaddr"].(string)
 					if !ok {
 						bindaddr = "127.0.0.1"
@@ -313,11 +332,11 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 						tls = node.serverTLSConfigs[tlsName]
 					}
 					if k == "tcp-listener" {
-						err = node.TCPListen(address, cost, tls)
+						err = node.TCPListen(address, cost, nodeCost, tls)
 					} else if k == "udp-listener" {
-						err = node.UDPListen(address, cost)
+						err = node.UDPListen(address, cost, nodeCost)
 					} else if k == "ws-listener" {
-						err = node.WebsocketListen(address, cost, tls)
+						err = node.WebsocketListen(address, cost, nodeCost, tls)
 					}
 					if err != nil {
 						return nil, err
@@ -362,12 +381,9 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 				if !ok {
 					return nil, errors.New("Listener object is not a map")
 				}
-				costStr, ok := listenerMap["cost"].(string)
-				if !ok {
-					costStr = "1.0"
-				}
 
-				cost, err := strconv.ParseFloat(costStr, 64)
+				cost := getListenerCost(listenerMap, k)
+
 				if err != nil {
 					return nil, fmt.Errorf("Unable to determine cost for %s", k)
 				}
@@ -384,12 +400,8 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 				if !ok {
 					return nil, errors.New("Listener object is not a map")
 				}
-				costStr, ok := listenerMap["cost"].(string)
-				if !ok {
-					costStr = "1.0"
-				}
+				cost := getListenerCost(listenerMap, k)
 
-				cost, err := strconv.ParseFloat(costStr, 64)
 				if err != nil {
 					return nil, fmt.Errorf("Unable to determine cost for %s", k)
 				}
@@ -406,12 +418,9 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 				if !ok {
 					return nil, errors.New("Listener object is not a map")
 				}
-				costStr, ok := listenerMap["cost"].(string)
-				if !ok {
-					costStr = "1.0"
-				}
 
-				cost, err := strconv.ParseFloat(costStr, 64)
+				cost := getListenerCost(listenerMap, k)
+
 				if err != nil {
 					return nil, fmt.Errorf("Unable to determine cost for %s", k)
 				}
@@ -476,8 +485,23 @@ func (m *LibMesh) CheckConnections() bool {
 			actualConnections[connection.NodeID] = connection.Cost
 		}
 		expectedConnections := map[string]float64{}
-		for k := range m.MeshDefinition.Nodes[status.NodeID].Connections {
-			expectedConnections[k] = 1.0
+		for k, i := range m.MeshDefinition.Nodes[status.NodeID].Connections {
+			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[i].(map[interface{}]interface{})
+			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
+			if ok {
+				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+				continue
+			}
+			listenerYaml, ok = configItemYaml["udp-listener"].(map[interface{}]interface{})
+			if ok {
+				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+				continue
+			}
+			listenerYaml, ok = configItemYaml["ws-listener"].(map[interface{}]interface{})
+			if ok {
+				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+				continue
+			}
 		}
 		for nodeID, node := range m.MeshDefinition.Nodes {
 			if nodeID == status.NodeID {
@@ -485,7 +509,6 @@ func (m *LibMesh) CheckConnections() bool {
 			}
 			for k := range node.Connections {
 				if k == status.NodeID {
-					expectedConnections[nodeID] = 1.0
 				}
 			}
 		}

@@ -153,36 +153,24 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
-				if k == "tcp-listener" {
+				if k == "tcp-listener" || k == "udp-listener" || k == "ws-listener" {
 					vMap, ok := v.(map[interface{}]interface{})
 					if !ok {
 						vMap = make(map[interface{}]interface{})
 					}
-					_, ok = vMap["port"]
-					if !ok {
-						vMap["port"] = strconv.Itoa(utils.ReserveTCPPort())
+					if k == "tcp-listener" || k == "ws-listener" {
+						_, ok = vMap["port"]
+						if !ok {
+							vMap["port"] = strconv.Itoa(utils.ReserveTCPPort())
+						}
+						attrMap[k] = vMap
+					} else if k == "udp-listener" {
+						_, ok = vMap["port"]
+						if !ok {
+							vMap["port"] = strconv.Itoa(utils.ReserveUDPPort())
+						}
+						attrMap[k] = vMap
 					}
-					attrMap[k] = vMap
-				} else if k == "udp-listener" {
-					vMap, ok := v.(map[interface{}]interface{})
-					if !ok {
-						vMap = make(map[interface{}]interface{})
-					}
-					_, ok = vMap["port"]
-					if !ok {
-						vMap["port"] = strconv.Itoa(utils.ReserveUDPPort())
-					}
-					attrMap[k] = vMap
-				} else if k == "ws-listener" {
-					vMap, ok := v.(map[interface{}]interface{})
-					if !ok {
-						vMap = make(map[interface{}]interface{})
-					}
-					_, ok = vMap["port"]
-					if !ok {
-						vMap["port"] = strconv.Itoa(utils.ReserveTCPPort())
-					}
-					attrMap[k] = vMap
 				} else if k == "node" {
 					vMap, _ := v.(map[interface{}]interface{})
 					_, ok := vMap["id"]
@@ -227,10 +215,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 					addr = "127.0.0.1:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
-				cost, ok := listenerMap["cost"].(string)
-				if ok {
-					peerYaml["cost"] = cost
-				}
+				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["tcp-peer"] = peerYaml
 				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
@@ -250,10 +235,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 					addr = "127.0.0.1:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
-				cost, ok := listenerMap["cost"].(string)
-				if ok {
-					peerYaml["cost"] = cost
-				}
+				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["udp-peer"] = peerYaml
 				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
@@ -273,10 +255,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 					addr = "ws://127.0.0.1:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
-				cost, ok := listenerMap["cost"].(string)
-				if ok {
-					peerYaml["cost"] = cost
-				}
+				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["ws-peer"] = peerYaml
 				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
@@ -368,8 +347,23 @@ func (m *CLIMesh) CheckConnections() bool {
 			actualConnections[connection.NodeID] = connection.Cost
 		}
 		expectedConnections := map[string]float64{}
-		for k := range m.MeshDefinition.Nodes[status.NodeID].Connections {
-			expectedConnections[k] = 1.0
+		for k, i := range m.MeshDefinition.Nodes[status.NodeID].Connections {
+			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[i].(map[interface{}]interface{})
+			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
+			if ok {
+				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+				continue
+			}
+			listenerYaml, ok = configItemYaml["udp-listener"].(map[interface{}]interface{})
+			if ok {
+				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+				continue
+			}
+			listenerYaml, ok = configItemYaml["ws-listener"].(map[interface{}]interface{})
+			if ok {
+				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+				continue
+			}
 		}
 		for nodeID, node := range m.MeshDefinition.Nodes {
 			if nodeID == status.NodeID {
@@ -377,7 +371,6 @@ func (m *CLIMesh) CheckConnections() bool {
 			}
 			for k := range node.Connections {
 				if k == status.NodeID {
-					expectedConnections[nodeID] = 1.0
 				}
 			}
 		}

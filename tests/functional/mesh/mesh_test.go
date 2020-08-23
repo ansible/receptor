@@ -40,8 +40,8 @@ func TestMeshStartup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer mesh.Shutdown()
 			defer mesh.WaitForShutdown()
+			defer mesh.Shutdown()
 			t.Logf("waiting for mesh")
 			err = mesh.WaitForReady(60000)
 			if err != nil {
@@ -93,8 +93,8 @@ func TestMeshConnections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer mesh.Shutdown()
 			defer mesh.WaitForShutdown()
+			defer mesh.Shutdown()
 			yamlDat, err := ioutil.ReadFile(filename)
 			if err != nil {
 				t.Fatal(err)
@@ -227,8 +227,78 @@ func TestTCPSSLConnections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mesh.Shutdown()
 	defer mesh.WaitForShutdown()
+	defer mesh.Shutdown()
+
+	err = mesh.WaitForReady(60000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test that each Node can ping each Node
+	for _, nodeSender := range mesh.Nodes() {
+		controller := receptorcontrol.New()
+		err = controller.Connect(nodeSender.ControlSocket())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for nodeIDResponder := range mesh.Nodes() {
+			response, err := controller.Ping(nodeIDResponder)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Logf("%v", response)
+		}
+		controller.Close()
+	}
+
+}
+
+func TestCosts(t *testing.T) {
+	t.Parallel()
+	// Setup our mesh yaml data
+	data := YamlData{}
+	data.Nodes = make(map[string]*YamlNode)
+
+	// Generate a mesh where each node n is connected to only n+1 and n-1
+	// if they exist
+	data.Nodes["node1"] = &YamlNode{
+		Connections: map[string]int{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{
+					"cost": 4.5,
+					"nodecost": map[interface{}]interface{}{
+						"node2": 2.6,
+						"node3": 3.2,
+					},
+				},
+			},
+		},
+	}
+	data.Nodes["node2"] = &YamlNode{
+		Connections: map[string]int{
+			"node1": 0,
+		},
+		Nodedef: []interface{}{},
+	}
+	data.Nodes["node3"] = &YamlNode{
+		Connections: map[string]int{
+			"node1": 0,
+		},
+		Nodedef: []interface{}{},
+	}
+	data.Nodes["node4"] = &YamlNode{
+		Connections: map[string]int{
+			"node1": 0,
+		},
+		Nodedef: []interface{}{},
+	}
+	mesh, err := NewCLIMeshFromYaml(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mesh.WaitForShutdown()
+	defer mesh.Shutdown()
 
 	err = mesh.WaitForReady(60000)
 	if err != nil {
@@ -282,7 +352,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 
 		// Reset the Timer because building the yaml data for the mesh may have
 		// taken a bit
-		mesh, err := NewLibMeshFromYaml(data)
+		mesh, err := NewCLIMeshFromYaml(data)
 		if err != nil {
 			b.Fatal(err)
 		}

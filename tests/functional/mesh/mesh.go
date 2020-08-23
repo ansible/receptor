@@ -37,3 +37,20 @@ type YamlNode struct {
 	Connections map[string]int
 	Nodedef     []interface{}
 }
+
+func getListenerCost(listenerYaml map[interface{}]interface{}, nodeID string) float64 {
+	var cost float64
+	nodecostYaml, ok := listenerYaml["nodecost"].(map[interface{}]interface{})
+	if ok {
+		cost, ok = nodecostYaml[nodeID].(float64)
+		if !ok {
+			cost, ok = listenerYaml["cost"].(float64)
+			if !ok {
+				cost = 1.0
+			}
+		}
+	} else {
+		cost = 1.0
+	}
+	return cost
+}

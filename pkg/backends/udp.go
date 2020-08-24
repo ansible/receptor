@@ -182,9 +182,19 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 				}
 				b.sessionRegistry[addrStr] = sess
 				b.sessRegLock.Unlock()
-				sessChan <- sess
+				select {
+				case <-ctx.Done():
+					_ = b.conn.Close()
+					return
+				case sessChan <- sess:
+				}
 			}
-			sess.recvChan <- data
+			select {
+			case <-ctx.Done():
+				_ = b.conn.Close()
+				return
+			case sess.recvChan <- data:
+			}
 		}
 	}()
 	if b.conn != nil {

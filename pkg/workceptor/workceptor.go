@@ -64,11 +64,6 @@ type WorkType interface {
 	Cancel() error
 }
 
-// Internal data for a registered worker type
-type workType struct {
-	newWorker NewWorkerFunc
-}
-
 // Internal data for a single unit of work
 type workUnit struct {
 	lock       *sync.RWMutex
@@ -83,7 +78,7 @@ type workUnit struct {
 type Workceptor struct {
 	nc              *netceptor.Netceptor
 	dataDir         string
-	workTypes       map[string]*workType
+	workTypes       map[string]NewWorkerFunc
 	activeUnitsLock *sync.RWMutex
 	activeUnits     map[string]*workUnit
 }
@@ -167,7 +162,7 @@ func New(cs *controlsvc.Server, nc *netceptor.Netceptor, dataDir string) (*Workc
 	w := &Workceptor{
 		nc:              nc,
 		dataDir:         dataDir,
-		workTypes:       make(map[string]*workType),
+		workTypes:       make(map[string]NewWorkerFunc),
 		activeUnitsLock: &sync.RWMutex{},
 		activeUnits:     make(map[string]*workUnit),
 	}
@@ -188,9 +183,7 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorker NewWorkerFunc) er
 	if ok {
 		return fmt.Errorf("work type %s already registered", typeName)
 	}
-	w.workTypes[typeName] = &workType{
-		newWorker: newWorker,
-	}
+	w.workTypes[typeName] = newWorker
 	return nil
 }
 
@@ -354,8 +347,10 @@ func (w *Workceptor) monitorRemoteStdout(ctx context.Context, cancel context.Can
 	for {
 		if firstTime {
 			firstTime = false
-			if checkDone(ctx.Done()) {
+			select {
+			case <-ctx.Done():
 				return
+			default:
 			}
 		} else {
 			if sleepOrDone(ctx.Done(), 1*time.Second) {
@@ -542,10 +537,10 @@ func (w *Workceptor) generateUnitID() (string, error) {
 
 // PreStartUnit creates a new work unit and generates an identifier for it
 func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params string) (string, error) {
-	var wT *workType
+	var newWorker NewWorkerFunc
 	if nodeID == w.nc.NodeID() {
 		var ok bool
-		wT, ok = w.workTypes[workTypeName]
+		newWorker, ok = w.workTypes[workTypeName]
 		if !ok {
 			return "", fmt.Errorf("unknown work type %s", workTypeName)
 		}
@@ -555,8 +550,8 @@ func (w *Workceptor) PreStartUnit(nodeID string, workTypeName string, params str
 		return "", err
 	}
 	var worker WorkType
-	if wT != nil {
-		worker = wT.newWorker()
+	if newWorker != nil {
+		worker = newWorker()
 	}
 	status := &StatusInfo{
 		State:       WorkStatePending,
@@ -850,7 +845,7 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 					logger.Error("Failed to release %s on remote node %s", remoteUnitID, nodeID)
 				}
 			}
-			conn.Close()
+			_ = conn.Close()
 		}
 	}
 	w.activeUnitsLock.Lock()
@@ -863,25 +858,8 @@ func (w *Workceptor) ReleaseUnit(unitID string) error {
 	return nil
 }
 
-// checkDone non-blockingly checks if the done channel is signaled
-func checkDone(doneChan <-chan struct{}) bool {
-	if doneChan == nil {
-		return false
-	}
-	select {
-	case <-doneChan:
-		return true
-	default:
-		return false
-	}
-}
-
 // sleepOrDone sleeps until a timeout or the done channel is signaled
 func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
-	if doneChan == nil {
-		time.Sleep(interval)
-		return false
-	}
 	select {
 	case <-doneChan:
 		return true

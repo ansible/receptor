@@ -169,9 +169,9 @@ func (cw *commandUnit) Cancel() error {
 
 // CommandCfg is the cmdline configuration object for a worker that runs a command
 type CommandCfg struct {
-	Service string `required:"true" description:"Local Receptor service name to bind to"`
-	Command string `required:"true" description:"Command to run to process units of work"`
-	Params  string `description:"Command-line parameters"`
+	WorkType string `required:"true" description:"Name for this worker type"`
+	Command  string `required:"true" description:"Command to run to process units of work"`
+	Params   string `description:"Command-line parameters"`
 }
 
 func (cfg CommandCfg) newWorker() WorkType {
@@ -183,7 +183,7 @@ func (cfg CommandCfg) newWorker() WorkType {
 
 // Run runs the action
 func (cfg CommandCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.Service, cfg.newWorker)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err
 }
 

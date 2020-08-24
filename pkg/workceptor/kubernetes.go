@@ -372,7 +372,7 @@ func (kw *kubeUnit) Cancel() error {
 
 // WorkKubeCfg is the cmdline configuration object for a Kubernetes worker plugin
 type WorkKubeCfg struct {
-	Service    string `required:"true" description:"Local Receptor service name to bind to"`
+	WorkType   string `required:"true" description:"Name for this worker type"`
 	KubeConfig string `description:"Kubeconfig file (defaults to environment)"`
 	Namespace  string `required:"true" description:"Kubernetes namespace to create pods in"`
 	Image      string `required:"true" description:"Container image to use for the worker pod"`
@@ -386,7 +386,7 @@ func (cfg WorkKubeCfg) newWorker() WorkType {
 		command = []string{cfg.Command}
 	}
 	return &kubeUnit{
-		namePrefix: fmt.Sprintf("%s-", strings.ToLower(cfg.Service)),
+		namePrefix: fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 		kubeConfig: cfg.KubeConfig,
 		namespace:  cfg.Namespace,
 		image:      cfg.Image,
@@ -396,7 +396,7 @@ func (cfg WorkKubeCfg) newWorker() WorkType {
 
 // Run runs the action
 func (cfg WorkKubeCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.Service, cfg.newWorker)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err
 }
 

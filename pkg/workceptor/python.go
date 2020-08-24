@@ -68,7 +68,7 @@ func (pw *pythonUnit) Cancel() error {
 
 // WorkPythonCfg is the cmdline configuration object for a Python worker plugin
 type WorkPythonCfg struct {
-	Service  string                 `required:"true" description:"Local Receptor service name to bind to"`
+	WorkType string                 `required:"true" description:"Name for this worker type"`
 	Plugin   string                 `required:"true" description:"Python module name of the worker plugin"`
 	Function string                 `required:"true" description:"Receptor-exported function within the module"`
 	Config   map[string]interface{} `description:"Plugin-specific configuration settings"`
@@ -85,7 +85,7 @@ func (cfg WorkPythonCfg) newWorker() WorkType {
 
 // Run runs the action
 func (cfg WorkPythonCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.Service, cfg.newWorker)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err
 }
 

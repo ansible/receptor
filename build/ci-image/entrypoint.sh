@@ -1,3 +1,3 @@
 #!/bin/sh
-export PATH=/github/workspace:/root/go/bin:$PATH
+export PATH=/home/test-user/receptor:/home/test-user/go/bin:$PATH
 make ci

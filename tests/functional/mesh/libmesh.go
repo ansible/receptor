@@ -426,7 +426,13 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 					return nil, fmt.Errorf("Unable to determine cost for %s", k)
 				}
 
-				addr := "ws://" + listenerMap["bindaddr"].(string) + ":" + listenerMap["port"].(string)
+				proto := "ws://"
+				tlsName, tlsEnabled := listenerMap["tls"].(string)
+				if tlsEnabled && tlsName != "" {
+					proto = "wss://"
+				}
+
+				addr := proto + listenerMap["bindaddr"].(string) + ":" + listenerMap["port"].(string)
 				err = node.WebsocketDial(addr, cost, nil)
 				if err != nil {
 					return nil, err

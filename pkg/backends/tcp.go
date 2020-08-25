@@ -41,7 +41,7 @@ func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 			if b.tls == nil {
 				conn, err = dialer.DialContext(ctx, "tcp", b.address)
 			} else {
-				dialer.Timeout = 15 // tls library does not have a DialContext equivalent
+				dialer.Timeout = 15 * time.Second // tls library does not have a DialContext equivalent
 				conn, err = tls.DialWithDialer(dialer, "tcp", b.address, b.tls)
 			}
 			if err != nil {
@@ -55,7 +55,8 @@ func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 type TCPListener struct {
 	address string
 	tls     *tls.Config
-	li      *net.TCPListener
+	li      net.Listener
+	innerLi *net.TCPListener
 }
 
 // NewTCPListener instantiates a new TCPListener backend
@@ -87,15 +88,23 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 				return err
 			}
 			var ok bool
-			b.li, ok = li.(*net.TCPListener)
+			tli, ok := li.(*net.TCPListener)
 			if !ok {
 				return fmt.Errorf("Listen returned a non-TCP listener")
+			}
+			if b.tls == nil {
+				b.li = li
+				b.innerLi = tli
+			} else {
+				tlsLi := tls.NewListener(tli, b.tls)
+				b.li = tlsLi
+				b.innerLi = tli
 			}
 			return nil
 		}, func() (netceptor.BackendSession, error) {
 			var c net.Conn
 			for {
-				err := b.li.SetDeadline(time.Now().Add(1 * time.Second))
+				err := b.innerLi.SetDeadline(time.Now().Add(1 * time.Second))
 				if err != nil {
 					return nil, err
 				}

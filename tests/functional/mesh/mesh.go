@@ -32,9 +32,16 @@ type YamlData struct {
 	Nodes map[string]*YamlNode
 }
 
+// YamlConnection represents a meta connection object that gets used to
+// generate the peer config for receptor
+type YamlConnection struct {
+	Index int
+	TLS   string
+}
+
 // YamlNode describes how a single node should be represented in yaml
 type YamlNode struct {
-	Connections map[string]int
+	Connections map[string]YamlConnection
 	Nodedef     []interface{}
 }
 

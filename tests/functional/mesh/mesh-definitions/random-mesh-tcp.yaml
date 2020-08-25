@@ -6,69 +6,89 @@ nodes:
       - tcp-listener: {}
   node1:
     connections:
-      controller: 0
+      controller:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node10:
     connections:
-      node12: 0
-      node4: 0
+      node12:
+        index: 0
+      node4:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node11:
     connections:
-      node1: 0
+      node1:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node12:
     connections:
-      node11: 0
-      controller: 0
+      node11:
+        index: 0
+      controller:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node2:
     connections:
-      node1: 0
+      node1:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node3:
     connections:
-      node6: 0
-      node4: 0
+      node6:
+        index: 0
+      node4:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node4:
     connections:
-      node7: 0
-      node2: 0
+      node7:
+        index: 0
+      node2:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node5:
     connections:
-      node8: 0
-      node12: 0
+      node8:
+        index: 0
+      node12:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node6:
     connections:
-      node10: 0
-      node3: 0
+      node10:
+        index: 0
+      node3:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node7:
     connections:
-      node3: 0
-      node1: 0
+      node3:
+        index: 0
+      node1:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node8:
     connections:
-      node1: 0
+      node1:
+        index: 0
     nodedef:
       - tcp-listener: {}
   node9:
     connections:
-      node10: 0
-      node5: 0
+      node10:
+        index: 0
+      node5:
+        index: 0
     nodedef:
       - tcp-listener: {}

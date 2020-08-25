@@ -6,61 +6,73 @@ nodes:
       - udp-listener: {}
   node1:
     connections:
-      controller: 0
+      controller:
+        index: 0
     nodedef:
       - udp-listener: {}
   node10:
     connections:
-      node9: 0
+      node9:
+        index: 0
     nodedef:
       - udp-listener: {}
   node11:
     connections:
-      node9: 0
+      node9:
+        index: 0
     nodedef:
       - udp-listener: {}
   node12:
     connections:
-      node9: 0
+      node9:
+        index: 0
     nodedef:
       - udp-listener: {}
   node2:
     connections:
-      node1: 0
+      node1:
+        index: 0
     nodedef:
       - udp-listener: {}
   node3:
     connections:
-      node1: 0
+      node1:
+        index: 0
     nodedef:
       - udp-listener: {}
   node4:
     connections:
-      node1: 0
+      node1:
+        index: 0
     nodedef:
       - udp-listener: {}
   node5:
     connections:
-      controller: 0
+      controller:
+        index: 0
     nodedef:
       - udp-listener: {}
   node6:
     connections:
-      node5: 0
+      node5:
+        index: 0
     nodedef:
       - udp-listener: {}
   node7:
     connections:
-      node5: 0
+      node5:
+        index: 0
     nodedef:
       - udp-listener: {}
   node8:
     connections:
-      node5: 0
+      node5:
+        index: 0
     nodedef:
       - udp-listener: {}
   node9:
     connections:
-      controller: 0
+      controller:
+        index: 0
     nodedef:
       - udp-listener: {}

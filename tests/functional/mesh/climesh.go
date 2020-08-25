@@ -196,7 +196,9 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 		nodes[k] = node
 	}
 	for k := range MeshDefinition.Nodes {
-		for connNode, index := range MeshDefinition.Nodes[k].Connections {
+		for connNode, connYaml := range MeshDefinition.Nodes[k].Connections {
+			index := connYaml.Index
+			TLS := connYaml.TLS
 			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
 			attrMap, ok := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
@@ -216,6 +218,10 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 				}
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
+
+				if TLS != "" {
+					peerYaml["tls"] = TLS
+				}
 				dialerYaml["tcp-peer"] = peerYaml
 				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
@@ -256,6 +262,9 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 				}
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
+				if TLS != "" {
+					peerYaml["tls"] = TLS
+				}
 				dialerYaml["ws-peer"] = peerYaml
 				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
@@ -347,8 +356,9 @@ func (m *CLIMesh) CheckConnections() bool {
 			actualConnections[connection.NodeID] = connection.Cost
 		}
 		expectedConnections := map[string]float64{}
-		for k, i := range m.MeshDefinition.Nodes[status.NodeID].Connections {
-			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[i].(map[interface{}]interface{})
+		for k, connYaml := range m.MeshDefinition.Nodes[status.NodeID].Connections {
+			index := connYaml.Index
+			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)

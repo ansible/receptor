@@ -3,6 +3,8 @@ package utils
 import (
 	"errors"
 	"net"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 )
@@ -113,4 +115,53 @@ func FreeUDPPort(portNum int) {
 	defer udpPortMutex.Unlock()
 
 	udpPortPool = append(udpPortPool, portNum)
+}
+
+// GenerateCert generates a private and public key for testing in the directory
+// specified
+func GenerateCert(dir, name string) (keyPath, certPath string, e error) {
+	KeyPath := filepath.Join(dir, name+".key")
+	CrtPath := filepath.Join(dir, name+".crt")
+	// Create our private key
+	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
+	err := cmd.Run()
+	if err != nil {
+		return "", "", err
+	}
+	// Create our certificate
+	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=", "-sha256", "-out", CrtPath)
+	err = cmd.Run()
+	if err != nil {
+		return "", "", err
+	}
+	return KeyPath, CrtPath, nil
+}
+
+// GenerateCertWithCA generates a private and public key for testing in the directory
+// specified using the ca specified
+func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPath string, e error) {
+	KeyPath := filepath.Join(dir, name+".key")
+	CrtPath := filepath.Join(dir, name+".crt")
+	CSRPath := filepath.Join(dir, name+".csa")
+	// Create our private key
+	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
+	err := cmd.Run()
+	if err != nil {
+		return "", "", err
+	}
+
+	// Create our certificate request
+	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=", "-out", CSRPath)
+	err = cmd.Run()
+	if err != nil {
+		return "", "", err
+	}
+
+	// Create our certificate using the CA
+	cmd = exec.Command("openssl", "x509", "-req", "-in", CSRPath, "-CA", caCrtPath, "-CAkey", caKeyPath, "-CAcreateserial", "-out", CrtPath, "-sha256")
+	err = cmd.Run()
+	if err != nil {
+		return "", "", err
+	}
+	return KeyPath, CrtPath, nil
 }

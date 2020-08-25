@@ -372,7 +372,8 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 	}
 	for k := range MeshDefinition.Nodes {
 		node := nodes[k]
-		for connNode, index := range MeshDefinition.Nodes[k].Connections {
+		for connNode, connYaml := range MeshDefinition.Nodes[k].Connections {
+			index := connYaml.Index
 			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
 			attrMap, ok := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
@@ -485,8 +486,9 @@ func (m *LibMesh) CheckConnections() bool {
 			actualConnections[connection.NodeID] = connection.Cost
 		}
 		expectedConnections := map[string]float64{}
-		for k, i := range m.MeshDefinition.Nodes[status.NodeID].Connections {
-			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[i].(map[interface{}]interface{})
+		for k, connYaml := range m.MeshDefinition.Nodes[status.NodeID].Connections {
+			index := connYaml.Index
+			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)

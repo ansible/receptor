@@ -253,12 +253,19 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 					return nil, errors.New("Listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
+
+				proto := "ws://"
+				tlsName, tlsEnabled := listenerMap["tls"].(string)
+				if tlsEnabled && tlsName != "" {
+					proto = "wss://"
+				}
+
 				bindaddr, ok := listenerMap["bindaddr"].(string)
 				var addr string
 				if ok {
-					addr = "ws://" + bindaddr + ":" + listenerMap["port"].(string)
+					addr = proto + bindaddr + ":" + listenerMap["port"].(string)
 				} else {
-					addr = "ws://127.0.0.1:" + listenerMap["port"].(string)
+					addr = proto + "127.0.0.1:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)

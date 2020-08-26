@@ -308,7 +308,189 @@ func TestTCPSSLConnections(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
+	t.Parallel()
+	testTable := []struct {
+		listener string
+	}{
+		{"tcp-listener"},
+		{"ws-listener"},
+	}
+	for _, data := range testTable {
+		listener := data.listener
+		t.Run(listener, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup the mesh directory
+			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
+			// Ignore the error, if the dir already exists thats fine
+			os.Mkdir(baseDir, 0755)
+			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
+			os.Mkdir(tempdir, 0755)
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			if err != nil {
+				t.Fatal(err)
+			}
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Setup our mesh yaml data
+			data := YamlData{}
+			data.Nodes = make(map[string]*YamlNode)
+
+			// Generate a mesh where each node n is connected to only n+1 and n-1
+			// if they exist
+			data.Nodes["node1"] = &YamlNode{
+				Connections: map[string]YamlConnection{},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-server": map[interface{}]interface{}{
+							"name":              "cert1",
+							"key":               key1,
+							"cert":              crt1,
+							"requireclientcert": true,
+							"clientcas":         caCrt,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{
+							"tls": "cert1",
+						},
+					},
+				},
+			}
+			data.Nodes["node2"] = &YamlNode{
+				Connections: map[string]YamlConnection{
+					"node1": YamlConnection{
+						Index: 1,
+						TLS:   "client-insecure",
+					},
+				},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-client": map[interface{}]interface{}{
+							"name":               "client-insecure",
+							"key":                "",
+							"cert":               "",
+							"insecureskipverify": true,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{},
+					},
+				},
+			}
+			mesh, err := NewCLIMeshFromYaml(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mesh.WaitForShutdown()
+			defer mesh.Shutdown()
+
+			err = mesh.WaitForReady(10000)
+			if err == nil {
+				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+			}
+		})
+	}
+}
+
+func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
+	t.Parallel()
+	testTable := []struct {
+		listener string
+	}{
+		{"tcp-listener"},
+		{"ws-listener"},
+	}
+	for _, data := range testTable {
+		listener := data.listener
+		t.Run(listener, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup the mesh directory
+			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
+			// Ignore the error, if the dir already exists thats fine
+			os.Mkdir(baseDir, 0755)
+			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
+			os.Mkdir(tempdir, 0755)
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			if err != nil {
+				t.Fatal(err)
+			}
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			key2, crt2, err := utils.GenerateCert(tempdir, "node2")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Setup our mesh yaml data
+			data := YamlData{}
+			data.Nodes = make(map[string]*YamlNode)
+
+			// Generate a mesh where each node n is connected to only n+1 and n-1
+			// if they exist
+			data.Nodes["node1"] = &YamlNode{
+				Connections: map[string]YamlConnection{},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-server": map[interface{}]interface{}{
+							"name":              "cert1",
+							"key":               key1,
+							"cert":              crt1,
+							"requireclientcert": true,
+							"clientcas":         caCrt,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{
+							"tls": "cert1",
+						},
+					},
+				},
+			}
+			data.Nodes["node2"] = &YamlNode{
+				Connections: map[string]YamlConnection{
+					"node1": YamlConnection{
+						Index: 1,
+						TLS:   "client-insecure",
+					},
+				},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-client": map[interface{}]interface{}{
+							"name":               "client-insecure",
+							"key":                key2,
+							"cert":               crt2,
+							"insecureskipverify": true,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{},
+					},
+				},
+			}
+			mesh, err := NewCLIMeshFromYaml(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mesh.WaitForShutdown()
+			defer mesh.Shutdown()
+
+			err = mesh.WaitForReady(10000)
+			if err == nil {
+				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+			}
+		})
+	}
 }
 
 func TestCosts(t *testing.T) {

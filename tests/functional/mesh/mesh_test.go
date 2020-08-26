@@ -642,12 +642,14 @@ func TestWorkCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = controller.AssertWorkRunning(workID)
+	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+	err = controller.AssertWorkRunning(ctx, workID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	controller.WorkCancel(workID)
-	err = controller.AssertWorkCancelled(workID)
+	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+	err = controller.AssertWorkCancelled(ctx, workID)
 	if err != nil {
 		t.Fatal(err)
 	}

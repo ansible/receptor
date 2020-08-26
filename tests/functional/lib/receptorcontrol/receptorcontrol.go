@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"net"
 	"regexp"
 	"strings"
@@ -258,40 +257,40 @@ func (r *ReceptorControl) getWorkList() (map[string]interface{}, error) {
 	return workList, nil
 }
 
-func checkTimeout(timeout <-chan time.Time) bool {
-	select {
-	case <-timeout:
-		return true
-	default:
-		return false
-	}
-}
-
-func assertWithTimeout(check func() bool) bool {
-	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-	return utils.CheckUntilTimeout(ctx, check, 250*time.Millisecond)
-}
-
 //AssertWorkRunning waits until work status is running
-func (r *ReceptorControl) AssertWorkRunning(workID string) error {
-	check := func() bool {
-		workStatus, _ := r.getWorkStatus(workID)
-		return workStatus["StateName"] == "Running"
-	}
-	if !assertWithTimeout(check) {
-		return fmt.Errorf("Failed to assert %s is running", workID)
+func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, workID string) error {
+	for {
+		workStatus, err := r.getWorkStatus(workID)
+		if err != nil {
+			return err
+		}
+		if workStatus["StateName"] == "Running" {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("assert %s is running has timed out", workID)
+		case <-time.After(250 * time.Millisecond):
+		}
 	}
 	return nil
 }
 
 //AssertWorkCancelled waits until work status is cancelled
-func (r *ReceptorControl) AssertWorkCancelled(workID string) error {
-	check := func() bool {
-		workStatus, _ := r.getWorkStatus(workID)
-		return workStatus["StateName"] == "Failed" && workStatus["Detail"] == "Cancelled"
-	}
-	if !assertWithTimeout(check) {
-		return fmt.Errorf("Failed to assert %s is cancelled", workID)
+func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, workID string) error {
+	for {
+		workStatus, err := r.getWorkStatus(workID)
+		if err != nil {
+			return err
+		}
+		if workStatus["StateName"] == "Failed" && workStatus["Detail"] == "Cancelled" {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("assert %s is cancelled has timed out", workID)
+		case <-time.After(250 * time.Millisecond):
+		}
 	}
 	return nil
 }
@@ -304,7 +303,7 @@ func (r *ReceptorControl) AssertWorkReleased(workID string) error {
 	}
 	_, ok := workList[workID] // workID should not be in list
 	if ok {
-		return fmt.Errorf("Failed to assert %s released", workID)
+		return fmt.Errorf("assert %s released has failed", workID)
 	}
 	return nil
 }

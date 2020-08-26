@@ -116,14 +116,12 @@ func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	jsonData := make(map[string]interface{})
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
 		return nil, err
 	}
-
 	return jsonData, nil
 }
 

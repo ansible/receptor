@@ -62,10 +62,38 @@ func (n *CLINode) ControlSocket() string {
 	return n.controlSocket
 }
 
-// Shutdown kills the receptor process and puts its ports back into the pool to
-// be reallocated once it's shutdown
+// Shutdown kills the receptor process
 func (n *CLINode) Shutdown() {
 	n.receptorCmd.Process.Kill()
+}
+
+// Start writes the the node config to disk and starts the receptor process
+func (n *CLINode) Start() error {
+	strData, err := yaml.Marshal(n.yamlConfig)
+	if err != nil {
+		return err
+	}
+	nodedefPath := filepath.Join(n.nodeDir, "nodedef.yaml")
+	ioutil.WriteFile(nodedefPath, strData, 0644)
+	n.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
+	stdout, err := os.Create(filepath.Join(n.nodeDir, "stdout"))
+	if err != nil {
+		return err
+	}
+	stderr, err := os.Create(filepath.Join(n.nodeDir, "stderr"))
+	if err != nil {
+		return err
+	}
+	n.receptorCmd.Stdout = stdout
+	n.receptorCmd.Stderr = stderr
+	n.receptorCmd.Start()
+	return nil
+}
+
+// Destroy kills the receptor process and puts its ports back into the pool to
+// be reallocated once it's shutdown
+func (n *CLINode) Destroy() {
+	n.Shutdown()
 	go func() {
 		n.receptorCmd.Wait()
 		for _, i := range n.yamlConfig {
@@ -298,24 +326,10 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 
 	for k, node := range nodes {
 		node.yamlConfig = MeshDefinition.Nodes[k].Nodedef
-		strData, err := yaml.Marshal(node.yamlConfig)
+		err = node.Start()
 		if err != nil {
 			return nil, err
 		}
-		nodedefPath := filepath.Join(node.nodeDir, "nodedef.yaml")
-		ioutil.WriteFile(nodedefPath, strData, 0644)
-		node.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
-		stdout, err := os.Create(filepath.Join(node.nodeDir, "stdout"))
-		if err != nil {
-			return nil, err
-		}
-		stderr, err := os.Create(filepath.Join(node.nodeDir, "stderr"))
-		if err != nil {
-			return nil, err
-		}
-		node.receptorCmd.Stdout = stdout
-		node.receptorCmd.Stderr = stderr
-		node.receptorCmd.Start()
 	}
 	mesh.nodes = nodes
 	mesh.MeshDefinition = &MeshDefinition
@@ -329,7 +343,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 		}()
 		select {
 		case <-failedMesh:
-			mesh.Shutdown()
+			mesh.Destroy()
 			mesh.WaitForShutdown()
 			return nil, errors.New("Failed to create mesh")
 		case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
@@ -339,10 +353,11 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 	return mesh, nil
 }
 
-// Shutdown stops all running Netceptors and their backends
-func (m *CLIMesh) Shutdown() {
+// Destroy stops all running Netceptors and their backends and frees all
+// relevant resources
+func (m *CLIMesh) Destroy() {
 	for _, node := range m.nodes {
-		node.Shutdown()
+		node.Destroy()
 	}
 }
 

@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"bytes"
+	"context"
 	_ "github.com/fortytw2/leaktest"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
@@ -45,7 +46,8 @@ func TestMeshStartup(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Shutdown()
 			t.Logf("waiting for mesh")
-			err = mesh.WaitForReady(60000)
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -108,13 +110,12 @@ func TestMeshConnections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			connectionsReady := false
-			for timeout := 10000; timeout > 0 && !connectionsReady; connectionsReady = mesh.CheckConnections() {
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			for connectionsReady := mesh.CheckConnections(); !connectionsReady; connectionsReady = mesh.CheckConnections() {
 				time.Sleep(100 * time.Millisecond)
-				timeout -= 100
-			}
-			if connectionsReady == false {
-				t.Error("Timed out while waiting for connections:")
+				if ctx.Err() != nil {
+					t.Error("Timed out while waiting for connections:")
+				}
 			}
 		})
 	}
@@ -137,7 +138,8 @@ func TestMeshShutdown(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = mesh.WaitForReady(60000)
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -286,7 +288,8 @@ func TestTCPSSLConnections(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Shutdown()
 
-			err = mesh.WaitForReady(10000)
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -391,7 +394,8 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Shutdown()
 
-			err = mesh.WaitForReady(10000)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			err = mesh.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
 			}
@@ -485,7 +489,8 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Shutdown()
 
-			err = mesh.WaitForReady(10000)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			err = mesh.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
 			}
@@ -546,7 +551,8 @@ func TestCosts(t *testing.T) {
 	defer mesh.WaitForShutdown()
 	defer mesh.Shutdown()
 
-	err = mesh.WaitForReady(60000)
+	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+	err = mesh.WaitForReady(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -604,7 +610,8 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		err = mesh.WaitForReady(60000)
+		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+		err = mesh.WaitForReady(ctx)
 		if err != nil {
 			b.Fatal(err)
 		}

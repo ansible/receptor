@@ -10,7 +10,9 @@ import (
 type Node interface {
 	Status() (*netceptor.Status, error)
 	ControlSocket() string
+	Start() error
 	Shutdown()
+	Destroy()
 	WaitForShutdown()
 }
 
@@ -23,7 +25,7 @@ type Mesh interface {
 	CheckKnownConnectionCosts() bool
 	CheckRoutes() bool
 	WaitForReady(context.Context) error
-	Shutdown()
+	Destroy()
 	WaitForShutdown()
 }
 

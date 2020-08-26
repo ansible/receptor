@@ -68,8 +68,18 @@ func (n *LibNode) ControlSocket() string {
 	return n.controlSocket
 }
 
-// Shutdown shuts the node down
+// Start is not implemented yet
+func (n *LibNode) Start() error {
+	panic("Start is not yet implemented for LibNode")
+}
+
+// Shutdown is not implemented yet
 func (n *LibNode) Shutdown() {
+	panic("Shutdown is not yet implemented for LibNode")
+}
+
+// Destroy shuts the node down
+func (n *LibNode) Destroy() {
 	n.controlServerCanceller()
 	n.NetceptorInstance.Shutdown()
 }
@@ -466,10 +476,10 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 	return mesh, nil
 }
 
-// Shutdown stops all running Netceptors and their backends
-func (m *LibMesh) Shutdown() {
+// Destroy stops all running Netceptors and their backends
+func (m *LibMesh) Destroy() {
 	for _, node := range m.nodes {
-		node.Shutdown()
+		node.Destroy()
 	}
 }
 

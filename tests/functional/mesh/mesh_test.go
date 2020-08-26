@@ -44,7 +44,7 @@ func TestMeshStartup(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer mesh.WaitForShutdown()
-			defer mesh.Shutdown()
+			defer mesh.Destroy()
 			t.Logf("waiting for mesh")
 			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 			err = mesh.WaitForReady(ctx)
@@ -98,7 +98,7 @@ func TestMeshConnections(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer mesh.WaitForShutdown()
-			defer mesh.Shutdown()
+			defer mesh.Destroy()
 			yamlDat, err := ioutil.ReadFile(filename)
 			if err != nil {
 				t.Fatal(err)
@@ -143,7 +143,7 @@ func TestMeshShutdown(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			mesh.Shutdown()
+			mesh.Destroy()
 			mesh.WaitForShutdown()
 
 			// Check that the connections are closed
@@ -286,7 +286,7 @@ func TestTCPSSLConnections(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer mesh.WaitForShutdown()
-			defer mesh.Shutdown()
+			defer mesh.Destroy()
 
 			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 			err = mesh.WaitForReady(ctx)
@@ -392,7 +392,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer mesh.WaitForShutdown()
-			defer mesh.Shutdown()
+			defer mesh.Destroy()
 
 			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			err = mesh.WaitForReady(ctx)
@@ -487,7 +487,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer mesh.WaitForShutdown()
-			defer mesh.Shutdown()
+			defer mesh.Destroy()
 
 			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			err = mesh.WaitForReady(ctx)
@@ -549,7 +549,7 @@ func TestCosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mesh.WaitForShutdown()
-	defer mesh.Shutdown()
+	defer mesh.Destroy()
 
 	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 	err = mesh.WaitForReady(ctx)
@@ -617,7 +617,7 @@ func TestWorkCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mesh.WaitForShutdown()
-	defer mesh.Shutdown()
+	defer mesh.Destroy()
 
 	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 	err = mesh.WaitForReady(ctx)
@@ -703,7 +703,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 			b.Fatal(err)
 		}
 		b.StopTimer()
-		mesh.Shutdown()
+		mesh.Destroy()
 		mesh.WaitForShutdown()
 		b.StartTimer()
 	}

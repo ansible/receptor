@@ -8,6 +8,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // ReceptorControl Connects to a control socket and provides basic commands
@@ -103,18 +104,26 @@ func (r *ReceptorControl) Close() error {
 	return err
 }
 
+// CloseWrite closes the write side of the socket
+func (r *ReceptorControl) CloseWrite() error {
+	err := r.socketConn.CloseWrite()
+	return err
+}
+
 // ReadAndParseJSON reads data from the socket and parses it as json
 func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	data, err := r.Read()
 	if err != nil {
 		return nil, err
 	}
+
 	jsonData := make(map[string]interface{})
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
 		return nil, err
 	}
+
 	return jsonData, nil
 }
 
@@ -157,4 +166,153 @@ func (r *ReceptorControl) Status() (*netceptor.Status, error) {
 	}
 
 	return &status, nil
+}
+
+// WorkSubmit begins work on remote node
+func (r *ReceptorControl) WorkSubmit(node, serviceName string) (string, error) {
+	_, err := r.WriteStr(fmt.Sprintf("work submit %s %s\n", node, serviceName))
+	if err != nil {
+		return "", err
+	}
+	r.ReadStr()
+	r.CloseWrite()
+	response, err := r.ReadAndParseJSON()
+	if err != nil {
+		return "", err
+	}
+	unitID := fmt.Sprintf("%v", response["unitid"])
+	return unitID, nil
+}
+
+// WorkStart begins work on local node
+func (r *ReceptorControl) WorkStart(workID string) (string, error) {
+	_, err := r.WriteStr(fmt.Sprintf("work start %s\n", workID))
+	if err != nil {
+		return "", err
+	}
+	_, err = r.ReadStr() // flush response
+	if err != nil {
+		return "", err
+	}
+	r.CloseWrite() // clost write half to signal EOF
+	response, err := r.ReadAndParseJSON()
+	if err != nil {
+		return "", err
+	}
+	r.Close()
+	unitID := fmt.Sprintf("%v", response["unitid"])
+	return unitID, nil
+}
+
+// WorkCancel cancels work
+func (r *ReceptorControl) WorkCancel(workID string) error {
+	_, err := r.WriteStr(fmt.Sprintf("work cancel %s\n", workID))
+	if err != nil {
+		return err
+	}
+	_, err = r.ReadAndParseJSON() // flush response
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// WorkRelease cancels and deletes work
+func (r *ReceptorControl) WorkRelease(workID string) error {
+	_, err := r.WriteStr(fmt.Sprintf("work release %s\n", workID))
+	if err != nil {
+		return err
+	}
+	_, err = r.ReadAndParseJSON() // flush response
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReceptorControl) getWorkStatus(workID string) (map[string]interface{}, error) {
+	_, err := r.WriteStr(fmt.Sprintf("work status %s\n", workID))
+	if err != nil {
+		return nil, err
+	}
+	status, err := r.ReadAndParseJSON()
+	if err != nil {
+		return nil, err
+	}
+	return status, nil
+}
+
+func (r *ReceptorControl) getWorkList() (map[string]interface{}, error) {
+	_, err := r.WriteStr(fmt.Sprintf("work list\n"))
+	if err != nil {
+		return nil, err
+	}
+	workList, err := r.ReadAndParseJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	return workList, nil
+}
+
+func checkTimeout(timeout <-chan time.Time) bool {
+	select {
+	case <-timeout:
+		return true
+	default:
+		return false
+	}
+}
+
+//AssertWorkRunning waits until work status is running
+func (r *ReceptorControl) AssertWorkRunning(workID string) error {
+	timeout := time.After(6 * time.Second)
+	for {
+		workStatus, err := r.getWorkStatus(workID)
+		if err != nil {
+			return err
+		}
+		if workStatus["StateName"] == "Running" {
+			break
+		}
+		if checkTimeout(timeout) {
+			return fmt.Errorf("Assert work running timed out")
+		}
+		time.Sleep(250 * time.Millisecond)
+
+	}
+	return nil
+}
+
+//AssertWorkCancelled waits until work status is cancelled
+func (r *ReceptorControl) AssertWorkCancelled(workID string) error {
+	timeout := time.After(6 * time.Second)
+	for {
+		workStatus, err := r.getWorkStatus(workID)
+		if err != nil {
+			return err
+		}
+		if workStatus["StateName"] == "Failed" && workStatus["Detail"] == "Cancelled" {
+			break
+		}
+		if checkTimeout(timeout) {
+			return fmt.Errorf("Assert work cancelled timed out")
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	return nil
+}
+
+// AssertWorkReleased asserts that work is not in work list
+func (r *ReceptorControl) AssertWorkReleased(workID string) error {
+	workList, err := r.getWorkList()
+	if err != nil {
+		return err
+	}
+	_, ok := workList[workID] // workID should not be in list
+	if ok {
+		return fmt.Errorf("%s did not release", workID)
+	}
+
+	return nil
 }

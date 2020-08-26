@@ -575,6 +575,90 @@ func TestCosts(t *testing.T) {
 
 }
 
+func TestWorkCancel(t *testing.T) {
+	t.Parallel()
+	// Setup our mesh yaml data
+	data := YamlData{}
+	data.Nodes = make(map[string]*YamlNode)
+	workCommand := map[interface{}]interface{}{
+		"service": "echosleep",
+		"command": "bash",
+		"params":  "-c \"for i in {1..5}; do echo $i; sleep 2;done\"",
+	}
+	// Generate a mesh with 2 nodes
+	data.Nodes["node1"] = &YamlNode{
+		Connections: map[string]YamlConnection{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{
+					"cost": 4.5,
+					"nodecost": map[interface{}]interface{}{
+						"node2": 2.6,
+					},
+				},
+			},
+		},
+	}
+	data.Nodes["node2"] = &YamlNode{
+		Connections: map[string]YamlConnection{
+			"node1": YamlConnection{
+				Index: 0,
+			},
+		},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"work-command": workCommand,
+			},
+		},
+	}
+
+	mesh, err := NewCLIMeshFromYaml(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mesh.WaitForShutdown()
+	defer mesh.Shutdown()
+
+	err = mesh.WaitForReady(60000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nodes := mesh.Nodes()
+
+	controller := receptorcontrol.New()
+	err = controller.Connect(nodes["node1"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workID, err := controller.WorkSubmit("node2", "echosleep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// controller closes after a work submit, so must reopen
+	controller = receptorcontrol.New()
+	err = controller.Connect(nodes["node1"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controller.AssertWorkRunning(workID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller.WorkCancel(workID)
+	err = controller.AssertWorkCancelled(workID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller.WorkRelease(workID)
+	err = controller.AssertWorkReleased(workID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller.Close()
+
+}
+
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Setup our mesh yaml data

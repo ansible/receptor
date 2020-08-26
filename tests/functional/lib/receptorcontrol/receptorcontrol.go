@@ -172,7 +172,10 @@ func (r *ReceptorControl) WorkSubmit(node, serviceName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	r.ReadStr()
+	_, err = r.ReadStr() // flush response
+	if err != nil {
+		return "", err
+	}
 	r.CloseWrite()
 	response, err := r.ReadAndParseJSON()
 	if err != nil {

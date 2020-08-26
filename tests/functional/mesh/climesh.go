@@ -1,8 +1,8 @@
 package mesh
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
@@ -453,47 +453,20 @@ func (m *CLIMesh) CheckControlSockets() bool {
 }
 
 // WaitForReady Waits for connections and routes to converge
-func (m *CLIMesh) WaitForReady(timeout float64) error {
-	fmt.Println("Checking control sockets")
-	socketsReady := m.CheckControlSockets()
-	for ; timeout > 0 && !socketsReady; socketsReady = m.CheckControlSockets() {
-		time.Sleep(100 * time.Millisecond)
-		timeout -= 100
+func (m *CLIMesh) WaitForReady(ctx context.Context) error {
+	sleepInterval := 100 * time.Millisecond
+	if !utils.CheckUntilTimeout(ctx, m.CheckControlSockets, sleepInterval) {
+		return errors.New("Timed out while waiting for control sockets")
 	}
-	if socketsReady == false {
-		return errors.New("Timed out while waiting for sockets")
+	if !utils.CheckUntilTimeout(ctx, m.CheckConnections, sleepInterval) {
+		return errors.New("Timed out while waiting for Connections")
 	}
-
-	fmt.Println("Checking connections")
-	connectionsReady := m.CheckConnections()
-	for ; timeout > 0 && !connectionsReady; connectionsReady = m.CheckConnections() {
-		time.Sleep(100 * time.Millisecond)
-		timeout -= 100
+	if !utils.CheckUntilTimeout(ctx, m.CheckKnownConnectionCosts, sleepInterval) {
+		return errors.New("Timed out while checking Connection Costs")
 	}
-	if connectionsReady == false {
-		return errors.New("Timed out while waiting for connections")
+	if !utils.CheckUntilTimeout(ctx, m.CheckRoutes, sleepInterval) {
+		return errors.New("Timed out while waiting for routes to converge")
 	}
-
-	fmt.Println("Checking connection costs")
-	costsConsistent := m.CheckKnownConnectionCosts()
-	for ; timeout > 0 && !costsConsistent; costsConsistent = m.CheckKnownConnectionCosts() {
-		time.Sleep(100 * time.Millisecond)
-		timeout -= 100
-	}
-	if costsConsistent == false {
-		return errors.New("Timed out while waiting for connection costs to converge")
-	}
-
-	fmt.Println("Checking Routes")
-	routesReady := m.CheckRoutes()
-	for ; timeout > 0 && !routesReady; routesReady = m.CheckRoutes() {
-		time.Sleep(100 * time.Millisecond)
-		timeout -= 100
-	}
-	if routesReady == false {
-		return errors.New("Timed out while waiting for every node to have a route to every other node")
-	}
-
 	return nil
 }
 

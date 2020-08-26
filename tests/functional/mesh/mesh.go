@@ -1,6 +1,7 @@
 package mesh
 
 import (
+	"context"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
@@ -21,7 +22,7 @@ type Mesh interface {
 	CheckConnections() bool
 	CheckKnownConnectionCosts() bool
 	CheckRoutes() bool
-	WaitForReady(float64) error
+	WaitForReady(context.Context) error
 	Shutdown()
 	WaitForShutdown()
 }

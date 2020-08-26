@@ -1,12 +1,14 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 )
 
 var udpPortMutex sync.Mutex
@@ -164,4 +166,16 @@ func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPa
 		return "", "", err
 	}
 	return KeyPath, CrtPath, nil
+}
+
+// CheckUntilTimeout Polls the check function until the context expires, in
+// which case it returns false
+func CheckUntilTimeout(ctx context.Context, check func() bool, interval time.Duration) bool {
+	for ready := check(); !ready; ready = check() {
+		if ctx.Err() != nil {
+			return false
+		}
+		time.Sleep(interval)
+	}
+	return true
 }

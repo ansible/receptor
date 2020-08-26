@@ -1,10 +1,12 @@
 package receptorcontrol
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"net"
 	"regexp"
 	"strings"
@@ -265,41 +267,31 @@ func checkTimeout(timeout <-chan time.Time) bool {
 	}
 }
 
+func assertWithTimeout(check func() bool) bool {
+	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+	return utils.CheckUntilTimeout(ctx, check, 250*time.Millisecond)
+}
+
 //AssertWorkRunning waits until work status is running
 func (r *ReceptorControl) AssertWorkRunning(workID string) error {
-	timeout := time.After(6 * time.Second)
-	for {
-		workStatus, err := r.getWorkStatus(workID)
-		if err != nil {
-			return err
-		}
-		if workStatus["StateName"] == "Running" {
-			break
-		}
-		if checkTimeout(timeout) {
-			return fmt.Errorf("Assert work running timed out")
-		}
-		time.Sleep(250 * time.Millisecond)
-
+	check := func() bool {
+		workStatus, _ := r.getWorkStatus(workID)
+		return workStatus["StateName"] == "Running"
+	}
+	if !assertWithTimeout(check) {
+		return fmt.Errorf("Failed to assert %s is running", workID)
 	}
 	return nil
 }
 
 //AssertWorkCancelled waits until work status is cancelled
 func (r *ReceptorControl) AssertWorkCancelled(workID string) error {
-	timeout := time.After(6 * time.Second)
-	for {
-		workStatus, err := r.getWorkStatus(workID)
-		if err != nil {
-			return err
-		}
-		if workStatus["StateName"] == "Failed" && workStatus["Detail"] == "Cancelled" {
-			break
-		}
-		if checkTimeout(timeout) {
-			return fmt.Errorf("Assert work cancelled timed out")
-		}
-		time.Sleep(250 * time.Millisecond)
+	check := func() bool {
+		workStatus, _ := r.getWorkStatus(workID)
+		return workStatus["StateName"] == "Failed" && workStatus["Detail"] == "Cancelled"
+	}
+	if !assertWithTimeout(check) {
+		return fmt.Errorf("Failed to assert %s is cancelled", workID)
 	}
 	return nil
 }
@@ -312,8 +304,7 @@ func (r *ReceptorControl) AssertWorkReleased(workID string) error {
 	}
 	_, ok := workList[workID] // workID should not be in list
 	if ok {
-		return fmt.Errorf("%s did not release", workID)
+		return fmt.Errorf("Failed to assert %s released", workID)
 	}
-
 	return nil
 }

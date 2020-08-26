@@ -490,7 +490,7 @@ func (m *CLIMesh) WaitForReady(timeout float64) error {
 		time.Sleep(100 * time.Millisecond)
 		timeout -= 100
 	}
-	if costsConsistent == false {
+	if routesReady == false {
 		return errors.New("Timed out while waiting for every node to have a route to every other node")
 	}
 

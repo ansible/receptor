@@ -168,23 +168,31 @@ func (r *ReceptorControl) Status() (*netceptor.Status, error) {
 	return &status, nil
 }
 
+func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
+	_, err := r.ReadStr() // flush response
+	if err != nil {
+		return "", err
+	}
+	r.CloseWrite() // close write half to signal EOF
+	response, err := r.ReadAndParseJSON()
+	if err != nil {
+		return "", err
+	}
+	r.Close() // since write is closed, we should close the whole socket
+	unitID := fmt.Sprintf("%v", response["unitid"])
+	return unitID, nil
+}
+
 // WorkSubmit begins work on remote node
 func (r *ReceptorControl) WorkSubmit(node, serviceName string) (string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work submit %s %s\n", node, serviceName))
 	if err != nil {
 		return "", err
 	}
-	_, err = r.ReadStr() // flush response
+	unitID, err := r.getWorkSubmitResponse()
 	if err != nil {
 		return "", err
 	}
-	r.CloseWrite()
-	response, err := r.ReadAndParseJSON()
-	if err != nil {
-		return "", err
-	}
-	r.Close()
-	unitID := fmt.Sprintf("%v", response["unitid"])
 	return unitID, nil
 }
 
@@ -194,17 +202,10 @@ func (r *ReceptorControl) WorkStart(workID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = r.ReadStr() // flush response
+	unitID, err := r.getWorkSubmitResponse()
 	if err != nil {
 		return "", err
 	}
-	r.CloseWrite() // clost write half to signal EOF
-	response, err := r.ReadAndParseJSON()
-	if err != nil {
-		return "", err
-	}
-	r.Close()
-	unitID := fmt.Sprintf("%v", response["unitid"])
 	return unitID, nil
 }
 

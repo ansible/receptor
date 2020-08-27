@@ -183,6 +183,7 @@ func (r *ReceptorControl) WorkSubmit(node, serviceName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	r.Close()
 	unitID := fmt.Sprintf("%v", response["unitid"])
 	return unitID, nil
 }
@@ -269,7 +270,6 @@ func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, workID string) 
 		return workStatus["StateName"] == "Running"
 	}
 	if !assertWithTimeout(ctx, check) {
-		workStatus, _ := r.getWorkStatus(workID)
 		return fmt.Errorf("Failed to assert %s is running", workID)
 	}
 	return nil

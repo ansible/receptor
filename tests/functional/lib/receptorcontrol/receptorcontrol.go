@@ -270,7 +270,6 @@ func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, workID string) 
 	}
 	if !assertWithTimeout(ctx, check) {
 		workStatus, _ := r.getWorkStatus(workID)
-		fmt.Println(workStatus)
 		return fmt.Errorf("Failed to assert %s is running", workID)
 	}
 	return nil

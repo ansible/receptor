@@ -8,6 +8,7 @@ import (
 // Node Defines the interface for nodes made using the CLI, Library, and
 // eventually Docker
 type Node interface {
+	Dir() string
 	Status() (*netceptor.Status, error)
 	ControlSocket() string
 	Start() error
@@ -19,6 +20,7 @@ type Node interface {
 // Mesh Defines the interface for meshes made using the CLI, Library, and
 // eventually Docker
 type Mesh interface {
+	Dir() string
 	Nodes() map[string]Node
 	Status() ([]*netceptor.Status, error)
 	CheckConnections() bool

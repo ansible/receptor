@@ -20,7 +20,7 @@ import (
 // go away later
 type CLINode struct {
 	receptorCmd    *exec.Cmd
-	nodeDir        string
+	dir            string
 	yamlConfigPath string
 	yamlConfig     []interface{}
 	controlSocket  string
@@ -30,7 +30,7 @@ type CLINode struct {
 type CLIMesh struct {
 	nodes          map[string]*CLINode
 	MeshDefinition *YamlData
-	dataDir        string
+	dir            string
 }
 
 // NewCLINode builds a node with the name passed as the argument
@@ -39,6 +39,11 @@ func NewCLINode(name string) *CLINode {
 		receptorCmd:   nil,
 		controlSocket: "",
 	}
+}
+
+// Dir returns the basedir which contains all of the node data
+func (n *CLINode) Dir() string {
+	return n.dir
 }
 
 // Status returns the status of the node using the control socket to query the
@@ -73,14 +78,14 @@ func (n *CLINode) Start() error {
 	if err != nil {
 		return err
 	}
-	nodedefPath := filepath.Join(n.nodeDir, "nodedef.yaml")
+	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
 	ioutil.WriteFile(nodedefPath, strData, 0644)
 	n.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
-	stdout, err := os.Create(filepath.Join(n.nodeDir, "stdout"))
+	stdout, err := os.Create(filepath.Join(n.dir, "stdout"))
 	if err != nil {
 		return err
 	}
-	stderr, err := os.Create(filepath.Join(n.nodeDir, "stderr"))
+	stderr, err := os.Create(filepath.Join(n.dir, "stderr"))
 	if err != nil {
 		return err
 	}
@@ -127,6 +132,11 @@ func (n *CLINode) WaitForShutdown() {
 	n.receptorCmd.Wait()
 }
 
+// Dir returns the basedir which contains all of the mesh data
+func (m *CLIMesh) Dir() string {
+	return m.dir
+}
+
 // Nodes Returns a list of nodes
 func (m *CLIMesh) Nodes() map[string]Node {
 	nodes := make(map[string]Node)
@@ -166,7 +176,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	mesh.dataDir = tempdir
+	mesh.dir = tempdir
 
 	// HERE BE DRAGONS OF THE TYPE SYSTEMS
 	nodes := make(map[string]*CLINode)
@@ -175,11 +185,11 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 	// there's something to dial into
 	for k := range MeshDefinition.Nodes {
 		node := NewCLINode(k)
-		tempdir, err = ioutil.TempDir(mesh.dataDir, k+"-*")
+		tempdir, err = ioutil.TempDir(mesh.dir, k+"-*")
 		if err != nil {
 			return nil, err
 		}
-		node.nodeDir = tempdir
+		node.dir = tempdir
 		// Keep track of if we need to add an attribute for the node id or if
 		// it already exists
 		needsIDAttr := true
@@ -219,7 +229,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 			idYaml := make(map[interface{}]interface{})
 			nodeYaml := make(map[interface{}]interface{})
 			nodeYaml["id"] = k
-			nodeYaml["datadir"] = filepath.Join(node.nodeDir, "datadir")
+			nodeYaml["datadir"] = filepath.Join(node.dir, "datadir")
 			os.Mkdir(nodeYaml["datadir"].(string), 0755)
 			idYaml["node"] = nodeYaml
 			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
@@ -316,7 +326,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
-		node.controlSocket = filepath.Join(node.nodeDir, "controlsock")
+		node.controlSocket = filepath.Join(node.dir, "controlsock")
 		controlServiceYaml := make(map[interface{}]interface{})
 		tmp := make(map[interface{}]interface{})
 		tmp["filename"] = node.controlSocket

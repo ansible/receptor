@@ -23,6 +23,7 @@ import (
 // LibNode holds a Netceptor, this layer of abstraction might be unnecessary and
 // go away later
 type LibNode struct {
+	dir                    string
 	NetceptorInstance      *netceptor.Netceptor
 	Backends               []netceptor.Backend
 	controlServer          *controlsvc.Server
@@ -36,7 +37,7 @@ type LibNode struct {
 type LibMesh struct {
 	nodes          map[string]*LibNode
 	MeshDefinition *YamlData
-	dataDir        string
+	dir            string
 }
 
 // Error handler that gets called for backend errors
@@ -55,6 +56,11 @@ func NewLibNode(name string) *LibNode {
 		serverTLSConfigs:  make(map[string]*tls.Config),
 		clientTLSConfigs:  make(map[string]*tls.Config),
 	}
+}
+
+// Dir returns the basedir which contains all of the node data
+func (n *LibNode) Dir() string {
+	return n.dir
 }
 
 // Status returns the status of the node
@@ -169,6 +175,11 @@ func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config
 	return err
 }
 
+// Dir returns the basedir which contains all of the mesh data
+func (m *LibMesh) Dir() string {
+	return m.dir
+}
+
 // NewLibMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
 func NewLibMeshFromFile(filename string) (Mesh, error) {
@@ -199,13 +210,18 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 	if err != nil {
 		return nil, err
 	}
-	mesh.dataDir = tempdir
+	mesh.dir = tempdir
 
 	nodes := make(map[string]*LibNode)
 	// We must start listening on all our nodes before we start dialing so
 	// there's something to dial into
 	for k := range MeshDefinition.Nodes {
 		node := NewLibNode(k)
+		node.dir, err = ioutil.TempDir(mesh.dir, k+"-*")
+		if err != nil {
+			return nil, err
+		}
+		os.Mkdir(node.dir, 0755)
 		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
@@ -452,18 +468,11 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 		}
 	}
 	// Setup the controlsvc and sockets
-	for k, node := range nodes {
+	for _, node := range nodes {
 		ctx, canceller := context.WithCancel(context.Background())
 		node.controlServerCanceller = canceller
 
-		baseDir := filepath.Join(os.TempDir(), "receptor-testing")
-		// Ignore the error, if the dir already exists thats fine
-		os.Mkdir(baseDir, 0700)
-		tempdir, err := ioutil.TempDir(mesh.dataDir, k+"-*")
-		if err != nil {
-			return nil, err
-		}
-		node.controlSocket = filepath.Join(tempdir, "controlsock")
+		node.controlSocket = filepath.Join(node.dir, "controlsock")
 
 		node.controlServer = controlsvc.New(true, node.NetceptorInstance)
 		err = node.controlServer.RunControlSvc(ctx, "control", nil, node.controlSocket, os.FileMode(0600))

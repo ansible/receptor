@@ -31,10 +31,16 @@ func (cfg nodeCfg) Prepare() error {
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
 	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
 	var err error
-	workceptor.MainInstance, err = workceptor.New(controlsvc.MainInstance, netceptor.MainInstance, cfg.DataDir)
+	workceptor.MainInstance, err = workceptor.New(context.Background(),
+		controlsvc.MainInstance, netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (cfg nodeCfg) Run() error {
+	workceptor.MainInstance.ListKnownUnitIDs() // Triggers a scan of unit dirs and restarts any that need it
 	return nil
 }
 

@@ -8,7 +8,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/sockutils"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"os/exec"
 	"strings"
@@ -21,7 +21,7 @@ func runCommand(qc net.Conn, command string) error {
 	if err != nil {
 		return err
 	}
-	sockutils.BridgeConns(tty, "external command", qc, "command service")
+	utils.BridgeConns(tty, "external command", qc, "command service")
 	return nil
 }
 

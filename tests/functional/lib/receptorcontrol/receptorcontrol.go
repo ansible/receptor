@@ -280,7 +280,30 @@ func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, workID string) 
 func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, workID string) error {
 	check := func() bool {
 		workStatus, _ := r.getWorkStatus(workID)
-		return workStatus["StateName"] == "Failed" && workStatus["Detail"] == "Cancelled"
+		if workStatus["StateName"] != "Failed" && workStatus["StateName"] != "Succeeded" {
+			return false
+		}
+		detailIf, ok := workStatus["Detail"]
+		if !ok {
+			return false
+		}
+		detailString, ok := detailIf.(string)
+		if !ok {
+			return false
+		}
+		detailLc := strings.ToLower(detailString)
+		keywords := []string{
+			"cancel",
+			"kill",
+			"terminate",
+			"stop",
+		}
+		for kwIdx := range keywords {
+			if strings.Contains(detailLc, keywords[kwIdx]) {
+				return true
+			}
+		}
+		return false
 	}
 	if !assertWithTimeout(ctx, check) {
 		return fmt.Errorf("Failed to assert %s is cancelled", workID)
@@ -289,14 +312,20 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, workID string
 }
 
 // AssertWorkReleased asserts that work is not in work list
-func (r *ReceptorControl) AssertWorkReleased(workID string) error {
-	workList, err := r.getWorkList()
-	if err != nil {
-		return err
+func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, workID string) error {
+	check := func() bool {
+		workList, err := r.getWorkList()
+		if err != nil {
+			return false
+		}
+		_, ok := workList[workID] // workID should not be in list
+		if ok {
+			return false
+		}
+		return true
 	}
-	_, ok := workList[workID] // workID should not be in list
-	if ok {
-		return fmt.Errorf("Failed to assert %s released", workID)
+	if !assertWithTimeout(ctx, check) {
+		return fmt.Errorf("Failed to assert %s is released", workID)
 	}
 	return nil
 }

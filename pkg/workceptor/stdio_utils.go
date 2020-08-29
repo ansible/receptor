@@ -10,10 +10,10 @@ import (
 // saveStdoutSize only the stdout size in the status metadata file in the unitdir
 func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	statusFilename := path.Join(unitdir, "status")
-	si := &StatusInfo{}
-	_ = si.Load(statusFilename)
-	si.StdoutSize = stdoutSize
-	return si.Save(statusFilename)
+	si := &StatusFileData{}
+	return si.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
+		status.StdoutSize = stdoutSize
+	})
 }
 
 // stdoutWriter writes to a stdout file while also updating the status file

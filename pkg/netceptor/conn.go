@@ -258,20 +258,26 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		tls.NextProtos = []string{"netceptor"}
 	}
 	okChan := make(chan struct{})
+	closeOnce := sync.Once{}
+	pcClose := func() {
+		closeOnce.Do(func() {
+			_ = pc.Close()
+		})
+	}
 	go func() {
 		select {
 		case <-okChan:
 			return
 		case <-ctx.Done():
-			_ = pc.Close()
+			pcClose()
 		case <-s.context.Done():
-			_ = pc.Close()
+			pcClose()
 		}
 	}()
 	qc, err := quic.DialContext(ctx, pc, rAddr, s.nodeID, tls, cfg)
 	if err != nil {
 		close(okChan)
-		_ = pc.Close()
+		pcClose()
 		return nil, err
 	}
 	qs, err := qc.OpenStreamSync(ctx)

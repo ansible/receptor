@@ -6,7 +6,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/sockutils"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"strconv"
 )
@@ -33,7 +33,7 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 				logger.Error("Error connecting on Receptor network: %s\n", err)
 				continue
 			}
-			go sockutils.BridgeConns(tc, "tcp service", qc, "receptor connection")
+			go utils.BridgeConns(tc, "tcp service", qc, "receptor connection")
 		}
 	}()
 	return nil
@@ -66,7 +66,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 				logger.Error("Error connecting via TCP: %s\n", err)
 				continue
 			}
-			go sockutils.BridgeConns(qc, "receptor service", tc, "tcp connection")
+			go utils.BridgeConns(qc, "receptor service", tc, "tcp connection")
 		}
 	}()
 	return nil

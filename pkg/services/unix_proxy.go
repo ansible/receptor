@@ -6,7 +6,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/sockutils"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"os"
 	"runtime"
@@ -15,7 +15,7 @@ import (
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
 	node string, rservice string, tlscfg *tls.Config) error {
-	uli, lock, err := sockutils.UnixSocketListen(filename, permissions)
+	uli, lock, err := utils.UnixSocketListen(filename, permissions)
 	if err != nil {
 		return fmt.Errorf("error opening Unix socket: %s", err)
 	}
@@ -33,7 +33,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 					logger.Error("Error connecting on Receptor network: %s", err)
 					return
 				}
-				sockutils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
+				utils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
 			}()
 		}
 	}()
@@ -62,7 +62,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 				logger.Error("Error connecting via Unix socket: %s\n", err)
 				continue
 			}
-			go sockutils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
+			go utils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
 		}
 	}()
 	return nil

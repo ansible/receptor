@@ -254,13 +254,15 @@ def cancel(ctx, unit_ids):
 
 
 @work.command(help="Release (delete) one or more units of work.")
+@click.option('--force', help="Delete locally even if we can't reach the remote node", is_flag=True)
 @click.argument('unit_ids', nargs=-1)
 @click.pass_context
-def release(ctx, unit_ids):
+def release(ctx, force, unit_ids):
     if len(unit_ids) == 0:
         print("No unit IDs supplied: Not doing anything")
         return
-    op_on_unit_ids(ctx, "release", unit_ids)
+    op = "release" if not force else "force-release"
+    op_on_unit_ids(ctx, op, unit_ids)
     print("Released:", unit_ids)
 
 

@@ -8,7 +8,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/sockutils"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"net"
 	"os"
@@ -40,7 +40,7 @@ func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName s
 			return err
 		}
 	}
-	sockutils.BridgeConns(s.conn, "control service", bc, bcName)
+	utils.BridgeConns(s.conn, "control service", bc, bcName)
 	return nil
 }
 
@@ -285,10 +285,10 @@ func (s *Server) RunControlSession(conn net.Conn) {
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
 	unixSocket string, unixSocketPermissions os.FileMode) error {
 	var uli net.Listener
-	var lock *sockutils.FLock
+	var lock *utils.FLock
 	var err error
 	if unixSocket != "" {
-		uli, lock, err = sockutils.UnixSocketListen(unixSocket, unixSocketPermissions)
+		uli, lock, err = utils.UnixSocketListen(unixSocket, unixSocketPermissions)
 		if err != nil {
 			return fmt.Errorf("error opening Unix socket: %s", err)
 		}

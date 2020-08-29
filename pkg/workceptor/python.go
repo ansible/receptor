@@ -6,60 +6,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
-	"os"
 	"os/exec"
-	"syscall"
 )
 
 // pythonUnit implements the WorkUnit interface
 type pythonUnit struct {
+	commandUnit
 	plugin   string
 	function string
 	config   map[string]interface{}
-	cmd      *exec.Cmd
-	done     bool
 }
 
 // Start launches a job with given parameters.
-func (pw *pythonUnit) Start(params string, unitdir string) error {
-	_ = saveStatus(unitdir, WorkStatePending, "Launching process", 0)
+func (pw *pythonUnit) Start() error {
+	pw.UpdateBasicStatus(WorkStatePending, "Launching Python runner", 0)
 	config := make(map[string]interface{})
 	for k, v := range pw.config {
 		config[k] = v
 	}
-	config["params"] = params
+	config["params"] = pw.Status().Params
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
 	}
-	pw.cmd = exec.Command("receptor-python-worker",
-		fmt.Sprintf("%s:%s", pw.plugin, pw.function), unitdir, string(configJSON))
-	pw.cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
-	}
-	pw.done = false
-	err = pw.cmd.Start()
-	if err != nil {
-		return err
-	}
-	doneChan := make(chan bool)
-	go func() {
-		<-doneChan
-		pw.done = true
-	}()
-	go cmdWaiter(pw.cmd, doneChan)
-	return nil
-}
-
-// Cancel releases resources associated with a job, including cancelling it if running.
-func (pw *pythonUnit) Cancel() error {
-	if pw.cmd != nil && !pw.done {
-		err := pw.cmd.Process.Signal(os.Interrupt)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	cmd := exec.Command("receptor-python-worker",
+		fmt.Sprintf("%s:%s", pw.plugin, pw.function), pw.UnitDir(), string(configJSON))
+	return pw.runCommand(cmd)
 }
 
 // **************************************************************************
@@ -75,7 +47,7 @@ type WorkPythonCfg struct {
 }
 
 // newWorker is a factory to produce worker instances
-func (cfg WorkPythonCfg) newWorker() WorkType {
+func (cfg WorkPythonCfg) newWorker() WorkUnit {
 	return &pythonUnit{
 		plugin:   cfg.Plugin,
 		function: cfg.Function,

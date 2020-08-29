@@ -1,4 +1,4 @@
-package sockutils
+package utils
 
 import (
 	"github.com/project-receptor/receptor/pkg/logger"

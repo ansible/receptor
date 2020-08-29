@@ -36,36 +36,50 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 			paramStart = 3
 
 		}
+		if workType == "remote" {
+			return nil, fmt.Errorf("bad command")
+		}
 		params := ""
 		if len(tokens) > paramStart {
 			params = strings.Join(tokens[paramStart:], " ")
 		}
-		ident, err := w.PreStartUnit(workNode, workType, params)
+		var worker WorkUnit
+		var err error
+		if tokens[0] == "start" {
+			worker, err = w.AllocateUnit(workType, params)
+		} else {
+			worker, err = w.AllocateRemoteUnit(workNode, workType, params)
+		}
 		if err != nil {
 			return nil, err
 		}
-		stdin, err := os.OpenFile(path.Join(w.dataDir, ident, "stdin"), os.O_CREATE+os.O_WRONLY, 0600)
+		stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O_WRONLY, 0600)
 		if err != nil {
 			return nil, err
 		}
-		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", ident), stdin)
+		worker.UpdateBasicStatus(WorkStatePending, "Waiting for Input Data", 0)
+		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin)
 		if err != nil {
+			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
 			return nil, err
 		}
 		err = stdin.Close()
 		if err != nil {
+			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
 			return nil, err
 		}
-		err = w.StartUnit(ident)
-		if err != nil {
+		worker.UpdateBasicStatus(WorkStatePending, "Starting Worker", 0)
+		err = worker.Start()
+		if err != nil && !IsPending(err) {
+			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error starting worker: %s", err), 0)
 			return nil, err
 		}
 		cfr := make(map[string]interface{})
-		cfr["unitid"] = ident
-		if tokens[0] == "start" {
-			cfr["result"] = "Job Started"
-		} else {
+		cfr["unitid"] = worker.ID()
+		if IsPending(err) {
 			cfr["result"] = "Job Submitted"
+		} else {
+			cfr["result"] = "Job Started"
 		}
 		return cfr, nil
 	case "list":
@@ -89,30 +103,37 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 			return nil, err
 		}
 		return cfr, nil
-	case "release":
+	case "cancel", "release", "force-release":
 		if len(tokens) != 2 {
 			return nil, fmt.Errorf("bad command")
 		}
-		err := w.ReleaseUnit(tokens[1])
-		if err != nil {
-			return nil, err
-		}
 		cfr := make(map[string]interface{})
-		cfr["released"] = tokens[1]
-		return cfr, nil
-	case "cancel":
-		if len(tokens) != 2 {
-			return nil, fmt.Errorf("bad command")
-		}
-		isPending, err := w.CancelUnit(tokens[1])
-		if err != nil {
-			return nil, err
-		}
-		cfr := make(map[string]interface{})
-		if isPending {
-			cfr["cancel pending"] = tokens[1]
+		var pendingMsg string
+		var completeMsg string
+		if tokens[0] == "cancel" {
+			pendingMsg = "cancel pending"
+			completeMsg = "cancelled"
 		} else {
-			cfr["cancelled"] = tokens[1]
+			pendingMsg = "release pending"
+			completeMsg = "released"
+		}
+		unit, err := w.findUnit(tokens[1])
+		if err != nil {
+			cfr["already gone"] = tokens[1]
+		} else {
+			if tokens[0] == "cancel" {
+				err = unit.Cancel()
+			} else {
+				err = unit.Release(tokens[0] == "force-release")
+			}
+			if err != nil && !IsPending(err) {
+				return nil, err
+			}
+			if IsPending(err) {
+				cfr[pendingMsg] = tokens[1]
+			} else {
+				cfr[completeMsg] = tokens[1]
+			}
 		}
 		return cfr, nil
 	case "results":

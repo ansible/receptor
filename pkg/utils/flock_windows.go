@@ -1,6 +1,6 @@
 //+build windows
 
-package sockutils
+package utils
 
 import (
 	"fmt"

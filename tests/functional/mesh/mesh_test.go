@@ -581,9 +581,9 @@ func TestWorkCancel(t *testing.T) {
 	data := YamlData{}
 	data.Nodes = make(map[string]*YamlNode)
 	workCommand := map[interface{}]interface{}{
-		"service": "echosleep",
-		"command": "bash",
-		"params":  "-c \"for i in {1..5}; do echo $i; sleep 2;done\"",
+		"worktype": "echosleep",
+		"command":  "bash",
+		"params":   "-c \"for i in {1..5}; do echo $i; sleep 2;done\"",
 	}
 	// Generate a mesh with 2 nodes
 	data.Nodes["node1"] = &YamlNode{
@@ -654,12 +654,12 @@ func TestWorkCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 	controller.WorkRelease(workID)
-	err = controller.AssertWorkReleased(workID)
+	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+	err = controller.AssertWorkReleased(ctx, workID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	controller.Close()
-
 }
 
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {

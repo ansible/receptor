@@ -42,8 +42,8 @@ func (pw *pythonUnit) Start() error {
 type WorkPythonCfg struct {
 	WorkType string                 `required:"true" description:"Name for this worker type"`
 	Plugin   string                 `required:"true" description:"Python module name of the worker plugin"`
-	Function string                 `required:"true" description:"Receptor-exported function within the module"`
-	Config   map[string]interface{} `description:"Plugin-specific configuration settings"`
+	Function string                 `required:"true" description:"Receptor-exported function to call"`
+	Config   map[string]interface{} `description:"Plugin-specific configuration"`
 }
 
 // newWorker is a factory to produce worker instances

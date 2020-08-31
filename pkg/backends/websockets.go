@@ -217,7 +217,7 @@ type WebsocketListenerCfg struct {
 	Port     int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
 	TLS      string             `description:"Name of TLS server config"`
 	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
-	NodeCost map[string]float64 `description:"Connection cost (weight) for each node"`
+	NodeCost map[string]float64 `description:"Per-node costs"`
 }
 
 // Prepare verifies the parameters are correct

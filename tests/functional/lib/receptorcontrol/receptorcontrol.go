@@ -261,7 +261,7 @@ func (r *ReceptorControl) getWorkList() (map[string]interface{}, error) {
 }
 
 func assertWithTimeout(ctx context.Context, check func() bool) bool {
-	return utils.CheckUntilTimeout(ctx, check, 250*time.Millisecond)
+	return utils.CheckUntilTimeout(ctx, 250*time.Millisecond, check)
 }
 
 //AssertWorkRunning waits until work status is running

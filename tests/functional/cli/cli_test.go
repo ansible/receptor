@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"io/ioutil"
@@ -62,18 +63,16 @@ func TestListeners(t *testing.T) {
 			defer cmd.Process.Wait()
 			defer cmd.Process.Kill()
 
-			for timeout := 2 * time.Second; timeout > 0; {
-				listening, err := ConfirmListening(cmd.Process.Pid)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if listening {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-				timeout -= 100 * time.Millisecond
+			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+			success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+				return ConfirmListening(cmd.Process.Pid)
+			})
+			if err != nil {
+				t.Fatal(err)
 			}
-			t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+			if !success {
+				t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+			}
 		})
 	}
 }
@@ -111,7 +110,7 @@ func TestSSLListeners(t *testing.T) {
 			defer cmd.Process.Wait()
 			defer cmd.Process.Kill()
 
-			for timeout := 2 * time.Second; timeout > 0; {
+			checkFunc := func() bool {
 				opensslStdOut := bytes.Buffer{}
 				opensslStdIn := bytes.Buffer{}
 				opensslCmd := exec.Command("openssl", "s_client", "-connect", ":"+strconv.Itoa(port))
@@ -119,12 +118,16 @@ func TestSSLListeners(t *testing.T) {
 				opensslCmd.Stdout = &opensslStdOut
 				err = opensslCmd.Run()
 				if err == nil {
-					return
+					return true
 				}
-				time.Sleep(100 * time.Millisecond)
-				timeout -= 100 * time.Millisecond
+				return false
 			}
-			t.Fatalf("Timed out while waiting for tls backend to start:\n%s", receptorStdOut.String())
+
+			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+			success := utils.CheckUntilTimeout(ctx, 10*time.Millisecond, checkFunc)
+			if !success {
+				t.Fatalf("Timed out while waiting for tls backend to start:\n%s", receptorStdOut.String())
+			}
 		})
 	}
 }
@@ -192,18 +195,16 @@ func TestCostMap(t *testing.T) {
 					defer cmd.Process.Wait()
 					defer cmd.Process.Kill()
 
-					for timeout := 2 * time.Second; timeout > 0; {
-						listening, err := ConfirmListening(cmd.Process.Pid)
-						if err != nil {
-							t.Fatal(err)
-						}
-						if listening {
-							return
-						}
-						time.Sleep(100 * time.Millisecond)
-						timeout -= 100 * time.Millisecond
+					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+						return ConfirmListening(cmd.Process.Pid)
+					})
+					if err != nil {
+						t.Fatal(err)
 					}
-					t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+					if !success {
+						t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+					}
 				})
 			}
 		})
@@ -240,18 +241,16 @@ func TestCosts(t *testing.T) {
 					defer cmd.Process.Wait()
 					defer cmd.Process.Kill()
 
-					for timeout := 2 * time.Second; timeout > 0; {
-						listening, err := ConfirmListening(cmd.Process.Pid)
-						if err != nil {
-							t.Fatal(err)
-						}
-						if listening {
-							return
-						}
-						time.Sleep(100 * time.Millisecond)
-						timeout -= 100 * time.Millisecond
+					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+						return ConfirmListening(cmd.Process.Pid)
+					})
+					if err != nil {
+						t.Fatal(err)
 					}
-					t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+					if !success {
+						t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+					}
 				})
 			}
 		})

@@ -483,16 +483,16 @@ func (m *CLIMesh) CheckControlSockets() bool {
 // WaitForReady Waits for connections and routes to converge
 func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
-	if !utils.CheckUntilTimeout(ctx, m.CheckControlSockets, sleepInterval) {
+	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
 		return errors.New("Timed out while waiting for control sockets")
 	}
-	if !utils.CheckUntilTimeout(ctx, m.CheckConnections, sleepInterval) {
+	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckConnections) {
 		return errors.New("Timed out while waiting for Connections")
 	}
-	if !utils.CheckUntilTimeout(ctx, m.CheckKnownConnectionCosts, sleepInterval) {
+	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
 		return errors.New("Timed out while checking Connection Costs")
 	}
-	if !utils.CheckUntilTimeout(ctx, m.CheckRoutes, sleepInterval) {
+	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
 		return errors.New("Timed out while waiting for routes to converge")
 	}
 	return nil

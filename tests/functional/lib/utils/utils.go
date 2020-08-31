@@ -170,7 +170,7 @@ func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPa
 
 // CheckUntilTimeout Polls the check function until the context expires, in
 // which case it returns false
-func CheckUntilTimeout(ctx context.Context, check func() bool, interval time.Duration) bool {
+func CheckUntilTimeout(ctx context.Context, interval time.Duration, check func() bool) bool {
 	for ready := check(); !ready; ready = check() {
 		if ctx.Err() != nil {
 			return false
@@ -178,4 +178,20 @@ func CheckUntilTimeout(ctx context.Context, check func() bool, interval time.Dur
 		time.Sleep(interval)
 	}
 	return true
+}
+
+// CheckUntilTimeoutWithErr does the same as CheckUntilTimeout but requires the
+// check function returns (bool, error), and will return an error immediately
+// if the check function returns an error
+func CheckUntilTimeoutWithErr(ctx context.Context, interval time.Duration, check func() (bool, error)) (bool, error) {
+	for ready, err := check(); !ready; ready, err = check() {
+		if err != nil {
+			return false, err
+		}
+		if ctx.Err() != nil {
+			return false, nil
+		}
+		time.Sleep(interval)
+	}
+	return true, nil
 }

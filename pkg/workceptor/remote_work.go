@@ -229,8 +229,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		status, err := reader.ReadString('\n')
 		if err != nil {
-			logger.Error("Read error reading from %s: %s\n", remoteNode, err)
-			return
+			logger.Debug("Read error reading from %s: %s\n", remoteNode, err)
+			_ = conn.Close()
+			conn = nil
+			continue
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
@@ -306,16 +308,16 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			}
 			_, err := conn.Write([]byte(fmt.Sprintf("work results %s %d\n", remoteUnitID, diskStdoutSize)))
 			if err != nil {
-				logger.Error("Write error sending to %s: %s\n", remoteNode, err)
+				logger.Warning("Write error sending to %s: %s\n", remoteNode, err)
 				continue
 			}
 			status, err := reader.ReadString('\n')
 			if err != nil {
-				logger.Error("Read error reading from %s: %s\n", remoteNode, err)
+				logger.Warning("Read error reading from %s: %s\n", remoteNode, err)
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
-				logger.Error("Remote node %s did not stream results\n", remoteNode)
+				logger.Warning("Remote node %s did not stream results\n", remoteNode)
 				continue
 			}
 			stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)

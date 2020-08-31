@@ -3,7 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -70,6 +74,57 @@ func TestListeners(t *testing.T) {
 				timeout -= 100 * time.Millisecond
 			}
 			t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+		})
+	}
+}
+
+func TestSSLListeners(t *testing.T) {
+	t.Parallel()
+	testTable := []struct {
+		listener string
+	}{
+		{"--tcp-listener"},
+		{"--ws-listener"},
+	}
+	for _, data := range testTable {
+		listener := data.listener
+		t.Run(listener, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup the mesh directory
+			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
+			// Ignore the error, if the dir already exists thats fine
+			os.Mkdir(baseDir, 0755)
+			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
+			os.Mkdir(tempdir, 0755)
+			key, crt, err := utils.GenerateCert(tempdir, "test")
+
+			receptorStdOut := bytes.Buffer{}
+			port := utils.ReserveTCPPort()
+			defer utils.FreeTCPPort(port)
+			cmd := exec.Command("receptor", "--node", "id=test", "--tls-server", "name=server-tls", fmt.Sprintf("cert=%s", crt), fmt.Sprintf("key=%s", key), listener, fmt.Sprintf("port=%d", port), "tls=server-tls")
+			cmd.Stdout = &receptorStdOut
+			err = cmd.Start()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cmd.Process.Wait()
+			defer cmd.Process.Kill()
+
+			for timeout := 2 * time.Second; timeout > 0; {
+				opensslStdOut := bytes.Buffer{}
+				opensslStdIn := bytes.Buffer{}
+				opensslCmd := exec.Command("openssl", "s_client", "-connect", ":"+strconv.Itoa(port))
+				opensslCmd.Stdin = &opensslStdIn
+				opensslCmd.Stdout = &opensslStdOut
+				err = opensslCmd.Run()
+				if err == nil {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+				timeout -= 100 * time.Millisecond
+			}
+			t.Fatalf("Timed out while waiting for tls backend to start:\n%s", receptorStdOut.String())
 		})
 	}
 }

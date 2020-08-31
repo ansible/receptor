@@ -107,7 +107,7 @@ func Trace(format string, v ...interface{}) {
 }
 
 type loglevelCfg struct {
-	Level string `description:"Log level to enable Error, Warning, Info, Debug" barevalue:"yes" required:"yes"`
+	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" required:"yes"`
 }
 
 func (cfg loglevelCfg) Prepare() error {

@@ -391,10 +391,10 @@ func (kw *kubeUnit) Release(force bool) error {
 // WorkKubeCfg is the cmdline configuration object for a Kubernetes worker plugin
 type WorkKubeCfg struct {
 	WorkType   string `required:"true" description:"Name for this worker type"`
-	KubeConfig string `description:"Kubeconfig file (defaults to in-cluster or environment)"`
+	KubeConfig string `description:"Kubeconfig file (default: in-cluster or environment)"`
 	Namespace  string `required:"true" description:"Kubernetes namespace to create pods in"`
 	Image      string `required:"true" description:"Container image to use for the worker pod"`
-	Command    string `description:"Command to run in the container (defaults to entrypoint)"`
+	Command    string `description:"Command to run in the container (default: entrypoint)"`
 }
 
 // newWorker is a factory to produce worker instances

@@ -248,7 +248,7 @@ type UDPListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
 	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
-	NodeCost map[string]float64 `description:"Connection cost (weight) for each node"`
+	NodeCost map[string]float64 `description:"Per-node costs"`
 }
 
 // Prepare verifies the parameters are correct

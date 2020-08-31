@@ -46,6 +46,21 @@ func AddConfigType(name string, description string, configType interface{}, requ
 	})
 }
 
+func printableTypeName(typ reflect.Type) string {
+	if typ.String() == "interface {}" {
+		return fmt.Sprintf("JSON data")
+	} else if typ.String() == "map[string]interface {}" {
+		return fmt.Sprintf("JSON dict with string keys")
+	} else if typ.Kind() == reflect.Map {
+		return fmt.Sprintf("JSON dict of %s to %s", printableTypeName(typ.Key()), printableTypeName(typ.Elem()))
+	} else if typ.Kind() == reflect.Slice {
+		return fmt.Sprintf("JSON list of %s", printableTypeName(typ.Elem()))
+	} else if typ.String() == "interface {}" {
+		return "anything"
+	}
+	return typ.String()
+}
+
 func printCmdHelp(ct param) {
 	if ct.Hidden {
 		return
@@ -57,7 +72,7 @@ func printCmdHelp(ct param) {
 	fmt.Printf("\n")
 	for i := 0; i < ct.Type.NumField(); i++ {
 		fmt.Printf("      %s=<%s>: %s", strings.ToLower(ct.Type.Field(i).Name),
-			ct.Type.Field(i).Type.Name(),
+			printableTypeName(ct.Type.Field(i).Type),
 			ct.Type.Field(i).Tag.Get("description"))
 		extras := make([]string, 0)
 		req, err := betterParseBool(ct.Type.Field(i).Tag.Get("required"))

@@ -591,7 +591,7 @@ func TestWork(t *testing.T) {
 		"params":   "-c \"for i in {1..5}; do echo $i;done\"",
 	}
 	expectedResults := []byte("1\n2\n3\n4\n5\n")
-	// Generate a mesh with 2 nodes
+	// Generate a mesh with 3 nodes
 	data.Nodes["node2"] = &YamlNode{
 		Connections: map[string]YamlConnection{},
 		Nodedef: []interface{}{
@@ -672,7 +672,7 @@ func TestWork(t *testing.T) {
 			}
 			return false
 		}
-		if !utils.CheckUntilTimeout(ctx, 500*time.Millisecond, check) {
+		if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 			t.Errorf("file size not correct for %s", stdoutFilename)
 		}
 	}
@@ -682,13 +682,13 @@ func TestWork(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkRunning(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		controller.WorkCancel(unitID)
-		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkCancelled(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
@@ -700,7 +700,7 @@ func TestWork(t *testing.T) {
 			t.Fatal(err)
 		}
 		controller.WorkRelease(unitID)
-		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkReleased(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
@@ -709,31 +709,13 @@ func TestWork(t *testing.T) {
 		assertFilesReleased(nodes["node3"].Dir(), "node3", remoteUnitID)
 	})
 
-	t.Run("get results from remote work", func(t *testing.T) {
-		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
-		if err != nil {
-			t.Fatal(err)
-		}
-		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
-		err = controller.AssertWorkSucceeded(ctx, unitID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
-		assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
-		err = controller.AssertWorkResults(unitID, expectedResults)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
 	t.Run("work submit while remote node is down", func(t *testing.T) {
 		nodes["node3"].Shutdown()
 		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkPending(ctx, unitID)
 		nodes["node3"].Start()
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)

@@ -17,7 +17,7 @@ func newCommandWorker() WorkUnit {
 }
 
 func TestWorkceptorJson(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("/tmp", "receptor-test-*")
+	tmpdir, err := ioutil.TempDir(os.TempDir(), "receptor-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}

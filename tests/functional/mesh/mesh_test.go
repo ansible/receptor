@@ -190,7 +190,7 @@ func TestTCPSSLConnections(t *testing.T) {
 			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
 			// Ignore the error, if the dir already exists thats fine
 			os.Mkdir(baseDir, 0755)
-			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
+			tempdir, err := ioutil.TempDir(baseDir, "certs-")
 			os.Mkdir(tempdir, 0755)
 			caKey, caCrt, err := utils.GenerateCert(tempdir, "ca")
 			if err != nil {
@@ -330,7 +330,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
 			// Ignore the error, if the dir already exists thats fine
 			os.Mkdir(baseDir, 0755)
-			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
+			tempdir, err := ioutil.TempDir(baseDir, "certs-")
 			os.Mkdir(tempdir, 0755)
 			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
 			if err != nil {
@@ -420,7 +420,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
 			// Ignore the error, if the dir already exists thats fine
 			os.Mkdir(baseDir, 0755)
-			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
+			tempdir, err := ioutil.TempDir(baseDir, "certs-")
 			os.Mkdir(tempdir, 0755)
 			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
 			if err != nil {
@@ -575,39 +575,57 @@ func TestCosts(t *testing.T) {
 
 }
 
-func TestWorkCancel(t *testing.T) {
+func TestWork(t *testing.T) {
 	t.Parallel()
 	// Setup our mesh yaml data
 	data := YamlData{}
 	data.Nodes = make(map[string]*YamlNode)
-	workCommand := map[interface{}]interface{}{
-		"worktype": "echosleep",
+	echoSleepLong := map[interface{}]interface{}{
+		"workType": "echosleeplong",
 		"command":  "bash",
-		"params":   "-c \"for i in {1..5}; do echo $i; sleep 2;done\"",
+		"params":   "-c \"for i in {1..5}; do echo $i; sleep 3;done\"",
 	}
+	echoSleepShort := map[interface{}]interface{}{
+		"workType": "echosleepshort",
+		"command":  "bash",
+		"params":   "-c \"for i in {1..5}; do echo $i;done\"",
+	}
+	expectedResults := []byte("1\n2\n3\n4\n5\n")
 	// Generate a mesh with 2 nodes
-	data.Nodes["node1"] = &YamlNode{
+	data.Nodes["node2"] = &YamlNode{
 		Connections: map[string]YamlConnection{},
 		Nodedef: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{
-					"cost": 4.5,
+					"cost": 1.0,
 					"nodecost": map[interface{}]interface{}{
-						"node2": 2.6,
+						"node1": 1.0,
+						"node3": 1.0,
 					},
 				},
 			},
 		},
 	}
-	data.Nodes["node2"] = &YamlNode{
+	data.Nodes["node1"] = &YamlNode{
 		Connections: map[string]YamlConnection{
-			"node1": YamlConnection{
+			"node2": YamlConnection{
+				Index: 0,
+			},
+		},
+		Nodedef: []interface{}{},
+	}
+	data.Nodes["node3"] = &YamlNode{
+		Connections: map[string]YamlConnection{
+			"node2": YamlConnection{
 				Index: 0,
 			},
 		},
 		Nodedef: []interface{}{
 			map[interface{}]interface{}{
-				"work-command": workCommand,
+				"work-command": echoSleepLong,
+			},
+			map[interface{}]interface{}{
+				"work-command": echoSleepShort,
 			},
 		},
 	}
@@ -626,40 +644,135 @@ func TestWorkCancel(t *testing.T) {
 	}
 
 	nodes := mesh.Nodes()
-
 	controller := receptorcontrol.New()
+	defer controller.Close()
 	err = controller.Connect(nodes["node1"].ControlSocket())
 	if err != nil {
 		t.Fatal(err)
 	}
-	workID, err := controller.WorkSubmit("node2", "echosleep")
-	if err != nil {
-		t.Fatal(err)
+
+	assertFilesReleased := func(nodeDir, nodeID, unitID string) {
+		workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
+		_, err := os.Stat(workPath)
+		if !os.IsNotExist(err) {
+			t.Errorf("unitID %s on %s did not release", unitID, nodeID)
+		}
 	}
-	// controller closes after a work submit, so must reopen
-	controller = receptorcontrol.New()
-	err = controller.Connect(nodes["node1"].ControlSocket())
-	if err != nil {
-		t.Fatal(err)
+
+	assertStdoutFizeSize := func(ctx context.Context, nodeDir, nodeID, unitID string, waitUntilSize int) {
+		stdoutFilename := filepath.Join(nodeDir, "datadir", nodeID, unitID, "stdout")
+		check := func() bool {
+			_, err := os.Stat(stdoutFilename)
+			if os.IsNotExist(err) {
+				return false
+			}
+			fstat, _ := os.Stat(stdoutFilename)
+			if int(fstat.Size()) >= waitUntilSize {
+				return true
+			}
+			return false
+		}
+		if !utils.CheckUntilTimeout(ctx, 500*time.Millisecond, check) {
+			t.Errorf("file size not correct for %s", stdoutFilename)
+		}
 	}
-	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
-	err = controller.AssertWorkRunning(ctx, workID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	controller.WorkCancel(workID)
-	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
-	err = controller.AssertWorkCancelled(ctx, workID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	controller.WorkRelease(workID)
-	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
-	err = controller.AssertWorkReleased(ctx, workID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	controller.Close()
+
+	t.Run("cancel then release remote work", func(t *testing.T) {
+		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		err = controller.AssertWorkRunning(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controller.WorkCancel(unitID)
+		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		err = controller.AssertWorkCancelled(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		workStatus, err := controller.GetWorkStatus(unitID)
+		extraData := workStatus["ExtraData"].(map[string]interface{})
+		remoteUnitID := extraData["RemoteUnitID"].(string)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controller.WorkRelease(unitID)
+		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		err = controller.AssertWorkReleased(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertFilesReleased(nodes["node1"].Dir(), "node1", unitID)
+		assertFilesReleased(nodes["node3"].Dir(), "node3", remoteUnitID)
+	})
+
+	t.Run("get results from remote work", func(t *testing.T) {
+		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		err = controller.AssertWorkSucceeded(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
+		err = controller.AssertWorkResults(unitID, expectedResults)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("work submit while remote node is down", func(t *testing.T) {
+		nodes["node3"].Shutdown()
+		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+		err = controller.AssertWorkPending(ctx, unitID)
+		nodes["node3"].Start()
+		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+		err = controller.AssertWorkSucceeded(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("work streaming resumes when relay node restarts", func(t *testing.T) {
+		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		err = controller.AssertWorkRunning(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+		assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 1)
+		err = controller.AssertWorkResults(unitID, expectedResults[:1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodes["node2"].Shutdown()
+		nodes["node2"].Start()
+		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+		err = controller.AssertWorkSucceeded(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+		assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
+		err = controller.AssertWorkResults(unitID, expectedResults)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {

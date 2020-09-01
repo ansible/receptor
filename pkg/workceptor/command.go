@@ -51,11 +51,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	status := StatusFileData{}
 	status.ExtraData = &commandExtraData{}
 	statusFilename := path.Join(unitdir, "status")
-	err := status.Load(statusFilename)
-	if err != nil {
-		return err
-	}
-	err = status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
+	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
 	if err != nil {
 		logger.Error("Error updating status file %s: %s", statusFilename, err)
 	}

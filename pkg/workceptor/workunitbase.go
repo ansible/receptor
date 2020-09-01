@@ -137,6 +137,24 @@ func (bwu *BaseWorkUnit) StdoutFileName() string {
 	return bwu.stdoutFileName
 }
 
+// lockStatusFile gains a lock on the status file
+func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, error) {
+	lockFileName := filename + ".lock"
+	lockFile, err := lockedfile.OpenFile(lockFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return nil, err
+	}
+	return lockFile, nil
+}
+
+// unlockStatusFile releases the lock on the status file
+func (sfd *StatusFileData) unlockStatusFile(filename string, lockFile *lockedfile.File) {
+	err := lockFile.Close()
+	if err != nil {
+		logger.Error("Error closing %s.lock: %s", filename, err)
+	}
+}
+
 // saveToFile saves status to an already-open file
 func (sfd *StatusFileData) saveToFile(file io.Writer) error {
 	jsonBytes, err := json.Marshal(sfd)
@@ -150,7 +168,12 @@ func (sfd *StatusFileData) saveToFile(file io.Writer) error {
 
 // Save saves status to a file
 func (sfd *StatusFileData) Save(filename string) error {
-	file, err := lockedfile.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	lockFile, err := sfd.lockStatusFile(filename)
+	if err != nil {
+		return err
+	}
+	defer sfd.unlockStatusFile(filename, lockFile)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -180,7 +203,12 @@ func (sfd *StatusFileData) loadFromFile(file io.Reader) error {
 
 // Load loads status from a file
 func (sfd *StatusFileData) Load(filename string) error {
-	file, err := lockedfile.Open(filename)
+	lockFile, err := sfd.lockStatusFile(filename)
+	if err != nil {
+		return err
+	}
+	defer sfd.unlockStatusFile(filename, lockFile)
+	file, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
@@ -202,22 +230,30 @@ func (bwu *BaseWorkUnit) Load() error {
 // UpdateFullStatus atomically updates the status metadata file.  Changes should be made in the callback function.
 // Errors are logged rather than returned.
 func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*StatusFileData)) error {
-	_, err := os.Stat(filename)
-	if err != nil && !os.IsNotExist(err) {
+	lockFile, err := sfd.lockStatusFile(filename)
+	if err != nil {
 		return err
 	}
-	fileExists := err == nil
-	file, err := lockedfile.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0600)
+	defer sfd.unlockStatusFile(filename, lockFile)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			logger.Error("Error closing and unlocking status file %s: %s", filename, err)
+			logger.Error("Error closing %s: %s", filename, err)
 		}
 	}()
-	if fileExists {
+	size, err := file.Seek(0, 2)
+	if err != nil {
+		return err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	if size > 0 {
 		err = sfd.loadFromFile(file)
 		if err != nil {
 			return err

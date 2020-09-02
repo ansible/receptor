@@ -578,77 +578,77 @@ func TestCosts(t *testing.T) {
 func TestWork(t *testing.T) {
 	t.Parallel()
 	// Setup our mesh yaml data
-	data := YamlData{}
-	data.Nodes = make(map[string]*YamlNode)
-	echoSleepLong := map[interface{}]interface{}{
-		"workType": "echosleeplong",
-		"command":  "bash",
-		"params":   "-c \"for i in {1..5}; do echo $i; sleep 3;done\"",
-	}
-	echoSleepShort := map[interface{}]interface{}{
-		"workType": "echosleepshort",
-		"command":  "bash",
-		"params":   "-c \"for i in {1..5}; do echo $i;done\"",
-	}
-	expectedResults := []byte("1\n2\n3\n4\n5\n")
-	// Generate a mesh with 3 nodes
-	data.Nodes["node2"] = &YamlNode{
-		Connections: map[string]YamlConnection{},
-		Nodedef: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{
-					"cost": 1.0,
-					"nodecost": map[interface{}]interface{}{
-						"node1": 1.0,
-						"node3": 1.0,
+	workInit := func() (*receptorcontrol.ReceptorControl, *CLIMesh, []byte) {
+		data := YamlData{}
+		data.Nodes = make(map[string]*YamlNode)
+		echoSleepLong := map[interface{}]interface{}{
+			"workType": "echosleeplong",
+			"command":  "bash",
+			"params":   "-c \"for i in {1..5}; do echo $i; sleep 3;done\"",
+		}
+		echoSleepShort := map[interface{}]interface{}{
+			"workType": "echosleepshort",
+			"command":  "bash",
+			"params":   "-c \"for i in {1..5}; do echo $i;done\"",
+		}
+		expectedResults := []byte("1\n2\n3\n4\n5\n")
+		// Generate a mesh with 3 nodes
+		data.Nodes["node2"] = &YamlNode{
+			Connections: map[string]YamlConnection{},
+			Nodedef: []interface{}{
+				map[interface{}]interface{}{
+					"tcp-listener": map[interface{}]interface{}{
+						"cost": 1.0,
+						"nodecost": map[interface{}]interface{}{
+							"node1": 1.0,
+							"node3": 1.0,
+						},
 					},
 				},
 			},
-		},
-	}
-	data.Nodes["node1"] = &YamlNode{
-		Connections: map[string]YamlConnection{
-			"node2": YamlConnection{
-				Index: 0,
+		}
+		data.Nodes["node1"] = &YamlNode{
+			Connections: map[string]YamlConnection{
+				"node2": YamlConnection{
+					Index: 0,
+				},
 			},
-		},
-		Nodedef: []interface{}{},
-	}
-	data.Nodes["node3"] = &YamlNode{
-		Connections: map[string]YamlConnection{
-			"node2": YamlConnection{
-				Index: 0,
+			Nodedef: []interface{}{},
+		}
+		data.Nodes["node3"] = &YamlNode{
+			Connections: map[string]YamlConnection{
+				"node2": YamlConnection{
+					Index: 0,
+				},
 			},
-		},
-		Nodedef: []interface{}{
-			map[interface{}]interface{}{
-				"work-command": echoSleepLong,
+			Nodedef: []interface{}{
+				map[interface{}]interface{}{
+					"work-command": echoSleepLong,
+				},
+				map[interface{}]interface{}{
+					"work-command": echoSleepShort,
+				},
 			},
-			map[interface{}]interface{}{
-				"work-command": echoSleepShort,
-			},
-		},
-	}
+		}
 
-	mesh, err := NewCLIMeshFromYaml(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer mesh.WaitForShutdown()
-	defer mesh.Destroy()
+		mesh, err := NewCLIMeshFromYaml(data)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-	err = mesh.WaitForReady(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+		err = mesh.WaitForReady(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	nodes := mesh.Nodes()
-	controller := receptorcontrol.New()
-	defer controller.Close()
-	err = controller.Connect(nodes["node1"].ControlSocket())
-	if err != nil {
-		t.Fatal(err)
+		nodes := mesh.Nodes()
+		controller := receptorcontrol.New()
+		err = controller.Connect(nodes["node1"].ControlSocket())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return controller, mesh, expectedResults
 	}
 
 	assertFilesReleased := func(nodeDir, nodeID, unitID string) {
@@ -678,11 +678,18 @@ func TestWork(t *testing.T) {
 	}
 
 	t.Run("cancel then release remote work", func(t *testing.T) {
+		t.Parallel()
+		controller, mesh, _ := workInit()
+		defer mesh.WaitForShutdown()
+		defer mesh.Destroy()
+		defer controller.Close()
+		nodes := mesh.Nodes()
+
 		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkRunning(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
@@ -694,10 +701,14 @@ func TestWork(t *testing.T) {
 			t.Fatal(err)
 		}
 		workStatus, err := controller.GetWorkStatus(unitID)
-		remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
 		if err != nil {
 			t.Fatal(err)
 		}
+		remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+		if remoteUnitID == "" {
+			t.Errorf("remoteUnitID should not be empty")
+		}
+
 		controller.WorkRelease(unitID)
 		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkReleased(ctx, unitID)
@@ -709,12 +720,19 @@ func TestWork(t *testing.T) {
 	})
 
 	t.Run("work submit while remote node is down", func(t *testing.T) {
+		t.Parallel()
+		controller, mesh, _ := workInit()
+		defer mesh.WaitForShutdown()
+		defer mesh.Destroy()
+		defer controller.Close()
+		nodes := mesh.Nodes()
+
 		nodes["node3"].Shutdown()
 		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkPending(ctx, unitID)
 		nodes["node3"].Start()
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
@@ -725,11 +743,18 @@ func TestWork(t *testing.T) {
 	})
 
 	t.Run("work streaming resumes when relay node restarts", func(t *testing.T) {
+		t.Parallel()
+		controller, mesh, expectedResults := workInit()
+		defer mesh.WaitForShutdown()
+		defer mesh.Destroy()
+		defer controller.Close()
+		nodes := mesh.Nodes()
+
 		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkRunning(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)

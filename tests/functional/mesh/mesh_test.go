@@ -694,8 +694,7 @@ func TestWork(t *testing.T) {
 			t.Fatal(err)
 		}
 		workStatus, err := controller.GetWorkStatus(unitID)
-		extraData := workStatus["ExtraData"].(map[string]interface{})
-		remoteUnitID := extraData["RemoteUnitID"].(string)
+		remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
 		if err != nil {
 			t.Fatal(err)
 		}

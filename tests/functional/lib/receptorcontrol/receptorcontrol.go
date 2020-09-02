@@ -254,14 +254,19 @@ func (r *ReceptorControl) WorkRelease(unitID string) error {
 }
 
 // GetWorkStatus returns JSON of status file for a given unitID
-func (r *ReceptorControl) GetWorkStatus(unitID string) (map[string]interface{}, error) {
+func (r *ReceptorControl) GetWorkStatus(unitID string) (workceptor.StatusFileData, error) {
+	status := workceptor.StatusFileData{}
 	_, err := r.WriteStr(fmt.Sprintf("work status %s\n", unitID))
 	if err != nil {
-		return nil, err
+		return status, err
 	}
-	status, err := r.ReadAndParseJSON()
+	jsonData, err := r.Read()
 	if err != nil {
-		return nil, err
+		return status, err
+	}
+	err = json.Unmarshal(jsonData, &status)
+	if err != nil {
+		return status, err
 	}
 	return status, nil
 }
@@ -286,7 +291,7 @@ func assertWithTimeout(ctx context.Context, check func() bool) bool {
 func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, state int) bool {
 	check := func() bool {
 		workStatus, _ := r.GetWorkStatus(unitID)
-		return int(workStatus["State"].(float64)) == state
+		return workStatus.State == state
 	}
 	return assertWithTimeout(ctx, check)
 }
@@ -327,19 +332,11 @@ func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) e
 func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string) error {
 	check := func() bool {
 		workStatus, _ := r.GetWorkStatus(unitID)
-		state := int(workStatus["State"].(float64))
-		if state != workceptor.WorkStateFailed {
+		if workStatus.State != workceptor.WorkStateFailed {
 			return false
 		}
-		detailIf, ok := workStatus["Detail"]
-		if !ok {
-			return false
-		}
-		detailString, ok := detailIf.(string)
-		if !ok {
-			return false
-		}
-		detailLc := strings.ToLower(detailString)
+		detail := workStatus.Detail
+		detailLc := strings.ToLower(detail)
 		keywords := []string{
 			"cancel",
 			"kill",

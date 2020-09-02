@@ -182,7 +182,7 @@ func (m *LibMesh) Dir() string {
 
 // NewLibMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
-func NewLibMeshFromFile(filename string) (Mesh, error) {
+func NewLibMeshFromFile(filename, dirPrefix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -195,17 +195,25 @@ func NewLibMeshFromFile(filename string) (Mesh, error) {
 		return nil, err
 	}
 
-	return NewLibMeshFromYaml(MeshDefinition)
+	return NewLibMeshFromYaml(MeshDefinition, dirPrefix)
 }
 
 // NewLibMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml
-func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
+func NewLibMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*LibMesh, error) {
 	mesh := &LibMesh{}
 	// Setup the mesh directory
-	baseDir := filepath.Join(os.TempDir(), "receptor-testing")
+	var baseDir string
+	if dirPrefix == "" {
+		baseDir = TestBaseDir
+	} else {
+		baseDir = dirPrefix
+	}
 	// Ignore the error, if the dir already exists thats fine
-	os.Mkdir(baseDir, 0755)
+	err := os.MkdirAll(baseDir, 0755)
+	if err != nil {
+		return nil, err
+	}
 	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
@@ -472,7 +480,11 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 		ctx, canceller := context.WithCancel(context.Background())
 		node.controlServerCanceller = canceller
 
-		node.controlSocket = filepath.Join(node.dir, "controlsock")
+		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
+		if err != nil {
+			return nil, err
+		}
+		node.controlSocket = filepath.Join(tempdir, "controlsock")
 
 		node.controlServer = controlsvc.New(true, node.NetceptorInstance)
 		err = node.controlServer.RunControlSvc(ctx, "control", nil, node.controlSocket, os.FileMode(0600))

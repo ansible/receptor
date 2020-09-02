@@ -148,7 +148,7 @@ func (m *CLIMesh) Nodes() map[string]Node {
 
 // NewCLIMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
-func NewCLIMeshFromFile(filename string) (Mesh, error) {
+func NewCLIMeshFromFile(filename, dirPrefix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -161,17 +161,24 @@ func NewCLIMeshFromFile(filename string) (Mesh, error) {
 		return nil, err
 	}
 
-	return NewCLIMeshFromYaml(MeshDefinition)
+	return NewCLIMeshFromYaml(MeshDefinition, dirPrefix)
 }
 
 // NewCLIMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml
-func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
+func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, error) {
 	mesh := &CLIMesh{}
 	// Setup the mesh directory
-	baseDir := filepath.Join(os.TempDir(), "receptor-testing")
-	// Ignore the error, if the dir already exists thats fine
-	os.Mkdir(baseDir, 0755)
+	var baseDir string
+	if dirPrefix == "" {
+		baseDir = TestBaseDir
+	} else {
+		baseDir = dirPrefix
+	}
+	err := os.MkdirAll(baseDir, 0755)
+	if err != nil {
+		return nil, err
+	}
 	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
@@ -326,7 +333,11 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
-		node.controlSocket = filepath.Join(node.dir, "controlsock")
+		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
+		if err != nil {
+			return nil, err
+		}
+		node.controlSocket = filepath.Join(tempdir, "controlsock")
 		controlServiceYaml := make(map[interface{}]interface{})
 		tmp := make(map[interface{}]interface{})
 		tmp["filename"] = node.controlSocket

@@ -91,11 +91,15 @@ func TestSSLListeners(t *testing.T) {
 			t.Parallel()
 
 			// Setup the mesh directory
-			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
-			// Ignore the error, if the dir already exists thats fine
-			os.Mkdir(baseDir, 0755)
-			tempdir, err := ioutil.TempDir(baseDir, "certs-*")
-			os.Mkdir(tempdir, 0755)
+			baseDir := filepath.Join(os.TempDir(), "receptor-testing", t.Name())
+			err := os.MkdirAll(baseDir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tempdir, err := ioutil.TempDir(baseDir, "certs-")
+			if err != nil {
+				t.Fatal(err)
+			}
 			key, crt, err := utils.GenerateCert(tempdir, "test")
 
 			receptorStdOut := bytes.Buffer{}

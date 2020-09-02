@@ -39,7 +39,7 @@ func TestMeshStartup(t *testing.T) {
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
 			t.Logf("starting mesh")
-			mesh, err := NewCLIMeshFromFile(filename)
+			mesh, err := NewCLIMeshFromFile(filename, filepath.Join(TestBaseDir, t.Name()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,7 +93,7 @@ func TestMeshConnections(t *testing.T) {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
-			mesh, err := NewCLIMeshFromFile(filename)
+			mesh, err := NewCLIMeshFromFile(filename, filepath.Join(TestBaseDir, t.Name()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +134,7 @@ func TestMeshShutdown(t *testing.T) {
 	for _, data := range testTable {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
-			mesh, err := NewLibMeshFromFile(filename)
+			mesh, err := NewLibMeshFromFile(filename, filepath.Join(TestBaseDir, t.Name()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -187,11 +187,15 @@ func TestTCPSSLConnections(t *testing.T) {
 			t.Parallel()
 
 			// Setup the mesh directory
-			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
-			// Ignore the error, if the dir already exists thats fine
-			os.Mkdir(baseDir, 0755)
+			baseDir := filepath.Join(TestBaseDir, t.Name())
+			err := os.MkdirAll(baseDir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
 			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			os.Mkdir(tempdir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
 			caKey, caCrt, err := utils.GenerateCert(tempdir, "ca")
 			if err != nil {
 				t.Fatal(err)
@@ -281,7 +285,7 @@ func TestTCPSSLConnections(t *testing.T) {
 					},
 				},
 			}
-			mesh, err := NewCLIMeshFromYaml(data)
+			mesh, err := NewCLIMeshFromYaml(data, baseDir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -327,11 +331,15 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			t.Parallel()
 
 			// Setup the mesh directory
-			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
-			// Ignore the error, if the dir already exists thats fine
-			os.Mkdir(baseDir, 0755)
+			baseDir := filepath.Join(TestBaseDir, t.Name())
+			err := os.MkdirAll(baseDir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
 			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			os.Mkdir(tempdir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
 			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
 			if err != nil {
 				t.Fatal(err)
@@ -387,7 +395,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 					},
 				},
 			}
-			mesh, err := NewCLIMeshFromYaml(data)
+			mesh, err := NewCLIMeshFromYaml(data, baseDir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -417,11 +425,15 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			t.Parallel()
 
 			// Setup the mesh directory
-			baseDir := filepath.Join(os.TempDir(), "receptor-testing")
-			// Ignore the error, if the dir already exists thats fine
-			os.Mkdir(baseDir, 0755)
+			baseDir := filepath.Join(TestBaseDir, t.Name())
+			err := os.MkdirAll(baseDir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
 			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			os.Mkdir(tempdir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
 			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
 			if err != nil {
 				t.Fatal(err)
@@ -482,7 +494,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 					},
 				},
 			}
-			mesh, err := NewCLIMeshFromYaml(data)
+			mesh, err := NewCLIMeshFromYaml(data, baseDir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -544,7 +556,7 @@ func TestCosts(t *testing.T) {
 		},
 		Nodedef: []interface{}{},
 	}
-	mesh, err := NewCLIMeshFromYaml(data)
+	mesh, err := NewCLIMeshFromYaml(data, filepath.Join(TestBaseDir, t.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -578,7 +590,7 @@ func TestCosts(t *testing.T) {
 func TestWork(t *testing.T) {
 	t.Parallel()
 	// Setup our mesh yaml data
-	workSetup := func() (*receptorcontrol.ReceptorControl, *CLIMesh, []byte) {
+	workSetup := func(testName string) (*receptorcontrol.ReceptorControl, *CLIMesh, []byte) {
 		data := YamlData{}
 		data.Nodes = make(map[string]*YamlNode)
 		echoSleepLong := map[interface{}]interface{}{
@@ -631,7 +643,7 @@ func TestWork(t *testing.T) {
 			},
 		}
 
-		mesh, err := NewCLIMeshFromYaml(data)
+		mesh, err := NewCLIMeshFromYaml(data, filepath.Join(TestBaseDir, testName))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -685,7 +697,7 @@ func TestWork(t *testing.T) {
 
 	t.Run("cancel then release remote work", func(t *testing.T) {
 		t.Parallel()
-		controller, mesh, _ := workSetup()
+		controller, mesh, _ := workSetup(t.Name())
 		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
@@ -725,7 +737,7 @@ func TestWork(t *testing.T) {
 
 	t.Run("work submit while remote node is down", func(t *testing.T) {
 		t.Parallel()
-		controller, mesh, _ := workSetup()
+		controller, mesh, _ := workSetup(t.Name())
 		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
@@ -747,7 +759,7 @@ func TestWork(t *testing.T) {
 
 	t.Run("work streaming resumes when relay node restarts", func(t *testing.T) {
 		t.Parallel()
-		controller, mesh, expectedResults := workSetup()
+		controller, mesh, expectedResults := workSetup(t.Name())
 		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
@@ -814,7 +826,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 
 		// Reset the Timer because building the yaml data for the mesh may have
 		// taken a bit
-		mesh, err := NewCLIMeshFromYaml(data)
+		mesh, err := NewCLIMeshFromYaml(data, filepath.Join(TestBaseDir, b.Name()))
 		if err != nil {
 			b.Fatal(err)
 		}

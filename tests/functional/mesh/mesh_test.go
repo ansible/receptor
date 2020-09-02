@@ -578,7 +578,7 @@ func TestCosts(t *testing.T) {
 func TestWork(t *testing.T) {
 	t.Parallel()
 	// Setup our mesh yaml data
-	workInit := func() (*receptorcontrol.ReceptorControl, *CLIMesh, []byte) {
+	workSetup := func() (*receptorcontrol.ReceptorControl, *CLIMesh, []byte) {
 		data := YamlData{}
 		data.Nodes = make(map[string]*YamlNode)
 		echoSleepLong := map[interface{}]interface{}{
@@ -651,6 +651,12 @@ func TestWork(t *testing.T) {
 		return controller, mesh, expectedResults
 	}
 
+	tearDown := func(controller *receptorcontrol.ReceptorControl, mesh *CLIMesh) {
+		defer mesh.WaitForShutdown()
+		defer mesh.Destroy()
+		defer controller.Close()
+	}
+
 	assertFilesReleased := func(nodeDir, nodeID, unitID string) {
 		workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
 		_, err := os.Stat(workPath)
@@ -677,15 +683,9 @@ func TestWork(t *testing.T) {
 		}
 	}
 
-	tearDown := func(controller *receptorcontrol.ReceptorControl, mesh *CLIMesh) {
-		defer mesh.WaitForShutdown()
-		defer mesh.Destroy()
-		defer controller.Close()
-	}
-
 	t.Run("cancel then release remote work", func(t *testing.T) {
 		t.Parallel()
-		controller, mesh, _ := workInit()
+		controller, mesh, _ := workSetup()
 		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
@@ -725,7 +725,7 @@ func TestWork(t *testing.T) {
 
 	t.Run("work submit while remote node is down", func(t *testing.T) {
 		t.Parallel()
-		controller, mesh, _ := workInit()
+		controller, mesh, _ := workSetup()
 		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
@@ -746,7 +746,7 @@ func TestWork(t *testing.T) {
 
 	t.Run("work streaming resumes when relay node restarts", func(t *testing.T) {
 		t.Parallel()
-		controller, mesh, expectedResults := workInit()
+		controller, mesh, expectedResults := workSetup()
 		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/workceptor"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"net"
 	"regexp"
@@ -15,13 +16,15 @@ import (
 
 // ReceptorControl Connects to a control socket and provides basic commands
 type ReceptorControl struct {
-	socketConn *net.UnixConn
+	socketConn     *net.UnixConn
+	socketFilename string
 }
 
 // New Returns an empty ReceptorControl
 func New() *ReceptorControl {
 	return &ReceptorControl{
-		socketConn: nil,
+		socketConn:     nil,
+		socketFilename: "",
 	}
 }
 
@@ -42,6 +45,20 @@ func (r *ReceptorControl) Connect(filename string) error {
 	err = r.handshake()
 	if err != nil {
 		return err
+	}
+	r.socketFilename = filename
+	return nil
+}
+
+// Reconnect to unix socket
+func (r *ReceptorControl) Reconnect() error {
+	if r.socketFilename != "" {
+		err := r.Connect(r.socketFilename)
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("Could not reconnect, no socketFilename")
 	}
 	return nil
 }
@@ -179,13 +196,14 @@ func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
 		return "", err
 	}
 	r.Close() // since write is closed, we should close the whole socket
+	r.Reconnect()
 	unitID := fmt.Sprintf("%v", response["unitid"])
 	return unitID, nil
 }
 
 // WorkSubmit begins work on remote node
-func (r *ReceptorControl) WorkSubmit(node, serviceName string) (string, error) {
-	_, err := r.WriteStr(fmt.Sprintf("work submit %s %s\n", node, serviceName))
+func (r *ReceptorControl) WorkSubmit(node, workType string) (string, error) {
+	_, err := r.WriteStr(fmt.Sprintf("work submit %s %s\n", node, workType))
 	if err != nil {
 		return "", err
 	}
@@ -197,8 +215,8 @@ func (r *ReceptorControl) WorkSubmit(node, serviceName string) (string, error) {
 }
 
 // WorkStart begins work on local node
-func (r *ReceptorControl) WorkStart(workID string) (string, error) {
-	_, err := r.WriteStr(fmt.Sprintf("work start %s\n", workID))
+func (r *ReceptorControl) WorkStart(workType string) (string, error) {
+	_, err := r.WriteStr(fmt.Sprintf("work start %s\n", workType))
 	if err != nil {
 		return "", err
 	}
@@ -210,8 +228,8 @@ func (r *ReceptorControl) WorkStart(workID string) (string, error) {
 }
 
 // WorkCancel cancels work
-func (r *ReceptorControl) WorkCancel(workID string) error {
-	_, err := r.WriteStr(fmt.Sprintf("work cancel %s\n", workID))
+func (r *ReceptorControl) WorkCancel(unitID string) error {
+	_, err := r.WriteStr(fmt.Sprintf("work cancel %s\n", unitID))
 	if err != nil {
 		return err
 	}
@@ -223,8 +241,8 @@ func (r *ReceptorControl) WorkCancel(workID string) error {
 }
 
 // WorkRelease cancels and deletes work
-func (r *ReceptorControl) WorkRelease(workID string) error {
-	_, err := r.WriteStr(fmt.Sprintf("work release %s\n", workID))
+func (r *ReceptorControl) WorkRelease(unitID string) error {
+	_, err := r.WriteStr(fmt.Sprintf("work release %s\n", unitID))
 	if err != nil {
 		return err
 	}
@@ -235,14 +253,20 @@ func (r *ReceptorControl) WorkRelease(workID string) error {
 	return nil
 }
 
-func (r *ReceptorControl) getWorkStatus(workID string) (map[string]interface{}, error) {
-	_, err := r.WriteStr(fmt.Sprintf("work status %s\n", workID))
+// GetWorkStatus returns JSON of status file for a given unitID
+func (r *ReceptorControl) GetWorkStatus(unitID string) (*workceptor.StatusFileData, error) {
+	status := &workceptor.StatusFileData{}
+	_, err := r.WriteStr(fmt.Sprintf("work status %s\n", unitID))
 	if err != nil {
-		return nil, err
+		return status, err
 	}
-	status, err := r.ReadAndParseJSON()
+	jsonData, err := r.Read()
 	if err != nil {
-		return nil, err
+		return status, err
+	}
+	err = json.Unmarshal(jsonData, status)
+	if err != nil {
+		return status, err
 	}
 	return status, nil
 }
@@ -261,37 +285,58 @@ func (r *ReceptorControl) getWorkList() (map[string]interface{}, error) {
 }
 
 func assertWithTimeout(ctx context.Context, check func() bool) bool {
-	return utils.CheckUntilTimeout(ctx, 250*time.Millisecond, check)
+	return utils.CheckUntilTimeout(ctx, 500*time.Millisecond, check)
+}
+
+func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, state int) bool {
+	check := func() bool {
+		workStatus, _ := r.GetWorkStatus(unitID)
+		return workStatus.State == state
+	}
+	return assertWithTimeout(ctx, check)
 }
 
 //AssertWorkRunning waits until work status is running
-func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, workID string) error {
-	check := func() bool {
-		workStatus, _ := r.getWorkStatus(workID)
-		return workStatus["StateName"] == "Running"
+func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) error {
+	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateRunning) {
+		return fmt.Errorf("Failed to assert %s is running or ctx timed out", unitID)
 	}
-	if !assertWithTimeout(ctx, check) {
-		return fmt.Errorf("Failed to assert %s is running", workID)
+	return nil
+}
+
+// AssertWorkPending waits until status is pending
+func (r *ReceptorControl) AssertWorkPending(ctx context.Context, unitID string) error {
+	if !r.assertWorkState(ctx, unitID, workceptor.WorkStatePending) {
+		return fmt.Errorf("Failed to assert %s is pending or ctx timed out", unitID)
+	}
+	return nil
+}
+
+// AssertWorkSucceeded waits until status is successful
+func (r *ReceptorControl) AssertWorkSucceeded(ctx context.Context, unitID string) error {
+	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateSucceeded) {
+		return fmt.Errorf("Failed to assert %s succeeded or ctx timed out", unitID)
+	}
+	return nil
+}
+
+// AssertWorkFailed waits until status is failed
+func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) error {
+	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateFailed) {
+		return fmt.Errorf("Failed to assert %s failed or ctx timed out", unitID)
 	}
 	return nil
 }
 
 //AssertWorkCancelled waits until work status is cancelled
-func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, workID string) error {
+func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string) error {
 	check := func() bool {
-		workStatus, _ := r.getWorkStatus(workID)
-		if workStatus["StateName"] != "Failed" && workStatus["StateName"] != "Succeeded" {
+		workStatus, _ := r.GetWorkStatus(unitID)
+		if workStatus.State != workceptor.WorkStateFailed {
 			return false
 		}
-		detailIf, ok := workStatus["Detail"]
-		if !ok {
-			return false
-		}
-		detailString, ok := detailIf.(string)
-		if !ok {
-			return false
-		}
-		detailLc := strings.ToLower(detailString)
+		detail := workStatus.Detail
+		detailLc := strings.ToLower(detail)
 		keywords := []string{
 			"cancel",
 			"kill",
@@ -306,26 +351,55 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, workID string
 		return false
 	}
 	if !assertWithTimeout(ctx, check) {
-		return fmt.Errorf("Failed to assert %s is cancelled", workID)
+		return fmt.Errorf("Failed to assert %s is cancelled or ctx timed out", unitID)
 	}
 	return nil
 }
 
 // AssertWorkReleased asserts that work is not in work list
-func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, workID string) error {
+func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, unitID string) error {
 	check := func() bool {
 		workList, err := r.getWorkList()
 		if err != nil {
 			return false
 		}
-		_, ok := workList[workID] // workID should not be in list
+		_, ok := workList[unitID] // unitID should not be in list
 		if ok {
 			return false
 		}
 		return true
 	}
 	if !assertWithTimeout(ctx, check) {
-		return fmt.Errorf("Failed to assert %s is released", workID)
+		return fmt.Errorf("Failed to assert %s is released or ctx timed out", unitID)
+	}
+
+	return nil
+}
+
+func (r *ReceptorControl) getWorkResults(unitID string, readSize int) ([]byte, error) {
+	r.WriteStr(fmt.Sprintf("work results %s\n", unitID))
+	r.ReadStr() // flush "Streaming results for.." line"
+	buf := make([]byte, readSize)
+	n, err := r.socketConn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	if n != readSize {
+		return nil, fmt.Errorf("did not read correct size")
+	}
+	r.Close()
+	r.Reconnect()
+	return buf, nil
+}
+
+// AssertWorkResults makes sure results match expected byte array
+func (r *ReceptorControl) AssertWorkResults(unitID string, expectedResults []byte) error {
+	workResults, err := r.getWorkResults(unitID, len(expectedResults))
+	if err != nil {
+		return err
+	}
+	if string(expectedResults) != string(workResults) {
+		return fmt.Errorf("work results did not match expected results")
 	}
 	return nil
 }

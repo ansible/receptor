@@ -172,7 +172,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 	baseDir := filepath.Join(os.TempDir(), "receptor-testing")
 	// Ignore the error, if the dir already exists thats fine
 	os.Mkdir(baseDir, 0755)
-	tempdir, err := ioutil.TempDir(baseDir, "mesh-*")
+	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData) (*CLIMesh, error) {
 	// there's something to dial into
 	for k := range MeshDefinition.Nodes {
 		node := NewCLINode(k)
-		tempdir, err = ioutil.TempDir(mesh.dir, k+"-*")
+		tempdir, err = ioutil.TempDir(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}

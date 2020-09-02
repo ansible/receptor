@@ -206,7 +206,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 	baseDir := filepath.Join(os.TempDir(), "receptor-testing")
 	// Ignore the error, if the dir already exists thats fine
 	os.Mkdir(baseDir, 0755)
-	tempdir, err := ioutil.TempDir(baseDir, "mesh-*")
+	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData) (*LibMesh, error) {
 	// there's something to dial into
 	for k := range MeshDefinition.Nodes {
 		node := NewLibNode(k)
-		node.dir, err = ioutil.TempDir(mesh.dir, k+"-*")
+		node.dir, err = ioutil.TempDir(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}

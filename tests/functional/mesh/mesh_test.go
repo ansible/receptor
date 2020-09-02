@@ -730,6 +730,7 @@ func TestWork(t *testing.T) {
 		nodes := mesh.Nodes()
 
 		nodes["node3"].Shutdown()
+		nodes["node3"].WaitForShutdown()
 		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
 		if err != nil {
 			t.Fatal(err)
@@ -766,6 +767,7 @@ func TestWork(t *testing.T) {
 			t.Fatal(err)
 		}
 		nodes["node2"].Shutdown()
+		nodes["node2"].WaitForShutdown()
 		nodes["node2"].Start()
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 		err = controller.AssertWorkSucceeded(ctx, unitID)

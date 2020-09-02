@@ -677,12 +677,16 @@ func TestWork(t *testing.T) {
 		}
 	}
 
-	t.Run("cancel then release remote work", func(t *testing.T) {
-		t.Parallel()
-		controller, mesh, _ := workInit()
+	tearDown := func(controller *receptorcontrol.ReceptorControl, mesh *CLIMesh) {
 		defer mesh.WaitForShutdown()
 		defer mesh.Destroy()
 		defer controller.Close()
+	}
+
+	t.Run("cancel then release remote work", func(t *testing.T) {
+		t.Parallel()
+		controller, mesh, _ := workInit()
+		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
 		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
@@ -722,9 +726,7 @@ func TestWork(t *testing.T) {
 	t.Run("work submit while remote node is down", func(t *testing.T) {
 		t.Parallel()
 		controller, mesh, _ := workInit()
-		defer mesh.WaitForShutdown()
-		defer mesh.Destroy()
-		defer controller.Close()
+		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
 		nodes["node3"].Shutdown()
@@ -745,9 +747,7 @@ func TestWork(t *testing.T) {
 	t.Run("work streaming resumes when relay node restarts", func(t *testing.T) {
 		t.Parallel()
 		controller, mesh, expectedResults := workInit()
-		defer mesh.WaitForShutdown()
-		defer mesh.Destroy()
-		defer controller.Close()
+		defer tearDown(controller, mesh)
 		nodes := mesh.Nodes()
 
 		unitID, err := controller.WorkSubmit("node3", "echosleeplong")

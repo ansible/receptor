@@ -254,8 +254,8 @@ func (r *ReceptorControl) WorkRelease(unitID string) error {
 }
 
 // GetWorkStatus returns JSON of status file for a given unitID
-func (r *ReceptorControl) GetWorkStatus(unitID string) (workceptor.StatusFileData, error) {
-	status := workceptor.StatusFileData{}
+func (r *ReceptorControl) GetWorkStatus(unitID string) (*workceptor.StatusFileData, error) {
+	status := &workceptor.StatusFileData{}
 	_, err := r.WriteStr(fmt.Sprintf("work status %s\n", unitID))
 	if err != nil {
 		return status, err
@@ -264,7 +264,7 @@ func (r *ReceptorControl) GetWorkStatus(unitID string) (workceptor.StatusFileDat
 	if err != nil {
 		return status, err
 	}
-	err = json.Unmarshal(jsonData, &status)
+	err = json.Unmarshal(jsonData, status)
 	if err != nil {
 		return status, err
 	}

@@ -39,6 +39,8 @@ BuildRequires:  golang-k8s-apimachinery-devel
 
 %if %{with check}
 # Tests
+BuildRequires:  iproute
+BuildRequires:  openssl
 BuildRequires:  golang(github.com/fortytw2/leaktest)
 %endif
 

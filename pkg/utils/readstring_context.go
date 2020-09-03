@@ -11,7 +11,7 @@ type readStringResult = struct {
 	err error
 }
 
-// ReadStringContext calls bufio.Reader.ReadString() but enforces a context.  Note that if the
+// ReadStringContext calls bufio.Reader.ReadString() but uses a context.  Note that if the
 // ctx.Done() fires, the ReadString() call is still active, and bufio is not re-entrant, so it is
 // important for callers to error out of further use of the bufio.  Also, the goroutine will not
 // exit until the bufio's underlying connection is closed.

@@ -1,0 +1,35 @@
+#
+# receptor.conf
+#
+# This is a YAML-formatted file in which each block represents a Receptor
+# configuration directive.  For a list of possible directives, see
+# "receptor --help".  Below is a basic example of a single node.
+
+
+# To create and launch a new systemd-managed Receptor node:
+#
+# 1. Copy this file to /etc/receptor/<some-name>.conf
+# 2. chmod 0600 if the new file will contain any passwords or sensitive data
+# 3. Edit the new config file as needed
+# 4. systemctl enable receptor@<some-name> --now
+
+
+# Basic properties of the node.  The node ID must be unique.
+- node:
+    id: receptor
+
+# The control service allows receptorctl to talk to the running service,
+# and is also used for functions like remote work submission.
+- control-service:
+    service: control
+    filename: /var/run/receptor.sock
+
+# A listener allows other Receptor nodes to connect to this one.
+- tcp-listener:
+    port: 2345
+
+# A work-command defines a type of worker that jobs can be submitted to.
+- work-command:
+    worktype: hello
+    command: /bin/echo
+    params: "Hello, world!"

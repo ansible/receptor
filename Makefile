@@ -29,7 +29,16 @@ testloop: receptor
 ci: pre-commit build-all test
 	@echo "All done"
 
-clean:
-	@rm -fv receptor receptor.exe receptor.app
+SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec
 
-.PHONY: lint format fmt ci pre-commit build-all test clean testloop
+specfiles: $(SPECFILES)
+
+$(SPECFILES): %.spec: %.spec.j2
+	cat VERSION | jinja2 $< -o $@
+
+packaging/rpm/receptor.spec: packaging/rpm/receptor.spec.j2
+
+clean:
+	@rm -fv receptor receptor.exe receptor.app $(SPECFILES)
+
+.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles

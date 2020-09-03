@@ -28,6 +28,6 @@ func ReadStringContext(ctx context.Context, reader *bufio.Reader, delim byte) (s
 	case res := <-result:
 		return res.str, res.err
 	case <-ctx.Done():
-		return "", fmt.Errorf("ctx timeout")
+		return "", ctx.Err()
 	}
 }

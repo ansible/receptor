@@ -3,7 +3,6 @@ package utils
 import (
 	"bufio"
 	"context"
-	"fmt"
 )
 
 type readStringResult = struct {

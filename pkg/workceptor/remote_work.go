@@ -52,11 +52,14 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 		return nil, nil, err
 	}
 	reader := bufio.NewReader(conn)
-	hello, err := utils.ReadStringWithTimeout(reader, '\n', 5*time.Second)
+	ctxChild, _ := context.WithTimeout(ctx, 5*time.Second)
+	hello, err := utils.ReadStringContext(ctxChild, reader, '\n')
 	if err != nil {
+		conn.Close()
 		return nil, nil, err
 	}
 	if !strings.Contains(hello, node) {
+		conn.Close()
 		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", node,
 			strings.TrimRight(hello, "\n"))
 	}

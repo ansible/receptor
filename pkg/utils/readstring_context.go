@@ -2,8 +2,8 @@ package utils
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"time"
 )
 
 type readStringResult = struct {
@@ -11,11 +11,11 @@ type readStringResult = struct {
 	err error
 }
 
-// ReadStringWithTimeout calls bufio.Reader.ReadString() but enforces a timeout.  Note that if the
-// timeout fires, the ReadString() call is still active, and bufio is not re-entrant, so it is
+// ReadStringContext calls bufio.Reader.ReadString() but enforces a context.  Note that if the
+// ctx.Done() fires, the ReadString() call is still active, and bufio is not re-entrant, so it is
 // important for callers to error out of further use of the bufio.  Also, the goroutine will not
 // exit until the bufio's underlying connection is closed.
-func ReadStringWithTimeout(reader *bufio.Reader, delim byte, timeout time.Duration) (string, error) {
+func ReadStringContext(ctx context.Context, reader *bufio.Reader, delim byte) (string, error) {
 	result := make(chan *readStringResult)
 	go func() {
 		str, err := reader.ReadString(delim)
@@ -27,7 +27,7 @@ func ReadStringWithTimeout(reader *bufio.Reader, delim byte, timeout time.Durati
 	select {
 	case res := <-result:
 		return res.str, res.err
-	case <-time.After(timeout):
-		return "", fmt.Errorf("timeout")
+	case <-ctx.Done():
+		return "", fmt.Errorf("ctx timeout")
 	}
 }

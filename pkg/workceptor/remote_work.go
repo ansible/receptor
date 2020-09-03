@@ -52,7 +52,7 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 		return nil, nil, err
 	}
 	reader := bufio.NewReader(conn)
-	hello, err := reader.ReadString('\n')
+	hello, err := utils.ReadStringWithTimeout(reader, '\n', 5*time.Second)
 	if err != nil {
 		return nil, nil, err
 	}

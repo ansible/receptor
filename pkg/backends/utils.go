@@ -4,7 +4,12 @@ import (
 	"context"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"math"
 	"time"
+)
+
+const (
+	maxRedialDelay = 20 * time.Second
 )
 
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
@@ -51,6 +56,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 				case <-ctx.Done():
 					return
 				}
+				redialDelay = time.Duration(math.Min(1.5*float64(redialDelay), float64(maxRedialDelay)))
 			} else {
 				if err != nil {
 					logger.Error("Backend connection failed: %s\n", err)

@@ -1,0 +1,8 @@
+[Unit]
+Description=Receptor
+
+[Service]
+ExecStart=/usr/bin/receptor -c /etc/receptor/%i.conf
+
+[Install]
+WantedBy=multi-user.target

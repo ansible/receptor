@@ -1,0 +1,46 @@
+%define name receptorctl
+%define version {{ version }}
+%define release {{ release }}
+
+Summary: Command line utility for Receptor
+Name: %{name}
+Version: %{version}
+Release: %{release}
+Source0: https://github.com/project-receptor/receptor/archive/%{version}/receptor-%{version}.tar.gz
+
+License: APL 2.0
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+Prefix: %{_prefix}
+BuildArch: noarch
+Url: https://github.com/project-receptor/receptor/receptorctl
+
+BuildRequires: python3
+BuildRequires: python3-setuptools
+Requires: python3
+Requires: python3-setuptools
+Requires: python3-dateutil
+Requires: python3-click
+
+%description
+receptorctl is a command line utility for managing Receptor
+
+%prep
+%setup -n %{name}-%{version} -c
+mv %{_builddir}/%{name}-%{version}/receptor-%{version}/receptorctl/* %{_builddir}/%{name}-%{version}
+mv %{_builddir}/%{name}-%{version}/receptor-%{version}/VERSION %{_builddir}/%{name}-%{version}
+
+%build
+python3 setup.py build
+
+%install
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
+PYTHONPATH=$RPM_BUILD_ROOT/usr/lib/python3.8/site-packages _RECEPTORCTL_COMPLETE=source_bash $RPM_BUILD_ROOT/usr/bin/receptorctl > %{_builddir}/%{name}-%{version}/receptorctl-completion || true
+install -m 0755 -vd %{buildroot}%{_datadir}/bash-completion/completions
+install -m 0644 -vp %{_builddir}/%{name}-%{version}/receptorctl-completion %{buildroot}%{_datadir}/bash-completion/completions/receptorctl
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files -f INSTALLED_FILES
+%{_datadir}/bash-completion/completions/receptorctl
+%defattr(-,root,root)

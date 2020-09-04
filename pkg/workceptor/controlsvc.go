@@ -45,7 +45,8 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		}
 		var worker WorkUnit
 		var err error
-		if tokens[0] == "start" {
+		// foocontroller: work submit foo workType should be run locally
+		if tokens[0] == "start" || workNode == w.nc.NodeID() {
 			worker, err = w.AllocateUnit(workType, params)
 		} else {
 			worker, err = w.AllocateRemoteUnit(workNode, workType, params)

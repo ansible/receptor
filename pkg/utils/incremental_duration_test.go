@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestIncrementDuration(t *testing.T) {
+func TestIncrementalDuration(t *testing.T) {
 	delay := NewIncrementalDuration(10, 100, 2.0)
 	if delay.Duration != 10 {
 		t.Fail()

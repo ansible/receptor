@@ -4,7 +4,12 @@ import (
 	"context"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"time"
+)
+
+const (
+	maxRedialDelay = 20 * time.Second
 )
 
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
@@ -15,6 +20,11 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 	sessChan := make(chan netceptor.BackendSession)
 	go func() {
 		defer close(sessChan)
+		redialDelayInc := &utils.IncrementalDuration{
+			Duration:    redialDelay,
+			MaxDuration: maxRedialDelay,
+			Multiplier:  1.5,
+		}
 		for {
 			closeChan := make(chan struct{})
 			sess, err := df(closeChan)
@@ -46,11 +56,12 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					logger.Warning("Backend connection exited (will retry)\n")
 				}
 				select {
-				case <-time.After(redialDelay):
+				case <-time.After(redialDelayInc.Duration):
 					continue
 				case <-ctx.Done():
 					return
 				}
+				redialDelayInc.NextDelay()
 			} else {
 				if err != nil {
 					logger.Error("Backend connection failed: %s\n", err)

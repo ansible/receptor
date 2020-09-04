@@ -419,5 +419,5 @@ func (cfg WorkKubeCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, false, false, false, workersSection)
+	cmdline.AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, false, false, false, false, workersSection)
 }

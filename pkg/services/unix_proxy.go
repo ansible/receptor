@@ -108,8 +108,8 @@ func (cfg UnixProxyOutboundCfg) Run() error {
 func init() {
 	if runtime.GOOS != "windows" {
 		cmdline.AddConfigType("unix-socket-server",
-			"Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, false, false, false, servicesSection)
+			"Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, false, false, false, false, servicesSection)
 		cmdline.AddConfigType("unix-socket-client",
-			"Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, false, false, false, servicesSection)
+			"Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, false, false, false, false, servicesSection)
 	}
 }

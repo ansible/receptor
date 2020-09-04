@@ -70,5 +70,5 @@ func (cfg CommandSvcCfg) Run() error {
 
 func init() {
 	cmdline.AddConfigType("command-service",
-		"Run an interactive command via a Receptor service", CommandSvcCfg{}, false, false, false, servicesSection)
+		"Run an interactive command via a Receptor service", CommandSvcCfg{}, false, false, false, false, servicesSection)
 }

@@ -18,19 +18,25 @@ import (
 )
 
 type nodeCfg struct {
-	ID           string `description:"Node ID" barevalue:"yes" required:"yes"`
-	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow" required:"no"`
+	ID           string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
+	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow"`
 	DataDir      string `description:"Directory in which to store node data"`
 }
 
 func (cfg nodeCfg) Prepare() error {
+	var err error
+	if cfg.ID == "" {
+		cfg.ID, err = os.Hostname()
+		if err != nil {
+			return err
+		}
+	}
 	var allowedPeers []string
 	if cfg.AllowedPeers != "" {
 		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
 	}
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
 	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
-	var err error
 	workceptor.MainInstance, err = workceptor.New(context.Background(),
 		controlsvc.MainInstance, netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
@@ -61,8 +67,8 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, false, false, nil)
-	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, false, false, nil)
+	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, true, false, false, nil)
+	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, true, false, false, nil)
 	cmdline.ParseAndRun(os.Args[1:])
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup

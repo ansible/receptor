@@ -78,7 +78,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		select {
 		case <-ctx.Done():
 			return nil, nil
-		case <-time.After(connectDelay.Duration()):
+		case <-time.After(connectDelay.Duration):
 		}
 		connectDelay.NextDelay()
 	}

@@ -67,7 +67,11 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 
 // getConnection retries connectToRemote until connected or the context expires
 func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
-	var nextDelay = SuccessWorkSleep
+	connectDelay := &utils.IncrementalDuration{
+		Duration:    SuccessWorkSleep,
+		MaxDuration: MaxWorkSleep,
+		Multiplier:  1.5,
+	}
 	for {
 		conn, reader, err := rw.connectToRemote(ctx)
 		if err == nil {
@@ -78,9 +82,9 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		select {
 		case <-ctx.Done():
 			return nil, nil
-		case <-time.After(nextDelay):
+		case <-time.After(connectDelay.Duration):
 		}
-		nextDelay = utils.IncreaseDuration(nextDelay, MaxWorkSleep, 1.5)
+		connectDelay.NextDelay()
 	}
 }
 

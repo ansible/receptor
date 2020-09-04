@@ -20,6 +20,11 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 	sessChan := make(chan netceptor.BackendSession)
 	go func() {
 		defer close(sessChan)
+		redialDelayInc := &utils.IncrementalDuration{
+			Duration:    redialDelay,
+			MaxDuration: maxRedialDelay,
+			Multiplier:  1.5,
+		}
 		for {
 			closeChan := make(chan struct{})
 			sess, err := df(closeChan)
@@ -51,12 +56,12 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					logger.Warning("Backend connection exited (will retry)\n")
 				}
 				select {
-				case <-time.After(redialDelay):
+				case <-time.After(redialDelayInc.Duration):
 					continue
 				case <-ctx.Done():
 					return
 				}
-				redialDelay = utils.IncreaseDuration(redialDelay, maxRedialDelay, 1.5)
+				redialDelayInc.NextDelay()
 			} else {
 				if err != nil {
 					logger.Error("Backend connection failed: %s\n", err)

@@ -25,6 +25,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 			closeChan := make(chan struct{})
 			sess, err := df(closeChan)
 			if err == nil {
+				redialDelayInc.Reset()
 				select {
 				case sessChan <- sess:
 					// continue
@@ -39,7 +40,6 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					return
 				}
 			}
-			redialDelayInc.Reset()
 			done := false
 			select {
 			case <-ctx.Done():
@@ -54,11 +54,11 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 				}
 				select {
 				case <-time.After(redialDelayInc.Duration):
+					redialDelayInc.NextDelay()
 					continue
 				case <-ctx.Done():
 					return
 				}
-				redialDelayInc.NextDelay()
 			} else {
 				if err != nil {
 					logger.Error("Backend connection failed: %s\n", err)

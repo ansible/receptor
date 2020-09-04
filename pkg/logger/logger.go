@@ -107,7 +107,7 @@ func Trace(format string, v ...interface{}) {
 }
 
 type loglevelCfg struct {
-	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" required:"yes"`
+	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
 }
 
 func (cfg loglevelCfg) Prepare() error {
@@ -133,6 +133,6 @@ func init() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
-	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, false, false, false, nil)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, false, false, nil)
+	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, false, true, false, false, nil)
+	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, true, false, false, nil)
 }

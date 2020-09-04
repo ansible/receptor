@@ -356,6 +356,6 @@ func (cfg CommandRunnerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, false, false, false, workersSection)
-	cmdline.AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, false, true, true, nil)
+	cmdline.AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, false, false, false, false, workersSection)
+	cmdline.AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, false, false, true, true, nil)
 }

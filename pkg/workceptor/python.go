@@ -60,5 +60,5 @@ func (cfg WorkPythonCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-python", "Run a worker using a Python plugin", WorkPythonCfg{}, false, false, false, workersSection)
+	cmdline.AddConfigType("work-python", "Run a worker using a Python plugin", WorkPythonCfg{}, false, false, false, false, workersSection)
 }

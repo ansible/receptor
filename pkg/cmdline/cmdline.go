@@ -26,6 +26,7 @@ type param struct {
 	Description string
 	Type        reflect.Type
 	Required    bool
+	Singleton   bool
 	Exclusive   bool
 	Hidden      bool
 	Section     *Section
@@ -34,12 +35,13 @@ type param struct {
 var configTypes []param
 
 // AddConfigType registers a new config type with the system
-func AddConfigType(name string, description string, configType interface{}, required bool, exclusive bool, hidden bool, section *Section) {
+func AddConfigType(name string, description string, configType interface{}, required bool, singleton bool, exclusive bool, hidden bool, section *Section) {
 	configTypes = append(configTypes, param{
 		Name:        name,
 		Description: description,
 		Type:        reflect.TypeOf(configType),
 		Required:    required,
+		Singleton:   singleton,
 		Exclusive:   exclusive,
 		Hidden:      hidden,
 		Section:     section,
@@ -460,6 +462,13 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 				}
 			}
 		}
+		if ct.Singleton {
+			for c := range cfgObjs {
+				if cfgObjs[c].obj.Type() == ct.Type {
+					return nil, fmt.Errorf("only one %s directive is allowed", command)
+				}
+			}
+		}
 		coi := newCOI()
 		coi.obj = reflect.New(ct.Type).Elem()
 		coi.arg = command
@@ -531,6 +540,14 @@ func ParseAndRun(args []string) {
 					os.Exit(1)
 				}
 				commandType = ct.Type
+				if ct.Singleton {
+					for c := range activeObjs {
+						if activeObjs[c].obj.Type() == ct.Type {
+							fmt.Printf("The \"%s\" directive is only allowed once.\n", ct.Name)
+							os.Exit(1)
+						}
+					}
+				}
 				accumulator = newCOI()
 				accumulator.obj = reflect.New(commandType).Elem()
 				accumulator.arg = arg
@@ -633,6 +650,31 @@ func ParseAndRun(args []string) {
 	if haveExclusive && len(activeObjs) > 1 {
 		fmt.Printf("Cannot specify any other options with %s.\n", exclusiveName)
 		os.Exit(1)
+	}
+
+	// Add missing required singletons
+	if !haveExclusive {
+		for i := range configTypes {
+			ct := configTypes[i]
+			if ct.Singleton && ct.Required {
+				haveThis := false
+				for j := range activeObjs {
+					ao := activeObjs[j]
+					if ao.obj.Type() == ct.Type {
+						haveThis = true
+						break
+					}
+				}
+				if !haveThis {
+					a := newCOI()
+					a.obj = reflect.New(ct.Type).Elem()
+					a.arg = fmt.Sprintf("implicit %s", ct.Name)
+					checkRequiredParams(buildRequiredParams(ct.Type), a.arg)
+					activeObjs = append(activeObjs, a)
+					delete(requiredObjs, ct.Type.Name())
+				}
+			}
+		}
 	}
 
 	// Error out if we didn't get all required objects

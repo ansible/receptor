@@ -153,5 +153,5 @@ func (cfg TunProxyCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("ip-tunnel", "Run an IP tunnel using a tun interface", TunProxyCfg{}, false, false, false, servicesSection)
+	cmdline.AddConfigType("ip-tunnel", "Run an IP tunnel using a tun interface", TunProxyCfg{}, false, false, false, false, servicesSection)
 }

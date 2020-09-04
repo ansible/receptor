@@ -36,9 +36,26 @@ specfiles: $(SPECFILES)
 $(SPECFILES): %.spec: %.spec.j2
 	cat VERSION | jinja2 $< -o $@
 
-packaging/rpm/receptor.spec: packaging/rpm/receptor.spec.j2
+VERSION = $(shell jq -r .version VERSION)
+RELEASE = $(shell jq -r .release VERSION)
+CONTAINERCMD ?= podman
+
+# Other RPMs get built but we only track the main one for Makefile purposes
+MAINRPM = rpmbuild/RPMS/x86_64/receptor-$(VERSION)-$(RELEASE).fc32.x86_64.rpm
+
+$(MAINRPM): receptor $(SPECFILES)
+	@$(CONTAINERCMD) build packaging/rpm-builder -t receptor-rpm-builder
+	@$(CONTAINERCMD) run -it --rm -v $$PWD:/receptor:Z receptor-rpm-builder
+
+rpms: $(MAINRPM)
+
+container: rpms
+	@cp -av rpmbuild/RPMS/ packaging/container/RPMS/
+	@$(CONTAINERCMD) build packaging/container -t receptor
 
 clean:
-	@rm -fv receptor receptor.exe receptor.app $(SPECFILES)
+	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)
+	@rm -rfv rpmbuild/
+	@rm -rfv packaging/container/RPMS/
 
-.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles
+.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container

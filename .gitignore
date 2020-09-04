@@ -3,3 +3,4 @@ receptor
 receptor.exe
 receptor.app
 net
+rpmbuild/

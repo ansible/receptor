@@ -8,7 +8,6 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
-	"math"
 	"net"
 	"os"
 	"path"
@@ -81,7 +80,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 			return nil, nil
 		case <-time.After(nextDelay):
 		}
-		nextDelay = time.Duration(math.Min(1.5*float64(nextDelay), float64(MaxWorkSleep)))
+		nextDelay = utils.IncreaseDuration(nextDelay, MaxWorkSleep, 1.5)
 	}
 }
 

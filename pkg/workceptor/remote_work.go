@@ -130,7 +130,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	defer doClose()
 	red := rw.Status().ExtraData.(*remoteExtraData)
-	_, err := conn.Write([]byte(fmt.Sprintf("work start %s\n", red.RemoteWorkType)))
+	_, err := conn.Write([]byte(fmt.Sprintf("work submit localhost %s\n", red.RemoteWorkType)))
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}

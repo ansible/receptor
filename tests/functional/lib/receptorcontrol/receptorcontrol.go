@@ -216,15 +216,7 @@ func (r *ReceptorControl) WorkSubmit(node, workType string) (string, error) {
 
 // WorkStart begins work on local node
 func (r *ReceptorControl) WorkStart(workType string) (string, error) {
-	_, err := r.WriteStr(fmt.Sprintf("work start %s\n", workType))
-	if err != nil {
-		return "", err
-	}
-	unitID, err := r.getWorkSubmitResponse()
-	if err != nil {
-		return "", err
-	}
-	return unitID, nil
+	return r.WorkSubmit("localhost", workType)
 }
 
 // WorkCancel cancels work

@@ -90,9 +90,8 @@ class ReceptorControl:
 
     def submit_work(self, node, worktype, params, payload):
         if node is None:
-            command = f"work start {worktype} {params}\n"
-        else:
-            command = f"work submit {node} {worktype} {params}\n"
+            node = "localhost"
+        command = f"work submit {node} {worktype} {params}\n"
         self.writestr(command)
         text = self.readstr()
         m = re.compile("Work unit created with ID (.+). Send stdin data and EOF.").fullmatch(text)

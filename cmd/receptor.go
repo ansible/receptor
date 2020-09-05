@@ -26,10 +26,18 @@ type nodeCfg struct {
 func (cfg nodeCfg) Prepare() error {
 	var err error
 	if cfg.ID == "" {
-		cfg.ID, err = os.Hostname()
+		host, err := os.Hostname()
 		if err != nil {
 			return err
 		}
+		lchost := strings.ToLower(host)
+		if lchost == "localhost" || lchost[:10] == "localhost." {
+			return fmt.Errorf("no node ID specified and local host name is localhost")
+		}
+		cfg.ID = host
+	}
+	if strings.ToLower(cfg.ID) == "localhost" {
+		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
 	var allowedPeers []string
 	if cfg.AllowedPeers != "" {

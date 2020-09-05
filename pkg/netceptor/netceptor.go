@@ -541,8 +541,11 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 // All-zero seed for deterministic highwayhash
 var zerokey = make([]byte, 32)
 
-// Adds a name to the hash lookup table
+// Hash a name and add it to the lookup table
 func (s *Netceptor) addNameHash(name string) uint64 {
+	if strings.EqualFold(name, "localhost") {
+		name = s.nodeID
+	}
 	h, _ := highwayhash.New64(zerokey)
 	_, _ = h.Write([]byte(name))
 	hv := h.Sum64()
@@ -649,6 +652,9 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
 	if len(fromService) > 8 || len(toService) > 8 {
 		return fmt.Errorf("service name too long")
+	}
+	if strings.EqualFold(toNode, "localhost") {
+		toNode = s.nodeID
 	}
 	md := &messageData{
 		FromNode:    s.nodeID,

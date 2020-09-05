@@ -16,26 +16,16 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 	}
 	tokens := strings.Split(params, " ")
 	switch tokens[0] {
-	case "start", "submit":
+	case "submit":
 		var workType string
 		var workNode string
 		var paramStart int
-		if tokens[0] == "start" {
-			if len(tokens) < 2 {
-				return nil, fmt.Errorf("bad command")
-			}
-			workNode = w.nc.NodeID()
-			workType = tokens[1]
-			paramStart = 2
-		} else {
-			if len(tokens) < 3 {
-				return nil, fmt.Errorf("bad command")
-			}
-			workNode = tokens[1]
-			workType = tokens[2]
-			paramStart = 3
-
+		if len(tokens) < 3 {
+			return nil, fmt.Errorf("bad command")
 		}
+		workNode = tokens[1]
+		workType = tokens[2]
+		paramStart = 3
 		if workType == "remote" {
 			return nil, fmt.Errorf("bad command")
 		}
@@ -45,8 +35,7 @@ func (w *Workceptor) workFunc(params string, cfo controlsvc.ControlFuncOperation
 		}
 		var worker WorkUnit
 		var err error
-		// foocontroller: work submit foo workType should be run locally
-		if tokens[0] == "start" || workNode == w.nc.NodeID() {
+		if workNode == w.nc.NodeID() || strings.EqualFold(workNode, "localhost") {
 			worker, err = w.AllocateUnit(workType, params)
 		} else {
 			worker, err = w.AllocateRemoteUnit(workNode, workType, params)

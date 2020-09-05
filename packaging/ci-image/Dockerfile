@@ -1,6 +1,6 @@
 FROM fedora:32
 RUN dnf -y update && \
-  dnf -y install git golang python3 python3-pip make jq && \
+  dnf -y install git golang python3 python3-pip make jq iproute openssl && \
   dnf clean all
 RUN pip3 install pre-commit
 

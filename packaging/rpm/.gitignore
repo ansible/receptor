@@ -1,3 +1,4 @@
 # These files are auto-generated
 receptor.spec
 receptorctl.spec
+receptor-python-worker.spec

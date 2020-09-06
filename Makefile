@@ -29,7 +29,7 @@ testloop: receptor
 ci: pre-commit build-all test
 	@echo "All done"
 
-SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec
+SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec packaging/rpm/receptor-python-worker.spec
 
 specfiles: $(SPECFILES)
 

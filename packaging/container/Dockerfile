@@ -6,7 +6,7 @@ COPY RPMS/ /receptor-RPMS/
 COPY receptor.repo /etc/yum.repos.d/receptor.repo
 COPY receptor.conf /etc/receptor/receptor.conf
 
-RUN dnf -y install dumb-init receptor receptorctl && \
+RUN dnf -y install dumb-init receptor receptorctl receptor-python-worker && \
     dnf clean all
 
 RUN rm -rf /receptor-RPMs/ /etc/yum.repos.d/receptor.repo

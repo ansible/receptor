@@ -749,7 +749,10 @@ func TestWork(t *testing.T) {
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkPending(ctx, unitID)
-		nodes["node3"].Start()
+		err = nodes["node3"].Start()
+		if err != nil {
+			t.Fatal(err)
+		}
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 		err = controller.AssertWorkSucceeded(ctx, unitID)
 		if err != nil {

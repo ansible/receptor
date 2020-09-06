@@ -23,7 +23,7 @@ type nodeCfg struct {
 	DataDir      string `description:"Directory in which to store node data"`
 }
 
-func (cfg nodeCfg) Prepare() error {
+func (cfg nodeCfg) Init() error {
 	var err error
 	if cfg.ID == "" {
 		host, err := os.Hostname()
@@ -31,7 +31,7 @@ func (cfg nodeCfg) Prepare() error {
 			return err
 		}
 		lchost := strings.ToLower(host)
-		if lchost == "localhost" || lchost[:10] == "localhost." {
+		if lchost == "localhost" || strings.HasPrefix(lchost, "localhost.") {
 			return fmt.Errorf("no node ID specified and local host name is localhost")
 		}
 		cfg.ID = host
@@ -44,9 +44,12 @@ func (cfg nodeCfg) Prepare() error {
 		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
 	}
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
+	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
+	if err != nil {
+		return err
+	}
 	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
-	workceptor.MainInstance, err = workceptor.New(context.Background(),
-		controlsvc.MainInstance, netceptor.MainInstance, cfg.DataDir)
+	err = workceptor.MainInstance.RegisterWithControlService(controlsvc.MainInstance)
 	if err != nil {
 		return err
 	}
@@ -77,7 +80,7 @@ func (cfg nullBackendCfg) Run() error {
 func main() {
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, true, false, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, true, false, false, nil)
-	cmdline.ParseAndRun(os.Args[1:])
+	cmdline.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"})
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})

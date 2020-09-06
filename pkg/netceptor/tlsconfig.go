@@ -8,35 +8,6 @@ import (
 	"io/ioutil"
 )
 
-var serverConfigs = make(map[string]*tls.Config)
-var clientConfigs = make(map[string]*tls.Config)
-
-// GetServerTLSConfig retrieves a server TLS config by name
-func GetServerTLSConfig(name string) (*tls.Config, error) {
-	if name == "" {
-		return nil, nil
-	}
-	sc, ok := serverConfigs[name]
-	if !ok {
-		return nil, fmt.Errorf("unknown TLS config %s", name)
-	}
-	return sc.Clone(), nil
-}
-
-// GetClientTLSConfig retrieves a server TLS config by name
-func GetClientTLSConfig(name string, expectedHostName string) (*tls.Config, error) {
-	if name == "" {
-		return nil, nil
-	}
-	cc, ok := clientConfigs[name]
-	if !ok {
-		return nil, fmt.Errorf("unknown TLS config %s", name)
-	}
-	cc = cc.Clone()
-	cc.ServerName = expectedHostName
-	return cc, nil
-}
-
 // **************************************************************************
 // Command line
 // **************************************************************************
@@ -92,8 +63,7 @@ func (cfg TLSServerCfg) Prepare() error {
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
 
-	serverConfigs[cfg.Name] = tlscfg
-	return nil
+	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
 
 // TLSClientCfg stores the configuration options for a TLS client
@@ -141,21 +111,10 @@ func (cfg TLSClientCfg) Prepare() error {
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
 
-	clientConfigs[cfg.Name] = tlscfg
-	return nil
+	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
 }
 
 func init() {
-	err := TLSClientCfg{
-		Name:               "default",
-		Cert:               "",
-		Key:                "",
-		RootCAs:            "",
-		InsecureSkipVerify: false,
-	}.Prepare()
-	if err != nil {
-		panic(err)
-	}
 	cmdline.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, false, false, false, false, configSection)
 	cmdline.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, false, false, false, false, configSection)
 }

@@ -190,13 +190,22 @@ func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	r.CloseWrite() // close write half to signal EOF
+	err = r.CloseWrite() // close write half to signal EOF
+	if err != nil {
+		return "", err
+	}
 	response, err := r.ReadAndParseJSON()
 	if err != nil {
 		return "", err
 	}
-	r.Close() // since write is closed, we should close the whole socket
-	r.Reconnect()
+	err = r.Close() // since write is closed, we should close the whole socket
+	if err != nil {
+		return "", err
+	}
+	err = r.Reconnect()
+	if err != nil {
+		return "", err
+	}
 	unitID := fmt.Sprintf("%v", response["unitid"])
 	return unitID, nil
 }
@@ -369,8 +378,17 @@ func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, unitID string)
 }
 
 func (r *ReceptorControl) getWorkResults(unitID string, readSize int) ([]byte, error) {
-	r.WriteStr(fmt.Sprintf("work results %s\n", unitID))
-	r.ReadStr() // flush "Streaming results for.." line"
+	_, err := r.WriteStr(fmt.Sprintf("work results %s\n", unitID))
+	if err != nil {
+		return nil, err
+	}
+	str, err := r.ReadStr()
+	if err != nil {
+		return nil, err
+	}
+	if str[:5] == "ERROR" {
+		return nil, fmt.Errorf("remote error: %s", str)
+	}
 	buf := make([]byte, readSize)
 	n, err := r.socketConn.Read(buf)
 	if err != nil {
@@ -379,8 +397,14 @@ func (r *ReceptorControl) getWorkResults(unitID string, readSize int) ([]byte, e
 	if n != readSize {
 		return nil, fmt.Errorf("did not read correct size")
 	}
-	r.Close()
-	r.Reconnect()
+	err = r.Close()
+	if err != nil {
+		return nil, err
+	}
+	err = r.Reconnect()
+	if err != nil {
+		return nil, err
+	}
 	return buf, nil
 }
 

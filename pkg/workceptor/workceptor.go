@@ -33,7 +33,7 @@ type workType struct {
 }
 
 // New constructs a new Workceptor instance
-func New(ctx context.Context, cs *controlsvc.Server, nc *netceptor.Netceptor, dataDir string) (*Workceptor, error) {
+func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workceptor, error) {
 	if dataDir == "" {
 		dataDir = path.Join(os.TempDir(), "receptor")
 	}
@@ -47,11 +47,7 @@ func New(ctx context.Context, cs *controlsvc.Server, nc *netceptor.Netceptor, da
 		activeUnitsLock: &sync.RWMutex{},
 		activeUnits:     make(map[string]WorkUnit),
 	}
-	err := cs.AddControlFunc("work", w.workFunc)
-	if err != nil {
-		return nil, fmt.Errorf("could not add work control function: %s", err)
-	}
-	err = w.RegisterWorker("remote", newRemoteWorker)
+	err := w.RegisterWorker("remote", newRemoteWorker)
 	if err != nil {
 		return nil, fmt.Errorf("could not register remote worker function: %s", err)
 	}
@@ -61,13 +57,24 @@ func New(ctx context.Context, cs *controlsvc.Server, nc *netceptor.Netceptor, da
 // MainInstance is the global instance of Workceptor instantiated by the command-line main() function
 var MainInstance *Workceptor
 
-// Returns size of stdout, if it exists, or 0 otherwise
+// stdoutSize returns size of stdout, if it exists, or 0 otherwise
 func stdoutSize(unitdir string) int64 {
 	stat, err := os.Stat(path.Join(unitdir, "stdout"))
 	if err != nil {
 		return 0
 	}
 	return stat.Size()
+}
+
+// RegisterWithControlService registers this workceptor instance with a control service instance
+func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
+	err := cs.AddControlFunc("work", &workceptorCommandType{
+		w: w,
+	})
+	if err != nil {
+		return fmt.Errorf("could not add work control function: %s", err)
+	}
+	return nil
 }
 
 // RegisterWorker notifies the Workceptor of a new kind of work that can be done

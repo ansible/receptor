@@ -2,7 +2,6 @@ package workceptor
 
 import (
 	"context"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io/ioutil"
 	"os"
@@ -23,8 +22,7 @@ func TestWorkceptorJson(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 	nc := netceptor.New(nil, "test", nil)
-	cs := controlsvc.New(false, nc)
-	w, err := New(context.Background(), cs, nc, tmpdir)
+	w, err := New(context.Background(), nc, tmpdir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -494,8 +494,10 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 	return cfgObjs, nil
 }
 
-// ParseAndRun parses the command line configuration and runs the selected actions.
-func ParseAndRun(args []string) {
+// ParseAndRun parses the command line configuration and runs the selected actions.  Phases is a list of function
+// names that will be called on each config objects.  If some objects need to be configured before others, use
+// multiple phases.  Each phase is run against all objects before moving to the next phase.
+func ParseAndRun(args []string, phases []string) {
 	var accumulator *cfgObjInfo
 	var commandType reflect.Type
 	var requiredParams map[string]bool
@@ -745,12 +747,7 @@ func ParseAndRun(args []string) {
 	}
 
 	// Run phases
-
-	// Prepare implementations must not refer to anything instantiated by any other object since
-	// the other object's resources may not be initialized yet. Prepare should not return until
-	// this object is ready to be accessed/used by other objects.
-	runMethod("Prepare")
-
-	// Run implementations can assume that everyone else's Prepare has already run.
-	runMethod("Run")
+	for i := range phases {
+		runMethod(phases[i])
+	}
 }

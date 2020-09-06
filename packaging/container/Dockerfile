@@ -11,6 +11,8 @@ RUN dnf -y install dumb-init receptor receptorctl && \
 
 RUN rm -rf /receptor-RPMs/ /etc/yum.repos.d/receptor.repo
 
+ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
+
 EXPOSE 7323
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

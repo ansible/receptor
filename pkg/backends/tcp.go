@@ -231,7 +231,7 @@ func (cfg TCPListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg TCPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
+	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (cfg TCPDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	tlscfg, err := netceptor.GetClientTLSConfig(cfg.TLS, host)
+	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host)
 	if err != nil {
 		return err
 	}

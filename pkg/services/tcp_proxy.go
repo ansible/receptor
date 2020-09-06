@@ -85,11 +85,11 @@ type TCPProxyInboundCfg struct {
 // Run runs the action
 func (cfg TCPProxyInboundCfg) Run() error {
 	logger.Debug("Running TCP inbound proxy service %v\n", cfg)
-	tlsClientCfg, err := netceptor.GetClientTLSConfig(cfg.TLSClient, cfg.RemoteNode)
+	tlsClientCfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLSClient, cfg.RemoteNode)
 	if err != nil {
 		return err
 	}
-	tlsServerCfg, err := netceptor.GetServerTLSConfig(cfg.TLSServer)
+	tlsServerCfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLSServer)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ type TCPProxyOutboundCfg struct {
 // Run runs the action
 func (cfg TCPProxyOutboundCfg) Run() error {
 	logger.Debug("Running TCP inbound proxy service %s\n", cfg)
-	tlsServerCfg, err := netceptor.GetServerTLSConfig(cfg.TLSServer)
+	tlsServerCfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLSServer)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	tlsClientCfg, err := netceptor.GetClientTLSConfig(cfg.TLSClient, host)
+	tlsClientCfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLSClient, host)
 	if err != nil {
 		return err
 	}

@@ -236,7 +236,7 @@ func (cfg WebsocketListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg WebsocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
+	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (cfg WebsocketDialerCfg) Run() error {
 	if u.Scheme == "wss" && tlsCfgName == "" {
 		tlsCfgName = "default"
 	}
-	tlscfg, err := netceptor.GetClientTLSConfig(tlsCfgName, u.Hostname())
+	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(tlsCfgName, u.Hostname())
 	if err != nil {
 		return err
 	}

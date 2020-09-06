@@ -3,6 +3,7 @@ package netceptor
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -97,6 +98,8 @@ type Netceptor struct {
 	backendWaitGroup       sync.WaitGroup
 	backendCount           int
 	networkName            string
+	serverTLSConfigs       map[string]*tls.Config
+	clientTLSConfigs       map[string]*tls.Config
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -224,6 +227,8 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 		backendWaitGroup:       sync.WaitGroup{},
 		backendCount:           0,
 		networkName:            makeNetworkName(NodeID),
+		clientTLSConfigs:       make(map[string]*tls.Config),
+		serverTLSConfigs:       make(map[string]*tls.Config),
 	}
 	s.reservedServices = map[string]func(*messageData) error{
 		"ping": s.handlePing,
@@ -231,6 +236,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	s.clientTLSConfigs["default"] = &tls.Config{}
 	s.addNameHash(NodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Second*1)
@@ -536,6 +542,50 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 		i := i
 		go func() { writeChans[i] <- message }()
 	}
+}
+
+// GetServerTLSConfig retrieves a server TLS config by name
+func (s *Netceptor) GetServerTLSConfig(name string) (*tls.Config, error) {
+	if name == "" {
+		return nil, nil
+	}
+	sc, ok := s.serverTLSConfigs[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown TLS config %s", name)
+	}
+	return sc.Clone(), nil
+}
+
+// SetServerTLSConfig stores a server TLS config by name
+func (s *Netceptor) SetServerTLSConfig(name string, config *tls.Config) error {
+	if name == "" {
+		return fmt.Errorf("must provide a name")
+	}
+	s.serverTLSConfigs[name] = config
+	return nil
+}
+
+// GetClientTLSConfig retrieves a client TLS config by name
+func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string) (*tls.Config, error) {
+	if name == "" {
+		return nil, nil
+	}
+	cc, ok := s.clientTLSConfigs[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown TLS config %s", name)
+	}
+	cc = cc.Clone()
+	cc.ServerName = expectedHostName
+	return cc, nil
+}
+
+// SetClientTLSConfig stores a client TLS config by name
+func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config) error {
+	if name == "" {
+		return fmt.Errorf("must provide a name")
+	}
+	s.clientTLSConfigs[name] = config
+	return nil
 }
 
 // All-zero seed for deterministic highwayhash

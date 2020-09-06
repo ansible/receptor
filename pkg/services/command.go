@@ -60,7 +60,7 @@ type CommandSvcCfg struct {
 // Run runs the action
 func (cfg CommandSvcCfg) Run() error {
 	logger.Info("Running command service %s\n", cfg)
-	tlscfg, err := netceptor.GetServerTLSConfig(cfg.TLS)
+	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
 	}

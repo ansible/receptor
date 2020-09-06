@@ -1,0 +1,40 @@
+%define name receptor-python-worker
+%define version {{ version }}
+%define release {{ release }}%{?dist}
+
+Summary: Python worker plugin interface for Receptor
+Name: %{name}
+Version: %{version}
+Release: %{release}
+Source0: https://github.com/project-receptor/receptor/archive/%{version}/receptor-%{version}.tar.gz
+
+License: APL 2.0
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+Prefix: %{_prefix}
+BuildArch: noarch
+Url: https://github.com/project-receptor/receptor/receptor-python-worker
+
+BuildRequires: python3
+BuildRequires: python3-setuptools
+Requires: python3
+Requires: python3-setuptools
+
+%description
+receptor-python-worker is a Python worker plugin interface for Receptor
+
+%prep
+%setup -n %{name}-%{version} -c
+mv %{_builddir}/%{name}-%{version}/receptor-%{version}/receptor-python-worker/* %{_builddir}/%{name}-%{version}
+mv %{_builddir}/%{name}-%{version}/receptor-%{version}/VERSION %{_builddir}/%{name}-%{version}
+
+%build
+python3 setup.py build
+
+%install
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files -f INSTALLED_FILES
+%defattr(-,root,root)

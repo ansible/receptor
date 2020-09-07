@@ -32,6 +32,9 @@ const ServiceAdTime = 60 * time.Second
 // SeenUpdateExpireTime is the age after which routing update IDs can be discarded
 const SeenUpdateExpireTime = 1 * time.Hour
 
+// MaxForwardingHops is the maximum number of times that Netceptor will forward a data packet
+const MaxForwardingHops = 30
+
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function
 var MainInstance *Netceptor
 
@@ -134,6 +137,7 @@ type messageData struct {
 	FromService string
 	ToNode      string
 	ToService   string
+	HopCount    byte
 	Data        []byte
 }
 
@@ -239,7 +243,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s.clientTLSConfigs["default"] = &tls.Config{}
 	s.addNameHash(NodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
-	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Second*1)
+	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
 	s.sendRouteFloodChan = tickrunner.Run(s.context, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
 	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
 	go s.monitorConnectionAging()
@@ -640,43 +644,48 @@ func fixedLenBytesFromString(s string, l int) []byte {
 
 // Translates an incoming message from wire protocol to messageData object.
 func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
-	if len(data) < 33 {
+	if len(data) < 36 {
 		return nil, fmt.Errorf("data too short to be a valid message")
 	}
-	fromNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[1:9]))
+	fromNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[4:12]))
 	if err != nil {
 		return nil, err
 	}
-	toNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[9:17]))
+	toNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[12:20]))
 	if err != nil {
 		return nil, err
 	}
-	fromService := stringFromFixedLenBytes(data[17:25])
-	toService := stringFromFixedLenBytes(data[25:33])
+	fromService := stringFromFixedLenBytes(data[20:28])
+	toService := stringFromFixedLenBytes(data[28:36])
 	md := &messageData{
 		FromNode:    fromNode,
 		FromService: fromService,
 		ToNode:      toNode,
 		ToService:   toService,
-		Data:        data[33:],
+		HopCount:    data[1],
+		Data:        data[36:],
 	}
 	return md, nil
 }
 
 // Translates an outgoing message from a messageData object to wire protocol.
 func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
-	data := make([]byte, 33+len(msg.Data))
+	data := make([]byte, 36+len(msg.Data))
 	data[0] = MsgTypeData
-	binary.BigEndian.PutUint64(data[1:9], s.addNameHash(msg.FromNode))
-	binary.BigEndian.PutUint64(data[9:17], s.addNameHash(msg.ToNode))
-	copy(data[17:25], fixedLenBytesFromString(msg.FromService, 8))
-	copy(data[25:33], fixedLenBytesFromString(msg.ToService, 8))
-	copy(data[33:], msg.Data)
+	data[1] = msg.HopCount
+	binary.BigEndian.PutUint64(data[4:12], s.addNameHash(msg.FromNode))
+	binary.BigEndian.PutUint64(data[12:20], s.addNameHash(msg.ToNode))
+	copy(data[20:28], fixedLenBytesFromString(msg.FromService, 8))
+	copy(data[28:36], fixedLenBytesFromString(msg.ToService, 8))
+	copy(data[36:], msg.Data)
 	return data, nil
 }
 
 // Forwards a message to its next hop
 func (s *Netceptor) forwardMessage(md *messageData) error {
+	if md.HopCount >= MaxForwardingHops {
+		return fmt.Errorf("message reached maximum number of forwarding hops")
+	}
 	s.routingTableLock.RLock()
 	nextHop, ok := s.routingTable[md.ToNode]
 	s.routingTableLock.RUnlock()
@@ -693,6 +702,8 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	if err != nil {
 		return err
 	}
+	// increment HopCount
+	message[1]++
 	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
 	c.WriteChan <- message
 	return nil
@@ -711,6 +722,7 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 		FromService: fromService,
 		ToNode:      toNode,
 		ToService:   toService,
+		HopCount:    0,
 		Data:        data,
 	}
 	logger.Trace("--- Sending data length %d from %s:%s to %s:%s\n", len(md.Data),
@@ -869,7 +881,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 	s.flood(message, recvConn)
 	if changed {
-		s.updateRoutingTableChan <- 0
+		s.updateRoutingTableChan <- 100 * time.Millisecond
 	}
 }
 

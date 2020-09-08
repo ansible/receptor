@@ -15,6 +15,20 @@ Receptor is an overlay network intended to ease the distribution of work across 
 * _Backend_: A type of connection that Receptor nodes can pass traffic over. Current backends include TCP, UDP and websockets.
 * _Control Service_: A built-in service that usually runs under the name `control`.  Used to report status and to launch and monitor work.
 
+## How to Get It
+
+The easiest way to check out Receptor is to run it as a container.  Images are kept on the Quay registry.  To use this, run:
+```
+[docker|podman] pull docker pull quay.io/project-receptor/receptor
+[docker|podman] run -d -v /path/to/receptor.conf:/etc/receptor/receptor.conf:Z receptor
+```
+
+RPMs for Fedora 32 also exist at https://copr.fedorainfracloud.org/coprs/ghjm/Receptor/.  To install these on a Fedora 32 system, run:
+```
+dnf copr enable ghjm/Receptor
+dnf install receptor receptorctl
+```
+
 ## Use as a Go library
 
 This code can be imported and used from Go programs.  The main libraries are:

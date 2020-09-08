@@ -129,8 +129,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}
-	ctxChild, _ := context.WithTimeout(ctx, 5*time.Second)
-	response, err := utils.ReadStringContext(ctxChild, reader, '\n')
+	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
@@ -157,8 +156,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("error closing stdin file: %s", err)
 	}
-	ctxChild, _ = context.WithTimeout(ctx, 5*time.Second)
-	response, err = utils.ReadStringContext(ctxChild, reader, '\n')
+	response, err = utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
@@ -190,8 +188,7 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}
-	ctxChild, _ := context.WithTimeout(ctx, 5*time.Second)
-	response, err := utils.ReadStringContext(ctxChild, reader, '\n')
+	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
@@ -234,8 +231,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			conn = nil
 			continue
 		}
-		ctxChild, _ := context.WithTimeout(mw, 5*time.Second)
-		status, err := utils.ReadStringContext(ctxChild, reader, '\n')
+		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
 			logger.Debug("Read error reading from %s: %s\n", remoteNode, err)
 			_ = conn.Close()
@@ -319,8 +315,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				logger.Warning("Write error sending to %s: %s\n", remoteNode, err)
 				continue
 			}
-			ctxChild, _ := context.WithTimeout(mw, 5*time.Second)
-			status, err := utils.ReadStringContext(ctxChild, reader, '\n')
+			status, err := utils.ReadStringContext(mw, reader, '\n')
 			if err != nil {
 				logger.Warning("Read error reading from %s: %s\n", remoteNode, err)
 				continue

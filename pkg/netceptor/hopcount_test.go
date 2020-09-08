@@ -2,6 +2,7 @@ package netceptor
 
 import (
 	"context"
+	"github.com/prep/socketpair"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"log"
 	"strings"
@@ -40,21 +41,35 @@ func TestHopCountLimit(t *testing.T) {
 	log.SetOutput(lw)
 	logger.SetShowTrace(true)
 
-	// Create two Netceptor nodes with an in-memory connection
-	b1, b2, err := NewInMemoryBackendPair()
+	// Create two Netceptor nodes using external backends
+	n1 := New(context.Background(), "node1", nil)
+	b1, err := NewExternalBackend()
 	if err != nil {
 		t.Fatal(err)
 	}
-	n1 := New(context.Background(), "node1", nil)
 	err = n1.AddBackend(b1, 1.0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	n2 := New(context.Background(), "node2", nil)
+	b2, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = n2.AddBackend(b2, 1.0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Create a Unix socket pair and use it to connect the backends
+	c1, c2, err := socketpair.New("unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b1.NewConnection(c1, true)
+	b2.NewConnection(c2, true)
+
+	// Wait for the nodes to establish routing to each other
 	timeout, _ := context.WithTimeout(context.Background(), 2*time.Second)
 	for {
 		if timeout.Err() != nil {
@@ -67,6 +82,7 @@ func TestHopCountLimit(t *testing.T) {
 				break
 			}
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	// Inject a fake node3 that both nodes think the other node has a route to
@@ -90,9 +106,8 @@ func TestHopCountLimit(t *testing.T) {
 	}
 
 	// If the hop count limit is not working, the connections will never become inactive
-	*b1.lastActivity = time.Now()
 	timeout, _ = context.WithTimeout(context.Background(), 2*time.Second)
-	for time.Now().Sub(*b1.lastActivity) < 250*time.Millisecond {
+	for time.Now().Sub(n1.connections["node2"].lastReceivedData) < 250*time.Millisecond {
 		select {
 		case <-timeout.Done():
 			t.Fatal(timeout.Err())

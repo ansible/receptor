@@ -46,7 +46,7 @@ func TestMeshStartup(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 			t.Logf("waiting for mesh")
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -138,7 +138,7 @@ func TestMeshShutdown(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -292,7 +292,7 @@ func TestTCPSSLConnections(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -402,7 +402,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
@@ -501,7 +501,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
@@ -563,7 +563,7 @@ func TestCosts(t *testing.T) {
 	defer mesh.WaitForShutdown()
 	defer mesh.Destroy()
 
-	ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 	err = mesh.WaitForReady(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -648,7 +648,7 @@ func TestWork(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 		err = mesh.WaitForReady(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -833,7 +833,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 		err = mesh.WaitForReady(ctx)
 		if err != nil {
 			b.Fatal(err)

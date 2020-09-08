@@ -28,19 +28,13 @@ func (ID *IncrementalDuration) Reset() {
 	ID.duration = ID.initialDuration
 }
 
-// Duration returns current duration
-func (ID *IncrementalDuration) Duration() time.Duration {
-	return ID.duration
-}
-
-// IncreaseDuration increases the current duration using multiplier
-func (ID *IncrementalDuration) IncreaseDuration() {
+func (ID *IncrementalDuration) increaseDuration() {
 	ID.duration = time.Duration(math.Min(ID.multiplier*float64(ID.duration), float64(ID.maxDuration)))
 }
 
 // NextTimeout returns a timeout channel based on current duration
 func (ID *IncrementalDuration) NextTimeout() <-chan time.Time {
 	ch := time.After(ID.duration)
-	ID.IncreaseDuration()
+	ID.increaseDuration()
 	return ch
 }

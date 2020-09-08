@@ -137,7 +137,7 @@ type messageData struct {
 	FromService string
 	ToNode      string
 	ToService   string
-	HopCount    byte
+	HopsToLive  byte
 	Data        []byte
 }
 
@@ -662,7 +662,7 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 		FromService: fromService,
 		ToNode:      toNode,
 		ToService:   toService,
-		HopCount:    data[1],
+		HopsToLive:  data[1],
 		Data:        data[36:],
 	}
 	return md, nil
@@ -672,7 +672,7 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 	data := make([]byte, 36+len(msg.Data))
 	data[0] = MsgTypeData
-	data[1] = msg.HopCount
+	data[1] = msg.HopsToLive
 	binary.BigEndian.PutUint64(data[4:12], s.addNameHash(msg.FromNode))
 	binary.BigEndian.PutUint64(data[12:20], s.addNameHash(msg.ToNode))
 	copy(data[20:28], fixedLenBytesFromString(msg.FromService, 8))
@@ -683,7 +683,7 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 
 // Forwards a message to its next hop
 func (s *Netceptor) forwardMessage(md *messageData) error {
-	if md.HopCount >= MaxForwardingHops {
+	if md.HopsToLive <= 0 {
 		return fmt.Errorf("message reached maximum number of forwarding hops")
 	}
 	s.routingTableLock.RLock()
@@ -702,8 +702,8 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	if err != nil {
 		return err
 	}
-	// increment HopCount
-	message[1]++
+	// decrement HopsToLive
+	message[1]--
 	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
 	c.WriteChan <- message
 	return nil
@@ -722,7 +722,7 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 		FromService: fromService,
 		ToNode:      toNode,
 		ToService:   toService,
-		HopCount:    0,
+		HopsToLive:  MaxForwardingHops,
 		Data:        data,
 	}
 	logger.Trace("--- Sending data length %d from %s:%s to %s:%s\n", len(md.Data),

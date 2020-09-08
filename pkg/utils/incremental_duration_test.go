@@ -2,25 +2,28 @@ package utils
 
 import (
 	"testing"
+	"time"
 )
 
 func TestIncrementalDuration(t *testing.T) {
-	delay := NewIncrementalDuration(10, 100, 2.0)
-	if delay.Duration != 10 {
+	delay := NewIncrementalDuration(1*time.Second, 10*time.Second, 2.0)
+	if delay.Duration() != 1*time.Second {
 		t.Fail()
 	}
-	delay.NextDelay()
-	if delay.Duration != 20 {
+	select {
+	case <-delay.NextTimeout():
+	}
+	if delay.Duration() != 2*time.Second {
 		t.Fail()
 	}
 	delay.Reset()
-	if delay.Duration != 10 {
+	if delay.Duration() != 1*time.Second {
 		t.Fail()
 	}
 	for i := 0; i <= 10; i++ {
-		delay.NextDelay()
+		delay.IncreaseDuration()
 	}
-	if delay.Duration != 100 {
+	if delay.Duration() != 10*time.Second {
 		t.Fail()
 	}
 }

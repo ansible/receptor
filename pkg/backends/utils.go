@@ -53,8 +53,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					logger.Warning("Backend connection exited (will retry)\n")
 				}
 				select {
-				case <-time.After(redialDelayInc.Duration):
-					redialDelayInc.NextDelay()
+				case <-redialDelayInc.NextTimeout():
 					continue
 				case <-ctx.Done():
 					return

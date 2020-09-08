@@ -1,64 +1,47 @@
-# Python Receptor and the 0.6 versions
-
-As of June 25th, this repo is the Go implementation of Receptor. If you are
-looking for the older Python version of Receptor, including any 0.6.x version,
-it is now located at https://github.com/project-receptor/python-receptor.
-
----
-
 Receptor
 ========
 
-Receptor is an overlay network intended to ease the distribution of 
-work across a large and dispersed collection of workers.  Receptor nodes
-establish peer-to-peer connections with each other via existing networks.
-Once connected, the Receptor mesh provides datagram (UDP-like) and stream
-(TCP-like) capabilities to applications, as well as robust unit-of-work
-handling with resiliency against transient network failures.
+Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers.  Receptor nodes establish peer-to-peer connections with each other via existing networks.  Once connected, the Receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.
 
-Terminology and Concepts
+## Terminology and Concepts
 
+* _Receptor_: The Receptor application taken as a whole, that typically runs as a daemon.
+* _Receptorctl_: A user-facing command line used to interact with Receptor, typically over a Unix domain socket.
+* _Netceptor_: The networking part of Receptor.  Usable as a Go library.
+* _Workceptor_: The unit-of-work handling of Receptor, which makes use of Netceptor.  Also usable as a Go library.
 * _Node_: A single running instance of Receptor.
-* _Node ID_: The network address of a Receptor node.  Currently a simple string.
-* _Service_: An up-to-8-character string identifying an endpoint on a Receptor
-  node that can receive messages.  Analogous to a port number in TCP or UDP.
-* _Backend_: A type of connection between nodes that the Receptor network
-  protocol can run over.  Current backends include TCP, UDP and websockets.
-* _Unit of work_: A single task that is intended to be run on a node.  For
-  example, a command invocation or an Ansible playbook.
-* _Response_: A single item from a stream of responses arising from the
-  execution of a unit of work.  For Ansible playbooks, these are job events.
-* _Controller_: An application-level process that creates units of work and
-  sends them to nodes to be executed.
-* _Worker_: A process that binds to a Receptor service and registers itself as
-  capable of executing jobs of a particular type.
+* _Node ID_: An arbitrary string identifying a single node, analogous to an IP address.
+* _Service_: An up-to-8-character string identifying an endpoint on a Receptor node that can receive messages.  Analogous to a port number in TCP or UDP.
+* _Backend_: A type of connection that Receptor nodes can pass traffic over. Current backends include TCP, UDP and websockets.
+* _Control Service_: A built-in service that usually runs under the name `control`.  Used to report status and to launch and monitor work.
 
-Use as a Go library
+## Use as a Go library
 
-This code can be imported and used from Go programs.  The main libraries are
-`netceptor`, which implements the network protocol, and `workceptor` which
-implements the unit-of-work handling.  See the `example/` directory for
-examples of using these libraries from Go.
+This code can be imported and used from Go programs.  The main libraries are:
 
-Use as a command-line tool
+* _Netceptor_: https://pkg.go.dev/github.com/project-receptor/receptor/pkg/netceptor
+* _Workceptor_: https://pkg.go.dev/github.com/project-receptor/receptor/pkg/workceptor
 
-The `receptor` command runs a Receptor node with access to all included
-backends and services.  See `receptor --help` for details.
+See the `example/` directory for examples of using these libraries from Go.
 
-Proxy services
+## Use as a command-line tool
 
-The command-line tool includes services that implement network proxies
-via TCP, UDP or (on Linux) tun interfaces.  For example, the following
-command will start a TCP proxy that listens for TCP connections on port
-1234 on localhost, and then forwards each connection to port 4321.
+The `receptor` command runs a Receptor node with access to all included backends and services.  See `receptor --help` for details.
 
-```sh
-receptor --node-id standalone --local-only \
-    --tcp-inbound-proxy port=1234 remotenode=standalone remoteservice=proxy \
-    --tcp-outbound-proxy address=localhost:4321 service=proxy
+The command line is organized into entities which take parameters, like: `receptor --entity1 param1=value1 param2=value1 --entity2 param1=value2 param2=value2`.  In this case we are configuring two things, entity1 and entity2, each of which takes two parameters.  Distinct entities are marked with a double dash, and bare parameters attach to the immediately preceding entity.
+
+Receptor can also take its configuration from a file in YAML format.  The allowed directives are the same as on the command line, with a top level list of entities and each entity receiving zero or more parameters as a dict.  The above command in YAML format would look like this:
+
+```
+---
+- entity1:
+    param1: value1
+    param2: value1
+- entity2:
+    param1: value2
+    param2: value2
 ```
 
-Unit-of-work handling
+## Python Receptor and the 0.6 versions
 
-The `workceptor` library will handle unit-of-work management.  This is still
-in progress.
+As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at https://github.com/project-receptor/python-receptor.

@@ -129,8 +129,9 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}
-	response, err := reader.ReadString('\n')
+	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
+		conn.Close()
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	submitIDRegex := regexp.MustCompile("with ID ([a-zA-Z0-9]+)\\.")
@@ -155,8 +156,9 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("error closing stdin file: %s", err)
 	}
-	response, err = reader.ReadString('\n')
+	response, err = utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
+		conn.Close()
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	resultErrorRegex := regexp.MustCompile("ERROR: (.*)")
@@ -186,8 +188,9 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}
-	response, err := reader.ReadString('\n')
+	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
+		conn.Close()
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	if response[:5] == "ERROR" {
@@ -228,7 +231,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			conn = nil
 			continue
 		}
-		status, err := reader.ReadString('\n')
+		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
 			logger.Debug("Read error reading from %s: %s\n", remoteNode, err)
 			_ = conn.Close()
@@ -312,7 +315,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				logger.Warning("Write error sending to %s: %s\n", remoteNode, err)
 				continue
 			}
-			status, err := reader.ReadString('\n')
+			status, err := utils.ReadStringContext(mw, reader, '\n')
 			if err != nil {
 				logger.Warning("Read error reading from %s: %s\n", remoteNode, err)
 				continue

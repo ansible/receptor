@@ -125,7 +125,7 @@ func GenerateCert(dir, name string) (keyPath, certPath string, e error) {
 	KeyPath := filepath.Join(dir, name+".key")
 	CrtPath := filepath.Join(dir, name+".crt")
 	// Create our private key
-	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
+	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "2048")
 	err := cmd.Run()
 	if err != nil {
 		return "", "", err
@@ -146,7 +146,7 @@ func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPa
 	CrtPath := filepath.Join(dir, name+".crt")
 	CSRPath := filepath.Join(dir, name+".csa")
 	// Create our private key
-	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
+	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "2048")
 	err := cmd.Run()
 	if err != nil {
 		return "", "", err

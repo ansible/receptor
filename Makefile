@@ -119,6 +119,10 @@ container: .container-flag-$(VERSION)
 	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t receptor:latest $(if $(OFFICIAL),-t receptor:$(VERSION),)
 	@touch .container-flag-$(VERSION)
 
+tc-image: container
+	@cp receptor packaging/tc-image/
+	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
+
 clean:
 	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)
 	@rm -rfv rpmbuild/

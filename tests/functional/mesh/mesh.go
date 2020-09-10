@@ -8,7 +8,7 @@ import (
 )
 
 // Node Defines the interface for nodes made using the CLI, Library, and
-// eventually Docker
+// containers
 type Node interface {
 	Dir() string
 	Status() (*netceptor.Status, error)
@@ -20,7 +20,7 @@ type Node interface {
 }
 
 // Mesh Defines the interface for meshes made using the CLI, Library, and
-// eventually Docker
+// containers
 type Mesh interface {
 	Dir() string
 	Nodes() map[string]Node
@@ -46,9 +46,27 @@ type YamlConnection struct {
 	TLS   string
 }
 
+// TCRuleYaml represents the rules to apply to the receptor container interface, note this only has
+// effect on docker receptor nodes, and podman receptor nodes run by root
+type TCRuleYaml struct {
+	// Adds delay to the interface
+	Delay string
+	// Adds jitter to the interface, can only be used if Delay is set
+	Jitter string
+	// Adds a percentage of loss to the interface
+	Loss string
+	// Adds a percentage of out of order packets
+	Reordering string
+	// Adds a percentage of duplicated packets
+	Duplication string
+	// Corrupts a percentage of packets
+	Corrupt string
+}
+
 // YamlNode describes how a single node should be represented in yaml
 type YamlNode struct {
 	Connections map[string]YamlConnection
+	TCRules     *TCRuleYaml
 	Nodedef     []interface{}
 }
 

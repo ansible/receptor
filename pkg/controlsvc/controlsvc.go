@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 )
 
 // ControlCommandType is a type of command that can be run from the control service
@@ -35,172 +34,6 @@ type ControlFuncOperations interface {
 	ReadFromConn(message string, out io.Writer) error
 	WriteToConn(message string, in chan []byte) error
 	Close() error
-}
-
-type pingCommandType struct{}
-type pingCommand struct {
-	target string
-}
-
-func (t *pingCommandType) InitFromString(params string) (ControlCommand, error) {
-	if params == "" {
-		return nil, fmt.Errorf("no ping target")
-	}
-	c := &pingCommand{
-		target: params,
-	}
-	return c, nil
-}
-
-func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
-	target, ok := config["target"]
-	if !ok {
-		return nil, fmt.Errorf("no ping target")
-	}
-	targetStr, ok := target.(string)
-	if !ok {
-		return nil, fmt.Errorf("ping target must be string")
-	}
-	c := &pingCommand{
-		target: targetStr,
-	}
-	return c, nil
-}
-
-func (c *pingCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
-	pc, err := nc.ListenPacket("")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = pc.Close()
-	}()
-	startTime := time.Now()
-	replyChan := make(chan net.Addr)
-	go func() {
-		buf := make([]byte, 8)
-		_, addr, err := pc.ReadFrom(buf)
-		if err == nil {
-			replyChan <- addr
-		}
-	}()
-	_, err = pc.WriteTo([]byte{}, nc.NewAddr(c.target, "ping"))
-	if err != nil {
-		return nil, err
-	}
-	cfr := make(map[string]interface{})
-	select {
-	case addr := <-replyChan:
-		cfr["Result"] = fmt.Sprintf("Reply from %s in %s", addr.String(), time.Since(startTime))
-	case <-time.After(10 * time.Second):
-		cfr["Result"] = "Timeout waiting for ping response"
-	}
-	return cfr, nil
-}
-
-type statusCommandType struct{}
-type statusCommand struct{}
-
-func (t *statusCommandType) InitFromString(params string) (ControlCommand, error) {
-	if params != "" {
-		return nil, fmt.Errorf("status command does not take parameters")
-	}
-	c := &statusCommand{}
-	return c, nil
-}
-
-func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
-	c := &statusCommand{}
-	return c, nil
-}
-
-func (c *statusCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
-	status := nc.Status()
-	cfr := make(map[string]interface{})
-	cfr["NodeID"] = status.NodeID
-	cfr["Connections"] = status.Connections
-	cfr["RoutingTable"] = status.RoutingTable
-	cfr["Advertisements"] = status.Advertisements
-	cfr["KnownConnectionCosts"] = status.KnownConnectionCosts
-	return cfr, nil
-}
-
-type connectCommandType struct{}
-type connectCommand struct {
-	targetNode    string
-	targetService string
-	tlsConfigName string
-}
-
-func (t *connectCommandType) InitFromString(params string) (ControlCommand, error) {
-	tokens := strings.Split(params, " ")
-	if len(tokens) < 2 {
-		return nil, fmt.Errorf("no connect target")
-	}
-	if len(tokens) > 3 {
-		return nil, fmt.Errorf("too many parameters")
-	}
-	var tlsConfigName string
-	if len(tokens) == 3 {
-		tlsConfigName = tokens[2]
-	}
-	c := &connectCommand{
-		targetNode:    tokens[0],
-		targetService: tokens[1],
-		tlsConfigName: tlsConfigName,
-	}
-	return c, nil
-}
-
-func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
-	targetNode, ok := config["node"]
-	if !ok {
-		return nil, fmt.Errorf("no connect target node")
-	}
-	targetNodeStr, ok := targetNode.(string)
-	if !ok {
-		return nil, fmt.Errorf("connect target node must be string")
-	}
-	targetService, ok := config["service"]
-	if !ok {
-		return nil, fmt.Errorf("no connect target service")
-	}
-	targetServiceStr, ok := targetService.(string)
-	if !ok {
-		return nil, fmt.Errorf("connect target service must be string")
-	}
-	var tlsConfigStr string
-	tlsConfig, ok := config["tls"]
-	if ok {
-		tlsConfigStr, ok = tlsConfig.(string)
-		if !ok {
-			return nil, fmt.Errorf("connect tls name must be string")
-		}
-	} else {
-		tlsConfigStr = ""
-	}
-	c := &connectCommand{
-		targetNode:    targetNodeStr,
-		targetService: targetServiceStr,
-		tlsConfigName: tlsConfigStr,
-	}
-	return c, nil
-}
-
-func (c *connectCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
-	tlscfg, err := nc.GetClientTLSConfig(c.tlsConfigName, c.targetNode)
-	if err != nil {
-		return nil, err
-	}
-	rc, err := nc.Dial(c.targetNode, c.targetService, tlscfg)
-	if err != nil {
-		return nil, err
-	}
-	err = cfo.BridgeConn("Connecting\n", rc, "connected service")
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
 }
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions
@@ -274,6 +107,7 @@ func New(stdServices bool, nc *netceptor.Netceptor) *Server {
 		s.controlTypes["ping"] = &pingCommandType{}
 		s.controlTypes["status"] = &statusCommandType{}
 		s.controlTypes["connect"] = &connectCommandType{}
+		s.controlTypes["traceroute"] = &tracerouteCommandType{}
 	}
 	return s
 }

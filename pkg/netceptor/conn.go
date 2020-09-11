@@ -55,7 +55,9 @@ func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config,
 		recvChan:     make(chan *messageData),
 		advertise:    advertise,
 		adTags:       adTags,
+		hopsToLive:   MaxForwardingHops,
 	}
+	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
 	if tls == nil {
 		tls = generateServerTLSConfig()
@@ -183,9 +185,9 @@ func (li *Listener) acceptLoop() {
 				doneOnce: &sync.Once{},
 				ctx:      cctx,
 			}
-			ra, ok := conn.RemoteAddr().(*Addr)
+			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
-				go monitorUnreachable(li.s, doneChan, *ra, ccancel)
+				go monitorUnreachable(li.pc, doneChan, rAddr, ccancel)
 			}
 			go func() {
 				select {
@@ -284,7 +286,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		}
 	}()
 	doneChan := make(chan struct{}, 1)
-	go monitorUnreachable(s, doneChan, rAddr, ccancel)
+	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tls, cfg)
 	if err != nil {
 		close(okChan)
@@ -340,19 +342,26 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	return conn, nil
 }
 
-func monitorUnreachable(s *Netceptor, doneChan chan struct{}, remoteAddr Addr, cancel utils.CancelWithErrFunc) {
-	msgCh := s.unreachableBroker.Subscribe()
-	defer s.unreachableBroker.Unsubscribe(msgCh)
+// monitorUnreachable receives unreachable messages from the underlying PacketConn, and ends the connection
+// if the remote service has gone away.
+func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel utils.CancelWithErrFunc) {
+	msgCh := pc.SubscribeUnreachable()
 	for {
 		select {
-		case <-s.context.Done():
+		case <-pc.context.Done():
 			return
 		case <-doneChan:
 			return
-		case msgRaw := <-msgCh:
-			msg, ok := msgRaw.(map[string]string)
-			if ok && msg["Problem"] == "service unknown" {
-				if ok && remoteAddr.node == msg["FromNode"] && remoteAddr.service == msg["Service"] {
+		case msg := <-msgCh:
+			problem, ok := msg["Problem"]
+			if ok && problem == "service unknown" {
+				toNode, ok1 := msg["ToNode"]
+				toService, ok2 := msg["ToService"]
+				problem, ok3 := msg["Problem"]
+				if !ok1 || !ok2 || !ok3 {
+					continue
+				}
+				if problem == ProblemServiceUnknown && toNode == remoteAddr.node && toService == remoteAddr.service {
 					cancel(fmt.Errorf("remote service unreachable"))
 				}
 			}

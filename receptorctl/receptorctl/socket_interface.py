@@ -74,14 +74,6 @@ class ReceptorControl:
                 pass
             self.socket = None
 
-    def ping(self, node):
-        try:
-            result = self.simple_command(f"ping {node}")
-            success = str.startswith(result['Result'], "Reply")
-            return success, result['Result']
-        except RuntimeError as e:
-            return False, e
-
     def connect_to_service(self, node, service):
         self.writestr(f"connect {node} {service}\n")
         text = self.readstr()

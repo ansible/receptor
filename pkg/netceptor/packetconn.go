@@ -1,20 +1,27 @@
 package netceptor
 
 import (
+	"context"
 	"fmt"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"time"
 )
 
 // PacketConn implements the net.PacketConn interface via the Receptor network
 type PacketConn struct {
-	s             *Netceptor
-	localService  string
-	recvChan      chan *messageData
-	readDeadline  time.Time
-	writeDeadline time.Time
-	advertise     bool
-	adTags        map[string]string
+	s                  *Netceptor
+	localService       string
+	recvChan           chan *messageData
+	readDeadline       time.Time
+	writeDeadline      time.Time
+	advertise          bool
+	adTags             map[string]string
+	hopsToLive         byte
+	unreachableMsgChan chan map[string]string
+	unreachableSubs    *utils.Broker
+	context            context.Context
+	cancel             context.CancelFunc
 }
 
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
@@ -40,7 +47,9 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 		recvChan:     make(chan *messageData),
 		advertise:    false,
 		adTags:       nil,
+		hopsToLive:   MaxForwardingHops,
 	}
+	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
 	return pc, nil
 }
@@ -58,15 +67,49 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	return pc, nil
 }
 
+// startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages
+func (pc *PacketConn) startUnreachable() {
+	pc.context, pc.cancel = context.WithCancel(pc.s.context)
+	pc.unreachableSubs = utils.NewBroker(pc.context)
+	pc.unreachableMsgChan = pc.s.unreachableBroker.Subscribe()
+	go func() {
+		for {
+			select {
+			case <-pc.context.Done():
+				return
+			case msg := <-pc.unreachableMsgChan:
+				FromNode, ok1 := msg["FromNode"]
+				FromService, ok2 := msg["FromService"]
+				if !ok1 || !ok2 {
+					continue
+				}
+				if FromNode == pc.s.nodeID && FromService == pc.localService {
+					pc.unreachableSubs.Publish(msg)
+				}
+			}
+		}
+	}()
+}
+
+// SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn
+func (pc *PacketConn) SubscribeUnreachable() chan map[string]string {
+	return pc.unreachableSubs.Subscribe()
+}
+
+// UnsubscribeUnreachable unsubscribes from a previous subscription
+func (pc *PacketConn) UnsubscribeUnreachable(msgCh chan map[string]string) {
+	pc.unreachableSubs.Unsubscribe(msgCh)
+}
+
 // ReadFrom reads a packet from the network and returns its data and address.
-func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	var m *messageData
-	if nc.readDeadline.IsZero() {
-		m = <-nc.recvChan
+	if pc.readDeadline.IsZero() {
+		m = <-pc.recvChan
 	} else {
 		select {
-		case m = <-nc.recvChan:
-		case <-time.After(time.Until(nc.readDeadline)):
+		case m = <-pc.recvChan:
+		case <-time.After(time.Until(pc.readDeadline)):
 			return 0, nil, ErrTimeout
 		}
 	}
@@ -75,7 +118,7 @@ func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	}
 	nCopied := copy(p, m.Data)
 	fromAddr := Addr{
-		network: nc.s.networkName,
+		network: pc.s.networkName,
 		node:    m.FromNode,
 		service: m.FromService,
 	}
@@ -83,40 +126,48 @@ func (nc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 }
 
 // WriteTo writes a packet to an address on the network.
-func (nc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+func (pc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	ncaddr, ok := addr.(Addr)
 	if !ok {
 		return 0, fmt.Errorf("attempt to write to non-netceptor address")
 	}
-	err = nc.s.sendMessage(nc.localService, ncaddr.node, ncaddr.service, p)
+	err = pc.s.sendMessageWithHopsToLive(pc.localService, ncaddr.node, ncaddr.service, p, pc.hopsToLive)
 	if err != nil {
 		return 0, err
 	}
 	return len(p), nil
 }
 
+// SetHopsToLive sets the HopsToLive value for future outgoing packets on this connection.
+func (pc *PacketConn) SetHopsToLive(hopsToLive byte) {
+	pc.hopsToLive = hopsToLive
+}
+
 // LocalService returns the local service name of the connection.
-func (nc *PacketConn) LocalService() string {
-	return nc.localService
+func (pc *PacketConn) LocalService() string {
+	return pc.localService
 }
 
 // LocalAddr returns the local address the connection is bound to.
-func (nc *PacketConn) LocalAddr() net.Addr {
+func (pc *PacketConn) LocalAddr() net.Addr {
 	return Addr{
-		network: nc.s.networkName,
-		node:    nc.s.nodeID,
-		service: nc.localService,
+		network: pc.s.networkName,
+		node:    pc.s.nodeID,
+		service: pc.localService,
 	}
 }
 
 // Close closes the connection.
-func (nc *PacketConn) Close() error {
-	nc.s.listenerLock.Lock()
-	defer nc.s.listenerLock.Unlock()
-	delete(nc.s.listenerRegistry, nc.localService)
-	close(nc.recvChan)
-	if nc.advertise {
-		err := nc.s.removeLocalServiceAdvertisement(nc.localService)
+func (pc *PacketConn) Close() error {
+	pc.s.listenerLock.Lock()
+	defer pc.s.listenerLock.Unlock()
+	delete(pc.s.listenerRegistry, pc.localService)
+	close(pc.recvChan)
+	if pc.cancel != nil {
+		pc.cancel()
+	}
+	if pc.advertise {
+		err := pc.s.removeLocalServiceAdvertisement(pc.localService)
 		if err != nil {
 			return err
 		}
@@ -125,19 +176,19 @@ func (nc *PacketConn) Close() error {
 }
 
 // SetDeadline sets both the read and write deadlines.
-func (nc *PacketConn) SetDeadline(t time.Time) error {
-	nc.readDeadline = t
+func (pc *PacketConn) SetDeadline(t time.Time) error {
+	pc.readDeadline = t
 	return nil
 }
 
 // SetReadDeadline sets the read deadline.
-func (nc *PacketConn) SetReadDeadline(t time.Time) error {
-	nc.readDeadline = t
+func (pc *PacketConn) SetReadDeadline(t time.Time) error {
+	pc.readDeadline = t
 	return nil
 }
 
 // SetWriteDeadline sets the write deadline.
-func (nc *PacketConn) SetWriteDeadline(t time.Time) error {
+func (pc *PacketConn) SetWriteDeadline(t time.Time) error {
 	// Write deadline doesn't mean anything because Write() implementation is non-blocking.
 	return nil
 }

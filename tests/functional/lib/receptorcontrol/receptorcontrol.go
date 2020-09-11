@@ -145,24 +145,20 @@ func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 }
 
 // Ping pings the specified node
-func (r *ReceptorControl) Ping(node string) (map[string]string, error) {
+func (r *ReceptorControl) Ping(node string) (string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("ping %s\n", node))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	jsonData, err := r.ReadAndParseJSON()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	pingData := make(map[string]string)
-	// Convert to map[string]string
-	for k, v := range jsonData {
-		pingData[k] = v.(string)
+	success := jsonData["Success"].(bool)
+	if !success {
+		return "", errors.New(jsonData["Error"].(string))
 	}
-	if strings.HasPrefix(pingData["Result"], "Reply") != true {
-		return nil, errors.New(pingData["Result"])
-	}
-	return pingData, nil
+	return fmt.Sprintf("Reply from %s in %s", jsonData["From"].(string), jsonData["TimeStr"].(string)), nil
 }
 
 // Status retrieves the status of the current node

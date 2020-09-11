@@ -107,7 +107,14 @@ func TestHopCountLimit(t *testing.T) {
 
 	// If the hop count limit is not working, the connections will never become inactive
 	timeout, _ = context.WithTimeout(context.Background(), 2*time.Second)
-	for time.Now().Sub(n1.connections["node2"].lastReceivedData) < 250*time.Millisecond {
+	for {
+		c, ok := n1.connections["node2"]
+		if !ok {
+			t.Fatal("node2 disappeared from node1's connections")
+		}
+		if time.Since(c.lastReceivedData) > 250*time.Millisecond {
+			break
+		}
 		select {
 		case <-timeout.Done():
 			t.Fatal(timeout.Err())

@@ -134,6 +134,13 @@ const (
 	MsgTypeReject = 3
 )
 
+const (
+	// ProblemServiceUnknown occurs when a message arrives for a non-listening service
+	ProblemServiceUnknown = "service unknown"
+	// ProblemExpiredInTransit occurs when a message's HopsToLive expires in transit
+	ProblemExpiredInTransit = "message expired"
+)
+
 type messageData struct {
 	FromNode    string
 	FromService string
@@ -690,10 +697,14 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	if md.HopsToLive <= 0 {
 		if md.FromService != "unreach" {
 			_ = s.sendUnreachable(md.FromNode, map[string]string{
-				"Problem": "message expired",
+				"FromNode":    md.FromNode,
+				"ToNode":      md.ToNode,
+				"FromService": md.FromService,
+				"ToService":   md.ToService,
+				"Problem":     ProblemExpiredInTransit,
 			})
 		}
-		return fmt.Errorf("message reached maximum number of forwarding hops")
+		return nil
 	}
 	s.routingTableLock.RLock()
 	nextHop, ok := s.routingTable[md.ToNode]
@@ -718,8 +729,8 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	return nil
 }
 
-// Generates and sends a message over the Receptor network
-func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
+// Generates and sends a message over the Receptor network, specifying HopsToLive
+func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
 	if len(fromService) > 8 || len(toService) > 8 {
 		return fmt.Errorf("service name too long")
 	}
@@ -731,12 +742,17 @@ func (s *Netceptor) sendMessage(fromService string, toNode string, toService str
 		FromService: fromService,
 		ToNode:      toNode,
 		ToService:   toService,
-		HopsToLive:  MaxForwardingHops,
+		HopsToLive:  hopsToLive,
 		Data:        data,
 	}
 	logger.Trace("--- Sending data length %d from %s:%s to %s:%s\n", len(md.Data),
 		md.FromNode, md.FromService, md.ToNode, md.ToService)
 	return s.handleMessageData(md)
+}
+
+// Generates and sends a message over the Receptor network
+func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
+	return s.sendMessageWithHopsToLive(fromService, toNode, toService, data, MaxForwardingHops)
 }
 
 // Returns an unused random service name to use as the equivalent of a TCP/IP ephemeral port number.
@@ -906,7 +922,7 @@ func (s *Netceptor) handleUnreachable(md *messageData) error {
 	if err != nil {
 		return err
 	}
-	unrData["FromNode"] = md.FromNode
+	unrData["ReceivedFromNode"] = md.FromNode
 	logger.Warning("Received unreachable message from %s", md.FromNode)
 	s.unreachableBroker.Publish(unrData)
 	return nil
@@ -948,11 +964,17 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 		pc, ok := s.listenerRegistry[md.ToService]
 		s.listenerLock.RUnlock()
 		if !ok {
+			if md.FromNode == s.nodeID {
+				return fmt.Errorf(ProblemServiceUnknown)
+			}
 			_ = s.sendUnreachable(md.FromNode, map[string]string{
-				"Service": md.ToService,
-				"Problem": "service unknown",
+				"FromNode":    md.FromNode,
+				"ToNode":      md.ToNode,
+				"FromService": md.FromService,
+				"ToService":   md.ToService,
+				"Problem":     ProblemServiceUnknown,
 			})
-			return fmt.Errorf("received message for unknown service %s", md.ToService)
+			return nil
 		}
 		pc.recvChan <- md
 		return nil

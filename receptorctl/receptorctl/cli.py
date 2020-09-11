@@ -112,13 +112,30 @@ def status(ctx):
 def ping(ctx, node, count, delay):
     rc = get_rc(ctx)
     for i in range(count):
-        success, detail = rc.ping(node)
-        if success:
-            print(detail)
+        results = rc.simple_command(f"ping {node}")
+        if "Success" in results and results["Success"]:
+            print(f"Reply from {results['From']} in {results['TimeStr']}")
         else:
-            print("FAILED:", detail)
+            if "From" in results and "TimeStr" in results:
+                print(f"Error {results['Error']} from {results['From']} in {results['TimeStr']}")
+            else:
+                print(f"Error: {results['Error']}")
         if i < count-1:
             time.sleep(delay)
+
+
+@cli.command(help="Do a traceroute to a Receptor node.")
+@click.pass_context
+@click.argument('node')
+def traceroute(ctx, node):
+    rc = get_rc(ctx)
+    results = rc.simple_command(f"traceroute {node}")
+    for resno in sorted(results, key=lambda r: int(r)):
+        resval = results[resno]
+        if 'Error' in resval:
+            print(f"{resno}: Error {resval['Error']} from {resval['From']} in {resval['TimeStr']}")
+        else:
+            print(f"{resno}: {resval['From']} in {resval['TimeStr']}")
 
 
 @cli.command(help="Connect the local terminal to a Receptor service on a remote node.")
@@ -156,6 +173,7 @@ def connect(ctx, node, service, raw):
                     rc.socket.send(data.encode())
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, stdin_tattrs)
+        print()
 
 
 @cli.group(help="Commands related to unit-of-work processing")

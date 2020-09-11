@@ -12,6 +12,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/randstr"
 	"github.com/project-receptor/receptor/pkg/tickrunner"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"math"
 	"reflect"
@@ -103,6 +104,7 @@ type Netceptor struct {
 	networkName            string
 	serverTLSConfigs       map[string]*tls.Config
 	clientTLSConfigs       map[string]*tls.Config
+	unreachableBroker      *utils.Broker
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -128,7 +130,7 @@ const (
 	MsgTypeRoute = 1
 	// MsgTypeServiceAdvertisement is an advertisement for a service
 	MsgTypeServiceAdvertisement = 2
-	// MsgTypeReject indicates a rejection
+	// MsgTypeReject indicates a rejection (closure) of a backend connection
 	MsgTypeReject = 3
 )
 
@@ -235,7 +237,8 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 		serverTLSConfigs:       make(map[string]*tls.Config),
 	}
 	s.reservedServices = map[string]func(*messageData) error{
-		"ping": s.handlePing,
+		"ping":    s.handlePing,
+		"unreach": s.handleUnreachable,
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -243,6 +246,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s.clientTLSConfigs["default"] = &tls.Config{}
 	s.addNameHash(NodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
+	s.unreachableBroker = utils.NewBroker(s.context)
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
 	s.sendRouteFloodChan = tickrunner.Run(s.context, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
 	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
@@ -684,6 +688,11 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 // Forwards a message to its next hop
 func (s *Netceptor) forwardMessage(md *messageData) error {
 	if md.HopsToLive <= 0 {
+		if md.FromService != "unreach" {
+			_ = s.sendUnreachable(md.FromNode, map[string]string{
+				"Problem": "message expired",
+			})
+		}
 		return fmt.Errorf("message reached maximum number of forwarding hops")
 	}
 	s.routingTableLock.RLock()
@@ -890,6 +899,32 @@ func (s *Netceptor) handlePing(md *messageData) error {
 	return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
 }
 
+// Handles an unreachable response
+func (s *Netceptor) handleUnreachable(md *messageData) error {
+	unrData := make(map[string]string)
+	err := json.Unmarshal(md.Data, &unrData)
+	if err != nil {
+		return err
+	}
+	unrData["FromNode"] = md.FromNode
+	logger.Warning("Received unreachable message from %s", md.FromNode)
+	s.unreachableBroker.Publish(unrData)
+	return nil
+}
+
+// Sends an unreachable response
+func (s *Netceptor) sendUnreachable(ToNode string, data map[string]string) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	err = s.sendMessage("unreach", ToNode, "unreach", bytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Dispatches a message to a reserved service.  Returns true if handled, false otherwise.
 func (s *Netceptor) dispatchReservedService(md *messageData) (bool, error) {
 	svc, ok := s.reservedServices[md.ToService]
@@ -913,7 +948,11 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 		pc, ok := s.listenerRegistry[md.ToService]
 		s.listenerLock.RUnlock()
 		if !ok {
-			return fmt.Errorf("received message for unknown service")
+			_ = s.sendUnreachable(md.FromNode, map[string]string{
+				"Service": md.ToService,
+				"Problem": "service unknown",
+			})
+			return fmt.Errorf("received message for unknown service %s", md.ToService)
 		}
 		pc.recvChan <- md
 		return nil

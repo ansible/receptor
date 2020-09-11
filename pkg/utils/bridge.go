@@ -2,7 +2,6 @@ package utils
 
 import (
 	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"strings"
 )
@@ -21,7 +20,7 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 	defer func() {
 		done <- true
 	}()
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, 65536)
 	shouldClose := false
 	for {
 		n, err := c1.Read(buf)

@@ -110,7 +110,7 @@ type loglevelCfg struct {
 	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
 }
 
-func (cfg loglevelCfg) Prepare() error {
+func (cfg loglevelCfg) Init() error {
 	var err error
 	val, err := GetLogLevelByName(cfg.Level)
 	if err != nil {

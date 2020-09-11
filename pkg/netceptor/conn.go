@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/lucas-clemente/quic-go"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"math/big"
 	"net"
 	"os"
@@ -172,6 +173,7 @@ func (li *Listener) acceptLoop() {
 				return
 			}
 			doneChan := make(chan struct{}, 1)
+			cctx, ccancel := utils.ContextWithCancelWithErr(li.s.context)
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -179,12 +181,17 @@ func (li *Listener) acceptLoop() {
 				qs:       qs,
 				doneChan: doneChan,
 				doneOnce: &sync.Once{},
+				ctx:      cctx,
+			}
+			ra, ok := conn.RemoteAddr().(*Addr)
+			if ok {
+				go monitorUnreachable(li.s, doneChan, *ra, ccancel)
 			}
 			go func() {
 				select {
 				case <-li.doneChan:
 					_ = conn.Close()
-				case <-li.s.context.Done():
+				case <-cctx.Done():
 					_ = conn.Close()
 				case <-doneChan:
 					return
@@ -231,6 +238,7 @@ type Conn struct {
 	qs       quic.Stream
 	doneChan chan struct{}
 	doneOnce *sync.Once
+	ctx      context.Context
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -264,27 +272,36 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			_ = pc.Close()
 		})
 	}
+	cctx, ccancel := utils.ContextWithCancelWithErr(ctx)
 	go func() {
 		select {
 		case <-okChan:
 			return
-		case <-ctx.Done():
+		case <-cctx.Done():
 			pcClose()
 		case <-s.context.Done():
 			pcClose()
 		}
 	}()
-	qc, err := quic.DialContext(ctx, pc, rAddr, s.nodeID, tls, cfg)
+	doneChan := make(chan struct{}, 1)
+	go monitorUnreachable(s, doneChan, rAddr, ccancel)
+	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tls, cfg)
 	if err != nil {
 		close(okChan)
 		pcClose()
+		if cctx.Err() != nil {
+			return nil, cctx.Err()
+		}
 		return nil, err
 	}
-	qs, err := qc.OpenStreamSync(ctx)
+	qs, err := qc.OpenStreamSync(cctx)
 	if err != nil {
 		close(okChan)
 		_ = qc.CloseWithError(500, err.Error())
 		_ = pc.Close()
+		if cctx.Err() != nil {
+			return nil, cctx.Err()
+		}
 		return nil, err
 	}
 	// We need to write something to the stream to trigger the Accept() to happen
@@ -293,10 +310,12 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		close(okChan)
 		_ = qs.Close()
 		_ = pc.Close()
+		if cctx.Err() != nil {
+			return nil, cctx.Err()
+		}
 		return nil, err
 	}
 	close(okChan)
-	doneChan := make(chan struct{}, 1)
 	go func() {
 		select {
 		case <-qc.Context().Done():
@@ -309,14 +328,36 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			return
 		}
 	}()
-	return &Conn{
+	conn := &Conn{
 		s:        s,
 		pc:       pc,
 		qc:       qc,
 		qs:       qs,
 		doneChan: doneChan,
 		doneOnce: &sync.Once{},
-	}, nil
+		ctx:      cctx,
+	}
+	return conn, nil
+}
+
+func monitorUnreachable(s *Netceptor, doneChan chan struct{}, remoteAddr Addr, cancel utils.CancelWithErrFunc) {
+	msgCh := s.unreachableBroker.Subscribe()
+	defer s.unreachableBroker.Unsubscribe(msgCh)
+	for {
+		select {
+		case <-s.context.Done():
+			return
+		case <-doneChan:
+			return
+		case msgRaw := <-msgCh:
+			msg, ok := msgRaw.(map[string]string)
+			if ok && msg["Problem"] == "service unknown" {
+				if ok && remoteAddr.node == msg["FromNode"] && remoteAddr.service == msg["Service"] {
+					cancel(fmt.Errorf("remote service unreachable"))
+				}
+			}
+		}
+	}
 }
 
 // Read reads data from the connection

@@ -712,7 +712,7 @@ func ParseAndRun(args []string, phases []string) {
 			lcname := strings.ToLower(f.Name)
 			hasBeenSet := false
 			for i := range cfgObj.fieldsSet {
-				if cfgObj.fieldsSet[i] == lcname {
+				if strings.ToLower(cfgObj.fieldsSet[i]) == lcname {
 					hasBeenSet = true
 					break
 				}

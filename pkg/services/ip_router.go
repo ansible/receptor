@@ -3,155 +3,367 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
+	"math"
 	"net"
+	"strings"
+	"sync"
+	"time"
 )
 
-func runTunToNetceptor(tunif *water.Interface, nconn *netceptor.PacketConn, remoteAddr netceptor.Addr) {
+const adTypeIPRouter = "IP Router"
+
+type ipRoute struct {
+	dest *net.IPNet
+	via  string
+}
+
+// IPRouterService is an IP router service
+type IPRouterService struct {
+	nc              *netceptor.Netceptor
+	networkName     string
+	tunIfName       string
+	localNet        *net.IPNet
+	advertiseRoutes []*net.IPNet
+	linkIP          net.IP
+	destIP          net.IP
+	tunIf           *water.Interface
+	link            netlink.Link
+	nConn           *netceptor.PacketConn
+	knownRoutes     []ipRoute
+	knownRoutesLock *sync.RWMutex
+}
+
+// NewIPRouter creates a new IP router service.
+func NewIPRouter(nc *netceptor.Netceptor, networkName string, tunInterface string,
+	localNet string, routes string) (*IPRouterService, error) {
+	ipr := &IPRouterService{
+		nc:              nc,
+		networkName:     networkName,
+		tunIfName:       tunInterface,
+		knownRoutes:     make([]ipRoute, 0),
+		knownRoutesLock: &sync.RWMutex{},
+	}
+	var err error
+	_, ipr.localNet, err = net.ParseCIDR(localNet)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse %s as a CIDR address", localNet)
+	}
+	ones, bits := ipr.localNet.Mask.Size()
+	if ones != 30 {
+		return nil, fmt.Errorf("local network %s must be a /30 CIDR", localNet)
+	}
+	if bits != 32 {
+		return nil, fmt.Errorf("local network %s must be IPv4", localNet)
+	}
+	ipr.advertiseRoutes = make([]*net.IPNet, 0)
+	if routes != "" {
+		routeList := strings.Split(routes, ",")
+		for i := range routeList {
+			_, ipNet, err := net.ParseCIDR(routeList[i])
+			if err != nil {
+				return nil, fmt.Errorf("could not parse %s as a CIDR address", routeList[i])
+			}
+			ipr.advertiseRoutes = append(ipr.advertiseRoutes, ipNet)
+		}
+	}
+	err = ipr.run()
+	if err != nil {
+		return nil, err
+	}
+	return ipr, nil
+}
+
+func (ipr *IPRouterService) updateKnownRoutes() {
+	newRoutes := make([]ipRoute, 0)
+	status := ipr.nc.Status()
+	for i := range status.Advertisements {
+		ad := status.Advertisements[i]
+		adType, ok := ad.Tags["type"]
+		if !ok || adType != adTypeIPRouter {
+			continue
+		}
+		network, ok := ad.Tags["network"]
+		if !ok || network != ipr.networkName {
+			continue
+		}
+		_, ok = status.RoutingTable[ad.NodeID]
+		if !ok {
+			continue
+		}
+		for key, value := range ad.Tags {
+			if strings.HasPrefix(key, "route") {
+				_, ipNet, err := net.ParseCIDR(value)
+				if err == nil {
+					newRoute := ipRoute{
+						dest: ipNet,
+						via:  ad.NodeID,
+					}
+					newRoutes = append(newRoutes, newRoute)
+				}
+			}
+		}
+	}
+	ipr.knownRoutesLock.Lock()
+	ipr.knownRoutes = newRoutes
+	ipr.knownRoutesLock.Unlock()
+}
+
+func (ipr *IPRouterService) reconcileRoutingTable() {
+	ipr.knownRoutesLock.RLock()
+	defer ipr.knownRoutesLock.RUnlock()
+	routes, err := netlink.RouteList(ipr.link, netlink.FAMILY_ALL)
+	if err != nil {
+		logger.Error("error retrieving kernel routes list: %s", err)
+		return
+	}
+
+	fmt.Printf("=========\n")
+	fmt.Printf("Receptor Routes:\n")
+	for i := range ipr.knownRoutes {
+		fmt.Printf("   dest %s via %s\n", ipr.knownRoutes[i].dest.String(), ipr.knownRoutes[i].via)
+	}
+	fmt.Printf("Kernel Routes:\n")
+	for i := range routes {
+		fmt.Printf("   dest %s\n", routes[i].Dst.String())
+	}
+
+	for i := range ipr.knownRoutes {
+		kr := ipr.knownRoutes[i]
+		found := false
+		for j := range routes {
+			route := routes[j]
+			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			logger.Debug("Adding route to %s", kr.dest.String())
+			err := ipr.addRoute(kr.dest)
+			if err != nil {
+				logger.Error("error adding kernel route to %s: %s", kr.dest.String(), err)
+			}
+		}
+	}
+	_, ipv6LinkLocal, _ := net.ParseCIDR("fe80::/10")
+	for i := range routes {
+		route := routes[i]
+		if ipr.localNet.Contains(route.Dst.IP) {
+			continue
+		}
+		if ipv6LinkLocal.Contains(route.Dst.IP) {
+			continue
+		}
+		found := false
+		for j := range ipr.knownRoutes {
+			kr := ipr.knownRoutes[j]
+			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			logger.Debug("Removing route to %s", route.Dst.String())
+			err := netlink.RouteDel(&route)
+			if err != nil {
+				logger.Error("error deleting kernel route to %s: %s", route.Dst.String(), err)
+			}
+		}
+	}
+}
+
+func (ipr *IPRouterService) runAdvertisingWatcher() {
+	for {
+		ipr.updateKnownRoutes()
+		ipr.reconcileRoutingTable()
+		select {
+		case <-ipr.nc.Context().Done():
+			return
+		case <-time.After(10 * time.Second):
+		}
+	}
+}
+
+func (ipr *IPRouterService) runTunToNetceptor() {
 	logger.Debug("Running tunnel-to-Receptor forwarder\n")
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, err := tunif.Read(buf)
+		if ipr.nc.Context().Err() != nil {
+			return
+		}
+		n, err := ipr.tunIf.Read(buf)
 		if err != nil {
 			logger.Error("Error reading from tun device: %s\n", err)
 			continue
 		}
-		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
-			tunif.Name(), remoteAddr.String())
-		wn, err := nconn.WriteTo(buf[:n], remoteAddr)
+		packet := buf[:n]
+
+		// Get the destination address from the received packet
+		ipVersion := int(packet[0] >> 4)
+		var destIP net.IP
+		if ipVersion == 4 {
+			header, err := ipv4.ParseHeader(packet)
+			if err != nil {
+				logger.Debug("Malformed ipv4 packet received: %s", err)
+			}
+			destIP = header.Dst
+		} else if ipVersion == 6 {
+			header, err := ipv6.ParseHeader(packet)
+			if err != nil {
+				logger.Debug("Malformed ipv6 packet received: %s", err)
+			}
+			destIP = header.Dst
+		} else {
+			logger.Debug("Packet received with unknown version %d", ipVersion)
+			continue
+		}
+
+		// Find the lowest cost receptor node that can accept this packet
+		remoteNode := ""
+		remoteCost := math.MaxFloat64
+		ipr.knownRoutesLock.RLock()
+		for i := range ipr.knownRoutes {
+			route := ipr.knownRoutes[i]
+			cost, err := ipr.nc.PathCost(route.via)
+			if err != nil {
+				continue
+			}
+			if cost < remoteCost && route.dest.Contains(destIP) {
+				remoteCost = cost
+				remoteNode = route.via
+			}
+		}
+		ipr.knownRoutesLock.RUnlock()
+		if remoteNode == "" {
+			continue
+		}
+
+		// Send the packet via Receptor
+		remoteAddr := ipr.nc.NewAddr(remoteNode, ipr.networkName)
+		logger.Trace("    Forwarding data length %d to %s via %s\n", n, destIP, remoteAddr.String())
+		wn, err := ipr.nConn.WriteTo(packet, remoteAddr)
 		if err != nil || wn != n {
 			logger.Error("Error writing to Receptor network: %s\n", err)
 		}
 	}
 }
 
-func runNetceptorToTun(nconn *netceptor.PacketConn, tunif *water.Interface, remoteAddr netceptor.Addr) {
+func (ipr *IPRouterService) runNetceptorToTun() {
 	logger.Debug("Running netceptor to tunnel forwarder\n")
 	buf := make([]byte, netceptor.MTU)
 	for {
-		n, addr, err := nconn.ReadFrom(buf)
+		if ipr.nc.Context().Err() != nil {
+			return
+		}
+		n, addr, err := ipr.nConn.ReadFrom(buf)
 		if err != nil {
 			logger.Error("Error reading from Receptor: %s\n", err)
 			continue
 		}
-		if addr != remoteAddr {
-			logger.Debug("Data received from unexpected source: %s\n", addr)
-			continue
-		}
 		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
-			addr.String(), tunif.Name())
-		wn, err := tunif.Write(buf[:n])
+			addr.String(), ipr.tunIf.Name())
+		wn, err := ipr.tunIf.Write(buf[:n])
 		if err != nil || wn != n {
 			logger.Error("Error writing to tun device: %s\n", err)
 		}
 	}
 }
 
-// TunProxyService runs the Receptor to tun interface proxy.
-func TunProxyService(s *netceptor.Netceptor, tunInterface string, lservice string,
-	node string, rservice string, ifaddress string, destaddress string, route string) error {
+func (ipr *IPRouterService) addRoute(route *net.IPNet) error {
+	err := netlink.RouteAdd(&netlink.Route{
+		LinkIndex: ipr.link.Attrs().Index,
+		Scope:     netlink.SCOPE_UNIVERSE,
+		Dst:       route,
+		Gw:        ipr.destIP,
+	})
+	if err != nil {
+		return fmt.Errorf("error adding route to interface: %s", err)
+	}
+	return nil
+}
+
+// Run runs the IP router.
+func (ipr *IPRouterService) run() error {
 	cfg := water.Config{
 		DeviceType: water.TUN,
 	}
-	cfg.Name = tunInterface
-	iface, err := water.New(water.Config{DeviceType: water.TUN})
+	cfg.Name = ipr.tunIfName
+	var err error
+	ipr.tunIf, err = water.New(water.Config{DeviceType: water.TUN})
 	if err != nil {
 		return fmt.Errorf("error opening tun device: %s", err)
 	}
-	if ifaddress != "" {
-		link, err := netlink.LinkByName(iface.Name())
-		if err != nil {
-			return fmt.Errorf("error accessing link for tun device: %s", err)
-		}
-		localaddr := net.ParseIP(ifaddress)
-		if localaddr == nil {
-			return fmt.Errorf("invalid IP address: %s", ifaddress)
-		}
-		destaddr := net.ParseIP(destaddress)
-		if destaddr == nil {
-			return fmt.Errorf("invalid IP address: %s", ifaddress)
-		}
-		addr := &netlink.Addr{
-			IPNet: netlink.NewIPNet(localaddr),
-			Peer:  netlink.NewIPNet(destaddr),
-		}
-		err = netlink.AddrAdd(link, addr)
-		if err != nil {
-			return fmt.Errorf("error adding IP address to link: %s", err)
-		}
-		err = netlink.LinkSetUp(link)
-		if err != nil {
-			return fmt.Errorf("error setting link up: %s", err)
-		}
-		if route != "" {
-			ipnet, err := netlink.ParseIPNet(route)
-			if err != nil {
-				return fmt.Errorf("error parsing route address: %s", err)
-			}
-			err = netlink.RouteAdd(&netlink.Route{
-				LinkIndex: link.Attrs().Index,
-				Scope:     netlink.SCOPE_UNIVERSE,
-				Dst:       ipnet,
-				Gw:        destaddr,
-			})
-			if err != nil {
-				return fmt.Errorf("error adding route to interface: %s", err)
-			}
-		}
-	}
-
-	nconn, err := s.ListenPacketAndAdvertise(lservice, map[string]string{
-		"type":          "Tunnel Proxy",
-		"interface":     tunInterface,
-		"remotenode":    node,
-		"remoteservice": rservice,
-		"ifaddress":     ifaddress,
-		"route":         route,
-	})
-
+	ipr.link, err = netlink.LinkByName(ipr.tunIf.Name())
 	if err != nil {
-		return fmt.Errorf("error listening for service %s: %s", lservice, err)
+		return fmt.Errorf("error accessing link for tun device: %s", err)
 	}
-	raddr := s.NewAddr(node, rservice)
-	go runTunToNetceptor(iface, nconn, raddr)
-	go runNetceptorToTun(nconn, iface, raddr)
+	baseIP := ipr.localNet.IP.To4()
+	ipr.linkIP = make([]byte, 4)
+	copy(ipr.linkIP, baseIP)
+	ipr.linkIP[3]++
+	ipr.destIP = make([]byte, 4)
+	copy(ipr.destIP, ipr.linkIP)
+	ipr.destIP[3]++
+	if !ipr.localNet.Contains(ipr.linkIP) || !ipr.localNet.Contains(ipr.destIP) {
+		return fmt.Errorf("error calculating link and remote addresses")
+	}
+	addr := &netlink.Addr{
+		IPNet: netlink.NewIPNet(ipr.linkIP),
+		Peer:  netlink.NewIPNet(ipr.destIP),
+	}
+	err = netlink.AddrAdd(ipr.link, addr)
+	if err != nil {
+		return fmt.Errorf("error adding IP address to link: %s", err)
+	}
+	err = netlink.LinkSetUp(ipr.link)
+	if err != nil {
+		return fmt.Errorf("error setting link up: %s", err)
+	}
+	advertisement := map[string]string{
+		"type":        adTypeIPRouter,
+		"network":     ipr.networkName,
+		"route_local": ipr.localNet.String(),
+	}
+	for i := range ipr.advertiseRoutes {
+		advertisement[fmt.Sprintf("route_%d", i)] = ipr.advertiseRoutes[i].String()
+	}
+	ipr.nConn, err = ipr.nc.ListenPacketAndAdvertise(ipr.networkName, advertisement)
+	if err != nil {
+		return fmt.Errorf("error listening for service %s: %s", ipr.networkName, err)
+	}
+	go ipr.runAdvertisingWatcher()
+	go ipr.runTunToNetceptor()
+	go ipr.runNetceptorToTun()
 	return nil
 }
 
-// TunProxyCfg is the cmdline configuration object for a tun proxy
-type TunProxyCfg struct {
-	Service       string `required:"true" description:"Local Receptor service name to bind to"`
-	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
-	RemoteService string `required:"true" description:"Receptor service name to connect to"`
-	Interface     string `description:"Name of the tun interface"`
-	IfAddress     string `description:"IP address to assign to the created interface"`
-	DestAddress   string `description:"IP address of the point-to-point destination"`
-	Route         string `description:"CIDR subnet to route over the created interface"`
-}
-
-// Prepare verifies we are ready to run
-func (cfg TunProxyCfg) Prepare() error {
-	if (cfg.IfAddress == "") != (cfg.DestAddress == "") {
-		return fmt.Errorf("ifaddress and destaddress must both be specified, or neither")
-	}
-	if cfg.Route != "" && cfg.IfAddress == "" {
-		return fmt.Errorf("when supplying a route, an IP address must also be given")
-	}
-	return nil
+// IPRouterCfg is the cmdline configuration object for an IP router
+type IPRouterCfg struct {
+	NetworkName string `required:"true" description:"Name of this network and service."`
+	Interface   string `description:"Name of the local tun interface"`
+	LocalNet    string `required:"true" description:"Local /30 CIDR address"`
+	Routes      string `description:"Comma separated list of CIDR subnets to advertise"`
 }
 
 // Run runs the action
-func (cfg TunProxyCfg) Run() error {
-	logger.Debug("Running tun proxy service %s\n", cfg)
-	return TunProxyService(netceptor.MainInstance, cfg.Interface, cfg.Service, cfg.RemoteNode, cfg.RemoteService,
-		cfg.IfAddress, cfg.DestAddress, cfg.Route)
+func (cfg IPRouterCfg) Run() error {
+	logger.Debug("Running tun router service %s\n", cfg)
+	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func init() {
-	cmdline.AddConfigType("ip-tunnel", "Run an IP tunnel using a tun interface", TunProxyCfg{}, false, false, false, false, servicesSection)
+	cmdline.AddConfigType("ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, false, false, false, false, servicesSection)
 }

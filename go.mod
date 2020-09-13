@@ -15,6 +15,7 @@ require (
 	github.com/rogpeppe/go-internal v1.6.1
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/vishvananda/netlink v1.1.0
+	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.18.6
 	k8s.io/apimachinery v0.18.6

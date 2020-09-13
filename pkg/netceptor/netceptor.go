@@ -87,6 +87,7 @@ type Netceptor struct {
 	knownConnectionCosts   map[string]map[string]float64
 	routingTableLock       *sync.RWMutex
 	routingTable           map[string]string
+	routingPathCosts       map[string]float64
 	listenerLock           *sync.RWMutex
 	listenerRegistry       map[string]*PacketConn
 	sendRouteFloodChan     chan time.Duration
@@ -228,6 +229,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 		knownConnectionCosts:   make(map[string]map[string]float64),
 		routingTableLock:       &sync.RWMutex{},
 		routingTable:           make(map[string]string),
+		routingPathCosts:       make(map[string]float64),
 		listenerLock:           &sync.RWMutex{},
 		listenerRegistry:       make(map[string]*PacketConn),
 		sendRouteFloodChan:     nil,
@@ -271,7 +273,12 @@ func (s *Netceptor) NewAddr(node string, service string) Addr {
 	}
 }
 
-// Shutdown shuts down a Receptor network protocol instance
+// Context returns the context for this Netceptor instance
+func (s *Netceptor) Context() context.Context {
+	return s.context
+}
+
+// Shutdown shuts down a Netceptor instance
 func (s *Netceptor) Shutdown() {
 	s.cancelFunc()
 }
@@ -369,6 +376,17 @@ func (s *Netceptor) Status() Status {
 		Advertisements:       serviceAds,
 		KnownConnectionCosts: knownConnectionCosts,
 	}
+}
+
+// PathCost returns the cost to a given remote node, or an error if the node doesn't exist.
+func (s *Netceptor) PathCost(nodeID string) (float64, error) {
+	s.routingTableLock.RLock()
+	defer s.routingTableLock.RUnlock()
+	cost, ok := s.routingPathCosts[nodeID]
+	if !ok {
+		return 0, fmt.Errorf("node not found")
+	}
+	return cost, nil
 }
 
 func (s *Netceptor) addLocalServiceAdvertisement(service string, tags map[string]string) {
@@ -540,6 +558,7 @@ func (s *Netceptor) updateRoutingTable() {
 			p = prev[p]
 		}
 	}
+	s.routingPathCosts = cost
 	s.printRoutingTable()
 }
 

@@ -3,6 +3,7 @@ package mesh
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
@@ -355,20 +356,24 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 	mesh.nodes = nodes
 	mesh.MeshDefinition = &MeshDefinition
 
-	failedMesh := make(chan bool, 1)
+	failedMesh := make(chan *CLINode)
 	time.Sleep(100 * time.Millisecond)
 	for _, node := range mesh.nodes {
-		go func() {
+		go func(node *CLINode) {
 			node.WaitForShutdown()
-			failedMesh <- true
-		}()
-		select {
-		case <-failedMesh:
-			mesh.Destroy()
-			mesh.WaitForShutdown()
-			return nil, errors.New("Failed to create mesh")
-		case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
-		}
+			// non-blocking send to failedMesh channel
+			select {
+			case failedMesh <- node:
+			default:
+			}
+		}(node)
+	}
+	select {
+	case node := <-failedMesh:
+		mesh.Destroy()
+		mesh.WaitForShutdown()
+		return nil, fmt.Errorf("Failed to create mesh: node %s exited early", node.dir)
+	case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
 	}
 
 	return mesh, nil

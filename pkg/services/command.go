@@ -1,4 +1,5 @@
-// +build !windows
+// +build !windows,!no_command_service
+// +build !windows,!no_services
 
 package services
 

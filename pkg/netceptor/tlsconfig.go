@@ -1,3 +1,5 @@
+// +build !no_tls_config
+
 package netceptor
 
 import (

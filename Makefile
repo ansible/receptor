@@ -1,5 +1,35 @@
 receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	go build cmd/receptor.go
+	go build $(TAGPARAM) cmd/receptor.go
+
+# When building Receptor, tags can be used to remove undesired
+# features.  This is primarily used for deploying Receptor in a
+# security sensitive role, where it is desired to have no possibility
+# of a service being accidentally enabled.  Features are controlled
+# using the TAGS environment variable, which is a comma delimeted
+# list of zero or more of the following:
+#
+# no_controlsvc:  Disable the control service
+#
+# no_backends:    Disable all backends (except external via the API)
+# no_tcp_backend: Disable the TCP backend
+# no_udp_backend: Disable the UDP backend
+# no_websocket_backend: Disable the websocket backent
+#
+# no_services:    Disable all services
+# no_proxies:     Disable the TCP, UDP and Unix proxy services
+# no_ip_router:   Disable the IP router service
+#
+# no_tls_config:  Disable the ability to configure TLS server/client configs
+#
+# no_workceptor:  Disable the unit-of-work subsystem (be network only)
+
+TAGS ?=
+ifeq ($(TAGS),)
+	TAGPARAM=
+else
+	TAGPARAM=--tags $(TAGS)
+endif
+
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -16,7 +46,9 @@ build-all:
 	@echo "Running Go builds..." && go build cmd/*.go && \
 	GOOS=windows go build -o receptor.exe cmd/receptor.go && \
 	GOOS=darwin go build -o receptor.app cmd/receptor.go && \
-	go build example/*.go
+	go build example/*.go && \
+	go build --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor cmd/receptor.go && \
+	go build cmd/receptor.go
 
 test: receptor
 	@go test ./... -p 1 -parallel=16 -count=1

@@ -1,4 +1,5 @@
-//+build linux
+// +build linux,!no_ip_router
+// +build linux,!no_services
 
 package services
 

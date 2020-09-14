@@ -1,3 +1,5 @@
+// +build !no_workceptor
+
 package workceptor
 
 import "github.com/project-receptor/receptor/pkg/cmdline"

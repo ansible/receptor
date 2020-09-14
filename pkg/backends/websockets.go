@@ -1,3 +1,6 @@
+// +build !no_websocket_backend
+// +build !no_backends
+
 package backends
 
 import (

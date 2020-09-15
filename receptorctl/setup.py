@@ -7,7 +7,7 @@ with open('README.md', 'r') as f:
     long_description = f.read()
 
 verfile = None
-for fn in ['VERSION', '../VERSION']:
+for fn in ['.VERSION', '../.VERSION']:
     if os.path.exists(fn):
         verfile = fn
         break

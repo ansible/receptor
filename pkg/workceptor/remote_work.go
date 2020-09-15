@@ -34,6 +34,7 @@ type remoteExtraData struct {
 	LocalStarted   bool
 	LocalCancelled bool
 	LocalReleased  bool
+	TLSConfigName  string
 }
 
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
@@ -48,7 +49,13 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	}
 	node := red.RemoteNode
 	rw.statusLock.RUnlock()
-	conn, err := rw.w.nc.DialContext(ctx, node, "control", nil)
+	tlsConfigName := rw.Status().ExtraData.(*remoteExtraData).TLSConfigName
+	expectedHostName := rw.Status().ExtraData.(*remoteExtraData).RemoteNode
+	tlsConfig, err := rw.w.nc.GetClientTLSConfig(tlsConfigName, expectedHostName)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn, err := rw.w.nc.DialContext(ctx, node, "control", tlsConfig)
 	if err != nil {
 		return nil, nil, err
 	}

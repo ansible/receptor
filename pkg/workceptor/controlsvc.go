@@ -139,6 +139,10 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err != nil {
 			return nil, err
 		}
+		c.params["tlsconfigname"], err = strFromMap(config, "tlsconfigname")
+		if err != nil {
+			return nil, err
+		}
 	case "status", "cancel", "release", "force-release":
 		c.params["unitid"], err = strFromMap(config, "unitid")
 		if err != nil {

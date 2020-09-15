@@ -1,15 +1,17 @@
 FROM fedora:32
+ARG VERSION
 
-RUN dnf -y update
-
-COPY RPMS/ /receptor-RPMS/
-COPY receptor.repo /etc/yum.repos.d/receptor.repo
-COPY receptor.conf /etc/receptor/receptor.conf
-
-RUN dnf -y install dumb-init receptor receptorctl receptor-python-worker && \
+RUN dnf -y update && \
+    dnf -y install dumb-init python3-click python3-dateutil && \
     dnf clean all
 
-RUN rm -rf /receptor-RPMs/ /etc/yum.repos.d/receptor.repo
+COPY receptorctl-${VERSION}-py3-none-any.whl /tmp
+COPY receptor_python_worker-${VERSION}-py3-none-any.whl /tmp
+RUN pip3 install /tmp/*.whl
+RUN rm /tmp/*.whl
+
+COPY receptor.conf /etc/receptor/receptor.conf
+COPY receptor /usr/bin/receptor
 
 ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
 

@@ -17,6 +17,20 @@ import (
 	"time"
 )
 
+var version string
+
+type versionCfg struct{}
+
+func (cfg versionCfg) Init() error {
+	if version == "" {
+		fmt.Printf("Version unknown\n")
+	} else {
+		fmt.Printf("%s\n", version)
+	}
+	os.Exit(0)
+	return nil
+}
+
 type nodeCfg struct {
 	ID           string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
 	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow"`
@@ -80,6 +94,7 @@ func (cfg nullBackendCfg) Run() error {
 func main() {
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, true, false, false, nil)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, true, false, false, nil)
+	cmdline.AddConfigType("version", "Show the Receptor version", versionCfg{}, false, false, true, false, nil)
 	cmdline.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"})
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup

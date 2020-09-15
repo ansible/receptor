@@ -6,11 +6,13 @@ ifeq ($(OFFICIAL_VERSION),)
 VERSION = $(shell git describe --tags | sed 's/-.*//' | awk -F. -v OFS=. '{$$NF++;print}')
 RELEASE = 0.git$(shell date -u +%Y%m%d%H%M).$(shell git rev-parse --short HEAD)
 OFFICIAL =
+APPVER = $(VERSION)-$(RELEASE)
 $(info Unofficial version $(VERSION)-$(RELEASE))
 else
 VERSION = $(OFFICIAL_VERSION)
 RELEASE = 1
 OFFICIAL = yes
+APPVER = $(VERSION)
 $(info Official version $(VERSION)-$(RELEASE))
 endif
 
@@ -47,7 +49,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	go build $(TAGPARAM) cmd/receptor.go
+	@go build -ldflags "-X main.version=$(APPVER)" $(TAGPARAM) cmd/receptor.go
 
 lint:
 	@golint cmd/... pkg/... example/...

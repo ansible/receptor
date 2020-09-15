@@ -1,5 +1,0 @@
-[receptor]
-name=Receptor
-baseurl=file:///receptor-RPMS
-enabled=1
-gpgcheck=0

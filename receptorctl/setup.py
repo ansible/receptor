@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
 import os
-import json
+from setuptools import setup, find_packages
 
 with open('README.md', 'r') as f:
     long_description = f.read()
@@ -15,11 +14,11 @@ for fn in ['VERSION', '../VERSION']:
 if verfile is None:
     raise IOError("Version file not found.")
 with open(verfile, 'r') as f:
-    verinfo = json.load(f)
+    version = f.readline().rstrip('\n\r')
 
 setup(
     name="receptorctl",
-    version=verinfo['version'],
+    version=version,
     author='Red Hat',
     url="https://github.com/project-receptor/receptor/receptorctl",
     license='APL 2.0',

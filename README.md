@@ -19,7 +19,7 @@ Receptor is an overlay network intended to ease the distribution of work across 
 
 The easiest way to check out Receptor is to run it as a container.  Images are kept on the Quay registry.  To use this, run:
 ```
-[docker|podman] pull docker pull quay.io/project-receptor/receptor
+[docker|podman] pull quay.io/project-receptor/receptor
 [docker|podman] run -d -v /path/to/receptor.conf:/etc/receptor/receptor.conf:Z receptor
 ```
 

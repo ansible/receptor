@@ -1,18 +1,16 @@
 # Calculate version number
 # - If we are on an exact Git tag, then this is official and gets a -1 release
 # - If we are not, then this is unofficial and gets a -0.date.gitref release
-VERSION = $(shell cat VERSION)
 OFFICIAL_VERSION = $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
 ifeq ($(OFFICIAL_VERSION),)
+VERSION = $(shell git describe --tags | sed 's/-.*//' | awk -F. -v OFS=. '{$$NF++;print}')
 RELEASE = 0.git$(shell date -u +%Y%m%d%H%M).$(shell git rev-parse --short HEAD)
 OFFICIAL =
 $(info Unofficial version $(VERSION)-$(RELEASE))
 else
+VERSION = $(OFFICIAL_VERSION)
 RELEASE = 1
 OFFICIAL = yes
-ifneq ($(OFFICIAL_VERSION),$(VERSION))
-$(error version file has $(VERSION) but should be $(OFFICIAL_VERSION))
-endif
 $(info Official version $(VERSION)-$(RELEASE))
 endif
 
@@ -85,7 +83,7 @@ SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec packaging
 
 specfiles: $(SPECFILES)
 
-$(SPECFILES): %.spec: %.spec.j2 VERSION
+$(SPECFILES): %.spec: %.spec.j2
 	@jinja2 -D version=$(VERSION) -D release=$(RELEASE) $< -o $@
 
 # Other RPMs get built but we only track the main one for Makefile purposes
@@ -95,28 +93,31 @@ MAINRPM = rpmbuild/RPMS/x86_64/receptor-$(VERSION)-$(RELEASE).fc32.x86_64.rpm
 	@$(CONTAINERCMD) build packaging/rpm-builder -t receptor-rpm-builder
 	@touch .rpm-builder-flag
 
-$(MAINRPM): .rpm-flag
-.rpm-flag: receptor $(SPECFILES) VERSION .rpm-builder-flag
+$(MAINRPM): .rpm-flag-$(VERSION)
+.rpm-flag-$(VERSION): receptor $(SPECFILES) .rpm-builder-flag
+	@echo $(VERSION) > .VERSION
 	@$(CONTAINERCMD) run -it --rm -v $$PWD:/receptor:Z receptor-rpm-builder
-	@touch .rpm-flag
+	@touch .rpm-flag-$(VERSION)
 
 rpms: $(MAINRPM)
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
-$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py') VERSION
+$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@echo $(VERSION) > .VERSION
 	@cd receptorctl && python3 setup.py bdist_wheel
 
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION)-py3-none-any.whl
-$(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py') VERSION
+$(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
+	@echo $(VERSION) > .VERSION
 	@cd receptor-python-worker && python3 setup.py bdist_wheel
 
-container: .container-flag
-.container-flag: receptor $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL) VERSION
+container: .container-flag-$(VERSION)
+.container-flag-$(VERSION): receptor $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@cp receptor packaging/container
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
 	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t receptor:latest $(if $(OFFICIAL),-t receptor:$(VERSION),)
-	@touch .container-flag
+	@touch .container-flag-$(VERSION)
 
 clean:
 	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)
@@ -126,6 +127,7 @@ clean:
 	@rm -fv receptor-python-worker/dist/*
 	@rm -fv packaging/container/receptor
 	@rm -fv packaging/container/*.whl
-	@rm -fv .container-flag .rpm-flag .rpm-builder-flag
+	@rm -fv .container-flag* .rpm-flag* .rpm-builder-flag
+	@rm -fv .VERSION
 
 .PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container

@@ -27,7 +27,7 @@ receptorctl is a command line utility for managing Receptor
 %prep
 %setup -n %{name}-%{version} -c
 mv %{_builddir}/%{name}-%{version}/receptor-%{version}/receptorctl/* %{_builddir}/%{name}-%{version}
-mv %{_builddir}/%{name}-%{version}/receptor-%{version}/VERSION %{_builddir}/%{name}-%{version}
+echo %{version} > %{_builddir}/%{name}-%{version}/.VERSION
 
 %build
 python3 setup.py build

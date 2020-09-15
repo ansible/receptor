@@ -4,6 +4,7 @@ receptor.exe
 receptor.app
 net
 rpmbuild/
-.container-flag
-.rpm-flag
+.container-flag*
+.rpm-flag*
 .rpm-builder-flag
+.VERSION

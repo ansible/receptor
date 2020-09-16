@@ -32,7 +32,7 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cw, err := w.AllocateUnit("command", "")
+	cw, err := w.AllocateUnit("command", make(map[string]string))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestWorkceptorJson(t *testing.T) {
 		t.Fatal(err)
 	}
 	cw2 := newCommandWorker()
-	cw2.Init(w, cw.ID(), "command", "")
+	cw2.Init(w, cw.ID(), "command")
 	err = cw2.Load()
 	if err != nil {
 		t.Fatal(err)

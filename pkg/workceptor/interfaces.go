@@ -2,7 +2,8 @@ package workceptor
 
 // WorkUnit represents a local unit of work
 type WorkUnit interface {
-	Init(w *Workceptor, unitID string, workType string, params string)
+	Init(w *Workceptor, unitID string, workType string)
+	SetParamsAndSave(params map[string]string) error
 	ID() string
 	UnitDir() string
 	StatusFileName() string
@@ -29,6 +30,5 @@ type StatusFileData struct {
 	Detail     string
 	StdoutSize int64
 	WorkType   string
-	Params     string
 	ExtraData  interface{}
 }

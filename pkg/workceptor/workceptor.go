@@ -126,7 +126,7 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 }
 
 // AllocateUnit creates a new local work unit and generates an identifier for it
-func (w *Workceptor) AllocateUnit(workTypeName string, params string) (WorkUnit, error) {
+func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string) (WorkUnit, error) {
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workTypeName]
 	w.workTypesLock.RUnlock()
@@ -140,14 +140,17 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params string) (WorkUnit,
 		return nil, err
 	}
 	worker := wt.newWorkerFunc()
-	worker.Init(w, ident, workTypeName, params)
+	worker.Init(w, ident, workTypeName)
+	err = worker.SetParamsAndSave(params)
+	if err != nil {
+		return nil, err
+	}
 	w.activeUnits[ident] = worker
-	worker.UpdateBasicStatus(WorkStatePending, "Work Unit Allocated", 0)
 	return worker, nil
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
-func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, params string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, params map[string]string) (WorkUnit, error) {
 	rw, err := w.AllocateUnit("remote", params)
 	if err != nil {
 		return nil, err
@@ -189,7 +192,7 @@ func (w *Workceptor) scanForUnits() {
 				} else {
 					worker = newUnknownWorker()
 				}
-				worker.Init(w, ident, sfd.WorkType, sfd.Params)
+				worker.Init(w, ident, sfd.WorkType)
 				err = worker.Load()
 				if err != nil {
 					logger.Warning("Failed to restart worker %s due to read error: %s", unitdir, err)

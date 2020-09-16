@@ -29,7 +29,7 @@ type remoteUnit struct {
 type remoteExtraData struct {
 	RemoteNode     string
 	RemoteWorkType string
-	RemoteParams   string
+	RemoteParams   map[string]string
 	RemoteUnitID   string
 	LocalStarted   bool
 	LocalCancelled bool
@@ -370,10 +370,20 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 }
 
 // Init initializes the work unit data
-func (rw *remoteUnit) Init(w *Workceptor, ident string, workType string, params string) {
-	rw.BaseWorkUnit.Init(w, ident, workType, params)
-	rw.status.ExtraData = &remoteExtraData{}
+func (rw *remoteUnit) Init(w *Workceptor, ident string, workType string) {
+	rw.BaseWorkUnit.Init(w, ident, workType)
+	red := &remoteExtraData{}
+	red.RemoteParams = make(map[string]string)
+	rw.status.ExtraData = red
 	rw.topJC = &utils.JobContext{}
+}
+
+// SetParamsAndSave sets the unit's parameters and saves it
+func (rw *remoteUnit) SetParamsAndSave(params map[string]string) error {
+	for k, v := range params {
+		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
+	}
+	return rw.Save()
 }
 
 // Status returns a copy of the status currently loaded in memory

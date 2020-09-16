@@ -70,20 +70,24 @@ type BaseWorkUnit struct {
 	lastUpdateError error
 }
 
-// Init initializes the work unit data
-func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, params string) {
+// Init initializes the basic work unit data, in memory only.
+func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.w = w
 	bwu.status.State = WorkStatePending
-	bwu.status.Detail = ""
+	bwu.status.Detail = "Unit Created"
 	bwu.status.StdoutSize = 0
 	bwu.status.WorkType = workType
-	bwu.status.Params = params
 	bwu.status.ExtraData = nil
 	bwu.unitID = unitID
 	bwu.unitDir = path.Join(w.dataDir, unitID)
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
+}
+
+// SetParamsAndSave configures this unit with given parameters and saves it, overwriting the status file.
+func (bwu *BaseWorkUnit) SetParamsAndSave(params map[string]string) error {
+	return bwu.Save()
 }
 
 // UnitDir returns the unit directory of this work unit

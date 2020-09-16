@@ -366,5 +366,5 @@ func (cfg IPRouterCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, false, false, false, false, servicesSection)
+	cmdline.AddConfigType("ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, cmdline.Section(servicesSection))
 }

@@ -290,6 +290,6 @@ func (cfg TCPDialerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, false, false, false, false, backendSection)
-	cmdline.AddConfigType("tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, false, false, false, false, backendSection)
+	cmdline.AddConfigType("tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, cmdline.Section(backendSection))
+	cmdline.AddConfigType("tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, cmdline.Section(backendSection))
 }

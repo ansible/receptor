@@ -133,6 +133,6 @@ func init() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
-	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, false, true, false, false, nil)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, false, true, false, false, nil)
+	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
 }

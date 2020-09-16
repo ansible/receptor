@@ -1,6 +1,11 @@
 FROM fedora:32
 ARG VERSION
 
+LABEL license="ASL2"
+LABEL name="receptor"
+LABEL vendor="project-receptor"
+LABEL version="${VERSION}"
+
 RUN dnf -y update && \
     dnf -y install dumb-init python3-click python3-dateutil && \
     dnf clean all

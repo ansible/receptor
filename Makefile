@@ -7,13 +7,11 @@ VERSION = $(shell git describe --tags | sed 's/-.*//' | awk -F. -v OFS=. '{$$NF+
 RELEASE = 0.git$(shell date -u +%Y%m%d%H%M).$(shell git rev-parse --short HEAD)
 OFFICIAL =
 APPVER = $(VERSION)-$(RELEASE)
-$(info Unofficial version $(VERSION)-$(RELEASE))
 else
 VERSION = $(OFFICIAL_VERSION)
 RELEASE = 1
 OFFICIAL = yes
 APPVER = $(VERSION)
-$(info Official version $(VERSION)-$(RELEASE))
 endif
 
 # Container command can be docker or podman

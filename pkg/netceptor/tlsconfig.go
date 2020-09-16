@@ -14,7 +14,7 @@ import (
 // Command line
 // **************************************************************************
 
-var configSection = &cmdline.Section{
+var configSection = &cmdline.ConfigSection{
 	Description: "Commands that configure resources used by other commands:",
 	Order:       5,
 }
@@ -117,6 +117,6 @@ func (cfg TLSClientCfg) Prepare() error {
 }
 
 func init() {
-	cmdline.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, false, false, false, false, configSection)
-	cmdline.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, false, false, false, false, configSection)
+	cmdline.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, cmdline.Section(configSection))
+	cmdline.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, cmdline.Section(configSection))
 }

@@ -92,9 +92,9 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, true, true, false, false, nil)
-	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, false, true, false, false, nil)
-	cmdline.AddConfigType("version", "Show the Receptor version", versionCfg{}, false, false, true, false, nil)
+	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
+	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
+	cmdline.AddConfigType("version", "Show the Receptor version", versionCfg{}, cmdline.Exclusive)
 	cmdline.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"})
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup

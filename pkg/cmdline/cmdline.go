@@ -15,37 +15,65 @@ import (
 	"strings"
 )
 
-// Section defines a section of the help output, for grouping commands together
-type Section struct {
+// ConfigSection defines a section of the help output, for grouping commands together
+type ConfigSection struct {
 	Description string
 	Order       int
 }
 
-type param struct {
-	Name        string
-	Description string
-	Type        reflect.Type
-	Required    bool
-	Singleton   bool
-	Exclusive   bool
-	Hidden      bool
-	Section     *Section
+// ConfigType describes a kind of parameter that can be used on the command line
+type ConfigType struct {
+	name        string
+	description string
+	objType     reflect.Type
+	required    bool
+	singleton   bool
+	exclusive   bool
+	hidden      bool
+	section     *ConfigSection
 }
 
-var configTypes []param
+// Required means this config type must be provided
+func Required(param *ConfigType) {
+	param.required = true
+}
+
+// Singleton means there can only be one of this config type
+func Singleton(param *ConfigType) {
+	param.singleton = true
+}
+
+// Exclusive means if this config type exists, none other is allowed
+func Exclusive(param *ConfigType) {
+	param.exclusive = true
+}
+
+// Hidden means this config type is not listed in help or bash completion
+func Hidden(param *ConfigType) {
+	param.hidden = true
+}
+
+// Section means this config type should be listed within a section in the help
+func Section(section *ConfigSection) func(param *ConfigType) {
+	return func(param *ConfigType) {
+		param.section = section
+	}
+}
+
+var configTypes []*ConfigType
 
 // AddConfigType registers a new config type with the system
-func AddConfigType(name string, description string, configType interface{}, required bool, singleton bool, exclusive bool, hidden bool, section *Section) {
-	configTypes = append(configTypes, param{
-		Name:        name,
-		Description: description,
-		Type:        reflect.TypeOf(configType),
-		Required:    required,
-		Singleton:   singleton,
-		Exclusive:   exclusive,
-		Hidden:      hidden,
-		Section:     section,
-	})
+func AddConfigType(name string, description string, configType interface{}, options ...func(*ConfigType)) {
+	newCT := &ConfigType{
+		name:        name,
+		description: description,
+		objType:     reflect.TypeOf(configType),
+	}
+	for i := range options {
+		opt := options[i]
+		opt(newCT)
+	}
+	configTypes = append(configTypes, newCT)
 }
 
 func printableTypeName(typ reflect.Type) string {
@@ -63,25 +91,25 @@ func printableTypeName(typ reflect.Type) string {
 	return typ.String()
 }
 
-func printCmdHelp(ct param) {
-	if ct.Hidden {
+func printCmdHelp(p *ConfigType) {
+	if p.hidden {
 		return
 	}
-	fmt.Printf("   --%s: %s", strings.ToLower(ct.Name), ct.Description)
-	if ct.Required {
+	fmt.Printf("   --%s: %s", strings.ToLower(p.name), p.description)
+	if p.required {
 		fmt.Printf(" (required)")
 	}
 	fmt.Printf("\n")
-	for i := 0; i < ct.Type.NumField(); i++ {
-		fmt.Printf("      %s=<%s>: %s", strings.ToLower(ct.Type.Field(i).Name),
-			printableTypeName(ct.Type.Field(i).Type),
-			ct.Type.Field(i).Tag.Get("description"))
+	for i := 0; i < p.objType.NumField(); i++ {
+		fmt.Printf("      %s=<%s>: %s", strings.ToLower(p.objType.Field(i).Name),
+			printableTypeName(p.objType.Field(i).Type),
+			p.objType.Field(i).Tag.Get("description"))
 		extras := make([]string, 0)
-		req, err := betterParseBool(ct.Type.Field(i).Tag.Get("required"))
+		req, err := betterParseBool(p.objType.Field(i).Tag.Get("required"))
 		if err == nil && req {
 			extras = append(extras, "required")
 		}
-		def := ct.Type.Field(i).Tag.Get("default")
+		def := p.objType.Field(i).Tag.Get("default")
 		if def != "" {
 			extras = append(extras, fmt.Sprintf("default: %s", def))
 		}
@@ -97,19 +125,19 @@ func printCmdHelp(ct param) {
 func ShowHelp() {
 
 	// Construct list of sections
-	sections := make([]*Section, 1)
-	sections[0] = &Section{
+	sections := make([]*ConfigSection, 1)
+	sections[0] = &ConfigSection{
 		Description: "",
 		Order:       0,
 	}
 	for i := range configTypes {
 		ct := configTypes[i]
-		if ct.Section == nil || ct.Hidden {
+		if ct.section == nil || ct.hidden {
 			continue
 		}
 		found := false
 		for j := range sections {
-			if ct.Section == sections[j] {
+			if ct.section == sections[j] {
 				found = true
 				break
 			}
@@ -117,7 +145,7 @@ func ShowHelp() {
 		if found {
 			continue
 		}
-		sections = append(sections, ct.Section)
+		sections = append(sections, ct.section)
 	}
 	sort.SliceStable(sections, func(i int, j int) bool {
 		return sections[i].Order < sections[j].Order
@@ -139,10 +167,10 @@ func ShowHelp() {
 		for i := 0; i <= 1; i++ {
 			for j := range configTypes {
 				ct := configTypes[j]
-				if (s == 0 && ct.Section != nil) || (s != 0 && ct.Section != sect) || ct.Hidden {
+				if (s == 0 && ct.section != nil) || (s != 0 && ct.section != sect) || ct.hidden {
 					continue
 				}
-				if (i == 0 && ct.Required) || (i == 1 && !ct.Required) {
+				if (i == 0 && ct.required) || (i == 1 && !ct.required) {
 					printCmdHelp(ct)
 				}
 			}
@@ -168,7 +196,7 @@ func bashCompletion() {
 	actions = append(actions, "-c")
 	for i := range configTypes {
 		ct := configTypes[i]
-		actions = append(actions, fmt.Sprintf("--%s", strings.ToLower(ct.Name)))
+		actions = append(actions, fmt.Sprintf("--%s", strings.ToLower(ct.name)))
 	}
 	fmt.Printf("  DASHCMDS=\"%s\"\n", strings.Join(actions, " "))
 	fmt.Printf("  if [[ $cur == -* ]]; then\n")
@@ -180,13 +208,13 @@ func bashCompletion() {
 	fmt.Printf("        ;;\n")
 	for i := range configTypes {
 		ct := configTypes[i]
-		if ct.Hidden {
+		if ct.hidden {
 			continue
 		}
-		fmt.Printf("      --%s)\n", strings.ToLower(ct.Name))
+		fmt.Printf("      --%s)\n", strings.ToLower(ct.name))
 		params := make([]string, 0)
-		for j := 0; j < ct.Type.NumField(); j++ {
-			params = append(params, fmt.Sprintf("%s=", strings.ToLower(ct.Type.Field(j).Name)))
+		for j := 0; j < ct.objType.NumField(); j++ {
+			params = append(params, fmt.Sprintf("%s=", strings.ToLower(ct.objType.Field(j).Name)))
 		}
 		fmt.Printf("        COMPREPLY=($(compgen -W \"%s\" -- ${cur}))\n", strings.Join(params, " "))
 		fmt.Printf("        ;;\n")
@@ -322,11 +350,11 @@ func convTagToBool(tag string, def bool) bool {
 	return b
 }
 
-func getCfgObjType(objType string) (*param, error) {
+func getCfgObjType(objType string) (*ConfigType, error) {
 	for i := range configTypes {
 		ct := configTypes[i]
-		if objType == strings.ToLower(ct.Name) {
-			return &ct, nil
+		if objType == strings.ToLower(ct.name) {
+			return ct, nil
 		}
 	}
 	return nil, fmt.Errorf("unknown config type %s", objType)
@@ -442,7 +470,7 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 			str, ok := rawParams.(string)
 			if ok {
 				// param is a single string, so it is a barevalue
-				bareparam, err := getBareParam(ct.Type)
+				bareparam, err := getBareParam(ct.objType)
 				if err != nil {
 					return nil, fmt.Errorf("could not get barevalue for command %s: %s", command, err)
 				}
@@ -462,17 +490,17 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 				}
 			}
 		}
-		if ct.Singleton {
+		if ct.singleton {
 			for c := range cfgObjs {
-				if cfgObjs[c].obj.Type() == ct.Type {
+				if cfgObjs[c].obj.Type() == ct.objType {
 					return nil, fmt.Errorf("only one %s directive is allowed", command)
 				}
 			}
 		}
 		coi := newCOI()
-		coi.obj = reflect.New(ct.Type).Elem()
+		coi.obj = reflect.New(ct.objType).Elem()
 		coi.arg = command
-		requiredParams := buildRequiredParams(ct.Type)
+		requiredParams := buildRequiredParams(ct.objType)
 		for k, v := range params {
 			f, err := getFieldByName(&coi.obj, k)
 			if err != nil {
@@ -507,8 +535,8 @@ func ParseAndRun(args []string, phases []string) {
 
 	for i := range configTypes {
 		ct := configTypes[i]
-		if ct.Required {
-			requiredObjs[ct.Type.Name()] = true
+		if ct.required {
+			requiredObjs[ct.objType.Name()] = true
 		}
 	}
 
@@ -541,11 +569,11 @@ func ParseAndRun(args []string, phases []string) {
 					fmt.Printf("Command error: %s\n", err)
 					os.Exit(1)
 				}
-				commandType = ct.Type
-				if ct.Singleton {
+				commandType = ct.objType
+				if ct.singleton {
 					for c := range activeObjs {
-						if activeObjs[c].obj.Type() == ct.Type {
-							fmt.Printf("The \"%s\" directive is only allowed once.\n", ct.Name)
+						if activeObjs[c].obj.Type() == ct.objType {
+							fmt.Printf("The \"%s\" directive is only allowed once.\n", ct.name)
 							os.Exit(1)
 						}
 					}
@@ -553,8 +581,8 @@ func ParseAndRun(args []string, phases []string) {
 				accumulator = newCOI()
 				accumulator.obj = reflect.New(commandType).Elem()
 				accumulator.arg = arg
-				delete(requiredObjs, ct.Type.Name())
-				requiredParams = buildRequiredParams(ct.Type)
+				delete(requiredObjs, ct.objType.Name())
+				requiredParams = buildRequiredParams(ct.objType)
 			}
 		} else {
 			// This arg did not start with a dash, so it is a parameter to the current accumulation
@@ -632,10 +660,10 @@ func ParseAndRun(args []string, phases []string) {
 		found := false
 		for j := range configTypes {
 			ct := configTypes[j]
-			if ao.obj.Type() == ct.Type {
-				if ct.Exclusive {
+			if ao.obj.Type() == ct.objType {
+				if ct.exclusive {
 					haveExclusive = true
-					exclusiveName = ct.Name
+					exclusiveName = ct.name
 				}
 				found = true
 				break
@@ -658,22 +686,22 @@ func ParseAndRun(args []string, phases []string) {
 	if !haveExclusive {
 		for i := range configTypes {
 			ct := configTypes[i]
-			if ct.Singleton && ct.Required {
+			if ct.singleton && ct.required {
 				haveThis := false
 				for j := range activeObjs {
 					ao := activeObjs[j]
-					if ao.obj.Type() == ct.Type {
+					if ao.obj.Type() == ct.objType {
 						haveThis = true
 						break
 					}
 				}
 				if !haveThis {
 					a := newCOI()
-					a.obj = reflect.New(ct.Type).Elem()
-					a.arg = fmt.Sprintf("implicit %s", ct.Name)
-					checkRequiredParams(buildRequiredParams(ct.Type), a.arg)
+					a.obj = reflect.New(ct.objType).Elem()
+					a.arg = fmt.Sprintf("implicit %s", ct.name)
+					checkRequiredParams(buildRequiredParams(ct.objType), a.arg)
 					activeObjs = append(activeObjs, a)
-					delete(requiredObjs, ct.Type.Name())
+					delete(requiredObjs, ct.objType.Name())
 				}
 			}
 		}
@@ -685,8 +713,8 @@ func ParseAndRun(args []string, phases []string) {
 		for p := range requiredObjs {
 			for i := range configTypes {
 				ct := configTypes[i]
-				if ct.Type.Name() == p {
-					sl = append(sl, ct.Name)
+				if ct.objType.Name() == p {
+					sl = append(sl, ct.name)
 					break
 				}
 			}

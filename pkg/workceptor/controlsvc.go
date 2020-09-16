@@ -40,9 +40,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 		c.params["node"] = tokens[1]
 		c.params["worktype"] = tokens[2]
 		if len(tokens) > 3 {
-			c.params["params"] = strings.Join(tokens[3:], " ")
-		} else {
-			c.params["params"] = ""
+			c.params["command_params"] = strings.Join(tokens[3:], " ")
 		}
 	case "list":
 		if len(tokens) > 1 {
@@ -126,15 +124,18 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 	}
 	switch c.subcommand {
 	case "submit":
-		c.params["node"], err = strFromMap(config, "node")
+		for k, v := range config {
+			_, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("submit parameters must all be strings and %s is not", k)
+			}
+			c.params[k] = v
+		}
+		_, err := strFromMap(c.params, "node")
 		if err != nil {
 			return nil, err
 		}
-		c.params["worktype"], err = strFromMap(config, "worktype")
-		if err != nil {
-			return nil, err
-		}
-		c.params["params"], err = strFromMap(config, "params")
+		_, err = strFromMap(c.params, "worktype")
 		if err != nil {
 			return nil, err
 		}
@@ -168,15 +169,22 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
-		params, err := strFromMap(c.params, "params")
-		if err != nil {
-			return nil, err
+		workParams := make(map[string]string)
+		for k, v := range c.params {
+			if k == "command" || k == "subcommand" || k == "node" || k == "worktype" {
+				continue
+			}
+			vStr, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s must be a string", k)
+			}
+			workParams[k] = vStr
 		}
 		var worker WorkUnit
 		if workNode == nc.NodeID() || strings.EqualFold(workNode, "localhost") {
-			worker, err = c.w.AllocateUnit(workType, params)
+			worker, err = c.w.AllocateUnit(workType, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, params)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, workParams)
 		}
 		if err != nil {
 			return nil, err

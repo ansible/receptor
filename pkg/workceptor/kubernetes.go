@@ -45,7 +45,8 @@ type kubeUnit struct {
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker
 type kubeExtraData struct {
-	podName string
+	Params  string
+	PodName string
 }
 
 // ErrPodCompleted is returned when pod has already completed before we could attach
@@ -116,7 +117,7 @@ func (kw *kubeUnit) runWork() {
 		status.State = WorkStatePending
 		status.Detail = "Pod created"
 		status.StdoutSize = 0
-		status.ExtraData.(*kubeExtraData).podName = kw.pod.Name
+		status.ExtraData.(*kubeExtraData).PodName = kw.pod.Name
 	})
 
 	// Wait for the pod to be running
@@ -304,9 +305,19 @@ func (kw *kubeUnit) connectToKube() error {
 }
 
 // Init initializes the work unit
-func (kw *kubeUnit) Init(w *Workceptor, ident string, workType string, params string) {
-	kw.BaseWorkUnit.Init(w, ident, workType, params)
+func (kw *kubeUnit) Init(w *Workceptor, ident string, workType string) {
+	kw.BaseWorkUnit.Init(w, ident, workType)
 	kw.status.ExtraData = &kubeExtraData{}
+}
+
+// SetParamsAndSave sets the unit's parameters and saves it
+func (kw *kubeUnit) SetParamsAndSave(params map[string]string) error {
+	cmdParams, ok := params["command_params"]
+	if !ok {
+		cmdParams = ""
+	}
+	kw.status.ExtraData.(*kubeExtraData).Params = cmdParams
+	return kw.Save()
 }
 
 // Status returns a copy of the status currently loaded in memory
@@ -329,7 +340,7 @@ func (kw *kubeUnit) Start() error {
 
 	// Figure out command and args
 	var command []string = nil
-	args, err := shlex.Split(kw.Status().Params)
+	args, err := shlex.Split(kw.Status().ExtraData.(*kubeExtraData).Params)
 	if err != nil {
 		return err
 	}

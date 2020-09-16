@@ -24,7 +24,7 @@ func (pw *pythonUnit) Start() error {
 	for k, v := range pw.config {
 		config[k] = v
 	}
-	config["params"] = pw.Status().Params
+	config["params"] = pw.Status().ExtraData.(*commandExtraData).Params
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return err

@@ -20,14 +20,17 @@ import (
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin
 type commandUnit struct {
 	BaseWorkUnit
-	command    string
-	baseParams string
-	done       bool
+	command             string
+	baseParams          string
+	acceptRuntimeParams bool
+	cmdParams           string
+	done                bool
 }
 
 // commandExtraData is the content of the ExtraData JSON field for a command worker
 type commandExtraData struct {
-	Pid int
+	Pid    int
+	Params string
 }
 
 func termThenKill(cmd *exec.Cmd) {
@@ -136,21 +139,31 @@ loop:
 	return nil
 }
 
-// Init initializes the work unit data
-func (cw *commandUnit) Init(w *Workceptor, ident string, workType string, params string) {
-	cw.BaseWorkUnit.Init(w, ident, workType, params)
+// Init initializes the work unit data in memory
+func (cw *commandUnit) Init(w *Workceptor, ident string, workType string) {
+	cw.BaseWorkUnit.Init(w, ident, workType)
 	cw.status.ExtraData = &commandExtraData{}
+}
+
+// SetParamsAndSave sets the unit's parameters and saves it to the status file
+func (cw *commandUnit) SetParamsAndSave(params map[string]string) error {
+	cmdParams, ok := params["command_params"]
+	if !ok {
+		cmdParams = ""
+	}
+	if ok && !cw.acceptRuntimeParams {
+		return fmt.Errorf("extra params provided but not allowed")
+	}
 	var allParams string
-	if params == "" {
+	if cmdParams == "" {
 		allParams = cw.baseParams
 	} else if cw.baseParams == "" {
-		allParams = params
+		allParams = cmdParams
 	} else {
-		allParams = strings.Join([]string{cw.baseParams, params}, " ")
+		allParams = strings.Join([]string{cw.baseParams, cmdParams}, " ")
 	}
-	cw.UpdateFullStatus(func(status *StatusFileData) {
-		status.Params = allParams
-	})
+	cw.status.ExtraData.(*commandExtraData).Params = allParams
+	return cw.Save()
 }
 
 // Status returns a copy of the status currently loaded in memory
@@ -254,7 +267,7 @@ func (cw *commandUnit) Start() error {
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
 	cmd := exec.Command(os.Args[0], "--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
-		fmt.Sprintf("params=%s", cw.Status().Params),
+		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*commandExtraData).Params),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))
 	return cw.runCommand(cmd)
 }
@@ -315,15 +328,17 @@ func (cw *commandUnit) Release(force bool) error {
 
 // CommandCfg is the cmdline configuration object for a worker that runs a command
 type CommandCfg struct {
-	WorkType string `required:"true" description:"Name for this worker type"`
-	Command  string `required:"true" description:"Command to run to process units of work"`
-	Params   string `description:"Command-line parameters"`
+	WorkType            string `required:"true" description:"Name for this worker type"`
+	Command             string `required:"true" description:"Command to run to process units of work"`
+	Params              string `description:"Command-line parameters"`
+	AcceptRuntimeParams bool   `description:"Allow users to add more parameters" default:"false"`
 }
 
 func (cfg CommandCfg) newWorker() WorkUnit {
 	return &commandUnit{
-		command:    cfg.Command,
-		baseParams: cfg.Params,
+		command:             cfg.Command,
+		baseParams:          cfg.Params,
+		acceptRuntimeParams: cfg.AcceptRuntimeParams,
 	}
 }
 

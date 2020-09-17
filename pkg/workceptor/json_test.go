@@ -10,11 +10,19 @@ import (
 	"testing"
 )
 
-func newCommandWorker() WorkUnit {
-	return &commandUnit{
-		command:    "echo",
-		baseParams: "foo",
+func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+	cw := &commandUnit{
+		BaseWorkUnit: BaseWorkUnit{
+			status: StatusFileData{
+				ExtraData: &commandExtraData{},
+			},
+		},
+		command:            "echo",
+		baseParams:         "foo",
+		allowRuntimeParams: true,
 	}
+	cw.BaseWorkUnit.Init(w, unitID, workType)
+	return cw
 }
 
 func TestWorkceptorJson(t *testing.T) {
@@ -47,8 +55,7 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cw2 := newCommandWorker()
-	cw2.Init(w, cw.ID(), "command")
+	cw2 := newCommandWorker(w, cw.ID(), "command")
 	err = cw2.Load()
 	if err != nil {
 		t.Fatal(err)

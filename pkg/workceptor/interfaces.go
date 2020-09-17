@@ -2,8 +2,7 @@ package workceptor
 
 // WorkUnit represents a local unit of work
 type WorkUnit interface {
-	Init(w *Workceptor, unitID string, workType string)
-	SetParamsAndSave(params map[string]string) error
+	SetParams(params map[string]string) error
 	ID() string
 	UnitDir() string
 	StatusFileName() string
@@ -21,7 +20,7 @@ type WorkUnit interface {
 }
 
 // NewWorkerFunc represents a factory of WorkUnit instances
-type NewWorkerFunc func() WorkUnit
+type NewWorkerFunc func(w *Workceptor, unitID string, workType string) WorkUnit
 
 // StatusFileData is the structure of the JSON data saved to a status file.
 // This struct should only contain value types, except for ExtraData.

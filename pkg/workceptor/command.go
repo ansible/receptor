@@ -20,11 +20,11 @@ import (
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin
 type commandUnit struct {
 	BaseWorkUnit
-	command             string
-	baseParams          string
-	acceptRuntimeParams bool
-	cmdParams           string
-	done                bool
+	command            string
+	baseParams         string
+	allowRuntimeParams bool
+	cmdParams          string
+	done               bool
 }
 
 // commandExtraData is the content of the ExtraData JSON field for a command worker
@@ -139,19 +139,13 @@ loop:
 	return nil
 }
 
-// Init initializes the work unit data in memory
-func (cw *commandUnit) Init(w *Workceptor, ident string, workType string) {
-	cw.BaseWorkUnit.Init(w, ident, workType)
-	cw.status.ExtraData = &commandExtraData{}
-}
-
-// SetParamsAndSave sets the unit's parameters and saves it to the status file
-func (cw *commandUnit) SetParamsAndSave(params map[string]string) error {
+// SetParams sets the unit's in-memory status from command line parameters
+func (cw *commandUnit) SetParams(params map[string]string) error {
 	cmdParams, ok := params["command_params"]
 	if !ok {
 		cmdParams = ""
 	}
-	if ok && !cw.acceptRuntimeParams {
+	if ok && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
 	var allParams string
@@ -163,7 +157,7 @@ func (cw *commandUnit) SetParamsAndSave(params map[string]string) error {
 		allParams = strings.Join([]string{cw.baseParams, cmdParams}, " ")
 	}
 	cw.status.ExtraData.(*commandExtraData).Params = allParams
-	return cw.Save()
+	return nil
 }
 
 // Status returns a copy of the status currently loaded in memory
@@ -328,18 +322,25 @@ func (cw *commandUnit) Release(force bool) error {
 
 // CommandCfg is the cmdline configuration object for a worker that runs a command
 type CommandCfg struct {
-	WorkType            string `required:"true" description:"Name for this worker type"`
-	Command             string `required:"true" description:"Command to run to process units of work"`
-	Params              string `description:"Command-line parameters"`
-	AcceptRuntimeParams bool   `description:"Allow users to add more parameters" default:"false"`
+	WorkType           string `required:"true" description:"Name for this worker type"`
+	Command            string `required:"true" description:"Command to run to process units of work"`
+	Params             string `description:"Command-line parameters"`
+	AllowRuntimeParams bool   `description:"Allow users to add more parameters" default:"false"`
 }
 
-func (cfg CommandCfg) newWorker() WorkUnit {
-	return &commandUnit{
-		command:             cfg.Command,
-		baseParams:          cfg.Params,
-		acceptRuntimeParams: cfg.AcceptRuntimeParams,
+func (cfg CommandCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+	cw := &commandUnit{
+		BaseWorkUnit: BaseWorkUnit{
+			status: StatusFileData{
+				ExtraData: &commandExtraData{},
+			},
+		},
+		command:            cfg.Command,
+		baseParams:         cfg.Params,
+		allowRuntimeParams: cfg.AllowRuntimeParams,
 	}
+	cw.BaseWorkUnit.Init(w, unitID, workType)
+	return cw
 }
 
 // Run runs the action

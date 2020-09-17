@@ -392,21 +392,12 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 	subJC.Wait()
 }
 
-// Init initializes the work unit data
-func (rw *remoteUnit) Init(w *Workceptor, ident string, workType string) {
-	rw.BaseWorkUnit.Init(w, ident, workType)
-	red := &remoteExtraData{}
-	red.RemoteParams = make(map[string]string)
-	rw.status.ExtraData = red
-	rw.topJC = &utils.JobContext{}
-}
-
-// SetParamsAndSave sets the unit's parameters and saves it
-func (rw *remoteUnit) SetParamsAndSave(params map[string]string) error {
+// SetParams sets the unit's parameters and saves it
+func (rw *remoteUnit) SetParams(params map[string]string) error {
 	for k, v := range params {
 		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
 	}
-	return rw.Save()
+	return nil
 }
 
 // Status returns a copy of the status currently loaded in memory
@@ -523,6 +514,12 @@ func (rw *remoteUnit) Release(force bool) error {
 	return rw.cancelOrRelease(true, force)
 }
 
-func newRemoteWorker() WorkUnit {
-	return &remoteUnit{}
+func newRemoteWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+	rw := &remoteUnit{}
+	rw.BaseWorkUnit.Init(w, unitID, workType)
+	red := &remoteExtraData{}
+	red.RemoteParams = make(map[string]string)
+	rw.status.ExtraData = red
+	rw.topJC = &utils.JobContext{}
+	return rw
 }

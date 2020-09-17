@@ -139,9 +139,11 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 	if err != nil {
 		return nil, err
 	}
-	worker := wt.newWorkerFunc()
-	worker.Init(w, ident, workTypeName)
-	err = worker.SetParamsAndSave(params)
+	worker := wt.newWorkerFunc(w, ident, workTypeName)
+	err = worker.SetParams(params)
+	if err == nil {
+		err = worker.Save()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -189,11 +191,10 @@ func (w *Workceptor) scanForUnits() {
 				w.workTypesLock.RUnlock()
 				var worker WorkUnit
 				if ok {
-					worker = wt.newWorkerFunc()
+					worker = wt.newWorkerFunc(w, ident, sfd.WorkType)
 				} else {
-					worker = newUnknownWorker()
+					worker = newUnknownWorker(w, ident, sfd.WorkType)
 				}
-				worker.Init(w, ident, sfd.WorkType)
 				err = worker.Load()
 				if err != nil {
 					logger.Warning("Failed to restart worker %s due to read error: %s", unitdir, err)

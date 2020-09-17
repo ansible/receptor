@@ -77,7 +77,6 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.status.Detail = "Unit Created"
 	bwu.status.StdoutSize = 0
 	bwu.status.WorkType = workType
-	bwu.status.ExtraData = nil
 	bwu.unitID = unitID
 	bwu.unitDir = path.Join(w.dataDir, unitID)
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
@@ -85,9 +84,9 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusLock = &sync.RWMutex{}
 }
 
-// SetParamsAndSave configures this unit with given parameters and saves it, overwriting the status file.
-func (bwu *BaseWorkUnit) SetParamsAndSave(params map[string]string) error {
-	return bwu.Save()
+// SetParams configures this unit with given parameters
+func (bwu *BaseWorkUnit) SetParams(params map[string]string) error {
+	return nil
 }
 
 // UnitDir returns the unit directory of this work unit
@@ -318,8 +317,10 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 
 // =============================================================================================== //
 
-func newUnknownWorker() WorkUnit {
-	return &unknownUnit{}
+func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+	uu := &unknownUnit{}
+	uu.BaseWorkUnit.Init(w, unitID, workType)
+	return uu
 }
 
 // unknownUnit is used to represent units we find on disk, but don't recognize their WorkType

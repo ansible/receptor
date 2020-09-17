@@ -34,7 +34,7 @@ type remoteExtraData struct {
 	RemoteStarted  bool
 	LocalCancelled bool
 	LocalReleased  bool
-	TLSConfigName  string
+	TLSClient      string
 }
 
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
@@ -49,9 +49,9 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	}
 	node := red.RemoteNode
 	rw.statusLock.RUnlock()
-	tlsConfigName := rw.Status().ExtraData.(*remoteExtraData).TLSConfigName
+	tlsClient := rw.Status().ExtraData.(*remoteExtraData).TLSClient
 	expectedHostName := rw.Status().ExtraData.(*remoteExtraData).RemoteNode
-	tlsConfig, err := rw.w.nc.GetClientTLSConfig(tlsConfigName, expectedHostName)
+	tlsConfig, err := rw.w.nc.GetClientTLSConfig(tlsClient, expectedHostName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,14 +82,18 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 		if err == nil {
 			return conn, reader
 		}
+		status := rw.Status()
 		logger.Debug("Connection to %s failed with error: %s",
-			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
+			status.ExtraData.(*remoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {
-			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = "Incorrect tlsclient to remote service"
-			})
-			if rw.Status().ExtraData.(*remoteExtraData).RemoteStarted == false {
+			detailMsg := "Incorrect tlsclient to remote service"
+			if status.Detail != detailMsg {
+				rw.UpdateFullStatus(func(status *StatusFileData) {
+					status.Detail = detailMsg
+				})
+			}
+			if status.ExtraData.(*remoteExtraData).RemoteStarted == false {
 				rw.UpdateFullStatus(func(status *StatusFileData) {
 					status.State = WorkStateFailed
 				})

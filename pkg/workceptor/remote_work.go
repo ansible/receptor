@@ -83,7 +83,7 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 			return conn, reader
 		}
 		status := rw.Status()
-		logger.Debug("Connection to %s failed with error: %s",
+		logger.Warning("Connection to %s failed with error: %s",
 			status.ExtraData.(*remoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {

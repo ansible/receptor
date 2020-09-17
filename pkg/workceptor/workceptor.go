@@ -159,7 +159,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string
 		ed := status.ExtraData.(*remoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
-		ed.TLSConfigName = params["tlsclient"]
+		ed.TLSConfigName = params["tlsclient"] // "" if tlsclient not defined""
 	})
 	if rw.LastUpdateError() != nil {
 		return nil, rw.LastUpdateError()

@@ -139,9 +139,9 @@ loop:
 	return nil
 }
 
-// SetParams sets the unit's in-memory status from command line parameters
-func (cw *commandUnit) SetParams(params map[string]string) error {
-	cmdParams, ok := params["command_params"]
+// SetFromParams sets the in-memory state from parameters
+func (cw *commandUnit) SetFromParams(params map[string]string) error {
+	cmdParams, ok := params["params"]
 	if !ok {
 		cmdParams = ""
 	}

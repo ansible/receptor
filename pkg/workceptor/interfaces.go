@@ -2,13 +2,13 @@ package workceptor
 
 // WorkUnit represents a local unit of work
 type WorkUnit interface {
-	SetParams(params map[string]string) error
 	ID() string
 	UnitDir() string
 	StatusFileName() string
 	StdoutFileName() string
 	Save() error
 	Load() error
+	SetFromParams(params map[string]string) error
 	UpdateBasicStatus(state int, detail string, stdoutSize int64)
 	UpdateFullStatus(statusFunc func(*StatusFileData))
 	LastUpdateError() error

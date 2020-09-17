@@ -392,8 +392,8 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 	subJC.Wait()
 }
 
-// SetParams sets the unit's parameters and saves it
-func (rw *remoteUnit) SetParams(params map[string]string) error {
+// SetFromParams sets the in-memory state from parameters
+func (rw *remoteUnit) SetFromParams(params map[string]string) error {
 	for k, v := range params {
 		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
 	}

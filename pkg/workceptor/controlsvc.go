@@ -40,7 +40,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 		c.params["node"] = tokens[1]
 		c.params["worktype"] = tokens[2]
 		if len(tokens) > 3 {
-			c.params["command_params"] = strings.Join(tokens[3:], " ")
+			c.params["params"] = strings.Join(tokens[3:], " ")
 		}
 	case "list":
 		if len(tokens) > 1 {

@@ -33,26 +33,25 @@ import (
 // kubeUnit implements the WorkUnit interface
 type kubeUnit struct {
 	BaseWorkUnit
-	ctx                context.Context
-	cancel             context.CancelFunc
-	authMethod         string
-	allowRuntimeAuth   bool
-	allowRuntimeTLS    bool
-	allowRuntimeParams bool
-	kubeConfig         string
-	namePrefix         string
-	image              string
-	command            []string
-	args               []string
-	config             *rest.Config
-	clientset          *kubernetes.Clientset
-	pod                *corev1.Pod
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	authMethod          string
+	allowRuntimeAuth    bool
+	allowRuntimeTLS     bool
+	allowRuntimeCommand bool
+	allowRuntimeParams  bool
+	kubeConfig          string
+	namePrefix          string
+	config              *rest.Config
+	clientset           *kubernetes.Clientset
+	pod                 *corev1.Pod
 }
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker
 type kubeExtraData struct {
+	Image           string
+	Command         string
 	Params          string
-	PodName         string
 	KubeHost        string
 	KubeAPIPath     string
 	KubeNamespace   string
@@ -61,6 +60,7 @@ type kubeExtraData struct {
 	KubeBearerToken string
 	KubeVerifyTLS   bool
 	KubeTLSCAData   string
+	PodName         string
 }
 
 // ErrPodCompleted is returned when pod has already completed before we could attach
@@ -96,18 +96,29 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 func (kw *kubeUnit) runWork() {
 
 	// Create the pod
-	var err error
-	kw.pod, err = kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).Create(kw.ctx, &corev1.Pod{
+	ked := kw.Status().ExtraData.(*kubeExtraData)
+	command, err := shlex.Split(ked.Command)
+	var args []string
+	if err == nil {
+		args, err = shlex.Split(ked.Params)
+	}
+	if err != nil {
+		errStr := fmt.Sprintf("Error tokenizing command: %s", err)
+		logger.Error(errStr)
+		kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
+		return
+	}
+	kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Create(kw.ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: kw.namePrefix,
-			Namespace:    kw.status.ExtraData.(*kubeExtraData).KubeNamespace,
+			Namespace:    ked.KubeNamespace,
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      "worker",
-				Image:     kw.image,
-				Command:   kw.command,
-				Args:      kw.args,
+				Image:     ked.Image,
+				Command:   command,
+				Args:      args,
 				Stdin:     true,
 				StdinOnce: true,
 				TTY:       false,
@@ -139,11 +150,11 @@ func (kw *kubeUnit) runWork() {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).List(kw.ctx, options)
+			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).List(kw.ctx, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).Watch(kw.ctx, options)
+			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).Watch(kw.ctx, options)
 		},
 	}
 	ev, err := watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
@@ -187,7 +198,7 @@ func (kw *kubeUnit) runWork() {
 	}
 
 	// Open the pod log for stdout
-	logreq := kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
+	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
 		Follow: true,
 	})
 	logStream, err := logreq.Stream(kw.ctx)
@@ -289,7 +300,8 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 	if kw.kubeConfig != "" {
 		clr.ExplicitPath = kw.kubeConfig
 	}
-	if kw.status.ExtraData.(*kubeExtraData).KubeNamespace == "" {
+	ked := kw.Status().ExtraData.(*kubeExtraData)
+	if ked.KubeNamespace == "" {
 		c, err := clr.Load()
 		if err != nil {
 			return err
@@ -315,7 +327,7 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 }
 
 func (kw *kubeUnit) connectUsingParams() error {
-	ked := kw.status.ExtraData.(*kubeExtraData)
+	ked := kw.Status().ExtraData.(*kubeExtraData)
 	kw.config = &rest.Config{
 		Host:        ked.KubeHost,
 		APIPath:     ked.KubeAPIPath,
@@ -353,61 +365,58 @@ func (kw *kubeUnit) connectToKube() error {
 	return nil
 }
 
-// SetParams sets the unit's in-memory status from command line parameters
-func (kw *kubeUnit) SetParams(params map[string]string) error {
-	kwed := kw.status.ExtraData.(*kubeExtraData)
-
-	// Runtime command params
-	Params, ok := params["command_params"]
-	if ok && !kw.allowRuntimeParams && kwed.Params != "" {
-		return fmt.Errorf("extra params provided but not allowed")
+// SetFromParams sets the in-memory state from parameters
+func (kw *kubeUnit) SetFromParams(params map[string]string) error {
+	ked := kw.status.ExtraData.(*kubeExtraData)
+	type value struct {
+		name       string
+		permission bool
+		setter     func(string) error
 	}
-	if ok && Params != "" {
-		kwed.Params = Params
+	setString := func(target *string) func(string) error {
+		ssf := func(value string) error {
+			*target = value
+			return nil
+		}
+		return ssf
 	}
-
-	// Runtime auth info
-	KubeHost, ok1 := params["kube_host"]
-	if ok1 {
-		kwed.KubeHost = KubeHost
+	setBool := func(target *bool) func(string) error {
+		ssf := func(value string) error {
+			bv, err := strconv.ParseBool(value)
+			if err != nil {
+				return err
+			}
+			*target = bv
+			return nil
+		}
+		return ssf
 	}
-	KubeAPIPath, ok2 := params["kube_api_path"]
-	if ok2 {
-		kwed.KubeAPIPath = KubeAPIPath
+	values := []value{
+		{name: "command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
+		{name: "image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
+		{name: "params", permission: kw.allowRuntimeParams, setter: setString(&ked.Params)},
+		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
+		{name: "kube_host", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeHost)},
+		{name: "kube_api_path", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeAPIPath)},
+		{name: "kube_username", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeUsername)},
+		{name: "kube_password", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubePassword)},
+		{name: "kube_bearer_token", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeBearerToken)},
+		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
+		{name: "tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 	}
-	KubeUsername, ok3 := params["kube_username"]
-	if ok3 {
-		kwed.KubeUsername = KubeUsername
-	}
-	KubePassword, ok4 := params["kube_password"]
-	if ok4 {
-		kwed.KubePassword = KubePassword
-	}
-	KubeBearerToken, ok5 := params["kube_bearer_token"]
-	if ok5 {
-		kwed.KubeBearerToken = KubeBearerToken
-	}
-	if (ok1 || ok2 || ok3 || ok4 || ok5) && !kw.allowRuntimeAuth {
-		return fmt.Errorf("kube auth params provided but not allowed")
-	}
-
-	// Runtime TLS info
-	verifyTLS, ok1 := params["verify_tls"]
-	if ok1 {
-		var err error
-		kwed.KubeVerifyTLS, err = strconv.ParseBool(verifyTLS)
-		if err != nil {
-			return fmt.Errorf("could not parse verify_tls value: %s", err)
+	for i := range values {
+		v := values[i]
+		value, ok := params[v.name]
+		if ok && value != "" {
+			if !v.permission {
+				return fmt.Errorf("%s provided but not allowed", v.name)
+			}
+			err := v.setter(value)
+			if err != nil {
+				return fmt.Errorf("error setting value for %s: %s", v.name, err)
+			}
 		}
 	}
-	KubeTLSCAData, ok2 := params["tls_ca"]
-	if ok2 {
-		kwed.KubeTLSCAData = KubeTLSCAData
-	}
-	if (ok1 || ok2) && !kw.allowRuntimeTLS {
-		return fmt.Errorf("tls params provided but not allowed")
-	}
-
 	return nil
 }
 
@@ -416,10 +425,10 @@ func (kw *kubeUnit) Status() *StatusFileData {
 	kw.statusLock.RLock()
 	defer kw.statusLock.RUnlock()
 	status := kw.getStatus()
-	ed, ok := kw.status.ExtraData.(*kubeExtraData)
+	ked, ok := kw.status.ExtraData.(*kubeExtraData)
 	if ok {
-		edCopy := *ed
-		status.ExtraData = &edCopy
+		kedCopy := *ked
+		status.ExtraData = &kedCopy
 	}
 	return status
 }
@@ -429,25 +438,8 @@ func (kw *kubeUnit) Start() error {
 	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
 	kw.ctx, kw.cancel = context.WithCancel(kw.w.ctx)
 
-	// Figure out command and args
-	var command []string = nil
-	args, err := shlex.Split(kw.status.ExtraData.(*kubeExtraData).Params)
-	if err != nil {
-		return err
-	}
-	if len(kw.command) > 0 {
-		command, err = shlex.Split(kw.command[0])
-		if err != nil {
-			return err
-		}
-		command = append(command, args...)
-		args = nil
-	}
-	kw.command = command
-	kw.args = args
-
 	// Connect to the Kubernetes API
-	err = kw.connectToKube()
+	err := kw.connectToKube()
 	if err != nil {
 		return err
 	}
@@ -494,34 +486,33 @@ func (kw *kubeUnit) Release(force bool) error {
 
 // WorkKubeCfg is the cmdline configuration object for a Kubernetes worker plugin
 type WorkKubeCfg struct {
-	WorkType           string `required:"true" description:"Name for this worker type"`
-	Namespace          string `required:"true" description:"Kubernetes namespace to create pods in"`
-	Image              string `required:"true" description:"Container image to use for the worker pod"`
-	Command            string `description:"Command to run in the container (default: entrypoint)"`
-	AuthMethod         string `description:"One of: kubeconfig, incluster, params" default:"incluster" required:"true"`
-	KubeConfig         string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
-	KubeHost           string `description:"k8s API hostname (for authmethod=params)"`
-	KubeAPIPath        string `description:"k8s API path (for authmethod=params)"`
-	KubeUsername       string `description:"k8s API username (for authmethod=params)"`
-	KubePassword       string `description:"k8s API password (for authmethod=params)"`
-	KubeBearerToken    string `description:"k8s API bearer token (for authmethod=params)"`
-	KubeVerifyTLS      bool   `description:"verify server TLS certificate/hostname" default:"true"`
-	KubeTLSCAData      string `description:"CA certificate PEM data to verify against"`
-	AllowRuntimeAuth   bool   `description:"Allow passing API parameters at runtime" default:"false"`
-	AllowRuntimeTLS    bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
-	AllowRuntimeParams bool   `description:"Allow adding parameters at runtime" default:"false"`
+	WorkType            string `required:"true" description:"Name for this worker type"`
+	Namespace           string `description:"Kubernetes namespace to create pods in"`
+	Image               string `description:"Container image to use for the worker pod"`
+	Command             string `description:"Command to run in the container (default: entrypoint)"`
+	AuthMethod          string `description:"One of: kubeconfig, incluster, params" default:"incluster" required:"true"`
+	KubeConfig          string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
+	KubeHost            string `description:"k8s API hostname (for authmethod=params)"`
+	KubeAPIPath         string `description:"k8s API path (for authmethod=params)"`
+	KubeUsername        string `description:"k8s API username (for authmethod=params)"`
+	KubePassword        string `description:"k8s API password (for authmethod=params)"`
+	KubeBearerToken     string `description:"k8s API bearer token (for authmethod=params)"`
+	KubeVerifyTLS       bool   `description:"verify server TLS certificate/hostname" default:"true"`
+	KubeTLSCAData       string `description:"CA certificate PEM data to verify against"`
+	AllowRuntimeAuth    bool   `description:"Allow passing API parameters at runtime" default:"false"`
+	AllowRuntimeTLS     bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
+	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
+	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
 }
 
 // newWorker is a factory to produce worker instances
 func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
-	var command []string
-	if cfg.Command != "" {
-		command = []string{cfg.Command}
-	}
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
 				ExtraData: &kubeExtraData{
+					Image:           cfg.Image,
+					Command:         cfg.Command,
 					KubeHost:        cfg.KubeHost,
 					KubeAPIPath:     cfg.KubeAPIPath,
 					KubeNamespace:   cfg.Namespace,
@@ -533,13 +524,13 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 				},
 			},
 		},
-		namePrefix:       fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
-		authMethod:       strings.ToLower(cfg.AuthMethod),
-		kubeConfig:       cfg.KubeConfig,
-		allowRuntimeAuth: cfg.AllowRuntimeAuth,
-		allowRuntimeTLS:  cfg.AllowRuntimeTLS,
-		image:            cfg.Image,
-		command:          command,
+		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
+		authMethod:          strings.ToLower(cfg.AuthMethod),
+		kubeConfig:          cfg.KubeConfig,
+		allowRuntimeAuth:    cfg.AllowRuntimeAuth,
+		allowRuntimeTLS:     cfg.AllowRuntimeTLS,
+		allowRuntimeCommand: cfg.AllowRuntimeCommand,
+		allowRuntimeParams:  cfg.AllowRuntimeParams,
 	}
 	ku.BaseWorkUnit.Init(w, unitID, workType)
 	return ku
@@ -551,7 +542,7 @@ func (cfg WorkKubeCfg) Prepare() error {
 	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "params" {
 		return fmt.Errorf("invalid AuthMethod: %s", cfg.AuthMethod)
 	}
-	if lcAuth != "kubeconfig" && cfg.Namespace == "" && !cfg.AllowRuntimeParams {
+	if cfg.Namespace == "" && !(lcAuth == "kubeconfig" || cfg.AllowRuntimeAuth) {
 		return fmt.Errorf("must provide namespace when AuthMethod is not kubeconfig")
 	}
 	if cfg.KubeConfig != "" {
@@ -563,7 +554,7 @@ func (cfg WorkKubeCfg) Prepare() error {
 			return fmt.Errorf("error accessing kubeconfig file: %s", err)
 		}
 	}
-	if lcAuth == "params" && !cfg.AllowRuntimeParams {
+	if lcAuth == "params" && !cfg.AllowRuntimeAuth {
 		if cfg.KubeHost == "" {
 			return fmt.Errorf("when AuthMethod=params, must provide KubeHost")
 		}
@@ -576,6 +567,9 @@ func (cfg WorkKubeCfg) Prepare() error {
 		if block == nil || block.Type != "BEGIN CERTIFICATE" {
 			return fmt.Errorf("could not decode KubeTLSCAData as a PEM formatted certificate")
 		}
+	}
+	if cfg.Image == "" && !cfg.AllowRuntimeCommand {
+		return fmt.Errorf("must specify a container image to run")
 	}
 	return nil
 }

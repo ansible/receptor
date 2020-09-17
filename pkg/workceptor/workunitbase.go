@@ -84,8 +84,8 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusLock = &sync.RWMutex{}
 }
 
-// SetParams configures this unit with given parameters
-func (bwu *BaseWorkUnit) SetParams(params map[string]string) error {
+// SetFromParams sets the in-memory state from parameters
+func (bwu *BaseWorkUnit) SetFromParams(params map[string]string) error {
 	return nil
 }
 

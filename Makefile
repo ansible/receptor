@@ -47,7 +47,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	@go build -ldflags "-X main.version=$(APPVER)" $(TAGPARAM) cmd/receptor.go
+	go build -ldflags "-X main.version=$(APPVER)" $(TAGPARAM) cmd/receptor.go
 
 lint:
 	@golint cmd/... pkg/... example/...

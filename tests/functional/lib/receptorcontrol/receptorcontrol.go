@@ -225,29 +225,21 @@ func (r *ReceptorControl) WorkStart(workType string) (string, error) {
 }
 
 // WorkCancel cancels work
-func (r *ReceptorControl) WorkCancel(unitID string) error {
+func (r *ReceptorControl) WorkCancel(unitID string) (map[string]interface{}, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work cancel %s\n", unitID))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = r.ReadAndParseJSON() // flush response
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.ReadAndParseJSON()
 }
 
 // WorkRelease cancels and deletes work
-func (r *ReceptorControl) WorkRelease(unitID string) error {
+func (r *ReceptorControl) WorkRelease(unitID string) (map[string]interface{}, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work release %s\n", unitID))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = r.ReadAndParseJSON() // flush response
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.ReadAndParseJSON()
 }
 
 // GetWorkStatus returns JSON of status file for a given unitID

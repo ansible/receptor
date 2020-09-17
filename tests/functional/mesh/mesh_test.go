@@ -292,7 +292,7 @@ func TestTCPSSLConnections(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -402,7 +402,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
@@ -501,7 +501,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			defer mesh.WaitForShutdown()
 			defer mesh.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 			err = mesh.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
@@ -710,7 +710,10 @@ func TestWork(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		controller.WorkCancel(unitID)
+		_, err = controller.WorkCancel(unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
 		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkCancelled(ctx, unitID)
 		if err != nil {
@@ -725,7 +728,10 @@ func TestWork(t *testing.T) {
 			t.Errorf("remoteUnitID should not be empty")
 		}
 
-		controller.WorkRelease(unitID)
+		_, err = controller.WorkRelease(unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
 		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 		err = controller.AssertWorkReleased(ctx, unitID)
 		if err != nil {
@@ -753,6 +759,10 @@ func TestWork(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Wait for node3 to join the mesh again
+		ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+		err = mesh.WaitForReady(ctx)
+
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 		err = controller.AssertWorkSucceeded(ctx, unitID)
 		if err != nil {
@@ -784,6 +794,10 @@ func TestWork(t *testing.T) {
 		nodes["node2"].Shutdown()
 		nodes["node2"].WaitForShutdown()
 		nodes["node2"].Start()
+		// Wait for node2 to join the mesh again
+		ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+		err = mesh.WaitForReady(ctx)
+
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 		err = controller.AssertWorkSucceeded(ctx, unitID)
 		if err != nil {

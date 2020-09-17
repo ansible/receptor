@@ -92,8 +92,8 @@ func (n *CLINode) Start() error {
 	}
 	n.receptorCmd.Stdout = stdout
 	n.receptorCmd.Stderr = stderr
-	n.receptorCmd.Start()
-	return nil
+	err = n.receptorCmd.Start()
+	return err
 }
 
 // Destroy kills the receptor process and puts its ports back into the pool to

@@ -66,8 +66,8 @@ func TestHopCountLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b1.NewConnection(c1, true)
-	b2.NewConnection(c2, true)
+	b1.NewConnection(MessageConnFromNetConn(c1), true)
+	b2.NewConnection(MessageConnFromNetConn(c2), true)
 
 	// Wait for the nodes to establish routing to each other
 	timeout, _ := context.WithTimeout(context.Background(), 2*time.Second)

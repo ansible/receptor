@@ -31,7 +31,7 @@ type remoteExtraData struct {
 	RemoteWorkType string
 	RemoteParams   map[string]string
 	RemoteUnitID   string
-	LocalStarted   bool
+	RemoteStarted  bool
 	LocalCancelled bool
 	LocalReleased  bool
 	TLSConfigName  string
@@ -89,7 +89,7 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 			rw.UpdateFullStatus(func(status *StatusFileData) {
 				status.Detail = "Incorrect tlsclient to remote service"
 			})
-			if rw.Status().ExtraData.(*remoteExtraData).LocalStarted == false {
+			if rw.Status().ExtraData.(*remoteExtraData).RemoteStarted == false {
 				rw.UpdateFullStatus(func(status *StatusFileData) {
 					status.State = WorkStateFailed
 				})
@@ -189,7 +189,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
 		ed := status.ExtraData.(*remoteExtraData)
-		ed.LocalStarted = true
+		ed.RemoteStarted = true
 	})
 	return nil
 }
@@ -443,14 +443,14 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 // startOrRestart is a shared implementation of Start() and Restart()
 func (rw *remoteUnit) startOrRestart(start bool) error {
 	red := rw.Status().ExtraData.(*remoteExtraData)
-	if start && red.LocalStarted {
+	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
 	newJobStarted := rw.topJC.NewJob(rw.w.ctx, 1, true)
 	if !newJobStarted {
 		return fmt.Errorf("start or monitor process already running")
 	}
-	if start || !red.LocalStarted {
+	if start || !red.RemoteStarted {
 		return rw.runAndMonitor(rw.topJC, false, rw.startRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
 		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {

@@ -75,17 +75,29 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 }
 
 // getConnection retries connectToRemote until connected or the context expires
-func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
+func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
 	for {
-		conn, reader, err := rw.connectToRemote(ctx)
+		conn, reader, err := rw.connectToRemote(mw)
 		if err == nil {
 			return conn, reader
 		}
 		logger.Debug("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
+		errStr := err.Error()
+		if strings.Contains(errStr, "CRYPTO_ERROR") {
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.Detail = "Incorrect tlsclient to remote service"
+			})
+			if rw.Status().ExtraData.(*remoteExtraData).LocalStarted == false {
+				rw.UpdateFullStatus(func(status *StatusFileData) {
+					status.State = WorkStateFailed
+				})
+				mw.Cancel()
+			}
+		}
 		select {
-		case <-ctx.Done():
+		case <-mw.Done():
 			return nil, nil
 		case <-connectDelay.NextTimeout():
 		}
@@ -104,9 +116,9 @@ func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) erro
 // getConnectionAndRun retries connecting to a host and, once the connection succeeds, runs an action function.
 // If firstTimeSync is true, a single attempt is made on the calling goroutine. If the initial attempt fails to
 // connect or firstTimeSync is false, we run return ErrPending to the caller.
-func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync bool, action actionFunc) error {
+func (rw *remoteUnit) getConnectionAndRun(mw *utils.JobContext, firstTimeSync bool, action actionFunc) error {
 	if firstTimeSync {
-		err := rw.connectAndRun(ctx, action)
+		err := rw.connectAndRun(mw, action)
 		if err == nil {
 			return nil
 		} else if !utils.ErrorIsKind(err, "connection") {
@@ -114,9 +126,9 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 		}
 	}
 	go func() {
-		conn, reader := rw.getConnection(ctx)
+		conn, reader := rw.getConnection(mw)
 		if conn != nil {
-			_ = action(ctx, conn, reader)
+			_ = action(mw, conn, reader)
 		}
 	}()
 	return ErrPending

@@ -139,7 +139,7 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err != nil {
 			return nil, err
 		}
-		c.params["tlsconfigname"], err = strFromMap(config, "tlsconfigname")
+		c.params["tlsclient"], err = strFromMap(config, "tlsclient")
 		if err != nil {
 			return nil, err
 		}

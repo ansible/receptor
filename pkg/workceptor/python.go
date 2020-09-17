@@ -47,12 +47,21 @@ type WorkPythonCfg struct {
 }
 
 // newWorker is a factory to produce worker instances
-func (cfg WorkPythonCfg) newWorker() WorkUnit {
-	return &pythonUnit{
+func (cfg WorkPythonCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+	cw := &pythonUnit{
+		commandUnit: commandUnit{
+			BaseWorkUnit: BaseWorkUnit{
+				status: StatusFileData{
+					ExtraData: &commandExtraData{},
+				},
+			},
+		},
 		plugin:   cfg.Plugin,
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
+	cw.BaseWorkUnit.Init(w, unitID, workType)
+	return cw
 }
 
 // Run runs the action

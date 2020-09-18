@@ -18,7 +18,7 @@ type PacketConn struct {
 	advertise          bool
 	adTags             map[string]string
 	hopsToLive         byte
-	unreachableMsgChan chan map[string]string
+	unreachableMsgChan chan interface{}
 	unreachableSubs    *utils.Broker
 	context            context.Context
 	cancel             context.CancelFunc
@@ -77,12 +77,13 @@ func (pc *PacketConn) startUnreachable() {
 			select {
 			case <-pc.context.Done():
 				return
-			case msg := <-pc.unreachableMsgChan:
-				FromNode, ok1 := msg["FromNode"]
-				FromService, ok2 := msg["FromService"]
-				if !ok1 || !ok2 {
+			case msgIf := <-pc.unreachableMsgChan:
+				msg, ok := msgIf.(UnreachableMessage)
+				if !ok {
 					continue
 				}
+				FromNode := msg.FromNode
+				FromService := msg.FromService
 				if FromNode == pc.s.nodeID && FromService == pc.localService {
 					pc.unreachableSubs.Publish(msg)
 				}
@@ -92,13 +93,32 @@ func (pc *PacketConn) startUnreachable() {
 }
 
 // SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn
-func (pc *PacketConn) SubscribeUnreachable() chan map[string]string {
-	return pc.unreachableSubs.Subscribe()
-}
-
-// UnsubscribeUnreachable unsubscribes from a previous subscription
-func (pc *PacketConn) UnsubscribeUnreachable(msgCh chan map[string]string) {
-	pc.unreachableSubs.Unsubscribe(msgCh)
+func (pc *PacketConn) SubscribeUnreachable() chan UnreachableMessage {
+	iChan := pc.unreachableSubs.Subscribe()
+	uChan := make(chan UnreachableMessage)
+	go func() {
+		for {
+			select {
+			case msgIf, ok := <-iChan:
+				if !ok {
+					close(uChan)
+					return
+				}
+				msg, ok := msgIf.(UnreachableMessage)
+				if !ok {
+					continue
+				}
+				select {
+				case uChan <- msg:
+				default:
+				}
+			case <-pc.context.Done():
+				close(uChan)
+				return
+			}
+		}
+	}()
+	return uChan
 }
 
 // ReadFrom reads a packet from the network and returns its data and address.

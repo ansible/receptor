@@ -106,6 +106,7 @@ type Netceptor struct {
 	serverTLSConfigs       map[string]*tls.Config
 	clientTLSConfigs       map[string]*tls.Config
 	unreachableBroker      *utils.Broker
+	routingUpdateBroker    *utils.Broker
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -188,6 +189,15 @@ type serviceAdvertisementFull struct {
 	Cancel bool
 }
 
+// UnreachableMessage is the data associated with an unreachable message
+type UnreachableMessage struct {
+	FromNode    string
+	ToNode      string
+	FromService string
+	ToService   string
+	Problem     string
+}
+
 var networkNames = make([]string, 0)
 var networkNamesLock = sync.Mutex{}
 
@@ -256,6 +266,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s.addNameHash(NodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context)
+	s.routingUpdateBroker = utils.NewBroker(s.context)
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
 	s.sendRouteFloodChan = tickrunner.Run(s.context, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
 	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
@@ -559,7 +570,37 @@ func (s *Netceptor) updateRoutingTable() {
 		}
 	}
 	s.routingPathCosts = cost
+	s.routingUpdateBroker.Publish(s.routingTable)
 	s.printRoutingTable()
+}
+
+// SubscribeRoutingUpdates subscribes for messages when the routing table is changed
+func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
+	iChan := s.routingUpdateBroker.Subscribe()
+	uChan := make(chan map[string]string)
+	go func() {
+		for {
+			select {
+			case msgIf, ok := <-iChan:
+				if !ok {
+					close(uChan)
+					return
+				}
+				msg, ok := msgIf.(map[string]string)
+				if !ok {
+					continue
+				}
+				select {
+				case uChan <- msg:
+				default:
+				}
+			case <-s.context.Done():
+				close(uChan)
+				return
+			}
+		}
+	}()
+	return uChan
 }
 
 // Forwards a message to all neighbors, possibly excluding one
@@ -715,12 +756,12 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 func (s *Netceptor) forwardMessage(md *messageData) error {
 	if md.HopsToLive <= 0 {
 		if md.FromService != "unreach" {
-			_ = s.sendUnreachable(md.FromNode, map[string]string{
-				"FromNode":    md.FromNode,
-				"ToNode":      md.ToNode,
-				"FromService": md.FromService,
-				"ToService":   md.ToService,
-				"Problem":     ProblemExpiredInTransit,
+			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
+				FromNode:    md.FromNode,
+				ToNode:      md.ToNode,
+				FromService: md.FromService,
+				ToService:   md.ToService,
+				Problem:     ProblemExpiredInTransit,
 			})
 		}
 		return nil
@@ -948,8 +989,8 @@ func (s *Netceptor) handleUnreachable(md *messageData) error {
 }
 
 // Sends an unreachable response
-func (s *Netceptor) sendUnreachable(ToNode string, data map[string]string) error {
-	bytes, err := json.Marshal(data)
+func (s *Netceptor) sendUnreachable(ToNode string, message *UnreachableMessage) error {
+	bytes, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
@@ -986,12 +1027,12 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 			if md.FromNode == s.nodeID {
 				return fmt.Errorf(ProblemServiceUnknown)
 			}
-			_ = s.sendUnreachable(md.FromNode, map[string]string{
-				"FromNode":    md.FromNode,
-				"ToNode":      md.ToNode,
-				"FromService": md.FromService,
-				"ToService":   md.ToService,
-				"Problem":     ProblemServiceUnknown,
+			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
+				FromNode:    md.FromNode,
+				ToNode:      md.ToNode,
+				FromService: md.FromService,
+				ToService:   md.ToService,
+				Problem:     ProblemServiceUnknown,
 			})
 			return nil
 		}

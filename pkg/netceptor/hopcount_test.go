@@ -66,23 +66,35 @@ func TestHopCountLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Subscribe for node list updates
+	nCh1 := n1.SubscribeRoutingUpdates()
+	nCh2 := n2.SubscribeRoutingUpdates()
+
+	// Connect the two nodes
 	b1.NewConnection(MessageConnFromNetConn(c1), true)
 	b2.NewConnection(MessageConnFromNetConn(c2), true)
 
 	// Wait for the nodes to establish routing to each other
+	var routes1 map[string]string
+	var routes2 map[string]string
 	timeout, _ := context.WithTimeout(context.Background(), 2*time.Second)
 	for {
-		if timeout.Err() != nil {
-			t.Fatal(timeout.Err())
+		select {
+		case <-timeout.Done():
+			t.Fatal("timed out waiting for nodes to connect")
+		case routes1 = <-nCh1:
+		case routes2 = <-nCh2:
 		}
-		_, ok := n1.Status().RoutingTable["node2"]
-		if ok {
-			_, ok := n2.Status().RoutingTable["node1"]
+		if routes1 != nil && routes2 != nil {
+			_, ok := routes1["node2"]
 			if ok {
-				break
+				_, ok := routes2["node1"]
+				if ok {
+					break
+				}
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	// Inject a fake node3 that both nodes think the other node has a route to

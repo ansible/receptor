@@ -49,31 +49,24 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 		_ = pc.Close()
 	}()
 	pc.SetHopsToLive(hopsToLive)
-	msgCh := pc.SubscribeUnreachable()
+	unrCh := pc.SubscribeUnreachable()
 	type errorResult struct {
 		err      error
 		fromNode string
 	}
 	errorChan := make(chan errorResult)
 	go func() {
-		for {
+		select {
+		case <-doneChan:
+			return
+		case msg := <-unrCh:
+			er := errorResult{
+				err:      fmt.Errorf(msg.Problem),
+				fromNode: msg.FromNode,
+			}
 			select {
-			case <-doneChan:
-				pc.UnsubscribeUnreachable(msgCh)
-				return
-			case msg := <-msgCh:
-				errMsg, ok := msg["Problem"]
-				if !ok {
-					errMsg = "unknown error"
-				}
-				fromNode, ok := msg["ReceivedFromNode"]
-				if !ok {
-					fromNode = ""
-				}
-				errorChan <- errorResult{
-					err:      fmt.Errorf(errMsg),
-					fromNode: fromNode,
-				}
+			case errorChan <- er:
+			default:
 			}
 		}
 	}()
@@ -88,11 +81,18 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 			fromNode = strings.TrimSuffix(fromNode, ":ping")
 		}
 		if err == nil {
-			replyChan <- fromNode
+			select {
+			case replyChan <- fromNode:
+			default:
+			}
 		} else {
-			errorChan <- errorResult{
+			er := errorResult{
 				err:      err,
 				fromNode: fromNode,
+			}
+			select {
+			case errorChan <- er:
+			default:
 			}
 		}
 	}()

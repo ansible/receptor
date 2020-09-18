@@ -91,8 +91,8 @@ class ReceptorControl:
             "tlsclient": tlsclient,
             "params": params,
         }
-        commandStr = json.dumps(commandMap)
-        command = f"{commandStr}\n"
+        commandJson = json.dumps(commandMap)
+        command = f"{commandJson}\n"
         self.writestr(command)
         text = self.readstr()
         m = re.compile("Work unit created with ID (.+). Send stdin data and EOF.").fullmatch(text)
@@ -127,4 +127,3 @@ class ReceptorControl:
             raise RuntimeError(errmsg)
         self.socket.shutdown(socket.SHUT_WR)
         return self.sockfile
-

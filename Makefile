@@ -71,9 +71,16 @@ build-all:
 test: receptor
 	@go test ./... -p 1 -parallel=16 -count=1
 
+RUNTEST ?=
+ifeq ($(RUNTEST),)
+TESTCMD =
+else
+TESTCMD = -run $(RUNTEST)
+endif
+
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
-	  go test ./... -p 1 -parallel=16 -count=1; do \
+	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
 	  i=$$((i+1)); done
 
 ci: pre-commit build-all test

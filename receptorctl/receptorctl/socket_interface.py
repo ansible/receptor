@@ -127,3 +127,4 @@ class ReceptorControl:
             raise RuntimeError(errmsg)
         self.socket.shutdown(socket.SHUT_WR)
         return self.sockfile
+

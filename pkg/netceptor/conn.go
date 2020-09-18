@@ -353,17 +353,8 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 		case <-doneChan:
 			return
 		case msg := <-msgCh:
-			problem, ok := msg["Problem"]
-			if ok && problem == "service unknown" {
-				toNode, ok1 := msg["ToNode"]
-				toService, ok2 := msg["ToService"]
-				problem, ok3 := msg["Problem"]
-				if !ok1 || !ok2 || !ok3 {
-					continue
-				}
-				if problem == ProblemServiceUnknown && toNode == remoteAddr.node && toService == remoteAddr.service {
-					cancel(fmt.Errorf("remote service unreachable"))
-				}
+			if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
+				cancel(fmt.Errorf("remote service unreachable"))
 			}
 		}
 	}

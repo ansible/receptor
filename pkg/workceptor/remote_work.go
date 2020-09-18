@@ -97,6 +97,7 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 				rw.UpdateFullStatus(func(status *StatusFileData) {
 					status.State = WorkStateFailed
 				})
+				mw.WorkerDone()
 				mw.Cancel()
 			}
 		}
@@ -504,6 +505,10 @@ func (rw *remoteUnit) Cancel() error {
 
 // Release releases resources associated with a job.  Implies Cancel.
 func (rw *remoteUnit) Release(force bool) error {
+	// if remote work has not started, force release
+	if rw.Status().ExtraData.(*remoteExtraData).RemoteStarted == false {
+		force = true
+	}
 	return rw.cancelOrRelease(true, force)
 }
 

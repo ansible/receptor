@@ -200,10 +200,11 @@ def list(ctx, quiet):
 @click.option('--node', type=str, help="Receptor node to run the work on. Defaults to the local node.")
 @click.option('--payload', '-p', type=str, help="File containing unit of work data. Use - for stdin.")
 @click.option('--payload-literal', '-l', type=str, help="Use the command line string as the literal unit of work data.")
+@click.option('--tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
 @click.option('--follow', '-f', help="Remain attached to the job and print its results to stdout", is_flag=True)
 @click.option('--rm', help="Release unit after completion", is_flag=True)
 @click.argument('params', nargs=-1, type=click.UNPROCESSED)
-def submit(ctx, worktype, node, payload, payload_literal, follow, rm, params):
+def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm, params):
     if not payload and not payload_literal:
         print("Must provide one of --payload or --payload-literal.")
         sys.exit(1)
@@ -224,7 +225,7 @@ def submit(ctx, worktype, node, payload, payload_literal, follow, rm, params):
         rc = get_rc(ctx)
         if node == "":
             node = None
-        work = rc.submit_work(node, worktype, " ".join(params), payload_data)
+        work = rc.submit_work(node, worktype, " ".join(params), payload_data, tlsclient)
         result = work.pop('result')
         unitid = work.pop('unitid')
         if follow:

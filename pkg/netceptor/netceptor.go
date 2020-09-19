@@ -1314,7 +1314,8 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					// Establish the connection
 					select {
 					case initDoneChan <- true:
-					default:
+					case <-s.context.Done():
+						return nil
 					}
 					logger.Info("Connection established with %s\n", remoteNodeID)
 					s.addNameHash(remoteNodeID)
@@ -1336,10 +1337,12 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					select {
 					case s.sendRouteFloodChan <- 0:
 					case <-s.context.Done():
+						return nil
 					}
 					select {
 					case s.updateRoutingTableChan <- 0:
 					case <-s.context.Done():
+						return nil
 					}
 					established = true
 				} else if msgType == MsgTypeReject {

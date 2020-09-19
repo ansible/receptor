@@ -2,10 +2,12 @@ package netceptor
 
 import (
 	"context"
+	"fmt"
 	"github.com/prep/socketpair"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"log"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -20,6 +22,7 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 	s := strings.Trim(string(p), "\n")
 	if strings.HasPrefix(s, "ERROR") {
 		if !strings.Contains(s, "maximum number of forwarding hops") {
+			fmt.Printf(s)
 			lw.t.Fatal(s)
 			return
 		}
@@ -78,7 +81,7 @@ func TestHopCountLimit(t *testing.T) {
 	// Wait for the nodes to establish routing to each other
 	var routes1 map[string]string
 	var routes2 map[string]string
-	timeout, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	timeout, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	for {
 		select {
 		case <-timeout.Done():
@@ -143,4 +146,170 @@ func TestHopCountLimit(t *testing.T) {
 	n2.Shutdown()
 	n1.BackendWait()
 	n2.BackendWait()
+}
+
+func TestLotsOfPings(t *testing.T) {
+	numBackboneNodes := 3
+	numLeafNodesPerBackbone := 3
+
+	nodes := make([]*Netceptor, numBackboneNodes)
+	for i := 0; i < numBackboneNodes; i++ {
+		nodes[i] = New(context.Background(), fmt.Sprintf("backbone_%d", i), nil)
+	}
+	for i := 0; i < numBackboneNodes; i++ {
+		for j := 0; j < i; j++ {
+			b1, err := NewExternalBackend()
+			if err == nil {
+				err = nodes[i].AddBackend(b1, 1.0, nil)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			b2, err := NewExternalBackend()
+			if err == nil {
+				err = nodes[j].AddBackend(b2, 1.0, nil)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			c1, c2, err := socketpair.New("unix")
+			if err != nil {
+				t.Fatal(err)
+			}
+			b1.NewConnection(MessageConnFromNetConn(c1), true)
+			b2.NewConnection(MessageConnFromNetConn(c2), true)
+		}
+	}
+
+	for i := 0; i < numBackboneNodes; i++ {
+		for j := 0; j < numLeafNodesPerBackbone; j++ {
+			b1, err := NewExternalBackend()
+			if err == nil {
+				err = nodes[i].AddBackend(b1, 1.0, nil)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			newNode := New(context.Background(), fmt.Sprintf("leaf_%d_%d", i, j), nil)
+			nodes = append(nodes, newNode)
+			b2, err := NewExternalBackend()
+			if err == nil {
+				err = newNode.AddBackend(b2, 1.0, nil)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			c1, c2, err := socketpair.New("unix")
+			if err != nil {
+				t.Fatal(err)
+			}
+			b1.NewConnection(MessageConnFromNetConn(c1), true)
+			b2.NewConnection(MessageConnFromNetConn(c2), true)
+		}
+	}
+
+	responses := make([][]bool, len(nodes))
+	for i := range nodes {
+		responses[i] = make([]bool, len(nodes))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	wg := sync.WaitGroup{}
+	for i := range nodes {
+		for j := range nodes {
+			wg.Add(2)
+			go func(sender *Netceptor, recipient *Netceptor, response *bool) {
+				pc, err := sender.ListenPacket("")
+				if err != nil {
+					t.Fatal(err)
+				}
+				go func() {
+					defer wg.Done()
+					for {
+						buf := make([]byte, 1024)
+						err := pc.SetReadDeadline(time.Now().Add(1 * time.Second))
+						if err != nil {
+							t.Fatalf("error in SetReadDeadline: %s", err)
+						}
+						_, addr, err := pc.ReadFrom(buf)
+						if ctx.Err() != nil {
+							return
+						}
+						if err != nil {
+							continue
+						}
+						ncAddr, ok := addr.(Addr)
+						if !ok {
+							t.Fatal("addr was not a Netceptor address")
+						}
+						if ncAddr.node != recipient.nodeID {
+							t.Fatal("Received response from wrong node")
+						}
+						*response = true
+					}
+				}()
+				go func() {
+					defer wg.Done()
+					buf := []byte("test")
+					rAddr := sender.NewAddr(recipient.nodeID, "ping")
+					for {
+						_, _ = pc.WriteTo(buf, rAddr)
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(100 * time.Millisecond):
+						}
+						if *response {
+							return
+						}
+					}
+				}()
+			}(nodes[i], nodes[j], &responses[i][j])
+		}
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			good := true
+			for i := range nodes {
+				for j := range nodes {
+					if !responses[i][j] {
+						good = false
+						break
+					}
+				}
+				if !good {
+					break
+				}
+			}
+			if good {
+				t.Log("all pings received")
+				cancel()
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	}()
+
+	t.Log("waiting for done")
+	select {
+	case <-ctx.Done():
+	}
+	t.Log("waiting for waitgroup")
+	wg.Wait()
+
+	t.Log("shutting down")
+	for i := range nodes {
+		go nodes[i].Shutdown()
+	}
+	t.Log("waiting for backends")
+	for i := range nodes {
+		nodes[i].BackendWait()
+	}
 }

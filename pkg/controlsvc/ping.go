@@ -1,6 +1,7 @@
 package controlsvc
 
 import (
+	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"strings"
@@ -39,13 +40,13 @@ func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCo
 
 // ping is the internal implementation of sending a single ping packet and waiting for a reply or error
 func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duration, string, error) {
-	doneChan := make(chan struct{})
 	pc, err := nc.ListenPacket("")
 	if err != nil {
 		return 0, "", err
 	}
+	ctx, ctxCancel := context.WithCancel(nc.Context())
 	defer func() {
-		close(doneChan)
+		ctxCancel()
 		_ = pc.Close()
 	}()
 	pc.SetHopsToLive(hopsToLive)
@@ -57,16 +58,12 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 	errorChan := make(chan errorResult)
 	go func() {
 		select {
-		case <-doneChan:
+		case <-ctx.Done():
 			return
 		case msg := <-unrCh:
-			er := errorResult{
+			errorChan <- errorResult{
 				err:      fmt.Errorf(msg.Problem),
 				fromNode: msg.FromNode,
-			}
-			select {
-			case errorChan <- er:
-			default:
 			}
 		}
 	}()
@@ -83,16 +80,15 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 		if err == nil {
 			select {
 			case replyChan <- fromNode:
-			default:
+			case <-ctx.Done():
 			}
 		} else {
-			er := errorResult{
+			select {
+			case errorChan <- errorResult{
 				err:      err,
 				fromNode: fromNode,
-			}
-			select {
-			case errorChan <- er:
-			default:
+			}:
+			case <-ctx.Done():
 			}
 		}
 	}()

@@ -135,8 +135,11 @@ func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	str := string(data)
+	if strings.HasPrefix(str, "ERROR") {
+		return nil, fmt.Errorf(str)
+	}
 	jsonData := make(map[string]interface{})
-
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
 		return nil, err

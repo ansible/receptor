@@ -579,8 +579,9 @@ func TestCosts(t *testing.T) {
 			response, err := controller.Ping(nodeIDResponder)
 			if err != nil {
 				t.Error(err)
+			} else {
+				t.Logf("%v", response)
 			}
-			t.Logf("%v", response)
 		}
 		controller.Close()
 	}

@@ -1335,11 +1335,11 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					s.knownNodeLock.Unlock()
 					select {
 					case s.sendRouteFloodChan <- 0:
-					default:
+					case <-s.context.Done():
 					}
 					select {
 					case s.updateRoutingTableChan <- 0:
-					default:
+					case <-s.context.Done():
 					}
 					established = true
 				} else if msgType == MsgTypeReject {

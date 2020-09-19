@@ -6,6 +6,7 @@ import (
 	"github.com/prep/socketpair"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -43,6 +44,10 @@ func TestHopCountLimit(t *testing.T) {
 	}
 	log.SetOutput(lw)
 	logger.SetShowTrace(true)
+	defer func() {
+		log.SetOutput(os.Stdout)
+		logger.SetShowTrace(false)
+	}()
 
 	// Create two Netceptor nodes using external backends
 	n1 := New(context.Background(), "node1", nil)
@@ -245,6 +250,7 @@ func TestLotsOfPings(t *testing.T) {
 						if ncAddr.node != recipient.nodeID {
 							t.Fatal("Received response from wrong node")
 						}
+						t.Logf("%s received response from %s", sender.nodeID, recipient.nodeID)
 						*response = true
 					}
 				}()

@@ -570,7 +570,11 @@ func (s *Netceptor) updateRoutingTable() {
 		}
 	}
 	s.routingPathCosts = cost
-	s.routingUpdateBroker.Publish(s.routingTable)
+	routingTableCopy := make(map[string]string)
+	for k, v := range s.routingTable {
+		routingTableCopy[k] = v
+	}
+	go s.routingUpdateBroker.Publish(routingTableCopy)
 	s.printRoutingTable()
 }
 
@@ -1110,7 +1114,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 			continue
 		}
 		if err != nil {
-			if err != io.EOF {
+			if err != io.EOF && ci.Context.Err() == nil {
 				logger.Error("Backend receiving error %s\n", err)
 			}
 			ci.CancelFunc()
@@ -1133,7 +1137,9 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 			}
 			err := sess.Send(message)
 			if err != nil {
-				logger.Error("Backend sending error %s\n", err)
+				if ci.Context.Err() == nil {
+					logger.Error("Backend sending error %s\n", err)
+				}
 				ci.CancelFunc()
 				return
 			}
@@ -1160,6 +1166,8 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 			return
 		}
 		select {
+		case <-s.context.Done():
+			return
 		case <-time.After(1 * time.Second):
 			continue
 		case <-initDoneChan:
@@ -1304,7 +1312,10 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					}
 
 					// Establish the connection
-					initDoneChan <- true
+					select {
+					case initDoneChan <- true:
+					default:
+					}
 					logger.Info("Connection established with %s\n", remoteNodeID)
 					s.addNameHash(remoteNodeID)
 					s.connLock.Lock()
@@ -1322,8 +1333,14 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					}
 					s.knownConnectionCosts[remoteNodeID][s.nodeID] = connectionCost
 					s.knownNodeLock.Unlock()
-					s.sendRouteFloodChan <- 0
-					s.updateRoutingTableChan <- 0
+					select {
+					case s.sendRouteFloodChan <- 0:
+					default:
+					}
+					select {
+					case s.updateRoutingTableChan <- 0:
+					default:
+					}
 					established = true
 				} else if msgType == MsgTypeReject {
 					logger.Warning("Received a rejection message from peer.")

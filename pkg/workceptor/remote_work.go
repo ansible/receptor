@@ -82,21 +82,19 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 		if err == nil {
 			return conn, reader
 		}
-		status := rw.Status()
 		logger.Warning("Connection to %s failed with error: %s",
-			status.ExtraData.(*remoteExtraData).RemoteNode, err)
+			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {
-			detailMsg := "Incorrect tlsclient to remote service"
-			if status.Detail != detailMsg {
-				rw.UpdateFullStatus(func(status *StatusFileData) {
-					status.Detail = detailMsg
-				})
-			}
-			if status.ExtraData.(*remoteExtraData).RemoteStarted == false {
-				rw.UpdateFullStatus(func(status *StatusFileData) {
+			var shouldExit = false
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+				if !status.ExtraData.(*remoteExtraData).RemoteStarted {
+					shouldExit = true
 					status.State = WorkStateFailed
-				})
+				}
+			})
+			if shouldExit {
 				mw.Cancel()
 			}
 		}
@@ -112,7 +110,7 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) error {
 	conn, reader, err := rw.connectToRemote(ctx)
 	if err != nil {
-		return utils.WrapErrorWithKind(err, "connection")
+		return utils.WrapErrorWithKind(err, "connection first attempt")
 	}
 	return action(ctx, conn, reader)
 }

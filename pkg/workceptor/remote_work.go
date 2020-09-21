@@ -96,6 +96,7 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 			})
 			if shouldExit {
 				mw.Cancel()
+				return nil, nil
 			}
 		}
 		select {

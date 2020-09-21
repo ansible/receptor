@@ -97,7 +97,6 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 				rw.UpdateFullStatus(func(status *StatusFileData) {
 					status.State = WorkStateFailed
 				})
-				mw.WorkerDone()
 				mw.Cancel()
 			}
 		}
@@ -425,10 +424,17 @@ func (rw *remoteUnit) Status() *StatusFileData {
 
 // startAndMonitorRemoteUnit waits for a connection to be available, then starts the remote unit and monitors it
 func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, action actionFunc) error {
-	return rw.getConnectionAndRun(mw, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	// important to only call WorkerDone() once
+	doneOnce := sync.Once{}
+	workerDone := func() {
+		doneOnce.Do(func() {
+			mw.WorkerDone()
+		})
+	}
+	err := rw.getConnectionAndRun(mw, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		err := action(mw, conn, reader)
 		if err != nil {
-			mw.WorkerDone()
+			workerDone()
 			return err
 		}
 		go func() {
@@ -439,10 +445,14 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 					logger.Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
 			}
-			mw.WorkerDone()
+			workerDone()
 		}()
 		return nil
 	})
+	if err != nil && err != ErrPending {
+		workerDone()
+	}
+	return err
 }
 
 // startOrRestart is a shared implementation of Start() and Restart()
@@ -480,12 +490,22 @@ func (rw *remoteUnit) Restart() error {
 // cancelOrRelease is a shared implementation of Cancel() and Release()
 func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	// Update the status file that the unit is locally cancelled/released
+	var remoteStarted bool
 	rw.UpdateFullStatus(func(status *StatusFileData) {
 		status.ExtraData.(*remoteExtraData).LocalCancelled = true
 		if release {
 			status.ExtraData.(*remoteExtraData).LocalReleased = true
 		}
+		remoteStarted = status.ExtraData.(*remoteExtraData).RemoteStarted
 	})
+	// if remote work has not started, don't attempt to connect to remote
+	if !remoteStarted {
+		rw.topJC.Cancel()
+		rw.topJC.Wait()
+		if release {
+			return rw.BaseWorkUnit.Release(true)
+		}
+	}
 	if release && force {
 		_ = rw.connectAndRun(rw.w.ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true, true)
@@ -505,10 +525,6 @@ func (rw *remoteUnit) Cancel() error {
 
 // Release releases resources associated with a job.  Implies Cancel.
 func (rw *remoteUnit) Release(force bool) error {
-	// if remote work has not started, force release
-	if rw.Status().ExtraData.(*remoteExtraData).RemoteStarted == false {
-		force = true
-	}
 	return rw.cancelOrRelease(true, force)
 }
 

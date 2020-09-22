@@ -57,6 +57,20 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	}
 	conn, err := rw.w.nc.DialContext(ctx, node, "control", tlsConfig)
 	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "CRYPTO_ERROR") {
+			var shouldExit = false
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+				if !status.ExtraData.(*remoteExtraData).RemoteStarted {
+					shouldExit = true
+					status.State = WorkStateFailed
+				}
+			})
+			if shouldExit {
+				return nil, nil, utils.WrapErrorWithKind(err, "crypto")
+			}
+		}
 		return nil, nil, err
 	}
 	reader := bufio.NewReader(conn)
@@ -84,21 +98,6 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 		}
 		logger.Warning("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
-		errStr := err.Error()
-		if strings.Contains(errStr, "CRYPTO_ERROR") {
-			var shouldExit = false
-			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
-				if !status.ExtraData.(*remoteExtraData).RemoteStarted {
-					shouldExit = true
-					status.State = WorkStateFailed
-				}
-			})
-			if shouldExit {
-				mw.Cancel()
-				return nil, nil
-			}
-		}
 		select {
 		case <-mw.Done():
 			return nil, nil
@@ -111,7 +110,10 @@ func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Read
 func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) error {
 	conn, reader, err := rw.connectToRemote(ctx)
 	if err != nil {
-		return utils.WrapErrorWithKind(err, "connection first attempt")
+		if !utils.ErrorIsKind(err, "crypto") {
+			return utils.WrapErrorWithKind(err, "connection")
+		}
+		return err
 	}
 	return action(ctx, conn, reader)
 }

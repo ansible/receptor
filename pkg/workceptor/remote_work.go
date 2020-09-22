@@ -471,7 +471,10 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased, false)
 		})
 	}
-	go rw.monitorRemoteUnit(rw.topJC, false)
+	go func() {
+		rw.monitorRemoteUnit(rw.topJC, false)
+		rw.topJC.WorkerDone()
+	}()
 	return nil
 }
 

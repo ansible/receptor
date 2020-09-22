@@ -380,18 +380,17 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 }
 
 // monitorRemoteUnit watches a remote unit on another node and maintains local status
-func (rw *remoteUnit) monitorRemoteUnit(mw *utils.JobContext, forRelease bool) {
+func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 	subJC := &utils.JobContext{}
 	if forRelease {
-		subJC.NewJob(mw, 1, false)
+		subJC.NewJob(ctx, 1, false)
 		go rw.monitorRemoteStatus(subJC, true)
 	} else {
-		subJC.NewJob(mw, 2, false)
+		subJC.NewJob(ctx, 2, false)
 		go rw.monitorRemoteStatus(subJC, false)
 		go rw.monitorRemoteStdout(subJC)
 	}
 	subJC.Wait()
-	mw.WorkerDone()
 }
 
 // Init initializes the work unit data
@@ -440,6 +439,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 					logger.Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
 			}
+			mw.WorkerDone()
 		}()
 		return nil
 	})
@@ -462,7 +462,10 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased, false)
 		})
 	}
-	rw.monitorRemoteUnit(rw.topJC, false)
+	go func() {
+		rw.monitorRemoteUnit(rw.topJC, false)
+		mw.WorkerDone()
+	}()
 	return nil
 }
 

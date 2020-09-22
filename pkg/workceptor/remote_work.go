@@ -89,17 +89,17 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 }
 
 // getConnection retries connectToRemote until connected or the context expires
-func (rw *remoteUnit) getConnection(mw *utils.JobContext) (net.Conn, *bufio.Reader) {
+func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
 	for {
-		conn, reader, err := rw.connectToRemote(mw)
+		conn, reader, err := rw.connectToRemote(ctx)
 		if err == nil {
 			return conn, reader
 		}
 		logger.Warning("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
 		select {
-		case <-mw.Done():
+		case <-ctx.Done():
 			return nil, nil
 		case <-connectDelay.NextTimeout():
 		}
@@ -121,9 +121,9 @@ func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) erro
 // getConnectionAndRun retries connecting to a host and, once the connection succeeds, runs an action function.
 // If firstTimeSync is true, a single attempt is made on the calling goroutine. If the initial attempt fails to
 // connect or firstTimeSync is false, we run return ErrPending to the caller.
-func (rw *remoteUnit) getConnectionAndRun(mw *utils.JobContext, firstTimeSync bool, action actionFunc) error {
+func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync bool, action actionFunc) error {
 	if firstTimeSync {
-		err := rw.connectAndRun(mw, action)
+		err := rw.connectAndRun(ctx, action)
 		if err == nil {
 			return nil
 		} else if !utils.ErrorIsKind(err, "connection") {
@@ -131,9 +131,9 @@ func (rw *remoteUnit) getConnectionAndRun(mw *utils.JobContext, firstTimeSync bo
 		}
 	}
 	go func() {
-		conn, reader := rw.getConnection(mw)
+		conn, reader := rw.getConnection(ctx)
 		if conn != nil {
-			_ = action(mw, conn, reader)
+			_ = action(ctx, conn, reader)
 		}
 	}()
 	return ErrPending

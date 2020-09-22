@@ -131,7 +131,7 @@ func GenerateCert(dir, name string) (keyPath, certPath string, e error) {
 		return "", "", err
 	}
 	// Create our certificate
-	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=", "-sha256", "-out", CrtPath)
+	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=localhost", "-sha256", "-out", CrtPath)
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
@@ -153,7 +153,7 @@ func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPa
 	}
 
 	// Create our certificate request
-	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=", "-out", CSRPath)
+	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=localhost", "-out", CSRPath)
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err

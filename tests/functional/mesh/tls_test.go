@@ -40,7 +40,7 @@ func TestTCPSSLConnections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			key1, crt1, err := utils.GenerateCertWithCA(tempdir, "node1", caKey, caCrt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -91,10 +91,10 @@ func TestTCPSSLConnections(t *testing.T) {
 					},
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
-							"name":               "client-cert2",
-							"key":                key2,
-							"cert":               crt2,
-							"insecureskipverify": true,
+							"name":    "client-cert2",
+							"key":     key2,
+							"cert":    crt2,
+							"rootcas": caCrt,
 						},
 					},
 					map[interface{}]interface{}{
@@ -108,16 +108,16 @@ func TestTCPSSLConnections(t *testing.T) {
 				Connections: map[string]mesh.YamlConnection{
 					"node2": mesh.YamlConnection{
 						Index: 2,
-						TLS:   "client-insecure",
+						TLS:   "client-secure",
 					},
 				},
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
-							"name":               "client-insecure",
-							"key":                "",
-							"cert":               "",
-							"insecureskipverify": true,
+							"name":    "client-secure",
+							"key":     "",
+							"cert":    "",
+							"rootcas": caCrt,
 						},
 					},
 					map[interface{}]interface{}{
@@ -345,6 +345,186 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			err = m.WaitForReady(ctx)
 			if err == nil {
 				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+			}
+		})
+	}
+}
+
+func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
+	t.Parallel()
+	testTable := []struct {
+		listener string
+	}{
+		{"tcp-listener"},
+		{"ws-listener"},
+	}
+	for _, data := range testTable {
+		listener := data.listener
+		t.Run(listener, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup the mesh directory
+			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
+			err := os.MkdirAll(baseDir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tempdir, err := ioutil.TempDir(baseDir, "certs-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			if err != nil {
+				t.Fatal(err)
+			}
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Setup our mesh yaml data
+			data := mesh.YamlData{}
+			data.Nodes = make(map[string]*mesh.YamlNode)
+
+			// Generate a mesh where each node n is connected to only n+1 and n-1
+			// if they exist
+			data.Nodes["node1"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{},
+					},
+				},
+			}
+			data.Nodes["node2"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{
+					"node1": mesh.YamlConnection{
+						Index: 1,
+						TLS:   "client-secure",
+					},
+				},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-client": map[interface{}]interface{}{
+							"name":    "client-secure",
+							"key":     key1,
+							"cert":    crt1,
+							"rootcas": caCrt,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{},
+					},
+				},
+			}
+			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			err = m.WaitForReady(ctx)
+			if err == nil {
+				t.Fatal("Receptor server auth was expected to fail but it succeeded")
+			}
+		})
+	}
+}
+
+func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
+	t.Parallel()
+	testTable := []struct {
+		listener string
+	}{
+		{"tcp-listener"},
+		{"ws-listener"},
+	}
+	for _, data := range testTable {
+		listener := data.listener
+		t.Run(listener, func(t *testing.T) {
+			t.Parallel()
+
+			// Setup the mesh directory
+			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
+			err := os.MkdirAll(baseDir, 0755)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tempdir, err := ioutil.TempDir(baseDir, "certs-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			if err != nil {
+				t.Fatal(err)
+			}
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			key2, crt2, err := utils.GenerateCert(tempdir, "node2")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Setup our mesh yaml data
+			data := mesh.YamlData{}
+			data.Nodes = make(map[string]*mesh.YamlNode)
+
+			// Generate a mesh where each node n is connected to only n+1 and n-1
+			// if they exist
+			data.Nodes["node1"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-server": map[interface{}]interface{}{
+							"name": "cert1",
+							"key":  key1,
+							"cert": crt1,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{
+							"tls": "cert1",
+						},
+					},
+				},
+			}
+			data.Nodes["node2"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{
+					"node1": mesh.YamlConnection{
+						Index: 1,
+						TLS:   "client-secure",
+					},
+				},
+				Nodedef: []interface{}{
+					map[interface{}]interface{}{
+						"tls-client": map[interface{}]interface{}{
+							"name":    "client-secure",
+							"key":     key2,
+							"cert":    crt2,
+							"rootcas": caCrt,
+						},
+					},
+					map[interface{}]interface{}{
+						listener: map[interface{}]interface{}{},
+					},
+				},
+			}
+			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			err = m.WaitForReady(ctx)
+			if err == nil {
+				t.Fatal("Receptor server auth was expected to fail but it succeeded")
 			}
 		})
 	}

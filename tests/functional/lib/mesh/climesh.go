@@ -268,7 +268,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 				if ok {
 					addr = bindaddr + ":" + listenerMap["port"].(string)
 				} else {
-					addr = "127.0.0.1:" + listenerMap["port"].(string)
+					addr = "localhost:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
@@ -292,7 +292,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 				if ok {
 					addr = bindaddr + ":" + listenerMap["port"].(string)
 				} else {
-					addr = "127.0.0.1:" + listenerMap["port"].(string)
+					addr = "localhost:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
@@ -319,7 +319,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 				if ok {
 					addr = proto + bindaddr + ":" + listenerMap["port"].(string)
 				} else {
-					addr = proto + "127.0.0.1:" + listenerMap["port"].(string)
+					addr = proto + "localhost:" + listenerMap["port"].(string)
 				}
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)

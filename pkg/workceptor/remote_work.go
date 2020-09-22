@@ -132,8 +132,9 @@ func (rw *remoteUnit) getConnectionAndRun(mw *utils.JobContext, firstTimeSync bo
 		conn, reader := rw.getConnection(mw)
 		if conn != nil {
 			_ = action(mw, conn, reader)
+		} else {
+			mw.WorkerDone()
 		}
-		mw.WorkerDone()
 	}()
 	return ErrPending
 }
@@ -390,6 +391,7 @@ func (rw *remoteUnit) monitorRemoteUnit(mw *utils.JobContext, forRelease bool) {
 		go rw.monitorRemoteStdout(subJC)
 	}
 	subJC.Wait()
+	mw.WorkerDone()
 }
 
 // Init initializes the work unit data
@@ -438,7 +440,6 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 					logger.Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
 			}
-			mw.WorkerDone()
 		}()
 		return nil
 	})
@@ -461,10 +462,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased, false)
 		})
 	}
-	go func() {
-		rw.monitorRemoteUnit(rw.topJC, false)
-		rw.topJC.WorkerDone()
-	}()
+	rw.monitorRemoteUnit(rw.topJC, false)
 	return nil
 }
 

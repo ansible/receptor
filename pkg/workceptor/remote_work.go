@@ -442,7 +442,6 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		}()
 		return nil
 	}, func() {
-		mw.Cancel()
 		mw.WorkerDone()
 	})
 }

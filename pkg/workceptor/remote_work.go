@@ -464,7 +464,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 	}
 	go func() {
 		rw.monitorRemoteUnit(rw.topJC, false)
-		mw.WorkerDone()
+		rw.topJC.WorkerDone()
 	}()
 	return nil
 }

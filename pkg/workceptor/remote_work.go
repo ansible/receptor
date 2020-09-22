@@ -495,6 +495,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		if release {
 			return rw.BaseWorkUnit.Release(true)
 		}
+		return nil
 	}
 	if release && force {
 		_ = rw.connectAndRun(rw.w.ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {

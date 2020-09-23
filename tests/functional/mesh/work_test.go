@@ -53,12 +53,6 @@ func TestWork(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Setup control service
-		tempdir, err = ioutil.TempDir(mesh.ControlSocketBaseDir, "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		controlSocket := filepath.Join(tempdir, "controlsock")
 		// Generate a mesh with 3 nodes
 		data.Nodes["node2"] = &mesh.YamlNode{
 			Connections: map[string]mesh.YamlConnection{},
@@ -83,9 +77,8 @@ func TestWork(t *testing.T) {
 				},
 				map[interface{}]interface{}{
 					"control-service": map[interface{}]interface{}{
-						"service":  "control",
-						"tls":      "control_tls",
-						"filename": controlSocket,
+						"service": "control",
+						"tls":     "control_tls",
 					},
 				},
 				map[interface{}]interface{}{

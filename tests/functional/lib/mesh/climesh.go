@@ -334,9 +334,9 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
-		controlSocket := ""
 		needsControlService := true
-		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
+		controlServiceIndex := 0
+		for index, attr := range MeshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -345,27 +345,32 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 					csvName, ok := vMap["service"]
 					if ok {
 						if csvName == "control" {
-							controlSocket = vMap["filename"].(string)
+							_, ok = vMap["filename"].(string)
+							if ok {
+								return nil, fmt.Errorf("control-service definition should not specify a filename")
+							}
+							controlServiceIndex = index
 							needsControlService = false
 						}
 					}
 				}
 			}
 		}
-		if !needsControlService {
-			node.controlSocket = controlSocket
-			continue
-		}
 		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}
-		node.controlSocket = filepath.Join(tempdir, "controlsock")
-		controlServiceYaml := make(map[interface{}]interface{})
+		controlSocket := filepath.Join(tempdir, "controlsock")
+		node.controlSocket = controlSocket
 		tmp := make(map[interface{}]interface{})
-		tmp["filename"] = node.controlSocket
-		controlServiceYaml["control-service"] = tmp
-		MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, controlServiceYaml)
+		tmp["filename"] = controlSocket
+		if needsControlService {
+			controlServiceYaml := make(map[interface{}]interface{})
+			controlServiceYaml["control-service"] = tmp
+			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, controlServiceYaml)
+		} else {
+			MeshDefinition.Nodes[k].Nodedef[controlServiceIndex].(map[interface{}]interface{})["control-service"].(map[interface{}]interface{})["filename"] = controlSocket
+		}
 	}
 
 	for k, node := range nodes {

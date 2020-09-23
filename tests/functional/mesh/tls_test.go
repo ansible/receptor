@@ -36,15 +36,15 @@ func TestTCPSSLConnections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			caKey, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			caKey, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCertWithCA(tempdir, "node1", caKey, caCrt)
+			key1, crt1, err := utils.GenerateCertWithCA(tempdir, "node1", caKey, caCrt, "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key2, crt2, err := utils.GenerateCertWithCA(tempdir, "node2", caKey, caCrt)
+			key2, crt2, err := utils.GenerateCertWithCA(tempdir, "node2", caKey, caCrt, "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -180,11 +180,11 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -274,16 +274,16 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			key2, crt2, err := utils.GenerateCert(tempdir, "node2")
+			key2, crt2, err := utils.GenerateCert(tempdir, "node2", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -373,11 +373,11 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -456,16 +456,16 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca")
+			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1")
+			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			key2, crt2, err := utils.GenerateCert(tempdir, "node2")
+			key2, crt2, err := utils.GenerateCert(tempdir, "node2", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}

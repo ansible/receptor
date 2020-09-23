@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os/exec"
 	"path/filepath"
@@ -121,7 +122,7 @@ func FreeUDPPort(portNum int) {
 
 // GenerateCert generates a private and public key for testing in the directory
 // specified
-func GenerateCert(dir, name string) (keyPath, certPath string, e error) {
+func GenerateCert(dir, name, commonName string) (keyPath, certPath string, e error) {
 	KeyPath := filepath.Join(dir, name+".key")
 	CrtPath := filepath.Join(dir, name+".crt")
 	// Create our private key
@@ -131,7 +132,7 @@ func GenerateCert(dir, name string) (keyPath, certPath string, e error) {
 		return "", "", err
 	}
 	// Create our certificate
-	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=localhost", "-sha256", "-out", CrtPath)
+	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", KeyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-sha256", "-out", CrtPath)
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
@@ -141,7 +142,7 @@ func GenerateCert(dir, name string) (keyPath, certPath string, e error) {
 
 // GenerateCertWithCA generates a private and public key for testing in the directory
 // specified using the ca specified
-func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPath string, e error) {
+func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath, commonName string) (keyPath, certPath string, e error) {
 	KeyPath := filepath.Join(dir, name+".key")
 	CrtPath := filepath.Join(dir, name+".crt")
 	CSRPath := filepath.Join(dir, name+".csa")
@@ -153,7 +154,7 @@ func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath string) (keyPath, certPa
 	}
 
 	// Create our certificate request
-	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", KeyPath, "-subj", "/C=/ST=/L=/O=Receptor Testing/OU=/CN=localhost", "-out", CSRPath)
+	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", KeyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-out", CSRPath)
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err

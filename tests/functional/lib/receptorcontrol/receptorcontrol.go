@@ -209,6 +209,19 @@ func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
 	return unitID, nil
 }
 
+// WorkSubmitJSON begins work on remote node via JSON command
+func (r *ReceptorControl) WorkSubmitJSON(command string) (string, error) {
+	_, err := r.WriteStr(fmt.Sprintf("%s\n", command))
+	if err != nil {
+		return "", err
+	}
+	unitID, err := r.getWorkSubmitResponse()
+	if err != nil {
+		return "", err
+	}
+	return unitID, nil
+}
+
 // WorkSubmit begins work on remote node
 func (r *ReceptorControl) WorkSubmit(node, workType string) (string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work submit %s %s\n", node, workType))

@@ -334,6 +334,28 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
+		controlSocket := ""
+		needsControlService := true
+		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
+			attrMap := attr.(map[interface{}]interface{})
+			for k, v := range attrMap {
+				k = k.(string)
+				if k == "control-service" {
+					vMap, _ := v.(map[interface{}]interface{})
+					csvName, ok := vMap["service"]
+					if ok {
+						if csvName == "control" {
+							controlSocket = vMap["filename"].(string)
+							needsControlService = false
+						}
+					}
+				}
+			}
+		}
+		if !needsControlService {
+			node.controlSocket = controlSocket
+			continue
+		}
 		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err

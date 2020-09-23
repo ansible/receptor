@@ -362,9 +362,9 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 		}
 		controlSocket := filepath.Join(tempdir, "controlsock")
 		node.controlSocket = controlSocket
-		tmp := make(map[interface{}]interface{})
-		tmp["filename"] = controlSocket
 		if needsControlService {
+			tmp := make(map[interface{}]interface{})
+			tmp["filename"] = controlSocket
 			controlServiceYaml := make(map[interface{}]interface{})
 			controlServiceYaml["control-service"] = tmp
 			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, controlServiceYaml)

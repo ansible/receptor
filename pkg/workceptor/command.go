@@ -145,7 +145,7 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	if !ok {
 		cmdParams = ""
 	}
-	if ok && !cw.allowRuntimeParams {
+	if cmdParams != "" && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
 	var allParams string
@@ -162,6 +162,11 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 
 // Status returns a copy of the status currently loaded in memory
 func (cw *commandUnit) Status() *StatusFileData {
+	return cw.UnredactedStatus()
+}
+
+// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets
+func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 	cw.statusLock.RLock()
 	defer cw.statusLock.RUnlock()
 	status := cw.getStatus()

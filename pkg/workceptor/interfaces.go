@@ -13,6 +13,7 @@ type WorkUnit interface {
 	UpdateFullStatus(statusFunc func(*StatusFileData))
 	LastUpdateError() error
 	Status() *StatusFileData
+	UnredactedStatus() *StatusFileData
 	Start() error
 	Restart() error
 	Cancel() error

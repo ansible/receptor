@@ -41,21 +41,16 @@ type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
 
 // connectToRemote establishes a control socket connection to a remote node
 func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Reader, error) {
-	rw.statusLock.RLock()
-	red, ok := rw.status.ExtraData.(*remoteExtraData)
+	status := rw.Status()
+	red, ok := status.ExtraData.(*remoteExtraData)
 	if !ok {
-		rw.statusLock.RUnlock()
 		return nil, nil, fmt.Errorf("remote ExtraData missing")
 	}
-	node := red.RemoteNode
-	rw.statusLock.RUnlock()
-	tlsClient := rw.Status().ExtraData.(*remoteExtraData).TLSClient
-	expectedHostName := rw.Status().ExtraData.(*remoteExtraData).RemoteNode
-	tlsConfig, err := rw.w.nc.GetClientTLSConfig(tlsClient, expectedHostName)
+	tlsConfig, err := rw.w.nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode)
 	if err != nil {
 		return nil, nil, err
 	}
-	conn, err := rw.w.nc.DialContext(ctx, node, "control", tlsConfig)
+	conn, err := rw.w.nc.DialContext(ctx, red.RemoteNode, "control", tlsConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -66,9 +61,9 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 		conn.Close()
 		return nil, nil, err
 	}
-	if !strings.Contains(hello, node) {
+	if !strings.Contains(hello, red.RemoteNode) {
 		conn.Close()
-		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", node,
+		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", red.RemoteNode,
 			strings.TrimRight(hello, "\n"))
 	}
 	return conn, reader, nil
@@ -149,8 +144,24 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 		return err
 	}
 	defer doClose()
-	red := rw.Status().ExtraData.(*remoteExtraData)
-	_, err := conn.Write([]byte(fmt.Sprintf("work submit localhost %s\n", red.RemoteWorkType)))
+	red := rw.UnredactedStatus().ExtraData.(*remoteExtraData)
+	workSubmitCmd := make(map[string]interface{})
+	for k, v := range red.RemoteParams {
+		workSubmitCmd[k] = v
+	}
+	workSubmitCmd["command"] = "work"
+	workSubmitCmd["subcommand"] = "submit"
+	workSubmitCmd["node"] = red.RemoteNode
+	workSubmitCmd["worktype"] = red.RemoteWorkType
+	workSubmitCmd["tlsclient"] = red.TLSClient
+	wscBytes, err := json.Marshal(workSubmitCmd)
+	if err != nil {
+		return fmt.Errorf("error constructing work submit command: %s", err)
+	}
+	_, err = conn.Write(wscBytes)
+	if err == nil {
+		_, err = conn.Write([]byte("\n"))
+	}
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}
@@ -309,6 +320,14 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	}
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
+	stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)
+	if err == nil {
+		err = stdout.Close()
+	}
+	if err != nil {
+		logger.Error("Could not open stdout file %s: %s\n", rw.stdoutFileName, err)
+		return
+	}
 	for {
 		if firstTime {
 			firstTime = false
@@ -402,12 +421,34 @@ func (rw *remoteUnit) SetFromParams(params map[string]string) error {
 
 // Status returns a copy of the status currently loaded in memory
 func (rw *remoteUnit) Status() *StatusFileData {
+	status := rw.UnredactedStatus()
+	ed, ok := status.ExtraData.(*remoteExtraData)
+	if ok {
+		keysToDelete := make([]string, 0)
+		for k := range ed.RemoteParams {
+			if strings.HasPrefix(strings.ToLower(k), "secret_") {
+				keysToDelete = append(keysToDelete, k)
+			}
+		}
+		for i := range keysToDelete {
+			delete(ed.RemoteParams, keysToDelete[i])
+		}
+	}
+	return status
+}
+
+// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets
+func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 	rw.statusLock.RLock()
 	defer rw.statusLock.RUnlock()
 	status := rw.getStatus()
 	ed, ok := rw.status.ExtraData.(*remoteExtraData)
 	if ok {
 		edCopy := *ed
+		edCopy.RemoteParams = make(map[string]string)
+		for k, v := range ed.RemoteParams {
+			edCopy.RemoteParams[k] = v
+		}
 		status.ExtraData = &edCopy
 	}
 	return status

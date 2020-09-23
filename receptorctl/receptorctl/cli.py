@@ -203,8 +203,8 @@ def list(ctx, quiet):
 @click.option('--tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
 @click.option('--follow', '-f', help="Remain attached to the job and print its results to stdout", is_flag=True)
 @click.option('--rm', help="Release unit after completion", is_flag=True)
-@click.argument('params', nargs=-1, type=click.UNPROCESSED)
-def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm, params):
+@click.option('--param', '-a', help="Additional parameter (key=value format)", multiple=True)
+def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm, param):
     if not payload and not payload_literal:
         print("Must provide one of --payload or --payload-literal.")
         sys.exit(1)
@@ -222,10 +222,11 @@ def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm,
             payload_data = open(payload, 'rb')
     unitid = None
     try:
+        params = dict(s.split('=', 1) for s in param)
         rc = get_rc(ctx)
         if node == "":
             node = None
-        work = rc.submit_work(node, worktype, " ".join(params), payload_data, tlsclient)
+        work = rc.submit_work(node, worktype, payload_data, tlsclient, params)
         result = work.pop('result')
         unitid = work.pop('unitid')
         if follow:
@@ -244,12 +245,16 @@ def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm,
 def results(ctx, unit_id):
     rc = get_rc(ctx)
     resultsfile = rc.get_work_results(unit_id)
-    try:
-        for text in iter(partial(resultsfile.readline, 256), b''):
-            sys.stdout.buffer.write(text)
-            sys.stdout.buffer.flush()
-    except Exception as e:
-        print("Exception:", e)
+    for text in iter(partial(resultsfile.readline, 256), b''):
+        sys.stdout.buffer.write(text)
+        sys.stdout.buffer.flush()
+    rc = get_rc(ctx)
+    status = rc.simple_command(f"work status {unit_id}")
+    state = status.pop("State", 0)
+    if state == 3:    # Failed
+        detail = status.pop("Detail", "Unknown")
+        sys.stderr.write(f"Remote unit failed: {detail}\n")
+        sys.exit(1)
 
 
 def op_on_unit_ids(ctx, op, unit_ids):
@@ -259,6 +264,7 @@ def op_on_unit_ids(ctx, op, unit_ids):
             rc.simple_command(f"work {op} {unit_id}")
         except Exception as e:
             print(f"{unit_id}: ERROR: {e}")
+            sys.exit(1)
 
 
 @work.command(help="Cancel (kill) one or more units of work.")

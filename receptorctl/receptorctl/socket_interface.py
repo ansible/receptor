@@ -80,7 +80,7 @@ class ReceptorControl:
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
 
-    def submit_work(self, node, worktype, params, payload, tlsclient):
+    def submit_work(self, node, worktype, payload, tlsclient, params):
         if node is None:
             node = "localhost"
         commandMap = {
@@ -89,8 +89,12 @@ class ReceptorControl:
             "node": node,
             "worktype": worktype,
             "tlsclient": tlsclient,
-            "params": params,
         }
+        for k,v in params.items():
+            if k not in commandMap:
+                commandMap[k] = v
+            else:
+                raise RuntimeError(f"duplicate or illegal parameter {k}")
         commandJson = json.dumps(commandMap)
         command = f"{commandJson}\n"
         self.writestr(command)
@@ -113,6 +117,8 @@ class ReceptorControl:
         self.socket.shutdown(socket.SHUT_WR)
         text = self.readstr()
         self.close()
+        if text.startswith("ERROR:"):
+            raise RuntimeError(f"Remote error: {text}")
         result = json.loads(text)
         return result
 

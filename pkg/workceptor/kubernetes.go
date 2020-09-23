@@ -327,7 +327,7 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 }
 
 func (kw *kubeUnit) connectUsingParams() error {
-	ked := kw.Status().ExtraData.(*kubeExtraData)
+	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
 	kw.config = &rest.Config{
 		Host:        ked.KubeHost,
 		APIPath:     ked.KubeAPIPath,
@@ -392,17 +392,17 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		return ssf
 	}
 	values := []value{
-		{name: "command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
-		{name: "image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
-		{name: "params", permission: kw.allowRuntimeParams, setter: setString(&ked.Params)},
+		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
+		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
+		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&ked.Params)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "kube_host", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeHost)},
 		{name: "kube_api_path", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeAPIPath)},
 		{name: "kube_username", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeUsername)},
-		{name: "kube_password", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubePassword)},
-		{name: "kube_bearer_token", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeBearerToken)},
+		{name: "secret_kube_password", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubePassword)},
+		{name: "secret_kube_bearer_token", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeBearerToken)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
-		{name: "tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
+		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 	}
 	for i := range values {
 		v := values[i]
@@ -422,6 +422,17 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 
 // Status returns a copy of the status currently loaded in memory
 func (kw *kubeUnit) Status() *StatusFileData {
+	status := kw.UnredactedStatus()
+	ed, ok := status.ExtraData.(*kubeExtraData)
+	if ok {
+		ed.KubePassword = ""
+		ed.KubeBearerToken = ""
+	}
+	return status
+}
+
+// Status returns a copy of the status currently loaded in memory
+func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	kw.statusLock.RLock()
 	defer kw.statusLock.RUnlock()
 	status := kw.getStatus()

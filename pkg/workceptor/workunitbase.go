@@ -296,6 +296,11 @@ func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
 
 // Status returns a copy of the status currently loaded in memory (use Load to get it from disk)
 func (bwu *BaseWorkUnit) Status() *StatusFileData {
+	return bwu.UnredactedStatus()
+}
+
+// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets
+func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()
 	return bwu.getStatus()

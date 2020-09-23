@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -153,6 +154,16 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
 func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient string, params map[string]string) (WorkUnit, error) {
+	hasSecrets := false
+	for k := range params {
+		if strings.HasPrefix(strings.ToLower(k), "secret_") {
+			hasSecrets = true
+			break
+		}
+	}
+	if hasSecrets && tlsclient == "" {
+		return nil, fmt.Errorf("cannot send secrets over a non-TLS connection")
+	}
 	rw, err := w.AllocateUnit("remote", params)
 	if err != nil {
 		return nil, err

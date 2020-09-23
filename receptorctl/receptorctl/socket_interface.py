@@ -80,10 +80,19 @@ class ReceptorControl:
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
 
-    def submit_work(self, node, worktype, params, payload):
+    def submit_work(self, node, worktype, params, payload, tlsclient):
         if node is None:
             node = "localhost"
-        command = f"work submit {node} {worktype} {params}\n"
+        commandMap = {
+            "command": "work",
+            "subcommand": "submit",
+            "node": node,
+            "worktype": worktype,
+            "tlsclient": tlsclient,
+            "params": params,
+        }
+        commandJson = json.dumps(commandMap)
+        command = f"{commandJson}\n"
         self.writestr(command)
         text = self.readstr()
         m = re.compile("Work unit created with ID (.+). Send stdin data and EOF.").fullmatch(text)

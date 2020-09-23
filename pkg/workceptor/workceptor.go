@@ -150,7 +150,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
-func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient string, params map[string]string) (WorkUnit, error) {
 	rw, err := w.AllocateUnit("remote", params)
 	if err != nil {
 		return nil, err
@@ -159,6 +159,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string
 		ed := status.ExtraData.(*remoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
+		ed.TLSClient = tlsclient
 	})
 	if rw.LastUpdateError() != nil {
 		return nil, rw.LastUpdateError()

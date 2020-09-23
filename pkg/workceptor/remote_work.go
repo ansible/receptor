@@ -31,9 +31,10 @@ type remoteExtraData struct {
 	RemoteWorkType string
 	RemoteParams   map[string]string
 	RemoteUnitID   string
-	LocalStarted   bool
+	RemoteStarted  bool
 	LocalCancelled bool
 	LocalReleased  bool
+	TLSClient      string
 }
 
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
@@ -48,7 +49,13 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	}
 	node := red.RemoteNode
 	rw.statusLock.RUnlock()
-	conn, err := rw.w.nc.DialContext(ctx, node, "control", nil)
+	tlsClient := rw.Status().ExtraData.(*remoteExtraData).TLSClient
+	expectedHostName := rw.Status().ExtraData.(*remoteExtraData).RemoteNode
+	tlsConfig, err := rw.w.nc.GetClientTLSConfig(tlsClient, expectedHostName)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn, err := rw.w.nc.DialContext(ctx, node, "control", tlsConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,8 +82,22 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		if err == nil {
 			return conn, reader
 		}
-		logger.Debug("Connection to %s failed with error: %s",
+		logger.Warning("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
+		errStr := err.Error()
+		if strings.Contains(errStr, "CRYPTO_ERROR") {
+			var shouldExit = false
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+				if !status.ExtraData.(*remoteExtraData).RemoteStarted {
+					shouldExit = true
+					status.State = WorkStateFailed
+				}
+			})
+			if shouldExit {
+				return nil, nil
+			}
+		}
 		select {
 		case <-ctx.Done():
 			return nil, nil
@@ -97,7 +118,7 @@ func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) erro
 // getConnectionAndRun retries connecting to a host and, once the connection succeeds, runs an action function.
 // If firstTimeSync is true, a single attempt is made on the calling goroutine. If the initial attempt fails to
 // connect or firstTimeSync is false, we run return ErrPending to the caller.
-func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync bool, action actionFunc) error {
+func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync bool, action actionFunc, failure func()) error {
 	if firstTimeSync {
 		err := rw.connectAndRun(ctx, action)
 		if err == nil {
@@ -110,6 +131,8 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 		conn, reader := rw.getConnection(ctx)
 		if conn != nil {
 			_ = action(ctx, conn, reader)
+		} else {
+			failure()
 		}
 	}()
 	return ErrPending
@@ -170,7 +193,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
 		ed := status.ExtraData.(*remoteExtraData)
-		ed.LocalStarted = true
+		ed.RemoteStarted = true
 	})
 	return nil
 }
@@ -399,16 +422,16 @@ func (rw *remoteUnit) Status() *StatusFileData {
 	return status
 }
 
-// startAndMonitorRemoteUnit waits for a connection to be available, then starts the remote unit and monitors it
+// runAndMonitor waits for a connection to be available, then starts the remote unit and monitors it
 func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, action actionFunc) error {
 	return rw.getConnectionAndRun(mw, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
-		err := action(mw, conn, reader)
+		err := action(ctx, conn, reader)
 		if err != nil {
 			mw.WorkerDone()
 			return err
 		}
 		go func() {
-			rw.monitorRemoteUnit(mw, forRelease)
+			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
 				err := rw.BaseWorkUnit.Release(false)
 				if err != nil {
@@ -418,27 +441,32 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 			mw.WorkerDone()
 		}()
 		return nil
+	}, func() {
+		mw.WorkerDone()
 	})
 }
 
 // startOrRestart is a shared implementation of Start() and Restart()
 func (rw *remoteUnit) startOrRestart(start bool) error {
 	red := rw.Status().ExtraData.(*remoteExtraData)
-	if start && red.LocalStarted {
+	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
 	newJobStarted := rw.topJC.NewJob(rw.w.ctx, 1, true)
 	if !newJobStarted {
 		return fmt.Errorf("start or monitor process already running")
 	}
-	if start || !red.LocalStarted {
+	if start || !red.RemoteStarted {
 		return rw.runAndMonitor(rw.topJC, false, rw.startRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
 		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased, false)
 		})
 	}
-	go rw.monitorRemoteUnit(rw.topJC, false)
+	go func() {
+		rw.monitorRemoteUnit(rw.topJC, false)
+		rw.topJC.WorkerDone()
+	}()
 	return nil
 }
 
@@ -456,12 +484,23 @@ func (rw *remoteUnit) Restart() error {
 // cancelOrRelease is a shared implementation of Cancel() and Release()
 func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	// Update the status file that the unit is locally cancelled/released
+	var remoteStarted bool
 	rw.UpdateFullStatus(func(status *StatusFileData) {
 		status.ExtraData.(*remoteExtraData).LocalCancelled = true
 		if release {
 			status.ExtraData.(*remoteExtraData).LocalReleased = true
 		}
+		remoteStarted = status.ExtraData.(*remoteExtraData).RemoteStarted
 	})
+	// if remote work has not started, don't attempt to connect to remote
+	if !remoteStarted {
+		rw.topJC.Cancel()
+		rw.topJC.Wait()
+		if release {
+			return rw.BaseWorkUnit.Release(true)
+		}
+		return nil
+	}
 	if release && force {
 		_ = rw.connectAndRun(rw.w.ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true, true)

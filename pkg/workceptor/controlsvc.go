@@ -169,9 +169,13 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
+		tlsclient, err := strFromMap(c.params, "tlsclient")
+		if err != nil {
+			tlsclient = "" // optional so don't return
+		}
 		workParams := make(map[string]string)
 		for k, v := range c.params {
-			if k == "command" || k == "subcommand" || k == "node" || k == "worktype" {
+			if k == "command" || k == "subcommand" || k == "node" || k == "worktype" || k == "tlsclient" {
 				continue
 			}
 			vStr, ok := v.(string)
@@ -184,7 +188,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if workNode == nc.NodeID() || strings.EqualFold(workNode, "localhost") {
 			worker, err = c.w.AllocateUnit(workType, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, workParams)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsclient, workParams)
 		}
 		if err != nil {
 			return nil, err

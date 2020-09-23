@@ -86,6 +86,10 @@ testloop: receptor
 ci: pre-commit build-all test
 	@echo "All done"
 
+version:
+	@echo $(VERSION) > .VERSION
+	@echo ".VERSION created for $(VERSION)"
+
 SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec packaging/rpm/receptor-python-worker.spec
 
 specfiles: $(SPECFILES)

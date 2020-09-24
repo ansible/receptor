@@ -7,7 +7,6 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,24 +31,15 @@ func TestWork(t *testing.T) {
 		}
 		expectedResults := []byte("1\n2\n3\n4\n5\n")
 		// Setup certs
-		baseDir := filepath.Join(mesh.TestBaseDir, testName)
-		err := os.MkdirAll(baseDir, 0755)
+		caKey, caCrt, err := utils.GenerateCert("ca", "localhost")
 		if err != nil {
 			t.Fatal(err)
 		}
-		tempdir, err := ioutil.TempDir(baseDir, "certs-")
+		key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "node1")
 		if err != nil {
 			t.Fatal(err)
 		}
-		caKey, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
-		if err != nil {
-			t.Fatal(err)
-		}
-		key1, crt1, err := utils.GenerateCertWithCA(tempdir, "node1", caKey, caCrt, "node1")
-		if err != nil {
-			t.Fatal(err)
-		}
-		key2, crt2, err := utils.GenerateCertWithCA(tempdir, "node2", caKey, caCrt, "node2")
+		key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "node2")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +110,7 @@ func TestWork(t *testing.T) {
 			},
 		}
 
-		m, err := mesh.NewCLIMeshFromYaml(data, filepath.Join(mesh.TestBaseDir, testName))
+		m, err := mesh.NewCLIMeshFromYaml(data, testName)
 		if err != nil {
 			t.Fatal(err)
 		}

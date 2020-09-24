@@ -182,7 +182,7 @@ func (m *LibMesh) Dir() string {
 
 // NewLibMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
-func NewLibMeshFromFile(filename, dirPrefix string) (Mesh, error) {
+func NewLibMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -195,19 +195,17 @@ func NewLibMeshFromFile(filename, dirPrefix string) (Mesh, error) {
 		return nil, err
 	}
 
-	return NewLibMeshFromYaml(MeshDefinition, dirPrefix)
+	return NewLibMeshFromYaml(MeshDefinition, dirSuffix)
 }
 
 // NewLibMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml
-func NewLibMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*LibMesh, error) {
+func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, error) {
 	mesh := &LibMesh{}
 	// Setup the mesh directory
-	var baseDir string
-	if dirPrefix == "" {
-		baseDir = TestBaseDir
-	} else {
-		baseDir = dirPrefix
+	baseDir := utils.TestBaseDir
+	if dirSuffix != "" {
+		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
 	// Ignore the error, if the dir already exists thats fine
 	err := os.MkdirAll(baseDir, 0755)
@@ -480,7 +478,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*LibMesh, er
 		ctx, canceller := context.WithCancel(context.Background())
 		node.controlServerCanceller = canceller
 
-		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
+		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}

@@ -3,8 +3,6 @@ package mesh
 import (
 	"context"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"os"
-	"path/filepath"
 )
 
 // Node Defines the interface for nodes made using the CLI, Library, and
@@ -85,19 +83,4 @@ func getListenerCost(listenerYaml map[interface{}]interface{}, nodeID string) fl
 		cost = 1.0
 	}
 	return cost
-}
-
-// TestBaseDir holds the base directory that all permanent test logs should go in
-var TestBaseDir string
-
-// ControlSocketBaseDir holds the base directory for controlsockets, control sockets
-// have a limited path length, therefore we cant always put them along side the
-// node they are attached to
-var ControlSocketBaseDir string
-
-func init() {
-	TestBaseDir = filepath.Join(os.TempDir(), "receptor-testing")
-	os.Mkdir(TestBaseDir, 0700)
-	ControlSocketBaseDir = filepath.Join(TestBaseDir, "controlsockets")
-	os.Mkdir(ControlSocketBaseDir, 0700)
 }

@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -39,7 +38,7 @@ func TestMeshStartup(t *testing.T) {
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
 			t.Logf("starting mesh")
-			m, err := mesh.NewCLIMeshFromFile(filename, filepath.Join(mesh.TestBaseDir, t.Name()))
+			m, err := mesh.NewCLIMeshFromFile(filename, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,7 +92,7 @@ func TestMeshConnections(t *testing.T) {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
-			m, err := mesh.NewCLIMeshFromFile(filename, filepath.Join(mesh.TestBaseDir, t.Name()))
+			m, err := mesh.NewCLIMeshFromFile(filename, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,7 +133,7 @@ func TestMeshShutdown(t *testing.T) {
 	for _, data := range testTable {
 		filename := data.filename
 		t.Run(filename, func(t *testing.T) {
-			m, err := mesh.NewLibMeshFromFile(filename, filepath.Join(mesh.TestBaseDir, t.Name()))
+			m, err := mesh.NewLibMeshFromFile(filename, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -219,7 +218,7 @@ func TestCosts(t *testing.T) {
 		},
 		Nodedef: []interface{}{},
 	}
-	m, err := mesh.NewCLIMeshFromYaml(data, filepath.Join(mesh.TestBaseDir, t.Name()))
+	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +281,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 
 		// Reset the Timer because building the yaml data for the mesh may have
 		// taken a bit
-		m, err := mesh.NewCLIMeshFromYaml(data, filepath.Join(mesh.TestBaseDir, b.Name()))
+		m, err := mesh.NewCLIMeshFromYaml(data, b.Name())
 		if err != nil {
 			b.Fatal(err)
 		}

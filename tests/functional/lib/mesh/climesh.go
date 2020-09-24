@@ -149,7 +149,7 @@ func (m *CLIMesh) Nodes() map[string]Node {
 
 // NewCLIMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
-func NewCLIMeshFromFile(filename, dirPrefix string) (Mesh, error) {
+func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -162,19 +162,17 @@ func NewCLIMeshFromFile(filename, dirPrefix string) (Mesh, error) {
 		return nil, err
 	}
 
-	return NewCLIMeshFromYaml(MeshDefinition, dirPrefix)
+	return NewCLIMeshFromYaml(MeshDefinition, dirSuffix)
 }
 
 // NewCLIMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml
-func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, error) {
+func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, error) {
 	mesh := &CLIMesh{}
 	// Setup the mesh directory
-	var baseDir string
-	if dirPrefix == "" {
-		baseDir = TestBaseDir
-	} else {
-		baseDir = dirPrefix
+	baseDir := utils.TestBaseDir
+	if dirSuffix != "" {
+		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
 	err := os.MkdirAll(baseDir, 0755)
 	if err != nil {
@@ -356,7 +354,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*CLIMesh, er
 				}
 			}
 		}
-		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
+		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}

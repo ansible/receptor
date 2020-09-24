@@ -2,10 +2,12 @@ package mesh
 
 import (
 	"context"
+	"fmt"
 	_ "github.com/fortytw2/leaktest"
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +17,7 @@ import (
 func TestWork(t *testing.T) {
 	t.Parallel()
 	// Setup our mesh yaml data
-	workSetup := func(testName string) (*receptorcontrol.ReceptorControl, *mesh.CLIMesh, []byte) {
+	workSetup := func(testName string) (map[string]*receptorcontrol.ReceptorControl, *mesh.CLIMesh, []byte) {
 		data := mesh.YamlData{}
 		data.Nodes = make(map[string]*mesh.YamlNode)
 		echoSleepLong := map[interface{}]interface{}{
@@ -29,6 +31,28 @@ func TestWork(t *testing.T) {
 			"params":   "-c \"for i in {1..5}; do echo $i;done\"",
 		}
 		expectedResults := []byte("1\n2\n3\n4\n5\n")
+		// Setup certs
+		baseDir := filepath.Join(mesh.TestBaseDir, testName)
+		err := os.MkdirAll(baseDir, 0755)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tempdir, err := ioutil.TempDir(baseDir, "certs-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		caKey, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
+		if err != nil {
+			t.Fatal(err)
+		}
+		key1, crt1, err := utils.GenerateCertWithCA(tempdir, "node1", caKey, caCrt, "node1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		key2, crt2, err := utils.GenerateCertWithCA(tempdir, "node2", caKey, caCrt, "node2")
+		if err != nil {
+			t.Fatal(err)
+		}
 		// Generate a mesh with 3 nodes
 		data.Nodes["node2"] = &mesh.YamlNode{
 			Connections: map[string]mesh.YamlConnection{},
@@ -42,6 +66,24 @@ func TestWork(t *testing.T) {
 						},
 					},
 				},
+				map[interface{}]interface{}{
+					"tls-server": map[interface{}]interface{}{
+						"name":              "control_tls",
+						"cert":              crt2,
+						"key":               key2,
+						"requireclientcert": true,
+						"clientcas":         caCrt,
+					},
+				},
+				map[interface{}]interface{}{
+					"control-service": map[interface{}]interface{}{
+						"service": "control",
+						"tls":     "control_tls",
+					},
+				},
+				map[interface{}]interface{}{
+					"work-command": echoSleepShort,
+				},
 			},
 		}
 		data.Nodes["node1"] = &mesh.YamlNode{
@@ -50,7 +92,17 @@ func TestWork(t *testing.T) {
 					Index: 0,
 				},
 			},
-			Nodedef: []interface{}{},
+			Nodedef: []interface{}{
+				map[interface{}]interface{}{
+					"tls-client": map[interface{}]interface{}{
+						"name":               "tlsclient",
+						"rootcas":            caCrt,
+						"insecureskipverify": false,
+						"cert":               crt1,
+						"key":                key1,
+					},
+				},
+			},
 		}
 		data.Nodes["node3"] = &mesh.YamlNode{
 			Connections: map[string]mesh.YamlConnection{
@@ -80,29 +132,44 @@ func TestWork(t *testing.T) {
 		}
 
 		nodes := m.Nodes()
-		controller := receptorcontrol.New()
-		err = controller.Connect(nodes["node1"].ControlSocket())
-		if err != nil {
-			t.Fatal(err)
+		controllers := make(map[string]*receptorcontrol.ReceptorControl)
+		for k := range nodes {
+			controller := receptorcontrol.New()
+			err = controller.Connect(nodes[k].ControlSocket())
+			if err != nil {
+				t.Fatal(err)
+			}
+			controllers[k] = controller
 		}
-		return controller, m, expectedResults
+		return controllers, m, expectedResults
 	}
 
-	tearDown := func(controller *receptorcontrol.ReceptorControl, m *mesh.CLIMesh) {
+	tearDown := func(controllers map[string]*receptorcontrol.ReceptorControl, m *mesh.CLIMesh) {
 		defer m.WaitForShutdown()
 		defer m.Destroy()
-		defer controller.Close()
+		defer func() {
+			for _, controller := range controllers {
+				controller.Close()
+			}
+		}()
 	}
 
-	assertFilesReleased := func(nodeDir, nodeID, unitID string) {
+	assertFilesReleased := func(ctx context.Context, nodeDir, nodeID, unitID string) error {
 		workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
-		_, err := os.Stat(workPath)
-		if !os.IsNotExist(err) {
-			t.Errorf("unitID %s on %s did not release", unitID, nodeID)
+		check := func() bool {
+			_, err := os.Stat(workPath)
+			if os.IsNotExist(err) {
+				return true
+			}
+			return false
 		}
+		if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
+			return fmt.Errorf("unitID %s on %s did not release", unitID, nodeID)
+		}
+		return nil
 	}
 
-	assertStdoutFizeSize := func(ctx context.Context, nodeDir, nodeID, unitID string, waitUntilSize int) {
+	assertStdoutFizeSize := func(ctx context.Context, nodeDir, nodeID, unitID string, waitUntilSize int) error {
 		stdoutFilename := filepath.Join(nodeDir, "datadir", nodeID, unitID, "stdout")
 		check := func() bool {
 			_, err := os.Stat(stdoutFilename)
@@ -116,35 +183,92 @@ func TestWork(t *testing.T) {
 			return false
 		}
 		if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
-			t.Errorf("file size not correct for %s", stdoutFilename)
+			return fmt.Errorf("file size not correct for %s", stdoutFilename)
 		}
+		return nil
 	}
 
-	t.Run("cancel then release remote work", func(t *testing.T) {
+	t.Run("work submit with tlsclient", func(t *testing.T) {
+		// tests work submit via json
+		// tests connecting to remote control service with tlsclient
 		t.Parallel()
-		controller, m, _ := workSetup(t.Name())
-		defer tearDown(controller, m)
-		nodes := m.Nodes()
+		controllers, m, _ := workSetup(t.Name())
+		defer tearDown(controllers, m)
 
-		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
+		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":""}`
+		unitID, err := controllers["node1"].WorkSubmitJSON(command)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		err = controller.AssertWorkRunning(ctx, unitID)
+		err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = controller.WorkCancel(unitID)
+	})
+
+	t.Run("work submit with incorrect tlsclient", func(t *testing.T) {
+		// tests that submitting work with incorrect tlsclient information
+		// immediately fails the job
+		// also tests that releasing a job that has not been started on remote
+		// will not attempt to connect to remote
+		t.Parallel()
+		controllers, m, _ := workSetup(t.Name())
+		defer tearDown(controllers, m)
+		nodes := m.Nodes()
+
+		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"","node":"node2","params":""}`
+		unitID, err := controllers["node3"].WorkSubmitJSON(command)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+		err = controllers["node3"].AssertWorkFailed(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = controllers["node3"].WorkRelease(unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
-		err = controller.AssertWorkCancelled(ctx, unitID)
+		err = controllers["node3"].AssertWorkReleased(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		workStatus, err := controller.GetWorkStatus(unitID)
+		ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+		err = assertFilesReleased(ctx, nodes["node3"].Dir(), "node3", unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("cancel then release remote work", func(t *testing.T) {
+		// also tests that release still works after control service restarts
+		t.Parallel()
+		controllers, m, _ := workSetup(t.Name())
+		defer tearDown(controllers, m)
+		nodes := m.Nodes()
+
+		unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+		err = controllers["node1"].AssertWorkRunning(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = controllers["node1"].WorkCancel(unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		err = controllers["node1"].AssertWorkCancelled(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		workStatus, err := controllers["node1"].GetWorkStatus(unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,34 +276,63 @@ func TestWork(t *testing.T) {
 		if remoteUnitID == "" {
 			t.Errorf("remoteUnitID should not be empty")
 		}
-
-		_, err = controller.WorkRelease(unitID)
+		nodes["node1"].Shutdown()
+		nodes["node1"].WaitForShutdown()
+		err = nodes["node1"].Start()
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
-		err = controller.AssertWorkReleased(ctx, unitID)
+		err = m.WaitForReady(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertFilesReleased(nodes["node1"].Dir(), "node1", unitID)
-		assertFilesReleased(nodes["node3"].Dir(), "node3", remoteUnitID)
+		err = controllers["node1"].Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = controllers["node1"].Reconnect()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = controllers["node1"].WorkRelease(unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+		err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		err = assertFilesReleased(ctx, nodes["node3"].Dir(), "node3", remoteUnitID)
+		if err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	t.Run("work submit while remote node is down", func(t *testing.T) {
 		t.Parallel()
-		controller, m, _ := workSetup(t.Name())
-		defer tearDown(controller, m)
+		controllers, m, _ := workSetup(t.Name())
+		defer tearDown(controllers, m)
 		nodes := m.Nodes()
 
 		nodes["node3"].Shutdown()
 		nodes["node3"].WaitForShutdown()
-		unitID, err := controller.WorkSubmit("node3", "echosleepshort")
+		unitID, err := controllers["node1"].WorkSubmit("node3", "echosleepshort")
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		err = controller.AssertWorkPending(ctx, unitID)
+		err = controllers["node1"].AssertWorkPending(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
 		err = nodes["node3"].Start()
 		if err != nil {
 			t.Fatal(err)
@@ -187,9 +340,11 @@ func TestWork(t *testing.T) {
 		// Wait for node3 to join the mesh again
 		ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
 		err = m.WaitForReady(ctx)
-
+		if err != nil {
+			t.Fatal(err)
+		}
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
-		err = controller.AssertWorkSucceeded(ctx, unitID)
+		err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -197,22 +352,25 @@ func TestWork(t *testing.T) {
 
 	t.Run("work streaming resumes when relay node restarts", func(t *testing.T) {
 		t.Parallel()
-		controller, m, expectedResults := workSetup(t.Name())
-		defer tearDown(controller, m)
+		controllers, m, expectedResults := workSetup(t.Name())
+		defer tearDown(controllers, m)
 		nodes := m.Nodes()
 
-		unitID, err := controller.WorkSubmit("node3", "echosleeplong")
+		unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		err = controller.AssertWorkRunning(ctx, unitID)
+		err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
-		assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 1)
-		err = controller.AssertWorkResults(unitID, expectedResults[:1])
+		err = assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = controllers["node1"].AssertWorkResults(unitID, expectedResults[:1])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -222,15 +380,20 @@ func TestWork(t *testing.T) {
 		// Wait for node2 to join the mesh again
 		ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
 		err = m.WaitForReady(ctx)
-
-		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
-		err = controller.AssertWorkSucceeded(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
-		assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
-		err = controller.AssertWorkResults(unitID, expectedResults)
+		err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+		err = assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 		if err != nil {
 			t.Fatal(err)
 		}

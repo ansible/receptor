@@ -100,7 +100,7 @@ func TestSSLListeners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			key, crt, err := utils.GenerateCert(tempdir, "test")
+			key, crt, err := utils.GenerateCert(tempdir, "test", "localhost")
 
 			receptorStdOut := bytes.Buffer{}
 			port := utils.ReserveTCPPort()

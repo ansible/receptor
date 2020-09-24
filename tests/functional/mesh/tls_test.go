@@ -6,9 +6,6 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -25,26 +22,15 @@ func TestTCPSSLConnections(t *testing.T) {
 		listener := data.listener
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
-
-			// Setup the mesh directory
-			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
-			err := os.MkdirAll(baseDir, 0755)
+			caKey, caCrt, err := utils.GenerateCert("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			tempdir, err := ioutil.TempDir(baseDir, "certs-")
+			key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			caKey, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key1, crt1, err := utils.GenerateCertWithCA(tempdir, "node1", caKey, caCrt, "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key2, crt2, err := utils.GenerateCertWithCA(tempdir, "node2", caKey, caCrt, "localhost")
+			key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -125,7 +111,7 @@ func TestTCPSSLConnections(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -170,21 +156,11 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup the mesh directory
-			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
-			err := os.MkdirAll(baseDir, 0755)
+			_, caCrt, err := utils.GenerateCert("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -235,7 +211,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -264,26 +240,16 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup the mesh directory
-			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
-			err := os.MkdirAll(baseDir, 0755)
+			_, caCrt, err := utils.GenerateCert("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			key2, crt2, err := utils.GenerateCert(tempdir, "node2", "localhost")
+			key2, crt2, err := utils.GenerateCert("node2", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -334,7 +300,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -363,21 +329,11 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup the mesh directory
-			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
-			err := os.MkdirAll(baseDir, 0755)
+			_, caCrt, err := utils.GenerateCert("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -417,7 +373,7 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -446,26 +402,16 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup the mesh directory
-			baseDir := filepath.Join(mesh.TestBaseDir, t.Name())
-			err := os.MkdirAll(baseDir, 0755)
+			_, caCrt, err := utils.GenerateCert("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, caCrt, err := utils.GenerateCert(tempdir, "ca", "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key1, crt1, err := utils.GenerateCert(tempdir, "node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			key2, crt2, err := utils.GenerateCert(tempdir, "node2", "localhost")
+			key2, crt2, err := utils.GenerateCert("node2", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -514,7 +460,7 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, baseDir)
+			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}

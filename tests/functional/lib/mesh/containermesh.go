@@ -201,7 +201,7 @@ func (m *ContainerMesh) Nodes() map[string]Node {
 
 // NewContainerMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it
-func NewContainerMeshFromFile(filename, dirPrefix string) (Mesh, error) {
+func NewContainerMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -214,23 +214,20 @@ func NewContainerMeshFromFile(filename, dirPrefix string) (Mesh, error) {
 		return nil, err
 	}
 
-	return NewContainerMeshFromYaml(MeshDefinition, dirPrefix)
+	return NewContainerMeshFromYaml(MeshDefinition, dirSuffix)
 }
 
 // NewContainerMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml
-func NewContainerMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*ContainerMesh, error) {
+func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*ContainerMesh, error) {
 	containerComposeData := make(map[string]interface{})
 	containerComposeData["version"] = "2.4"
 	// Contains the description of each node for docker/podman-compose
 	containerComposeServices := make(map[string]map[string]interface{})
 	mesh := &ContainerMesh{}
-	// Setup the mesh directory
-	var baseDir string
-	if dirPrefix == "" {
-		baseDir = TestBaseDir
-	} else {
-		baseDir = dirPrefix
+	baseDir := utils.TestBaseDir
+	if dirSuffix != "" {
+		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
 	err := os.MkdirAll(baseDir, 0755)
 	if err != nil {
@@ -257,9 +254,9 @@ func NewContainerMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*Conta
 		node.dir = tempdir
 		containerComposeServices[k] = make(map[string]interface{})
 		containerComposeServices[k]["image"] = containerImage
-		volume := fmt.Sprintf("%s:/etc/receptor", node.dir)
-		serviceVolumes := make([]string, 0)
-		serviceVolumes = append(serviceVolumes, volume)
+		configVolume := fmt.Sprintf("%s:/etc/receptor", node.dir)
+		certVolume := fmt.Sprintf("%s:%s", utils.CertBaseDir, utils.CertBaseDir)
+		serviceVolumes := []string{configVolume, certVolume}
 		containerComposeServices[k]["volumes"] = serviceVolumes
 
 		// We need this so we can apply tc rules from inside the container
@@ -416,11 +413,10 @@ func NewContainerMeshFromYaml(MeshDefinition YamlData, dirPrefix string) (*Conta
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
-		tempdir, err := ioutil.TempDir(ControlSocketBaseDir, "")
+		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}
-		//node.containerControlSocket = filepath.Join("/tmp/controlsocketdir/controlsock")
 		node.externalControlSocket = filepath.Join(tempdir, "controlsock")
 		controlServiceYaml := make(map[interface{}]interface{})
 		tmp := make(map[interface{}]interface{})

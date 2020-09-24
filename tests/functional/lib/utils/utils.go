@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -18,6 +20,17 @@ var udpPortPool []int
 var tcpPortMutex sync.Mutex
 var tcpPortPool []int
 
+// TestBaseDir holds the base directory that all permanent test logs should go in
+var TestBaseDir string
+
+// ControlSocketBaseDir holds the base directory for controlsockets, control sockets
+// have a limited path length, therefore we cant always put them along side the
+// node they are attached to
+var ControlSocketBaseDir string
+
+// CertBaseDir specifies the directory that generated certs get put in
+var CertBaseDir string
+
 func init() {
 	udpPortMutex.Lock()
 	defer udpPortMutex.Unlock()
@@ -25,6 +38,12 @@ func init() {
 	tcpPortMutex.Lock()
 	defer tcpPortMutex.Unlock()
 	tcpPortPool, _ = makeRange(10000, 65000, 1)
+	TestBaseDir = filepath.Join(os.TempDir(), "receptor-testing")
+	os.Mkdir(TestBaseDir, 0700)
+	ControlSocketBaseDir = filepath.Join(TestBaseDir, "controlsockets")
+	os.Mkdir(ControlSocketBaseDir, 0700)
+	CertBaseDir = filepath.Join(TestBaseDir, "receptor-testing-certs")
+	os.Mkdir(CertBaseDir, 0700)
 }
 
 func makeRange(start, stop, step int) ([]int, error) {
@@ -122,12 +141,16 @@ func FreeUDPPort(portNum int) {
 
 // GenerateCert generates a private and public key for testing in the directory
 // specified
-func GenerateCert(dir, name, commonName string) (keyPath, certPath string, e error) {
+func GenerateCert(name, commonName string) (keyPath, certPath string, e error) {
+	dir, err := ioutil.TempDir(CertBaseDir, "")
+	if err != nil {
+		return "", "", err
+	}
 	KeyPath := filepath.Join(dir, name+".key")
 	CrtPath := filepath.Join(dir, name+".crt")
 	// Create our private key
 	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}
@@ -142,13 +165,17 @@ func GenerateCert(dir, name, commonName string) (keyPath, certPath string, e err
 
 // GenerateCertWithCA generates a private and public key for testing in the directory
 // specified using the ca specified
-func GenerateCertWithCA(dir, name, caKeyPath, caCrtPath, commonName string) (keyPath, certPath string, e error) {
+func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string) (keyPath, certPath string, e error) {
+	dir, err := ioutil.TempDir(CertBaseDir, "")
+	if err != nil {
+		return "", "", err
+	}
 	KeyPath := filepath.Join(dir, name+".key")
 	CrtPath := filepath.Join(dir, name+".crt")
 	CSRPath := filepath.Join(dir, name+".csa")
 	// Create our private key
 	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}

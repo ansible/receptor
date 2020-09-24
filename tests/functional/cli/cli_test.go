@@ -5,10 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"io/ioutil"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -90,17 +87,7 @@ func TestSSLListeners(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			// Setup the mesh directory
-			baseDir := filepath.Join(os.TempDir(), "receptor-testing", t.Name())
-			err := os.MkdirAll(baseDir, 0755)
-			if err != nil {
-				t.Fatal(err)
-			}
-			tempdir, err := ioutil.TempDir(baseDir, "certs-")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key, crt, err := utils.GenerateCert(tempdir, "test", "localhost")
+			key, crt, err := utils.GenerateCert("test", "localhost")
 
 			receptorStdOut := bytes.Buffer{}
 			port := utils.ReserveTCPPort()

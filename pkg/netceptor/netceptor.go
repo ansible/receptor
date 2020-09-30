@@ -1197,6 +1197,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 		return fmt.Errorf("connection cost must be positive")
 	}
 	established := false
+	remoteEstablished := false
 	remoteNodeID := ""
 	defer func() {
 		_ = sess.Close()
@@ -1263,7 +1264,13 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 						// This is an update from our direct connection, so do some extra verification
 						remoteCost, ok := ri.Connections[s.nodeID]
 						if !ok {
-							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
+							if remoteEstablished {
+								return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
+							}
+							// This is a late initialization request from the remote node, so don't process it as a routing update.
+							continue
+						} else {
+							remoteEstablished = true
 						}
 						if ok && remoteCost != connectionCost {
 							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")

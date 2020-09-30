@@ -175,6 +175,17 @@ func (kw *kubeUnit) runWork() {
 	}
 	kw.pod = ev.Object.(*corev1.Pod)
 
+	// Open the pod log for stdout
+	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
+		Follow: true,
+	})
+	logStream, err := logreq.Stream(kw.ctx)
+	if err != nil {
+		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error opening pod stream: %s", err), 0)
+		return
+	}
+	defer logStream.Close()
+
 	// Attach stdin stream to the pod
 	var exec remotecommand.Executor
 	if !skipStdin {
@@ -196,17 +207,6 @@ func (kw *kubeUnit) runWork() {
 			return
 		}
 	}
-
-	// Open the pod log for stdout
-	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
-		Follow: true,
-	})
-	logStream, err := logreq.Stream(kw.ctx)
-	if err != nil {
-		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error opening pod stream: %s", err), 0)
-		return
-	}
-	defer logStream.Close()
 
 	// Check if we were cancelled before starting the streams
 	select {

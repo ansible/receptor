@@ -949,17 +949,19 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		_ = s.addNameHash(ri.NodeID)
 	}
 	s.knownNodeInfo[ri.NodeID] = ni
-	s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
-	for k, v := range ri.Connections {
-		s.knownConnectionCosts[ri.NodeID][k] = v
-	}
-	for conn := range s.knownConnectionCosts {
-		if conn == s.nodeID {
-			continue
+	if changed {
+		s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
+		for k, v := range ri.Connections {
+			s.knownConnectionCosts[ri.NodeID][k] = v
 		}
-		_, ok = ri.Connections[conn]
-		if !ok {
-			delete(s.knownConnectionCosts[conn], ri.NodeID)
+		for conn := range s.knownConnectionCosts {
+			if conn == s.nodeID {
+				continue
+			}
+			_, ok = ri.Connections[conn]
+			if !ok {
+				delete(s.knownConnectionCosts[conn], ri.NodeID)
+			}
 		}
 	}
 	s.knownNodeLock.Unlock()

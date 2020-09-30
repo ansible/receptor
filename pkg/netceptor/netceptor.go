@@ -925,12 +925,13 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	s.knownNodeLock.Lock()
 	s.seenUpdates[ri.UpdateID] = time.Now()
 	ni, ok := s.knownNodeInfo[ri.NodeID]
-	s.knownNodeLock.Unlock()
 	if ok {
 		if ri.UpdateEpoch < ni.Epoch {
+			s.knownNodeLock.Unlock()
 			return
 		}
 		if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence {
+			s.knownNodeLock.Unlock()
 			return
 		}
 	} else {
@@ -939,7 +940,6 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	}
 	ni.Epoch = ri.UpdateEpoch
 	ni.Sequence = ri.UpdateSequence
-	s.knownNodeLock.Lock()
 	changed := false
 	if !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID]) {
 		changed = true

@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -141,6 +142,26 @@ func (n *ContainerNode) Start() error {
 		if err != nil {
 			return err
 		}
+		// Write the script so we can apply these tc rules when launching the
+		// mesh manually
+		scriptCmdArgs := append([]string{containerRunner}, args...)
+		nodeTCScript := "#!/bin/bash\n" + strings.Join(scriptCmdArgs, " ")
+		f, err := os.Create(filepath.Join(n.dir, "apply-tc-rules.sh"))
+		if err != nil {
+			return err
+		}
+		err = f.Chmod(0755)
+		if err != nil {
+			return err
+		}
+		_, err = f.WriteString(nodeTCScript)
+		if err != nil {
+			return err
+		}
+		err = f.Close()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -238,6 +259,32 @@ func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*Conta
 		return nil, err
 	}
 	mesh.dir = tempdir
+
+	// Setup a script that will apply each node's tc rules, this is so it's
+	// possible to restart a mesh after tests run and apply the same tc rules
+	// the tests used, this is not used from within the tests itself
+	meshTCScript := `#!/bin/bash
+SCRIPT_PATH="$(dirname $0)"
+for d in $SCRIPT_PATH/*/; do
+	"$d/apply-tc-rules.sh"
+done`
+
+	f, err := os.Create(filepath.Join(mesh.dir, "apply-tc-rules.sh"))
+	if err != nil {
+		return nil, err
+	}
+	err = f.Chmod(0755)
+	if err != nil {
+		return nil, err
+	}
+	_, err = f.WriteString(meshTCScript)
+	if err != nil {
+		return nil, err
+	}
+	err = f.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	// HERE BE DRAGONS OF THE TYPE SYSTEMS
 	nodes := make(map[string]*ContainerNode)
@@ -435,6 +482,11 @@ func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*Conta
 	ioutil.WriteFile(nodedefPath, containerComposeDataStr, 0644)
 
 	containerCompose := exec.Command(containerComposeRunner, "up", "--no-start")
+	// Add COMPOSE_PARALLEL_LIMIT=500 to our environment because of
+	// https://github.com/docker/compose/issues/7486
+	// It's unlikely we'll make meshes larger than 500 containers on a single
+	// node, which is why i chose 500
+	containerCompose.Env = append(os.Environ(), "COMPOSE_PARALLEL_LIMIT=500")
 	containerCompose.Dir = mesh.dir
 	err = containerCompose.Run()
 	if err != nil {

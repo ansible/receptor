@@ -596,7 +596,9 @@ func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
 				}
 				select {
 				case uChan <- msg:
-				default:
+				case <-s.context.Done():
+					close(uChan)
+					return
 				}
 			case <-s.context.Done():
 				close(uChan)

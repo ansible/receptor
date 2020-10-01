@@ -103,9 +103,9 @@ func (n *ContainerNode) Start() error {
 	nodedefPath := filepath.Join(n.dir, "receptor.conf")
 	ioutil.WriteFile(nodedefPath, strData, 0644)
 	Cmd := exec.Command(containerRunner, "start", n.containerName)
-	err = Cmd.Run()
+	output, err := Cmd.CombinedOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("%s failed: %s\nCombined Output: %s", Cmd.String(), err.Error(), output)
 	}
 	if n.TCRules != nil {
 		args := []string{"exec", "-u", "0", n.containerName, "tc", "qdisc", "add", "dev", "eth0", "root", "netem"}
@@ -138,9 +138,9 @@ func (n *ContainerNode) Start() error {
 			args = append(args, n.TCRules.Corrupt)
 		}
 		tcCmd := exec.Command(containerRunner, args...)
-		err = tcCmd.Run()
+		output, err = tcCmd.CombinedOutput()
 		if err != nil {
-			return err
+			return fmt.Errorf("%s failed: %s\nCombined Output: %s", tcCmd.String(), err.Error(), output)
 		}
 		// Write the script so we can apply these tc rules when launching the
 		// mesh manually
@@ -488,9 +488,9 @@ done`
 	// node, which is why i chose 500
 	containerCompose.Env = append(os.Environ(), "COMPOSE_PARALLEL_LIMIT=500")
 	containerCompose.Dir = mesh.dir
-	err = containerCompose.Run()
+	output, err := containerCompose.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s failed: %s\nCombined Output: %s", containerCompose.String(), err.Error(), output)
 	}
 
 	for k, node := range nodes {

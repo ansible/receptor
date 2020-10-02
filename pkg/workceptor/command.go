@@ -4,7 +4,6 @@ package workceptor
 
 import (
 	"fmt"
-	"github.com/fsnotify/fsnotify"
 	"github.com/google/shlex"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
@@ -176,61 +175,6 @@ func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 		status.ExtraData = &edCopy
 	}
 	return status
-}
-
-// monitorLocalStatus watches a unit dir and keeps the workUnit up to date with status changes
-func (cw *commandUnit) monitorLocalStatus() {
-	statusFile := path.Join(cw.UnitDir(), "status")
-	watcher, err := fsnotify.NewWatcher()
-	if err == nil {
-		err = watcher.Add(statusFile)
-		if err == nil {
-			defer func() {
-				_ = watcher.Close()
-			}()
-		} else {
-			_ = watcher.Close()
-			watcher = nil
-		}
-	} else {
-		watcher = nil
-	}
-	fi, err := os.Stat(statusFile)
-	if err != nil {
-		fi = nil
-	}
-	var watcherEvents chan fsnotify.Event
-	if watcher == nil {
-		watcherEvents = make(chan fsnotify.Event)
-	} else {
-		watcherEvents = watcher.Events
-	}
-	for {
-		select {
-		case event := <-watcherEvents:
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				err = cw.Load()
-				if err != nil {
-					logger.Error("Error reading %s: %s", statusFile, err)
-				}
-			}
-		case <-time.After(time.Second):
-			newFi, err := os.Stat(statusFile)
-			if err == nil {
-				if fi == nil || fi.ModTime() != newFi.ModTime() {
-					fi = newFi
-					err = cw.Load()
-					if err != nil {
-						logger.Error("Error reading %s: %s", statusFile, err)
-					}
-				}
-			}
-		}
-		complete := IsComplete(cw.Status().State)
-		if complete {
-			break
-		}
-	}
 }
 
 // runCommand actually runs the exec.Cmd.  This is in a separate function so the Python worker can call it.

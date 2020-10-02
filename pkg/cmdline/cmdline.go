@@ -235,7 +235,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 	valueType := reflect.TypeOf(value)
 
 	// If the value is directly convertible to the field, just set it
-	if valueType.ConvertibleTo(fieldType) {
+	if fieldKind == valueType.Kind() && valueType.ConvertibleTo(fieldType) {
 		field.Set(reflect.ValueOf(value).Convert(fieldType))
 		return nil
 	}
@@ -318,6 +318,13 @@ func setValue(field *reflect.Value, value interface{}) error {
 			return nil
 		}
 	}
+
+	// If the destination is a string, try a last ditch string conversion
+	if fieldKind == reflect.String {
+		field.Set(reflect.ValueOf(fmt.Sprintf("%v", value)))
+		return nil
+	}
+
 	return fmt.Errorf("type error (expected %s)", fieldType)
 }
 

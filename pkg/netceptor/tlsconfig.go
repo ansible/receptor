@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"io/ioutil"
+	"strings"
 )
 
 // **************************************************************************
@@ -21,11 +22,24 @@ var configSection = &cmdline.ConfigSection{
 
 // TLSServerCfg stores the configuration options for a TLS server
 type TLSServerCfg struct {
-	Name              string `required:"true" description:"Name of this TLS server configuration"`
-	Cert              string `required:"true" description:"Server certificate filename"`
-	Key               string `required:"true" description:"Server private key filename"`
-	RequireClientCert bool   `description:"Require client certificates" default:"false"`
-	ClientCAs         string `description:"Filename of CA bundle to verify client certs with"`
+	Name               string `required:"true" description:"Name of this TLS server configuration"`
+	Cert               string `required:"true" description:"Server certificate filename"`
+	Key                string `required:"true" description:"Server private key filename"`
+	RequireClientCert  bool   `description:"Require client certificates" default:"false"`
+	VerifyClientNodeID bool   `description:"Verify certificate CA matches client node id" default:"true"`
+	ClientCAs          string `description:"Filename of CA bundle to verify client certs with"`
+}
+
+func getClientValidator(helloInfo *tls.ClientHelloInfo, clientCAs *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		opts := x509.VerifyOptions{
+			Roots:     clientCAs,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			DNSName:   strings.Split(helloInfo.Conn.RemoteAddr().String(), ":")[0],
+		}
+		_, err := verifiedChains[0][0].Verify(opts)
+		return err
+	}
 }
 
 // Prepare creates the tls.config and stores it in the global map
@@ -65,7 +79,17 @@ func (cfg TLSServerCfg) Prepare() error {
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
 
-	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
+	tlscfg.NextProtos = []string{"netceptor"}
+
+	serverConf := tlscfg
+	if cfg.VerifyClientNodeID {
+		serverConf = &tls.Config{}
+		serverConf.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+			tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
+			return tlscfg, nil
+		}
+	}
+	return MainInstance.SetServerTLSConfig(cfg.Name, serverConf)
 }
 
 // TLSClientCfg stores the configuration options for a TLS client
@@ -112,7 +136,7 @@ func (cfg TLSClientCfg) Prepare() error {
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
-
+	tlscfg.NextProtos = []string{"netceptor"}
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
 }
 

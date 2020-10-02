@@ -54,7 +54,25 @@ class ReceptorControl:
             elif m[2] and m[3]:
                 host = m[2]
                 port = m[3]
-                print(f"TCP socket, host {host} port {port}")
+                self.socket = None
+                addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)
+                for addr in addrs:
+                    family, type, proto, canonname, sockaddr = addr
+                    try:
+                        self.socket = socket.socket(family, type, proto)
+                    except OSError:
+                        self.socket = None
+                        continue
+                    try:
+                        self.socket.connect(sockaddr)
+                    except OSError:
+                        self.socket.close()
+                        self.socket = None
+                        continue
+                    self.sockfile = self.socket.makefile('rwb')
+                    break
+                if self.socket is None:
+                    raise ValueError(f"Could not connect to host {host} port {port}")
                 self.handshake()
                 return
         raise ValueError(f"Invalid socket address {address}")

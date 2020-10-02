@@ -431,9 +431,10 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name": "cert1",
-							"key":  key1,
-							"cert": crt1,
+							"name":               "cert1",
+							"key":                key1,
+							"cert":               crt1,
+							"verifyclientnodeid": false,
 						},
 					},
 					map[interface{}]interface{}{

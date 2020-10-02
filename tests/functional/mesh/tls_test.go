@@ -71,9 +71,10 @@ func TestTCPSSLConnections(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name": "server-cert2",
-							"key":  key2,
-							"cert": crt2,
+							"name":               "server-cert2",
+							"key":                key2,
+							"cert":               crt2,
+							"verifyclientnodeid": false,
 						},
 					},
 					map[interface{}]interface{}{

@@ -92,7 +92,7 @@ func TestSSLListeners(t *testing.T) {
 			receptorStdOut := bytes.Buffer{}
 			port := utils.ReserveTCPPort()
 			defer utils.FreeTCPPort(port)
-			cmd := exec.Command("receptor", "--node", "id=test", "--tls-server", "name=server-tls", fmt.Sprintf("cert=%s", crt), fmt.Sprintf("key=%s", key), listener, fmt.Sprintf("port=%d", port), "tls=server-tls")
+			cmd := exec.Command("receptor", "--node", "id=test", "--tls-server", "name=server-tls", "verifyclientnodeid=false", fmt.Sprintf("cert=%s", crt), fmt.Sprintf("key=%s", key), listener, fmt.Sprintf("port=%d", port), "tls=server-tls")
 			cmd.Stdout = &receptorStdOut
 			err = cmd.Start()
 			if err != nil {

@@ -239,7 +239,7 @@ def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm,
             op_on_unit_ids(ctx, "release", [unitid])
 
 
-@work.command(help="Get results for a previously run unit of work.")
+@work.command(help="Get results for a previously or currently running unit of work.")
 @click.pass_context
 @click.argument('unit_id', type=str, required=True)
 def results(ctx, unit_id):

@@ -5,6 +5,7 @@ package workceptor
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/rogpeppe/go-internal/lockedfile"
 	"io"
@@ -284,6 +285,61 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 // LastUpdateError returns the last error (including nil) resulting from an UpdateBasicStatus or UpdateFullStatus
 func (bwu *BaseWorkUnit) LastUpdateError() error {
 	return bwu.lastUpdateError
+}
+
+// monitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes
+func (bwu *BaseWorkUnit) monitorLocalStatus() {
+	statusFile := path.Join(bwu.UnitDir(), "status")
+	watcher, err := fsnotify.NewWatcher()
+	if err == nil {
+		err = watcher.Add(statusFile)
+		if err == nil {
+			defer func() {
+				_ = watcher.Close()
+			}()
+		} else {
+			_ = watcher.Close()
+			watcher = nil
+		}
+	} else {
+		watcher = nil
+	}
+	fi, err := os.Stat(statusFile)
+	if err != nil {
+		fi = nil
+	}
+	var watcherEvents chan fsnotify.Event
+	if watcher == nil {
+		watcherEvents = make(chan fsnotify.Event)
+	} else {
+		watcherEvents = watcher.Events
+	}
+	for {
+		select {
+		case event := <-watcherEvents:
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				err = bwu.Load()
+				if err != nil {
+					logger.Error("Error reading %s: %s", statusFile, err)
+				}
+			}
+		case <-time.After(time.Second):
+			newFi, err := os.Stat(statusFile)
+			if err == nil {
+				if fi == nil || fi.ModTime() != newFi.ModTime() {
+					fi = newFi
+					err = bwu.Load()
+					if err != nil {
+						logger.Error("Error reading %s: %s", statusFile, err)
+					}
+				}
+			}
+		}
+		complete := IsComplete(bwu.Status().State)
+		if complete {
+			break
+		}
+	}
 }
 
 // getStatus returns a copy of the base status (no ExtraData).  The caller must already hold the statusLock.

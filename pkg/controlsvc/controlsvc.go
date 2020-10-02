@@ -142,7 +142,9 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				return
 			}
 			if n == 1 {
-				if buf[0] == '\n' {
+				if buf[0] == '\r' {
+					continue
+				} else if buf[0] == '\n' {
 					break
 				}
 				cmdBytes = append(cmdBytes, buf[0])
@@ -242,7 +244,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 // RunControlSvc runs the main accept loop of the control service
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
-	unixSocket string, unixSocketPermissions os.FileMode) error {
+	unixSocket string, TCPListen string, tcptls *tls.Config, unixSocketPermissions os.FileMode) error {
 	var uli net.Listener
 	var lock *utils.FLock
 	var err error
@@ -253,6 +255,24 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		}
 	} else {
 		uli = nil
+	}
+	var tli net.Listener
+	if TCPListen != "" {
+		listenAddr := ""
+		if strings.Contains(TCPListen, ":") {
+			listenAddr = TCPListen
+		} else {
+			listenAddr = fmt.Sprintf("0.0.0.0:%s", TCPListen)
+		}
+		tli, err = net.Listen("tcp", listenAddr)
+		if err != nil {
+			return fmt.Errorf("error listening on TCP socket: %s", err)
+		}
+		if tcptls != nil {
+			tli = tls.NewListener(tli, tcptls)
+		}
+	} else {
+		tli = nil
 	}
 	var li *netceptor.Listener
 	if service != "" {
@@ -277,6 +297,9 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 			if li != nil {
 				_ = li.Close()
 			}
+			if tli != nil {
+				_ = tli.Close()
+			}
 			return
 		}
 	}()
@@ -284,8 +307,26 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		go func() {
 			for {
 				conn, err := uli.Accept()
+				if ctx.Err() != nil {
+					return
+				}
 				if err != nil {
 					logger.Error("Error accepting Unix socket connection: %s. Closing socket.\n", err)
+					return
+				}
+				go s.RunControlSession(conn)
+			}
+		}()
+	}
+	if tli != nil {
+		go func() {
+			for {
+				conn, err := tli.Accept()
+				if ctx.Err() != nil {
+					return
+				}
+				if err != nil {
+					logger.Error("Error accepting TCP connection: %s. Closing socket.\n", err)
 					return
 				}
 				go s.RunControlSession(conn)
@@ -296,6 +337,9 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		go func() {
 			for {
 				conn, err := li.Accept()
+				if ctx.Err() != nil {
+					return
+				}
 				if err != nil {
 					logger.Error("Error accepting connection: %s. Closing socket.\n", err)
 					return
@@ -313,8 +357,10 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 
 // CmdlineConfigWindows is the cmdline configuration object for a control service on Windows
 type CmdlineConfigWindows struct {
-	Service string `description:"Receptor service name to listen on" default:"control"`
-	TLS     string `description:"Name of TLS server config for the Receptor listener"`
+	Service   string `description:"Receptor service name to listen on" default:"control"`
+	TLS       string `description:"Name of TLS server config for the Receptor listener"`
+	TCPListen string `description:"Local TCP port or host:port to bind to the control service"`
+	TCPTLS    string `description:"Name of TLS server config for the TCP listener"`
 }
 
 // CmdlineConfigUnix is the cmdline configuration object for a control service on Unix
@@ -323,6 +369,8 @@ type CmdlineConfigUnix struct {
 	Filename    string `description:"Filename of local Unix socket to bind to the service"`
 	Permissions int    `description:"Socket file permissions" default:"0600"`
 	TLS         string `description:"Name of TLS server config for the Receptor listener"`
+	TCPListen   string `description:"Local TCP port or host:port to bind to the control service"`
+	TCPTLS      string `description:"Name of TLS server config for the TCP listener"`
 }
 
 // Run runs the action
@@ -331,7 +379,15 @@ func (cfg CmdlineConfigUnix) Run() error {
 	if err != nil {
 		return err
 	}
-	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename, os.FileMode(cfg.Permissions))
+	var tcptls *tls.Config
+	if cfg.TCPListen != "" {
+		tcptls, err = netceptor.MainInstance.GetServerTLSConfig(cfg.TCPTLS)
+		if err != nil {
+			return err
+		}
+	}
+	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
+		cfg.TCPListen, tcptls, os.FileMode(cfg.Permissions))
 	if err != nil {
 		return err
 	}
@@ -341,8 +397,10 @@ func (cfg CmdlineConfigUnix) Run() error {
 // Run runs the action
 func (cfg CmdlineConfigWindows) Run() error {
 	return CmdlineConfigUnix{
-		Service: cfg.Service,
-		TLS:     cfg.TLS,
+		Service:   cfg.Service,
+		TLS:       cfg.TLS,
+		TCPListen: cfg.TCPListen,
+		TCPTLS:    cfg.TCPTLS,
 	}.Run()
 }
 

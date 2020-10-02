@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	watch2 "k8s.io/client-go/tools/watch"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ type kubeUnit struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	authMethod          string
+	streamMethod        string
 	allowRuntimeAuth    bool
 	allowRuntimeTLS     bool
 	allowRuntimeCommand bool
@@ -93,9 +95,7 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 	return false, nil
 }
 
-func (kw *kubeUnit) runWork() {
-
-	// Create the pod
+func (kw *kubeUnit) createPod(env map[string]string) error {
 	ked := kw.Status().ExtraData.(*kubeExtraData)
 	command, err := shlex.Split(ked.Command)
 	var args []string
@@ -103,12 +103,9 @@ func (kw *kubeUnit) runWork() {
 		args, err = shlex.Split(ked.Params)
 	}
 	if err != nil {
-		errStr := fmt.Sprintf("Error tokenizing command: %s", err)
-		logger.Error(errStr)
-		kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
-		return
+		return err
 	}
-	kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Create(kw.ctx, &corev1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: kw.namePrefix,
 			Namespace:    ked.KubeNamespace,
@@ -125,17 +122,24 @@ func (kw *kubeUnit) runWork() {
 			}},
 			RestartPolicy: corev1.RestartPolicyNever,
 		},
-	}, metav1.CreateOptions{})
+	}
+	if env != nil {
+		evs := make([]corev1.EnvVar, 0)
+		for k, v := range env {
+			evs = append(evs, corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+		pod.Spec.Containers[0].Env = evs
+	}
+	kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Create(kw.ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		errStr := fmt.Sprintf("Error creating pod: %s", err)
-		logger.Error(errStr)
-		kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
-		return
+		return err
 	}
 	select {
 	case <-kw.ctx.Done():
-		kw.UpdateBasicStatus(WorkStateFailed, "Cancelled", 0)
-		return
+		return fmt.Errorf("cancelled")
 	default:
 	}
 	kw.UpdateFullStatus(func(status *StatusFileData) {
@@ -158,30 +162,40 @@ func (kw *kubeUnit) runWork() {
 		},
 	}
 	ev, err := watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
+	if err != nil {
+		return err
+	}
+	if ev == nil {
+		return fmt.Errorf("pod disappeared during watch")
+	}
+	kw.pod = ev.Object.(*corev1.Pod)
+	return nil
+}
+
+func (kw *kubeUnit) runWorkUsingLogger() {
+
+	// Create the pod
 	skipStdin := false
+	err := kw.createPod(nil)
 	if err == ErrPodCompleted {
 		skipStdin = true
 	} else if err != nil {
-		errStr := fmt.Sprintf("Error waiting for pod to be running: %s", err)
-		logger.Error(errStr)
-		kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
+		errMsg := fmt.Sprintf("Error creating pod: %s", err)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		logger.Error(errMsg)
 		return
 	}
-	if ev == nil {
-		errStr := "Pod disappeared during watch"
-		logger.Error(errStr)
-		kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
-		return
-	}
-	kw.pod = ev.Object.(*corev1.Pod)
 
 	// Open the pod log for stdout
+	ked := kw.Status().ExtraData.(*kubeExtraData)
 	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
 		Follow: true,
 	})
 	logStream, err := logreq.Stream(kw.ctx)
 	if err != nil {
-		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error opening pod stream: %s", err), 0)
+		errMsg := fmt.Sprintf("Error opening pod stream: %s", err)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		logger.Error(errMsg)
 		return
 	}
 	defer logStream.Close()
@@ -221,9 +235,9 @@ func (kw *kubeUnit) runWork() {
 	if !skipStdin {
 		stdin, err = newStdinReader(kw.UnitDir())
 		if err != nil {
-			errStr := fmt.Sprintf("Error opening stdin file: %s", err)
-			logger.Error(errStr)
-			kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
+			errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
+			logger.Error(errMsg)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			return
 		}
 	}
@@ -231,9 +245,9 @@ func (kw *kubeUnit) runWork() {
 	// Open stdout writer
 	stdout, err := newStdoutWriter(kw.UnitDir())
 	if err != nil {
-		errStr := fmt.Sprintf("Error opening stdout file: %s", err)
-		logger.Error(errStr)
-		kw.UpdateBasicStatus(WorkStateFailed, errStr, 0)
+		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
+		logger.Error(errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		return
 	}
 	kw.UpdateBasicStatus(WorkStatePending, "Sending stdin to pod", 0)
@@ -292,6 +306,176 @@ func (kw *kubeUnit) runWork() {
 		return
 	}
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+}
+
+func getDefaultInterface() (string, error) {
+	nifs, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for i := range nifs {
+		nif := nifs[i]
+		if nif.Flags&net.FlagUp != 0 && nif.Flags&net.FlagLoopback == 0 {
+			ads, err := nif.Addrs()
+			if err == nil && len(ads) > 0 {
+				for j := range ads {
+					ad := ads[j]
+					ip, ok := ad.(*net.IPNet)
+					if ok {
+						if !ip.IP.IsLoopback() && !ip.IP.IsMulticast() {
+							return ip.IP.String(), nil
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("could not determine local address")
+}
+
+func (kw *kubeUnit) runWorkUsingTCP() {
+
+	// Create local cancellable context
+	ctx, cancel := context.WithCancel(kw.ctx)
+	defer cancel()
+
+	// Create the TCP listener
+	lc := net.ListenConfig{}
+	defaultInterfaceIP, err := getDefaultInterface()
+	var li net.Listener
+	if err == nil {
+		li, err = lc.Listen(ctx, "tcp", fmt.Sprintf("%s:", defaultInterfaceIP))
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	var listenHost, listenPort string
+	if err == nil {
+		listenHost, listenPort, err = net.SplitHostPort(li.Addr().String())
+	}
+	if err != nil {
+		errMsg := fmt.Sprintf("Error listening: %s", err)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		logger.Error(errMsg)
+		return
+	}
+
+	// Wait for a single incoming connection
+	connChan := make(chan *net.TCPConn)
+	go func() {
+		conn, err := li.Accept()
+		_ = li.Close()
+		if ctx.Err() != nil {
+			return
+		}
+		var tcpConn *net.TCPConn
+		if err == nil {
+			var ok bool
+			tcpConn, ok = conn.(*net.TCPConn)
+			if !ok {
+				err = fmt.Errorf("connection was not a TCPConn")
+			}
+		}
+		if err != nil {
+			errMsg := fmt.Sprintf("Error accepting: %s", err)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			logger.Error(errMsg)
+			cancel()
+			return
+		}
+		connChan <- tcpConn
+	}()
+
+	// Create the pod
+	err = kw.createPod(map[string]string{"RECEPTOR_HOST": listenHost, "RECEPTOR_PORT": listenPort})
+	if err != nil {
+		errMsg := fmt.Sprintf("Error creating pod: %s", err)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		logger.Error(errMsg)
+		cancel()
+		return
+	}
+
+	// Wait for the pod to connect back to us
+	var conn *net.TCPConn
+	select {
+	case <-ctx.Done():
+		return
+	case conn = <-connChan:
+	}
+
+	// Open stdin reader
+	var stdin *stdinReader
+	stdin, err = newStdinReader(kw.UnitDir())
+	if err != nil {
+		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
+		logger.Error(errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		cancel()
+		return
+	}
+
+	// Open stdout writer
+	stdout, err := newStdoutWriter(kw.UnitDir())
+	if err != nil {
+		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
+		logger.Error(errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		cancel()
+		return
+	}
+
+	kw.UpdateBasicStatus(WorkStatePending, "Sending stdin to pod", 0)
+
+	// Write stdin to pod
+	go func() {
+		_, err := io.Copy(conn, stdin)
+		if ctx.Err() != nil {
+			return
+		}
+		_ = conn.CloseWrite()
+		if err != nil {
+			errMsg := fmt.Sprintf("Error sending stdin to pod: %s", err)
+			logger.Error(errMsg)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			cancel()
+			return
+		}
+	}()
+
+	// Goroutine to update status when stdin is fully sent to the pod, which is when we
+	// update from WorkStatePending to WorkStateRunning.
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-stdin.Done():
+			err := stdin.Error()
+			if err == io.EOF {
+				kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+			} else {
+				kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", err), stdout.Size())
+				cancel()
+			}
+		}
+	}()
+
+	// Read stdout from pod
+	_, err = io.Copy(stdout, conn)
+	if ctx.Err() != nil {
+		return
+	}
+	if err != nil {
+		errMsg := fmt.Sprintf("Error reading stdout from pod: %s", err)
+		logger.Error(errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		cancel()
+		return
+	}
+
+	if ctx.Err() == nil {
+		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+	}
 }
 
 func (kw *kubeUnit) connectUsingKubeconfig() error {
@@ -456,7 +640,12 @@ func (kw *kubeUnit) Start() error {
 	}
 
 	// Launch runner process
-	go kw.runWork()
+	if kw.streamMethod == "tcp" {
+		go kw.runWorkUsingTCP()
+	} else {
+		go kw.runWorkUsingLogger()
+	}
+	go kw.monitorLocalStatus()
 
 	return nil
 }
@@ -501,7 +690,7 @@ type WorkKubeCfg struct {
 	Namespace           string `description:"Kubernetes namespace to create pods in"`
 	Image               string `description:"Container image to use for the worker pod"`
 	Command             string `description:"Command to run in the container (default: entrypoint)"`
-	AuthMethod          string `description:"One of: kubeconfig, incluster, params" default:"incluster" required:"true"`
+	AuthMethod          string `description:"One of: kubeconfig, incluster, params" default:"incluster"`
 	KubeConfig          string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
 	KubeHost            string `description:"k8s API hostname (for authmethod=params)"`
 	KubeAPIPath         string `description:"k8s API path (for authmethod=params)"`
@@ -514,6 +703,7 @@ type WorkKubeCfg struct {
 	AllowRuntimeTLS     bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
 	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
 	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
+	StreamMethod        string `description:"Method for connecting to worker pods: logger or tcp" default:"logger"`
 }
 
 // newWorker is a factory to produce worker instances
@@ -537,6 +727,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		},
 		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 		authMethod:          strings.ToLower(cfg.AuthMethod),
+		streamMethod:        strings.ToLower(cfg.StreamMethod),
 		kubeConfig:          cfg.KubeConfig,
 		allowRuntimeAuth:    cfg.AllowRuntimeAuth,
 		allowRuntimeTLS:     cfg.AllowRuntimeTLS,
@@ -581,6 +772,10 @@ func (cfg WorkKubeCfg) Prepare() error {
 	}
 	if cfg.Image == "" && !cfg.AllowRuntimeCommand {
 		return fmt.Errorf("must specify a container image to run")
+	}
+	method := strings.ToLower(cfg.StreamMethod)
+	if method != "logger" && method != "tcp" {
+		return fmt.Errorf("stream mode must be logger or tcp")
 	}
 	return nil
 }

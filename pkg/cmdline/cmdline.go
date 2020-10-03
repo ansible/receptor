@@ -233,9 +233,25 @@ func setValue(field *reflect.Value, value interface{}) error {
 	fieldType := field.Type()
 	fieldKind := fieldType.Kind()
 	valueType := reflect.TypeOf(value)
+	valueKind := valueType.Kind()
+
+	// If the destination is a string, try some string conversions
+	if fieldKind == reflect.String {
+		switch valueKind {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			field.SetString(fmt.Sprintf("%d", value))
+			return nil
+		case reflect.Float32, reflect.Float64:
+			field.SetString(fmt.Sprintf("%f", value))
+			return nil
+		case reflect.Bool:
+			field.SetString(fmt.Sprintf("%t", value))
+			return nil
+		}
+	}
 
 	// If the value is directly convertible to the field, just set it
-	if fieldKind == valueType.Kind() && valueType.ConvertibleTo(fieldType) {
+	if valueType.ConvertibleTo(fieldType) {
 		field.Set(reflect.ValueOf(value).Convert(fieldType))
 		return nil
 	}
@@ -244,19 +260,20 @@ func setValue(field *reflect.Value, value interface{}) error {
 	valueStr, isString := value.(string)
 
 	// If the field is a map, check if we were given a JSON-encoded string
-	if fieldKind == reflect.Map && valueType.Kind() == reflect.String && strings.HasPrefix(valueStr, "{") {
-		dest := reflect.MakeMap(reflect.MapOf(fieldType.Key(), fieldType.Elem()))
+	if fieldKind == reflect.Map && valueKind == reflect.String && isString && strings.HasPrefix(valueStr, "{") {
+		valueType = reflect.MapOf(fieldType.Key(), fieldType.Elem())
+		valueKind = valueType.Kind()
+		dest := reflect.MakeMap(valueType)
 		value = dest.Interface()
 		err := json.Unmarshal([]byte(valueStr), &value)
 		if err != nil {
 			return err
 		}
-		valueType = reflect.TypeOf(value)
 		// We do not return here because we still need the map copy below
 	}
 
 	// If the field and value are a map type, attempt to copy the keys/values
-	if fieldKind == reflect.Map && valueType.Kind() == reflect.Map {
+	if fieldKind == reflect.Map && valueKind == reflect.Map {
 		fieldMap := reflect.MakeMap(reflect.MapOf(fieldType.Key(), fieldType.Elem()))
 		iter := reflect.ValueOf(value).MapRange()
 		for iter.Next() {
@@ -275,7 +292,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 	}
 
 	// If the field and value are a slice type, attempt to copy the values
-	if fieldKind == reflect.Slice && valueType.Kind() == reflect.Slice {
+	if fieldKind == reflect.Slice && valueKind == reflect.Slice {
 		valueSlice, ok := value.([]interface{})
 		if !ok {
 			return fmt.Errorf("invalid value for slice type")
@@ -292,7 +309,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 		return nil
 	}
 
-	// No direct field conversions were possible, so let's try a string conversion
+	// If the value is a string and no direct conversions were possible, try some string conversions
 	if isString {
 		switch fieldKind {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -317,12 +334,6 @@ func setValue(field *reflect.Value, value interface{}) error {
 			field.SetBool(v)
 			return nil
 		}
-	}
-
-	// If the destination is a string, try a last ditch string conversion
-	if fieldKind == reflect.String {
-		field.Set(reflect.ValueOf(fmt.Sprintf("%v", value)))
-		return nil
 	}
 
 	return fmt.Errorf("type error (expected %s)", fieldType)

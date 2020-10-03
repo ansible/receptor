@@ -485,7 +485,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		node.controlSocket = filepath.Join(tempdir, "controlsock")
 
 		node.controlServer = controlsvc.New(true, node.NetceptorInstance)
-		err = node.controlServer.RunControlSvc(ctx, "control", nil, node.controlSocket, os.FileMode(0600))
+		err = node.controlServer.RunControlSvc(ctx, "control", nil, node.controlSocket, os.FileMode(0600), "", nil)
 		if err != nil {
 			return nil, err
 		}

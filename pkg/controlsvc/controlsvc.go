@@ -244,7 +244,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 // RunControlSvc runs the main accept loop of the control service
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
-	unixSocket string, TCPListen string, tcptls *tls.Config, unixSocketPermissions os.FileMode) error {
+	unixSocket string, unixSocketPermissions os.FileMode, TCPListen string, tcptls *tls.Config) error {
 	var uli net.Listener
 	var lock *utils.FLock
 	var err error
@@ -387,7 +387,7 @@ func (cfg CmdlineConfigUnix) Run() error {
 		}
 	}
 	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
-		cfg.TCPListen, tcptls, os.FileMode(cfg.Permissions))
+		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)
 	if err != nil {
 		return err
 	}

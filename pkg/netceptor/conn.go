@@ -63,8 +63,8 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		tlscfg = generateServerTLSConfig()
 	} else {
 		tlscfg = tlscfg.Clone()
+		tlscfg.NextProtos = []string{"netceptor"}
 		if tlscfg.GetConfigForClient != nil {
-			tlscfg.NextProtos = []string{"netceptor"}
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
 				return tlscfg, nil

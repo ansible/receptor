@@ -78,8 +78,7 @@ func (cfg TLSServerCfg) Prepare() error {
 	} else {
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
-
-	serverConf := tlscfg
+	var serverConf *tls.Config
 	if cfg.VerifyClientNodeID {
 		tlscfg.NextProtos = []string{"netceptor"}
 		serverConf = &tls.Config{}
@@ -87,6 +86,8 @@ func (cfg TLSServerCfg) Prepare() error {
 			tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
 			return tlscfg, nil
 		}
+	} else {
+		serverConf = tlscfg
 	}
 	return MainInstance.SetServerTLSConfig(cfg.Name, serverConf)
 }

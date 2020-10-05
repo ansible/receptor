@@ -80,6 +80,8 @@ func (cfg TLSServerCfg) Prepare() error {
 	}
 
 	if cfg.VerifyClientNodeID {
+		// make GetConfigForClient non-nil for now, and later fill in the callback
+		// after cloning the tls
 		tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 			return nil, nil
 		}

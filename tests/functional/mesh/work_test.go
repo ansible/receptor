@@ -212,8 +212,7 @@ func TestWork(t *testing.T) {
 	})
 
 	t.Run("work submit with incorrect tlsclient CN", func(t *testing.T) {
-		// tests that submitting work with tlsclient wrong CN information
-		// immediately fails the job
+		// tests that submitting work with wrong cert CN immediately fails the job
 		// also tests that releasing a job that has not been started on remote
 		// will not attempt to connect to remote
 		t.Parallel()

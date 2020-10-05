@@ -78,18 +78,13 @@ func (cfg TLSServerCfg) Prepare() error {
 	} else {
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
-	var serverConf *tls.Config
+
 	if cfg.VerifyClientNodeID {
-		tlscfg.NextProtos = []string{"netceptor"}
-		serverConf = &tls.Config{}
-		serverConf.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
-			tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
-			return tlscfg, nil
+		tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+			return nil, nil
 		}
-	} else {
-		serverConf = tlscfg
 	}
-	return MainInstance.SetServerTLSConfig(cfg.Name, serverConf)
+	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
 
 // TLSClientCfg stores the configuration options for a TLS client
@@ -136,7 +131,6 @@ func (cfg TLSClientCfg) Prepare() error {
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
-	tlscfg.NextProtos = []string{"netceptor"}
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
 }
 

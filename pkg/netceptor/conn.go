@@ -34,7 +34,7 @@ type Listener struct {
 }
 
 // Internal implementation of Listen and ListenAndAdvertise
-func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
+func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
@@ -59,13 +59,19 @@ func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config,
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
-	if tls == nil {
-		tls = generateServerTLSConfig()
+	if tlscfg == nil {
+		tlscfg = generateServerTLSConfig()
 	} else {
-		tls = tls.Clone()
-		tls.NextProtos = []string{"netceptor"}
+		tlscfg = tlscfg.Clone()
+		if tlscfg.GetConfigForClient != nil {
+			tlscfg.NextProtos = []string{"netceptor"}
+			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+				tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
+				return tlscfg, nil
+			}
+		}
 	}
-	ql, err := quic.Listen(pc, tls, nil)
+	ql, err := quic.Listen(pc, tlscfg, nil)
 	if err != nil {
 		return nil, err
 	}

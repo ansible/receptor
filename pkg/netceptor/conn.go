@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,8 +34,20 @@ type Listener struct {
 	doneOnce   *sync.Once
 }
 
+func getClientValidator(helloInfo *tls.ClientHelloInfo, clientCAs *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		opts := x509.VerifyOptions{
+			Roots:     clientCAs,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			DNSName:   strings.Split(helloInfo.Conn.RemoteAddr().String(), ":")[0],
+		}
+		_, err := verifiedChains[0][0].Verify(opts)
+		return err
+	}
+}
+
 // Internal implementation of Listen and ListenAndAdvertise
-func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
+func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
@@ -59,13 +72,19 @@ func (s *Netceptor) listen(ctx context.Context, service string, tls *tls.Config,
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
-	if tls == nil {
-		tls = generateServerTLSConfig()
+	if tlscfg == nil {
+		tlscfg = generateServerTLSConfig()
 	} else {
-		tls = tls.Clone()
-		tls.NextProtos = []string{"netceptor"}
+		tlscfg = tlscfg.Clone()
+		tlscfg.NextProtos = []string{"netceptor"}
+		if tlscfg.GetConfigForClient != nil {
+			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+				tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
+				return tlscfg, nil
+			}
+		}
 	}
-	ql, err := quic.Listen(pc, tls, nil)
+	ql, err := quic.Listen(pc, tlscfg, nil)
 	if err != nil {
 		return nil, err
 	}

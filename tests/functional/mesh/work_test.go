@@ -43,6 +43,10 @@ func TestWork(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		key3, crt3, err := utils.GenerateCertWithCA("node1wrongCN", caKey, caCrt, "node1wrongCN")
+		if err != nil {
+			t.Fatal(err)
+		}
 		// Generate a mesh with 3 nodes
 		data.Nodes["node2"] = &mesh.YamlNode{
 			Connections: map[string]mesh.YamlConnection{},
@@ -58,11 +62,12 @@ func TestWork(t *testing.T) {
 				},
 				map[interface{}]interface{}{
 					"tls-server": map[interface{}]interface{}{
-						"name":              "control_tls",
-						"cert":              crt2,
-						"key":               key2,
-						"requireclientcert": true,
-						"clientcas":         caCrt,
+						"name":               "control_tls",
+						"cert":               crt2,
+						"key":                key2,
+						"requireclientcert":  true,
+						"verifyclientnodeid": true,
+						"clientcas":          caCrt,
 					},
 				},
 				map[interface{}]interface{}{
@@ -90,6 +95,15 @@ func TestWork(t *testing.T) {
 						"insecureskipverify": false,
 						"cert":               crt1,
 						"key":                key1,
+					},
+				},
+				map[interface{}]interface{}{
+					"tls-client": map[interface{}]interface{}{
+						"name":               "tlsclientwrongCN",
+						"rootcas":            caCrt,
+						"insecureskipverify": false,
+						"cert":               crt3,
+						"key":                key3,
 					},
 				},
 			},
@@ -197,9 +211,8 @@ func TestWork(t *testing.T) {
 		}
 	})
 
-	t.Run("work submit with incorrect tlsclient", func(t *testing.T) {
-		// tests that submitting work with incorrect tlsclient information
-		// immediately fails the job
+	t.Run("work submit with incorrect tlsclient CN", func(t *testing.T) {
+		// tests that submitting work with wrong cert CN immediately fails the job
 		// also tests that releasing a job that has not been started on remote
 		// will not attempt to connect to remote
 		t.Parallel()
@@ -207,27 +220,27 @@ func TestWork(t *testing.T) {
 		defer tearDown(controllers, m)
 		nodes := m.Nodes()
 
-		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"","node":"node2","params":""}`
-		unitID, err := controllers["node3"].WorkSubmitJSON(command)
+		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclientwrongCN","node":"node2","params":""}`
+		unitID, err := controllers["node1"].WorkSubmitJSON(command)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-		err = controllers["node3"].AssertWorkFailed(ctx, unitID)
+		err = controllers["node1"].AssertWorkFailed(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = controllers["node3"].WorkRelease(unitID)
+		_, err = controllers["node1"].WorkRelease(unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
-		err = controllers["node3"].AssertWorkReleased(ctx, unitID)
+		err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
-		err = assertFilesReleased(ctx, nodes["node3"].Dir(), "node3", unitID)
+		err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
 		if err != nil {
 			t.Fatal(err)
 		}

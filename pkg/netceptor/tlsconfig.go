@@ -21,11 +21,12 @@ var configSection = &cmdline.ConfigSection{
 
 // TLSServerCfg stores the configuration options for a TLS server
 type TLSServerCfg struct {
-	Name              string `required:"true" description:"Name of this TLS server configuration"`
-	Cert              string `required:"true" description:"Server certificate filename"`
-	Key               string `required:"true" description:"Server private key filename"`
-	RequireClientCert bool   `description:"Require client certificates" default:"false"`
-	ClientCAs         string `description:"Filename of CA bundle to verify client certs with"`
+	Name               string `required:"true" description:"Name of this TLS server configuration"`
+	Cert               string `required:"true" description:"Server certificate filename"`
+	Key                string `required:"true" description:"Server private key filename"`
+	RequireClientCert  bool   `description:"Require client certificates" default:"false"`
+	VerifyClientNodeID bool   `description:"Verify certificate CA matches client node id" default:"true"`
+	ClientCAs          string `description:"Filename of CA bundle to verify client certs with"`
 }
 
 // Prepare creates the tls.config and stores it in the global map
@@ -65,6 +66,13 @@ func (cfg TLSServerCfg) Prepare() error {
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
 
+	if cfg.VerifyClientNodeID {
+		// make GetConfigForClient non-nil for now, and later fill in the callback
+		// after cloning the tls
+		tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+			return nil, nil
+		}
+	}
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
 
@@ -112,7 +120,6 @@ func (cfg TLSClientCfg) Prepare() error {
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
-
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
 }
 

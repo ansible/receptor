@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,6 +32,18 @@ type Listener struct {
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
+}
+
+func getClientValidator(helloInfo *tls.ClientHelloInfo, clientCAs *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		opts := x509.VerifyOptions{
+			Roots:     clientCAs,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			DNSName:   strings.Split(helloInfo.Conn.RemoteAddr().String(), ":")[0],
+		}
+		_, err := verifiedChains[0][0].Verify(opts)
+		return err
+	}
 }
 
 // Internal implementation of Listen and ListenAndAdvertise

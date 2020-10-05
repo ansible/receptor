@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"io/ioutil"
-	"strings"
 )
 
 // **************************************************************************
@@ -28,18 +27,6 @@ type TLSServerCfg struct {
 	RequireClientCert  bool   `description:"Require client certificates" default:"false"`
 	VerifyClientNodeID bool   `description:"Verify certificate CA matches client node id" default:"true"`
 	ClientCAs          string `description:"Filename of CA bundle to verify client certs with"`
-}
-
-func getClientValidator(helloInfo *tls.ClientHelloInfo, clientCAs *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
-	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		opts := x509.VerifyOptions{
-			Roots:     clientCAs,
-			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-			DNSName:   strings.Split(helloInfo.Conn.RemoteAddr().String(), ":")[0],
-		}
-		_, err := verifiedChains[0][0].Verify(opts)
-		return err
-	}
 }
 
 // Prepare creates the tls.config and stores it in the global map

@@ -1030,8 +1030,8 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 		}
 		s.listenerLock.RLock()
 		pc, ok := s.listenerRegistry[md.ToService]
-		s.listenerLock.RUnlock()
-		if !ok {
+		if !ok || pc.context.Err() != nil {
+			s.listenerLock.RUnlock()
 			if md.FromNode == s.nodeID {
 				return fmt.Errorf(ProblemServiceUnknown)
 			}
@@ -1045,6 +1045,7 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 			return nil
 		}
 		pc.recvChan <- md
+		s.listenerLock.RUnlock()
 		return nil
 	}
 	return s.forwardMessage(md)

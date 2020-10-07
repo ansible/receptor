@@ -200,21 +200,32 @@ def list(ctx, quiet):
 @click.option('--node', type=str, help="Receptor node to run the work on. Defaults to the local node.")
 @click.option('--payload', '-p', type=str, help="File containing unit of work data. Use - for stdin.")
 @click.option('--payload-literal', '-l', type=str, help="Use the command line string as the literal unit of work data.")
+@click.option('--no-payload', '-n', is_flag=True, help="Send an empty payload.")
 @click.option('--tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
 @click.option('--follow', '-f', help="Remain attached to the job and print its results to stdout", is_flag=True)
 @click.option('--rm', help="Release unit after completion", is_flag=True)
-@click.option('--param', '-a', help="Additional parameter (key=value format)", multiple=True)
-def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm, param):
-    if not payload and not payload_literal:
-        print("Must provide one of --payload or --payload-literal.")
+@click.option('--param', '-a', help="Additional Receptor parameter (key=value format)", multiple=True)
+@click.argument('cmdparams', type=str, required=False, nargs=-1)
+def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient, follow, rm, param, cmdparams):
+    pcmds = 0
+    if payload:
+        pcmds += 1
+    if no_payload:
+        pcmds += 1
+    if payload_literal:
+        pcmds += 1
+    if pcmds < 1:
+        print("Must provide one of --payload, --no-payload or --payload-literal.")
         sys.exit(1)
-    if payload and payload_literal:
-        print("Cannot provide both --payload and --payload-literal.")
+    if pcmds > 1:
+        print("Cannot provide more than one of --payload, --no-payload and --payload-literal.")
         sys.exit(1)
     if rm and not follow:
         print("Warning: using --rm without --follow. Unit results will never be seen.")
     if payload_literal:
         payload_data = f"{payload_literal}\n".encode()
+    elif no_payload:
+        payload_data = "".encode()
     else:
         if payload == "-":
             payload_data = sys.stdin.buffer
@@ -223,9 +234,15 @@ def submit(ctx, worktype, node, payload, payload_literal, tlsclient, follow, rm,
     unitid = None
     try:
         params = dict(s.split('=', 1) for s in param)
-        rc = get_rc(ctx)
+        if cmdparams:
+            allparams = []
+            if "params" in params:
+                allparams.append(params["params"])
+            allparams.extend(cmdparams)
+            params["params"] = " ".join(allparams)
         if node == "":
             node = None
+        rc = get_rc(ctx)
         work = rc.submit_work(node, worktype, payload_data, tlsclient, params)
         result = work.pop('result')
         unitid = work.pop('unitid')

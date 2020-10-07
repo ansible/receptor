@@ -108,11 +108,12 @@ class ReceptorControl:
             "worktype": worktype,
             "tlsclient": tlsclient,
         }
-        for k,v in params.items():
-            if k not in commandMap:
-                commandMap[k] = v
-            else:
-                raise RuntimeError(f"duplicate or illegal parameter {k}")
+        if params:
+            for k,v in params.items():
+                if k not in commandMap:
+                    commandMap[k] = v
+                else:
+                    raise RuntimeError(f"Duplicate or illegal parameter {k}")
         commandJson = json.dumps(commandMap)
         command = f"{commandJson}\n"
         self.writestr(command)

@@ -127,7 +127,7 @@ class ReceptorControl:
         if isinstance(payload, io.IOBase):
             shutil.copyfileobj(payload, self.sockfile)
         elif isinstance(payload, str):
-            self.writestr(str)
+            self.writestr(payload)
         elif isinstance(payload, bytes):
             self.sockfile.write(payload)
         else:

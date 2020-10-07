@@ -402,3 +402,96 @@ func TestWork(t *testing.T) {
 		}
 	})
 }
+
+func TestRuntimeParams(t *testing.T) {
+	echoCommand := map[interface{}]interface{}{
+		"workType":           "echo",
+		"command":            "echo",
+		"params":             "",
+		"allowruntimeparams": true,
+	}
+
+	data := mesh.YamlData{}
+	data.Nodes = make(map[string]*mesh.YamlNode)
+	data.Nodes["node0"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
+			},
+			map[interface{}]interface{}{
+				"work-command": echoCommand,
+			},
+		},
+	}
+
+	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	err = m.WaitForReady(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := m.Nodes()
+	controller := receptorcontrol.New()
+	err = controller.Connect(nodes["node0"].ControlSocket())
+	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
+	unitID, err := controller.WorkSubmitJSON(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controller.AssertWorkSucceeded(ctx, unitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = controller.AssertWorkResults(unitID, []byte("it worked!"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRuntimeParamsNotAllowed(t *testing.T) {
+	echoCommand := map[interface{}]interface{}{
+		"workType":           "echo",
+		"command":            "echo",
+		"params":             "",
+		"allowruntimeparams": false,
+	}
+
+	data := mesh.YamlData{}
+	data.Nodes = make(map[string]*mesh.YamlNode)
+	data.Nodes["node0"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
+			},
+			map[interface{}]interface{}{
+				"work-command": echoCommand,
+			},
+		},
+	}
+
+	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	err = m.WaitForReady(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := m.Nodes()
+	controller := receptorcontrol.New()
+	err = controller.Connect(nodes["node0"].ControlSocket())
+	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
+	_, err = controller.WorkSubmitJSON(command)
+	if err == nil {
+		t.Fatal("Expected work submit to fail but it succeeded")
+	}
+}

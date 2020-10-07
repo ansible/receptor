@@ -35,6 +35,7 @@ type remoteExtraData struct {
 	LocalCancelled bool
 	LocalReleased  bool
 	TLSClient      string
+	Expiration     time.Time
 }
 
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
@@ -478,6 +479,23 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 	})
 }
 
+func (rw *remoteUnit) setExpiration(mw *utils.JobContext) {
+	red := rw.Status().ExtraData.(*remoteExtraData)
+	dur := red.Expiration.Sub(time.Now())
+	select {
+	case <-mw.Done():
+	case <-time.After(dur):
+		red := rw.Status().ExtraData.(*remoteExtraData)
+		if !red.RemoteStarted {
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.Detail = fmt.Sprintf("Work unit expired on %s", red.Expiration.Format("Mon Jan 2 15:04:05"))
+				status.State = WorkStateFailed
+			})
+			mw.Cancel()
+		}
+	}
+}
+
 // startOrRestart is a shared implementation of Start() and Restart()
 func (rw *remoteUnit) startOrRestart(start bool) error {
 	red := rw.Status().ExtraData.(*remoteExtraData)
@@ -489,6 +507,9 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 		return fmt.Errorf("start or monitor process already running")
 	}
 	if start || !red.RemoteStarted {
+		if !red.Expiration.IsZero() {
+			go rw.setExpiration(rw.topJC)
+		}
 		return rw.runAndMonitor(rw.topJC, false, rw.startRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
 		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {

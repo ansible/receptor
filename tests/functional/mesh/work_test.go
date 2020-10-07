@@ -195,11 +195,12 @@ func TestWork(t *testing.T) {
 	t.Run("work submit with tlsclient", func(t *testing.T) {
 		// tests work submit via json
 		// tests connecting to remote control service with tlsclient
+		// tests that having a ttl that never times out (10 hours) works fine
 		t.Parallel()
 		controllers, m, _ := workSetup(t.Name())
 		defer tearDown(controllers, m)
 
-		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":""}`
+		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":"", "ttl":"10h"}`
 		unitID, err := controllers["node1"].WorkSubmitJSON(command)
 		if err != nil {
 			t.Fatal(err)
@@ -227,6 +228,41 @@ func TestWork(t *testing.T) {
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 		err = controllers["node1"].AssertWorkFailed(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = controllers["node1"].WorkRelease(unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+		err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+		err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("start remote work with ttl", func(t *testing.T) {
+		t.Parallel()
+		controllers, m, _ := workSetup(t.Name())
+		defer tearDown(controllers, m)
+		nodes := m.Nodes()
+
+		nodes["node2"].Shutdown()
+		nodes["node2"].WaitForShutdown()
+
+		command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":"","ttl":"5s"}`
+		unitID, err := controllers["node1"].WorkSubmitJSON(command)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+		err = controllers["node1"].AssertWorkTimedOut(ctx, unitID)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -153,7 +153,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
-func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient string, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, ttl string, params map[string]string) (WorkUnit, error) {
 	hasSecrets := false
 	for k := range params {
 		if strings.HasPrefix(strings.ToLower(k), "secret_") {
@@ -168,11 +168,23 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient st
 	if err != nil {
 		return nil, err
 	}
+	var expiration time.Time
+	if ttl != "" {
+		duration, err := time.ParseDuration(ttl)
+		if err != nil {
+			logger.Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
+			return nil, err
+		}
+		expiration = time.Now().Add(duration)
+	} else {
+		expiration = time.Time{}
+	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
 		ed := status.ExtraData.(*remoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
 		ed.TLSClient = tlsclient
+		ed.Expiration = expiration
 	})
 	if rw.LastUpdateError() != nil {
 		return nil, rw.LastUpdateError()

@@ -84,6 +84,13 @@ testloop: receptor
 	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
 	  i=$$((i+1)); done
 
+kubectl:
+	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+	chmod a+x kubectl
+
+kubetest: kubectl
+	./kubectl get nodes
+
 ci: pre-commit build-all test receptorctl-tests
 	@echo "All done"
 
@@ -168,5 +175,6 @@ clean:
 	@rm -fv .container-flag* .rpm-flag* .rpm-builder-flag
 	@rm -fv .VERSION
 	@rm -rfv receptorctl-test-venv/
+	@rm -fv kubectl
 
-.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests
+.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests kubetest

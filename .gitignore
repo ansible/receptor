@@ -9,3 +9,4 @@ rpmbuild/
 .rpm-flag*
 .rpm-builder-flag
 .VERSION
+kubectl

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import subprocess
 from setuptools import setup, find_packages
 
 with open('README.md', 'r') as f:
@@ -11,8 +12,14 @@ for fn in ['.VERSION', '../.VERSION']:
     if os.path.exists(fn):
         verfile = fn
         break
+
 if verfile is None:
-    raise IOError("Version file not found.")
+    subprocess.run(["make", "version"], cwd="../")
+    verfile = '../.VERSION'
+
+    if not os.path.exists(verfile):
+        raise IOError("Version file not found.")
+
 with open(verfile, 'r') as f:
     version = f.readline().rstrip('\n\r')
 

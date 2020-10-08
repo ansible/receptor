@@ -179,7 +179,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		workParams := make(map[string]string)
 		for k, v := range c.params {
-			if k == "command" || k == "subcommand" || k == "node" || k == "worktype" || k == "tlsclient" {
+			if k == "command" || k == "subcommand" || k == "node" || k == "worktype" || k == "tlsclient" || k == "ttl" {
 				continue
 			}
 			vStr, ok := v.(string)
@@ -190,6 +190,9 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		var worker WorkUnit
 		if workNode == nc.NodeID() || strings.EqualFold(workNode, "localhost") {
+			if ttl != "" {
+				return nil, fmt.Errorf("ttl option is intended for remote work only")
+			}
 			worker, err = c.w.AllocateUnit(workType, workParams)
 		} else {
 			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsclient, ttl, workParams)

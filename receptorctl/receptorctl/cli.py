@@ -202,11 +202,12 @@ def list(ctx, quiet):
 @click.option('--payload-literal', '-l', type=str, help="Use the command line string as the literal unit of work data.")
 @click.option('--no-payload', '-n', is_flag=True, help="Send an empty payload.")
 @click.option('--tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
+@click.option('--ttl', type=str, default="", help="Time to live until remote work must start, e.g. 1h20m30s or 30m10s")
 @click.option('--follow', '-f', help="Remain attached to the job and print its results to stdout", is_flag=True)
 @click.option('--rm', help="Release unit after completion", is_flag=True)
 @click.option('--param', '-a', help="Additional Receptor parameter (key=value format)", multiple=True)
 @click.argument('cmdparams', type=str, required=False, nargs=-1)
-def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient, follow, rm, param, cmdparams):
+def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient, ttl, follow, rm, param, cmdparams):
     pcmds = 0
     if payload:
         pcmds += 1
@@ -243,7 +244,7 @@ def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient,
         if node == "":
             node = None
         rc = get_rc(ctx)
-        work = rc.submit_work(node, worktype, payload_data, tlsclient, params)
+        work = rc.submit_work(node, worktype, payload_data, tlsclient, ttl, params)
         result = work.pop('result')
         unitid = work.pop('unitid')
         if follow:

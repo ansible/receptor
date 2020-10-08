@@ -336,7 +336,10 @@ func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) e
 //AssertWorkCancelled waits until work status is cancelled
 func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string) error {
 	check := func() bool {
-		workStatus, _ := r.GetWorkStatus(unitID)
+		workStatus, err := r.GetWorkStatus(unitID)
+		if err != nil {
+			return false
+		}
 		if workStatus.State != workceptor.WorkStateFailed {
 			return false
 		}
@@ -357,6 +360,28 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string
 	}
 	if !assertWithTimeout(ctx, check) {
 		return fmt.Errorf("Failed to assert %s is cancelled or ctx timed out", unitID)
+	}
+	return nil
+}
+
+// AssertWorkTimedOut asserts that work failed
+func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string) error {
+	check := func() bool {
+		workStatus, err := r.GetWorkStatus(unitID)
+		if err != nil {
+			return false
+		}
+		if workStatus.State != workceptor.WorkStateFailed {
+			return false
+		}
+		detail := workStatus.Detail
+		if strings.HasPrefix(detail, "Work unit expired on") {
+			return true
+		}
+		return false
+	}
+	if !assertWithTimeout(ctx, check) {
+		fmt.Errorf("Failed to assert work timed out or ctx timed out")
 	}
 	return nil
 }

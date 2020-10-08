@@ -42,7 +42,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params string) (WorkUnit,
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
-func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, tlsclient string, params string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, tlsclient string, ttl string, params string) (WorkUnit, error) {
 	return nil, ErrNotImplemented
 }
 

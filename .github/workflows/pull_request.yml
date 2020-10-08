@@ -26,12 +26,26 @@ jobs:
       - name: Create tempdir for artifacts
         run: "mkdir -p /tmp/receptor-testing"
 
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v2.0.1
+        with:
+          minikube version: 'v1.13.1'
+          kubernetes version: 'v1.19.2'
+          github token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Interact with the cluster
+        run: kubectl get nodes
+
       - name: Run CI tasks in Docker
-        run: "docker run --rm -v /home/runner/work/receptor/receptor:/home/test-user/receptor -v /tmp/receptor-testing:/tmp/receptor-testing docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
+        run: "docker run --rm -v /home/runner/work/receptor/receptor:/home/test-user/receptor -v /tmp/receptor-testing:/tmp/receptor-testing -v /home/runner/.kube:/home/test-user/.kube -v /home/runner:/home/runner docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
 
       - name: Remove sockets for artifacting
         if: ${{ failure() }}
         run: "find /tmp/receptor-testing -type s -exec /bin/rm {} \\;"
+
+      - name: get minikube logs
+        if: ${{ failure() }}
+        run: .github/workflows/artifact-k8s-logs.sh
 
       - name: Artifact receptor data
         uses: actions/upload-artifact@v2

@@ -162,7 +162,16 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		},
 	}
 	ev, err := watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
-	if err != nil {
+	if err == ErrPodCompleted {
+		if len(kw.pod.Status.ContainerStatuses) != 1 {
+			return fmt.Errorf("expected 1 container in pod but there were %d", len(kw.pod.Status.ContainerStatuses))
+		}
+		cstat := kw.pod.Status.ContainerStatuses[0]
+		if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
+			return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
+		}
+		return err
+	} else if err != nil {
 		return err
 	}
 	if ev == nil {

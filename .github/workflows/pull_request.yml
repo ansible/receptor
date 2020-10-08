@@ -26,6 +26,16 @@ jobs:
       - name: Create tempdir for artifacts
         run: "mkdir -p /tmp/receptor-testing"
 
+      - name: Setup Minikube
+        uses: manusa/actions-setup-minikube@v2.0.0
+        with:
+          minikube version: 'v1.13.1'
+          kubernetes version: 'v1.19.2'
+          github token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Interact with the cluster
+        run: kubectl get nodes
+
       - name: Run CI tasks in Docker
         run: "docker run --rm -v /home/runner/work/receptor/receptor:/home/test-user/receptor -v /tmp/receptor-testing:/tmp/receptor-testing docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
 

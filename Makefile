@@ -16,6 +16,7 @@ endif
 
 # Container command can be docker or podman
 CONTAINERCMD ?= podman
+TAG ?= receptor:latest
 
 # When building Receptor, tags can be used to remove undesired
 # features.  This is primarily used for deploying Receptor in a
@@ -127,7 +128,7 @@ container: .container-flag-$(VERSION)
 	@cp receptor packaging/container
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t receptor:latest $(if $(OFFICIAL),-t receptor:$(VERSION),)
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t $(TAG) $(if $(OFFICIAL),-t receptor:$(VERSION),)
 	@touch .container-flag-$(VERSION)
 
 tc-image: container

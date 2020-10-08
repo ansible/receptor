@@ -84,7 +84,12 @@ testloop: receptor
 	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
 	  i=$$((i+1)); done
 
-ci: pre-commit build-all test
+kubetest:
+	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+	chmod a+x kubectl
+	./kubectl get nodes
+
+ci: kubetest pre-commit build-all test
 	@echo "All done"
 
 version:

@@ -37,7 +37,7 @@ jobs:
         run: kubectl get nodes
 
       - name: Run CI tasks in Docker
-        run: "docker run --rm -v /home/runner/work/receptor/receptor:/home/test-user/receptor -v /tmp/receptor-testing:/tmp/receptor-testing docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
+        run: "docker run --rm -v /home/runner/work/receptor/receptor:/home/test-user/receptor -v /tmp/receptor-testing:/tmp/receptor-testing -v /home/runner/.kube:/home/test-user/.kube docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
 
       - name: Remove sockets for artifacting
         if: ${{ failure() }}

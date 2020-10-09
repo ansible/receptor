@@ -104,7 +104,7 @@ func TestSSLListeners(t *testing.T) {
 			checkFunc := func() bool {
 				opensslStdOut := bytes.Buffer{}
 				opensslStdIn := bytes.Buffer{}
-				opensslCmd := exec.Command("openssl", "s_client", "-connect", ":"+strconv.Itoa(port))
+				opensslCmd := exec.Command("openssl", "s_client", "-connect", "localhost:"+strconv.Itoa(port))
 				opensslCmd.Stdin = &opensslStdIn
 				opensslCmd.Stdout = &opensslStdOut
 				err = opensslCmd.Run()

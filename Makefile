@@ -4,7 +4,7 @@
 OFFICIAL_VERSION = $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
 ifeq ($(OFFICIAL_VERSION),)
 VERSION = $(shell git describe --tags | sed 's/-.*//' | awk -F. -v OFS=. '{$$NF++;print}')
-RELEASE = 0.git$(shell date -u +%Y%m%d%H%M).$(shell git rev-parse --short HEAD)
+RELEASE = 0.git.$(shell git describe --tags | sed 's/^[^\-]*-//' | sed 's/-/\./g')
 OFFICIAL =
 APPVER = $(VERSION)-$(RELEASE)
 else
@@ -98,21 +98,35 @@ specfiles: $(SPECFILES)
 $(SPECFILES): %.spec: %.spec.j2
 	@jinja2 -D version=$(VERSION) -D release=$(RELEASE) $< -o $@
 
-# Other RPMs get built but we only track the main one for Makefile purposes
-MAINRPM = rpmbuild/RPMS/x86_64/receptor-$(VERSION)-$(RELEASE).fc32.x86_64.rpm
+DIST = $(shell rpm --eval '%{dist}')
+ARCH = $(shell rpm --eval '%{_arch}')
 
-.rpm-builder-flag: $(shell find packaging/rpm-builder -type f)
-	@$(CONTAINERCMD) build packaging/rpm-builder -t receptor-rpm-builder
-	@touch .rpm-builder-flag
+RPMSOURCEDIRS = cmd example pkg receptorctl receptor-python-worker packaging/rpm tests
+RPMSOURCETAR = rpmbuild/SOURCES/receptor-$(VERSION).tar.gz
+$(RPMSOURCETAR): $(shell find $(RPMSOURCEDIRS) -type f)
+	mkdir receptor-$(VERSION)
+	cp -av cmd/ example/ pkg/ receptorctl/ receptor-python-worker/ packaging/ tests/ receptor-$(VERSION)
+	mkdir -p rpmbuild/SOURCES
+	tar cfvz $(RPMSOURCETAR) receptor-$(VERSION)
+	rm -rf receptor-$(VERSION)
 
-$(MAINRPM): .rpm-flag-$(VERSION)
-.rpm-flag-$(VERSION): receptor $(SPECFILES) .rpm-builder-flag
-	@echo $(VERSION) > .VERSION
-	@$(CONTAINERCMD) run -it --rm -v $$PWD:/receptor:Z receptor-rpm-builder
-	@touch .rpm-flag-$(VERSION)
+RECEPTOR_RPM = rpmbuild/RPMS/x86_64/receptor-$(VERSION)-$(RELEASE)$(DIST).$(ARCH).rpm
+RECEPTORCTL_RPM = rpmbuild/RPMS/noarch/receptorctl-$(VERSION)-$(RELEASE)$(DIST).noarch.rpm
+RECEPTOR_PYTHON_WORKER_RPM = rpmbuild/RPMS/noarch/receptor-python-worker-$(VERSION)-$(RELEASE)$(DIST).noarch.rpm
 
-rpms: $(MAINRPM)
+RPMS = $(RECEPTOR_RPM) $(RECEPTORCTL_RPM) $(RECEPTOR_PYTHON_WORKER_RPM)
 
+$(RECEPTOR_RPM): packaging/rpm/receptor.spec $(RPMSOURCETAR)
+	rpmbuild -ba packaging/rpm/receptor.spec --without check -D "%_topdir $$PWD/rpmbuild"
+
+$(RECEPTORCTL_RPM): packaging/rpm/receptorctl.spec $(RPMSOURCETAR)
+	rpmbuild -ba packaging/rpm/receptorctl.spec -D "%_topdir $$PWD/rpmbuild"
+
+$(RECEPTOR_PYTHON_WORKER_RPM): packaging/rpm/receptor-python-worker.spec $(RPMSOURCETAR)
+	rpmbuild -ba packaging/rpm/receptor-python-worker.spec -D "%_topdir $$PWD/rpmbuild"
+
+rpms: $(RPMS)
+	
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
 $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
 	@echo $(VERSION) > .VERSION
@@ -146,4 +160,4 @@ clean:
 	@rm -fv .container-flag* .rpm-flag* .rpm-builder-flag
 	@rm -fv .VERSION
 
-.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container
+.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version

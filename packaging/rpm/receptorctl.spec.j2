@@ -14,12 +14,20 @@ Prefix: %{_prefix}
 BuildArch: noarch
 Url: https://github.com/project-receptor/receptor/receptorctl
 
+%if 0%{?rhel} == 7
+BuildRequires: python36
+BuildRequires: python36-setuptools
+Requires: python36
+Requires: python36-setuptools
+Requires: python36-dateutil
+%else
 BuildRequires: python3
 BuildRequires: python3-setuptools
 Requires: python3
 Requires: python3-setuptools
 Requires: python3-dateutil
 Requires: python3-click
+%endif
 
 %description
 receptorctl is a command line utility for managing Receptor

@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"reflect"
 )
 
 // Broker code adapted from https://stackoverflow.com/questions/36417199/how-to-broadcast-message-using-channel
@@ -11,15 +12,17 @@ import (
 // Broker implements a simple pub-sub broadcast system
 type Broker struct {
 	ctx       context.Context
+	msgType   reflect.Type
 	publishCh chan interface{}
 	subCh     chan chan interface{}
 	unsubCh   chan chan interface{}
 }
 
 // NewBroker allocates a new Broker object
-func NewBroker(ctx context.Context) *Broker {
+func NewBroker(ctx context.Context, msgType reflect.Type) *Broker {
 	b := &Broker{
 		ctx:       ctx,
+		msgType:   msgType,
 		publishCh: make(chan interface{}, 1),
 		subCh:     make(chan chan interface{}),
 		unsubCh:   make(chan chan interface{}),
@@ -75,8 +78,12 @@ func (b *Broker) Unsubscribe(msgCh chan interface{}) {
 }
 
 // Publish sends a message to all subscribers
-func (b *Broker) Publish(msg interface{}) {
+func (b *Broker) Publish(msg interface{}) error {
+	if reflect.TypeOf(msg) != b.msgType {
+		return fmt.Errorf("messages to broker must be of type %s", b.msgType.String())
+	}
 	if b.ctx.Err() == nil {
 		b.publishCh <- msg
 	}
+	return nil
 }

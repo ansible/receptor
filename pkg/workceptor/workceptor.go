@@ -354,7 +354,6 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 		var stdout *os.File
 		var err error
 		filePos := startPos
-		buf := make([]byte, 1024)
 		for {
 			if sleepOrDone(doneChan, 250*time.Millisecond) {
 				return
@@ -365,15 +364,20 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 					continue
 				}
 			}
-			newPos, err := stdout.Seek(filePos, 0)
-			if newPos != filePos {
-				logger.Warning("Seek error processing stdout\n")
-				return
-			}
-			n, err := stdout.Read(buf)
-			if n > 0 {
-				filePos += int64(n)
-				resultChan <- buf[:n]
+			for err == nil {
+				var newPos int64
+				newPos, err = stdout.Seek(filePos, 0)
+				if newPos != filePos {
+					logger.Warning("Seek error processing stdout\n")
+					return
+				}
+				var n int
+				buf := make([]byte, netceptor.MTU)
+				n, err = stdout.Read(buf)
+				if n > 0 {
+					filePos += int64(n)
+					resultChan <- buf[:n]
+				}
 			}
 			if err == io.EOF {
 				err = stdout.Close()

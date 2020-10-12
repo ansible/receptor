@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
+	"reflect"
 	"time"
 )
 
@@ -70,7 +71,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 // startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages
 func (pc *PacketConn) startUnreachable() {
 	pc.context, pc.cancel = context.WithCancel(pc.s.context)
-	pc.unreachableSubs = utils.NewBroker(pc.context)
+	pc.unreachableSubs = utils.NewBroker(pc.context, reflect.TypeOf(UnreachableNotification{}))
 	pc.unreachableMsgChan = pc.s.unreachableBroker.Subscribe()
 	go func() {
 		for {
@@ -78,14 +79,14 @@ func (pc *PacketConn) startUnreachable() {
 			case <-pc.context.Done():
 				return
 			case msgIf := <-pc.unreachableMsgChan:
-				msg, ok := msgIf.(UnreachableMessage)
+				msg, ok := msgIf.(UnreachableNotification)
 				if !ok {
 					continue
 				}
 				FromNode := msg.FromNode
 				FromService := msg.FromService
 				if FromNode == pc.s.nodeID && FromService == pc.localService {
-					pc.unreachableSubs.Publish(msg)
+					_ = pc.unreachableSubs.Publish(msg)
 				}
 			}
 		}
@@ -93,9 +94,9 @@ func (pc *PacketConn) startUnreachable() {
 }
 
 // SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn
-func (pc *PacketConn) SubscribeUnreachable() chan UnreachableMessage {
+func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 	iChan := pc.unreachableSubs.Subscribe()
-	uChan := make(chan UnreachableMessage)
+	uChan := make(chan UnreachableNotification)
 	go func() {
 		for {
 			select {
@@ -104,7 +105,7 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableMessage {
 					close(uChan)
 					return
 				}
-				msg, ok := msgIf.(UnreachableMessage)
+				msg, ok := msgIf.(UnreachableNotification)
 				if !ok {
 					continue
 				}

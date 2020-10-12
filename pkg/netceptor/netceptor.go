@@ -189,13 +189,19 @@ type serviceAdvertisementFull struct {
 	Cancel bool
 }
 
-// UnreachableMessage is the data associated with an unreachable message
+// UnreachableMessage is the on-the-wire data associated with an unreachable message
 type UnreachableMessage struct {
 	FromNode    string
 	ToNode      string
 	FromService string
 	ToService   string
 	Problem     string
+}
+
+// UnreachableNotification includes additional information returned from SubscribeUnreachable
+type UnreachableNotification struct {
+	UnreachableMessage
+	ReceivedFromNode string
 }
 
 var networkNames = make([]string, 0)
@@ -265,8 +271,8 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s.clientTLSConfigs["default"] = &tls.Config{}
 	s.addNameHash(NodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
-	s.unreachableBroker = utils.NewBroker(s.context)
-	s.routingUpdateBroker = utils.NewBroker(s.context)
+	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
+	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
 	s.sendRouteFloodChan = tickrunner.Run(s.context, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
 	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
@@ -985,15 +991,17 @@ func (s *Netceptor) handlePing(md *messageData) error {
 
 // Handles an unreachable response
 func (s *Netceptor) handleUnreachable(md *messageData) error {
-	unrData := make(map[string]string)
-	err := json.Unmarshal(md.Data, &unrData)
+	unrMsg := UnreachableMessage{}
+	err := json.Unmarshal(md.Data, &unrMsg)
 	if err != nil {
 		return err
 	}
-	unrData["ReceivedFromNode"] = md.FromNode
+	unrData := UnreachableNotification{
+		UnreachableMessage: unrMsg,
+		ReceivedFromNode:   md.FromNode,
+	}
 	logger.Warning("Received unreachable message from %s", md.FromNode)
-	s.unreachableBroker.Publish(unrData)
-	return nil
+	return s.unreachableBroker.Publish(unrData)
 }
 
 // Sends an unreachable response

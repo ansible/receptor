@@ -46,12 +46,11 @@ func TestTCPSSLConnections(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name":               "cert1",
-							"key":                key1,
-							"cert":               crt1,
-							"requireclientcert":  true,
-							"verifyclientnodeid": false,
-							"clientcas":          caCrt,
+							"name":              "cert1",
+							"key":               key1,
+							"cert":              crt1,
+							"requireclientcert": true,
+							"clientcas":         caCrt,
 						},
 					},
 					map[interface{}]interface{}{
@@ -71,10 +70,9 @@ func TestTCPSSLConnections(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name":               "server-cert2",
-							"key":                key2,
-							"cert":               crt2,
-							"verifyclientnodeid": false,
+							"name": "server-cert2",
+							"key":  key2,
+							"cert": crt2,
 						},
 					},
 					map[interface{}]interface{}{
@@ -178,12 +176,11 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name":               "cert1",
-							"key":                key1,
-							"cert":               crt1,
-							"requireclientcert":  true,
-							"verifyclientnodeid": false,
-							"clientcas":          caCrt,
+							"name":              "cert1",
+							"key":               key1,
+							"cert":              crt1,
+							"requireclientcert": true,
+							"clientcas":         caCrt,
 						},
 					},
 					map[interface{}]interface{}{
@@ -268,12 +265,11 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name":               "cert1",
-							"key":                key1,
-							"cert":               crt1,
-							"requireclientcert":  true,
-							"verifyclientnodeid": false,
-							"clientcas":          caCrt,
+							"name":              "cert1",
+							"key":               key1,
+							"cert":              crt1,
+							"requireclientcert": true,
+							"clientcas":         caCrt,
 						},
 					},
 					map[interface{}]interface{}{
@@ -431,10 +427,9 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 				Nodedef: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name":               "cert1",
-							"key":                key1,
-							"cert":               crt1,
-							"verifyclientnodeid": false,
+							"name": "cert1",
+							"key":  key1,
+							"cert": crt1,
 						},
 					},
 					map[interface{}]interface{}{

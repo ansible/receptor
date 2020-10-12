@@ -25,7 +25,7 @@ type TLSServerCfg struct {
 	Cert               string `required:"true" description:"Server certificate filename"`
 	Key                string `required:"true" description:"Server private key filename"`
 	RequireClientCert  bool   `description:"Require client certificates" default:"false"`
-	VerifyClientNodeID bool   `description:"Verify certificate CA matches client node id" default:"true"`
+	VerifyClientNodeID bool   `description:"Verify certificate CA matches client node id" default:"false"`
 	ClientCAs          string `description:"Filename of CA bundle to verify client certs with"`
 }
 

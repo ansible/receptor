@@ -3,6 +3,7 @@ package mesh
 import (
 	"bytes"
 	"context"
+	"fmt"
 	_ "github.com/fortytw2/leaktest"
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
@@ -114,6 +115,96 @@ func TestMeshConnections(t *testing.T) {
 				time.Sleep(100 * time.Millisecond)
 				if ctx.Err() != nil {
 					t.Error("Timed out while waiting for connections:")
+				}
+			}
+		})
+	}
+}
+
+// Test that traceroute works
+func TestTraceroute(t *testing.T) {
+	testTable := []struct {
+		filename string
+	}{
+		{"mesh-definitions/tree-mesh-tcp.yaml"},
+		{"mesh-definitions/tree-mesh-udp.yaml"},
+		{"mesh-definitions/tree-mesh-ws.yaml"},
+	}
+	t.Parallel()
+	for _, data := range testTable {
+		filename := data.filename
+		t.Run(filename, func(t *testing.T) {
+			t.Parallel()
+			m, err := mesh.NewLibMeshFromFile(filename, t.Name())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			for connectionsReady := m.CheckConnections(); !connectionsReady; connectionsReady = m.CheckConnections() {
+				time.Sleep(100 * time.Millisecond)
+				if ctx.Err() != nil {
+					t.Fatal("Timed out while waiting for connections:")
+				}
+			}
+			controlNode := m.Nodes()["controller"]
+			controller := receptorcontrol.New()
+			err = controller.Connect(controlNode.ControlSocket())
+			_, err = controller.WriteStr("traceroute node7\n")
+			if err != nil {
+				t.Fatal(err)
+			}
+			jsonData, err := controller.ReadAndParseJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = controller.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key := range jsonData {
+				value := jsonData[key]
+				valMap, ok := value.(map[string]interface{})
+				if !ok {
+					t.Fatal("traceroute returned invalid result")
+				}
+				_, ok = valMap["Error"]
+				if ok {
+					t.Fatal(fmt.Sprintf("traceroute returned error: %s", valMap["Error"]))
+				}
+			}
+			expectedHops := []struct {
+				key  string
+				from string
+			}{
+				{"0", "controller"},
+				{"1", "node5"},
+				{"2", "node7"},
+			}
+			if len(jsonData) != len(expectedHops) {
+				t.Fatal("traceroute has wrong number of hops")
+			}
+			for i := range expectedHops {
+				eh := expectedHops[i]
+				var fromStr string
+				result, ok := jsonData[eh.key]
+				if ok {
+					var resultMap map[string]interface{}
+					resultMap, ok = result.(map[string]interface{})
+					if ok {
+						var fromIf interface{}
+						fromIf, ok = resultMap["From"]
+						if ok {
+							fromStr, ok = fromIf.(string)
+						}
+					}
+				}
+				if !ok {
+					t.Fatal(fmt.Sprintf("hop %s not in result data or not in expected format", eh.key))
+				}
+				if fromStr != eh.from {
+					t.Fatal(fmt.Sprintf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr))
 				}
 			}
 		})

@@ -47,10 +47,12 @@ func (b *Broker) start() {
 			delete(subs, msgCh)
 		case msg := <-b.publishCh:
 			for msgCh := range subs {
-				select {
-				case msgCh <- msg:
-				default:
-				}
+				go func(msgCh chan interface{}) {
+					select {
+					case msgCh <- msg:
+					case <-b.ctx.Done():
+					}
+				}(msgCh)
 			}
 		}
 	}

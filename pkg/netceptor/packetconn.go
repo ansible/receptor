@@ -109,10 +109,7 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 				if !ok {
 					continue
 				}
-				select {
-				case uChan <- msg:
-				default:
-				}
+				uChan <- msg
 			case <-pc.context.Done():
 				close(uChan)
 				return

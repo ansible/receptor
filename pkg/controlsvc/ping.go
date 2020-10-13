@@ -63,7 +63,7 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 		case msg := <-unrCh:
 			errorChan <- errorResult{
 				err:      fmt.Errorf(msg.Problem),
-				fromNode: msg.FromNode,
+				fromNode: msg.ReceivedFromNode,
 			}
 		}
 	}()

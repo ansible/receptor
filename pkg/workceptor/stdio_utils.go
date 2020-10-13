@@ -27,7 +27,7 @@ type stdoutWriter struct {
 
 // newStdoutWriter allocates a new stdoutWriter, which writes to both the stdout and status files
 func newStdoutWriter(unitdir string) (*stdoutWriter, error) {
-	writer, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0600)
+	writer, err := os.OpenFile(path.Join(unitdir, "stdout"), (os.O_APPEND|os.O_CREATE)+os.O_WRONLY+os.O_SYNC, 0600)
 	if err != nil {
 		return nil, err
 	}

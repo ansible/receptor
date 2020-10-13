@@ -182,21 +182,31 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 }
 
 func (kw *kubeUnit) runWorkUsingLogger() {
-
-	// Create the pod
 	skipStdin := false
-	err := kw.createPod(nil)
-	if err == ErrPodCompleted {
+	status := kw.Status()
+	ked := status.ExtraData.(*kubeExtraData)
+	var err error
+	if status.State != WorkStateRunning {
+		// Create the pod
+		err = kw.createPod(nil)
+		if err == ErrPodCompleted {
+			skipStdin = true
+		} else if err != nil {
+			errMsg := fmt.Sprintf("Error creating pod: %s", err)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			logger.Error(errMsg)
+			return
+		}
+	} else {
 		skipStdin = true
-	} else if err != nil {
-		errMsg := fmt.Sprintf("Error creating pod: %s", err)
-		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		logger.Error(errMsg)
-		return
+		kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Get(kw.ctx, ked.PodName, metav1.GetOptions{})
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
 	}
 
 	// Open the pod log for stdout
-	ked := kw.Status().ExtraData.(*kubeExtraData)
 	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
 		Follow: true,
 	})
@@ -238,7 +248,6 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		return
 	default:
 	}
-
 	// Open stdin reader
 	var stdin *stdinReader
 	if !skipStdin {
@@ -259,12 +268,12 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		return
 	}
-	kw.UpdateBasicStatus(WorkStatePending, "Sending stdin to pod", 0)
+	finishedChan := make(chan struct{})
 
 	// Goroutine to update status when stdin is fully sent to the pod, which is when we
 	// update from WorkStatePending to WorkStateRunning.
-	finishedChan := make(chan struct{})
 	if !skipStdin {
+		kw.UpdateBasicStatus(WorkStatePending, "Sending stdin to pod", 0)
 		go func() {
 			select {
 			case <-finishedChan:
@@ -343,7 +352,6 @@ func getDefaultInterface() (string, error) {
 }
 
 func (kw *kubeUnit) runWorkUsingTCP() {
-
 	// Create local cancellable context
 	ctx, cancel := context.WithCancel(kw.ctx)
 	defer cancel()
@@ -638,8 +646,7 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 }
 
 // Start launches a job with given parameters.
-func (kw *kubeUnit) Start() error {
-	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
+func (kw *kubeUnit) StartOrRestart(start bool) error {
 	kw.ctx, kw.cancel = context.WithCancel(kw.w.ctx)
 
 	// Connect to the Kubernetes API
@@ -648,8 +655,14 @@ func (kw *kubeUnit) Start() error {
 		return err
 	}
 
+	if start {
+		kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
+	}
 	// Launch runner process
 	if kw.streamMethod == "tcp" {
+		if start {
+			return fmt.Errorf("restart of Kubernetes pod not implemented for streammethod tcp")
+		}
 		go kw.runWorkUsingTCP()
 	} else {
 		go kw.runWorkUsingLogger()
@@ -661,7 +674,11 @@ func (kw *kubeUnit) Start() error {
 
 // Restart resumes monitoring a job after a Receptor restart
 func (kw *kubeUnit) Restart() error {
-	return fmt.Errorf("restart of Kubernetes pod not implemented")
+	return kw.StartOrRestart(false)
+}
+
+func (kw *kubeUnit) Start() error {
+	return kw.StartOrRestart(true)
 }
 
 // Cancel releases resources associated with a job, including cancelling it if running.

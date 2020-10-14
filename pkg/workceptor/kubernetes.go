@@ -669,31 +669,35 @@ func (kw *kubeUnit) StartOrRestart() error {
 
 // Restart resumes monitoring a job after a Receptor restart
 func (kw *kubeUnit) Restart() error {
-	err := kw.connectToKube()
-	if err != nil {
-		return err
-	}
 	status := kw.Status()
 	ked := status.ExtraData.(*kubeExtraData)
-	if status.State == WorkStateRunning {
+	if IsComplete(status.State) {
+		return nil
+	}
+	isTCP := kw.streamMethod == "tcp"
+	if status.State == WorkStateRunning && !isTCP {
 		return kw.StartOrRestart()
-	} else if status.State == WorkStatePending {
-		if kw.deletePodOnRestart {
+	}
+	// Work unit is in Pending state
+	if kw.deletePodOnRestart {
+		err := kw.connectToKube()
+		if err != nil {
+			logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+		} else {
 			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
-				logger.Error("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+				logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
 		}
-		return fmt.Errorf("work unit is not in running state, cannot be restarted")
 	}
-	return nil
+	if isTCP {
+		return fmt.Errorf("restart not implemented for streammethod tcp")
+	}
+	return fmt.Errorf("work unit is not in running state, cannot be restarted")
 }
 
 func (kw *kubeUnit) Start() error {
 	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
-	if kw.streamMethod == "tcp" {
-		return fmt.Errorf("restart of Kubernetes pod not implemented for streammethod tcp")
-	}
 	return kw.StartOrRestart()
 }
 

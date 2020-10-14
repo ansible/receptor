@@ -679,13 +679,12 @@ func (kw *kubeUnit) Restart() error {
 		return kw.StartOrRestart()
 	} else if status.State == WorkStatePending {
 		if kw.deletePodOnRestart {
-			logger.Debug("Attempting to delete pod %s", ked.PodName)
 			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
 				logger.Error("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
 		}
-		return fmt.Errorf("Pod %s is not in running state, cannot be restarted", ked.PodName)
+		return fmt.Errorf("work unit is not in running state, cannot be restarted")
 	}
 	return nil
 }

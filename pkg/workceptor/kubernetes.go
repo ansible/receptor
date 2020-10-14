@@ -648,8 +648,8 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	return status
 }
 
-// Start launches a job with given parameters.
-func (kw *kubeUnit) StartOrRestart() error {
+// startOrRestart is a shared implementation of Start() and Restart()
+func (kw *kubeUnit) startOrRestart() error {
 	kw.ctx, kw.cancel = context.WithCancel(kw.w.ctx)
 	// Connect to the Kubernetes API
 	err := kw.connectToKube()
@@ -676,7 +676,7 @@ func (kw *kubeUnit) Restart() error {
 	}
 	isTCP := kw.streamMethod == "tcp"
 	if status.State == WorkStateRunning && !isTCP {
-		return kw.StartOrRestart()
+		return kw.startOrRestart()
 	}
 	// Work unit is in Pending state
 	if kw.deletePodOnRestart {
@@ -696,9 +696,10 @@ func (kw *kubeUnit) Restart() error {
 	return fmt.Errorf("work unit is not in running state, cannot be restarted")
 }
 
+// Start launches a job with given parameters.
 func (kw *kubeUnit) Start() error {
 	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
-	return kw.StartOrRestart()
+	return kw.startOrRestart()
 }
 
 // Cancel releases resources associated with a job, including cancelling it if running.

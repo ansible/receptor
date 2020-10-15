@@ -188,7 +188,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	ked := status.ExtraData.(*kubeExtraData)
 	var err error
 	var errMsg string
-	if status.State != WorkStateRunning {
+	if ked.PodName == "" {
 		// Create the pod
 		err := kw.createPod(nil)
 		if err == ErrPodCompleted {
@@ -276,7 +276,10 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	// update from WorkStatePending to WorkStateRunning.
 	finishedChan := make(chan struct{})
 	if !skipStdin {
-		kw.UpdateBasicStatus(WorkStatePending, "Sending stdin to pod", 0)
+		kw.UpdateFullStatus(func(status *StatusFileData) {
+			status.State = WorkStatePending
+			status.Detail = "Sending stdin to pod"
+		})
 		go func() {
 			select {
 			case <-finishedChan:

@@ -705,12 +705,10 @@ func (kw *kubeUnit) Start() error {
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (kw *kubeUnit) Cancel() error {
 	if kw.pod != nil {
-		go func(pod string) {
-			err := kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).Delete(context.Background(), pod, metav1.DeleteOptions{})
-			if err != nil {
-				logger.Error("Error deleting pod %s: %s", pod, err)
-			}
-		}(kw.pod.Name)
+		err := kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
+		}
 	}
 	if kw.cancel != nil {
 		kw.cancel()

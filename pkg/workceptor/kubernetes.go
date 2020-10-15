@@ -42,6 +42,7 @@ type kubeUnit struct {
 	allowRuntimeTLS     bool
 	allowRuntimeCommand bool
 	allowRuntimeParams  bool
+	deletePodOnRestart  bool
 	kubeConfig          string
 	namePrefix          string
 	config              *rest.Config
@@ -182,21 +183,33 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 }
 
 func (kw *kubeUnit) runWorkUsingLogger() {
-
-	// Create the pod
 	skipStdin := false
-	err := kw.createPod(nil)
-	if err == ErrPodCompleted {
+	status := kw.Status()
+	ked := status.ExtraData.(*kubeExtraData)
+	var err error
+	var errMsg string
+	if ked.PodName == "" {
+		// Create the pod
+		err := kw.createPod(nil)
+		if err == ErrPodCompleted {
+			skipStdin = true
+		} else if err != nil {
+			errMsg = fmt.Sprintf("Error creating pod: %s", err)
+		}
+	} else {
 		skipStdin = true
-	} else if err != nil {
-		errMsg := fmt.Sprintf("Error creating pod: %s", err)
+		kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Get(kw.ctx, ked.PodName, metav1.GetOptions{})
+		if err != nil {
+			errMsg = fmt.Sprintf("Error getting pod: %s", err)
+		}
+	}
+	if errMsg != "" {
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		logger.Error(errMsg)
 		return
 	}
 
 	// Open the pod log for stdout
-	ked := kw.Status().ExtraData.(*kubeExtraData)
 	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
 		Follow: true,
 	})
@@ -238,7 +251,6 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		return
 	default:
 	}
-
 	// Open stdin reader
 	var stdin *stdinReader
 	if !skipStdin {
@@ -259,12 +271,15 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		return
 	}
-	kw.UpdateBasicStatus(WorkStatePending, "Sending stdin to pod", 0)
 
 	// Goroutine to update status when stdin is fully sent to the pod, which is when we
 	// update from WorkStatePending to WorkStateRunning.
 	finishedChan := make(chan struct{})
 	if !skipStdin {
+		kw.UpdateFullStatus(func(status *StatusFileData) {
+			status.State = WorkStatePending
+			status.Detail = "Sending stdin to pod"
+		})
 		go func() {
 			select {
 			case <-finishedChan:
@@ -343,7 +358,6 @@ func getDefaultInterface() (string, error) {
 }
 
 func (kw *kubeUnit) runWorkUsingTCP() {
-
 	// Create local cancellable context
 	ctx, cancel := context.WithCancel(kw.ctx)
 	defer cancel()
@@ -637,17 +651,14 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	return status
 }
 
-// Start launches a job with given parameters.
-func (kw *kubeUnit) Start() error {
-	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
+// startOrRestart is a shared implementation of Start() and Restart()
+func (kw *kubeUnit) startOrRestart() error {
 	kw.ctx, kw.cancel = context.WithCancel(kw.w.ctx)
-
 	// Connect to the Kubernetes API
 	err := kw.connectToKube()
 	if err != nil {
 		return err
 	}
-
 	// Launch runner process
 	if kw.streamMethod == "tcp" {
 		go kw.runWorkUsingTCP()
@@ -661,18 +672,46 @@ func (kw *kubeUnit) Start() error {
 
 // Restart resumes monitoring a job after a Receptor restart
 func (kw *kubeUnit) Restart() error {
-	return fmt.Errorf("restart of Kubernetes pod not implemented")
+	status := kw.Status()
+	ked := status.ExtraData.(*kubeExtraData)
+	if IsComplete(status.State) {
+		return nil
+	}
+	isTCP := kw.streamMethod == "tcp"
+	if status.State == WorkStateRunning && !isTCP {
+		return kw.startOrRestart()
+	}
+	// Work unit is in Pending state
+	if kw.deletePodOnRestart {
+		err := kw.connectToKube()
+		if err != nil {
+			logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+		} else {
+			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
+			if err != nil {
+				logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+			}
+		}
+	}
+	if isTCP {
+		return fmt.Errorf("restart not implemented for streammethod tcp")
+	}
+	return fmt.Errorf("work unit is not in running state, cannot be restarted")
+}
+
+// Start launches a job with given parameters.
+func (kw *kubeUnit) Start() error {
+	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
+	return kw.startOrRestart()
 }
 
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (kw *kubeUnit) Cancel() error {
 	if kw.pod != nil {
-		go func(pod string) {
-			err := kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).Delete(context.Background(), pod, metav1.DeleteOptions{})
-			if err != nil {
-				logger.Error("Error deleting pod %s: %s", pod, err)
-			}
-		}(kw.pod.Name)
+		err := kw.clientset.CoreV1().Pods(kw.status.ExtraData.(*kubeExtraData).KubeNamespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
+		}
 	}
 	if kw.cancel != nil {
 		kw.cancel()
@@ -712,6 +751,7 @@ type WorkKubeCfg struct {
 	AllowRuntimeTLS     bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
 	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
 	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
+	DeletePodOnRestart  bool   `description:"On restart, delete the pod if in pending state" default:"true"`
 	StreamMethod        string `description:"Method for connecting to worker pods: logger or tcp" default:"logger"`
 }
 
@@ -742,6 +782,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		allowRuntimeTLS:     cfg.AllowRuntimeTLS,
 		allowRuntimeCommand: cfg.AllowRuntimeCommand,
 		allowRuntimeParams:  cfg.AllowRuntimeParams,
+		deletePodOnRestart:  cfg.DeletePodOnRestart,
 	}
 	ku.BaseWorkUnit.Init(w, unitID, workType)
 	return ku

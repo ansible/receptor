@@ -84,7 +84,7 @@ testloop: receptor
 	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
 	  i=$$((i+1)); done
 
-ci: pre-commit build-all test
+ci: pre-commit build-all test receptorctl-tests
 	@echo "All done"
 
 version:
@@ -149,6 +149,14 @@ tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
 
+receptorctl-test-venv/bin/pytest:
+	virtualenv receptorctl-test-venv -p python3
+	receptorctl-test-venv/bin/pip install -e receptorctl
+	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
+
+receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
+	cd receptorctl && ../receptorctl-test-venv/bin/pytest tests/tests.py
+
 clean:
 	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)
 	@rm -rfv rpmbuild/
@@ -159,5 +167,6 @@ clean:
 	@rm -fv packaging/container/*.whl
 	@rm -fv .container-flag* .rpm-flag* .rpm-builder-flag
 	@rm -fv .VERSION
+	@rm -rfv receptorctl-test-venv/
 
-.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version
+.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests

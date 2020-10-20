@@ -3,6 +3,7 @@ receptor
 receptor.exe
 receptor.app
 net
+receptorctl-test-venv/
 rpmbuild/
 .container-flag*
 .rpm-flag*

@@ -1,0 +1,10 @@
+- node:
+    id: node1
+- tcp-listener:
+    port: 11111
+- control-service:
+    filename: /tmp/node1.sock
+- tcp-server:
+    port: 11112
+    remotenode: localhost
+    remoteservice: control

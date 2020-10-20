@@ -39,6 +39,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		Subject: pkix.Name{
 			CommonName: "localhost",
 		},
+		DNSNames:  []string{"localhost"},
 		NotBefore: time.Now().Add(-1 * time.Minute),
 		NotAfter:  time.Now().Add(24 * time.Hour),
 	}

@@ -143,9 +143,10 @@ def traceroute(ctx, node):
 @click.argument('node')
 @click.argument('service')
 @click.option('--raw', '-r', default=False, is_flag=True, help="Set terminal to raw mode")
-def connect(ctx, node, service, raw):
+@click.option('--tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
+def connect(ctx, node, service, raw, tlsclient):
     rc = get_rc(ctx)
-    rc.connect_to_service(node, service)
+    rc.connect_to_service(node, service, tlsclient)
 
     stdin_tattrs = termios.tcgetattr(sys.stdin)
     stdin_fcntl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)

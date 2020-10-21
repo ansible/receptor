@@ -92,8 +92,8 @@ class ReceptorControl:
                 pass
             self.socket = None
 
-    def connect_to_service(self, node, service):
-        self.writestr(f"connect {node} {service}\n")
+    def connect_to_service(self, node, service, tlsclient):
+        self.writestr(f"connect {node} {service} {tlsclient}\n")
         text = self.readstr()
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)

@@ -143,7 +143,7 @@ def traceroute(ctx, node):
 @click.argument('node')
 @click.argument('service')
 @click.option('--raw', '-r', default=False, is_flag=True, help="Set terminal to raw mode")
-@click.option('--tlsclient', type=str, default="", help="TLS client used when connecting to remote node")
+@click.option('--tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
 def connect(ctx, node, service, raw, tlsclient):
     rc = get_rc(ctx)
     rc.connect_to_service(node, service, tlsclient)

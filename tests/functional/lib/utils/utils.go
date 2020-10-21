@@ -141,59 +141,70 @@ func FreeUDPPort(portNum int) {
 
 // GenerateCert generates a private and public key for testing in the directory
 // specified
-func GenerateCert(name, commonName string) (keyPath, certPath string, e error) {
+func GenerateCert(name, commonName string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}
-	KeyPath := filepath.Join(dir, name+".key")
-	CrtPath := filepath.Join(dir, name+".crt")
+	keyPath := filepath.Join(dir, name+".key")
+	crtPath := filepath.Join(dir, name+".crt")
 	// Create our private key
-	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
+	cmd := exec.Command("openssl", "genrsa", "-out", keyPath, "1024")
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}
 	// Create our certificate
-	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", KeyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-sha256", "-out", CrtPath)
+	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", keyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-addext", fmt.Sprintf("subjectAltName=DNS:%s", commonName), "-sha256", "-out", crtPath)
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}
-	return KeyPath, CrtPath, nil
+	return keyPath, crtPath, nil
 }
 
 // GenerateCertWithCA generates a private and public key for testing in the directory
 // specified using the ca specified
-func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string) (keyPath, certPath string, e error) {
+func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}
-	KeyPath := filepath.Join(dir, name+".key")
-	CrtPath := filepath.Join(dir, name+".crt")
-	CSRPath := filepath.Join(dir, name+".csa")
+	keyPath := filepath.Join(dir, name+".key")
+	crtPath := filepath.Join(dir, name+".crt")
+	csrPath := filepath.Join(dir, name+".csa")
+	extPath := filepath.Join(dir, name+".ext")
 	// Create our private key
-	cmd := exec.Command("openssl", "genrsa", "-out", KeyPath, "1024")
+	cmd := exec.Command("openssl", "genrsa", "-out", keyPath, "1024")
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}
 
 	// Create our certificate request
-	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", KeyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-out", CSRPath)
+	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", keyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-out", csrPath)
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}
 
+	// Create tmp configuration for the x509 extension
+	fid, err := os.Create(extPath)
+	defer fid.Close()
+	if err != nil {
+		return "", "", nil
+	}
+	_, err = fid.WriteString(fmt.Sprintf("subjectAltName=DNS:%s", commonName))
+	if err != nil {
+		return "", "", nil
+	}
 	// Create our certificate using the CA
-	cmd = exec.Command("openssl", "x509", "-req", "-in", CSRPath, "-CA", caCrtPath, "-CAkey", caKeyPath, "-CAcreateserial", "-out", CrtPath, "-sha256")
+	cmd = exec.Command("openssl", "x509", "-req", "-extfile", extPath, "-in", csrPath, "-CA", caCrtPath, "-CAkey", caKeyPath, "-CAcreateserial", "-out", crtPath, "-sha256")
 	err = cmd.Run()
 	if err != nil {
 		return "", "", err
 	}
-	return KeyPath, CrtPath, nil
+	return keyPath, crtPath, nil
 }
 
 // CheckUntilTimeout Polls the check function until the context expires, in

@@ -531,7 +531,11 @@ func (rw *remoteUnit) Start() error {
 
 // Restart resumes monitoring a job after a Receptor restart
 func (rw *remoteUnit) Restart() error {
-	return rw.startOrRestart(false)
+	red := rw.Status().ExtraData.(*remoteExtraData)
+	if red.RemoteStarted {
+		return rw.startOrRestart(false)
+	}
+	return fmt.Errorf("remote work had not previously started")
 }
 
 // cancelOrRelease is a shared implementation of Cancel() and Release()

@@ -5,7 +5,7 @@ import io
 import socket
 import shutil
 import json
-
+import ssl
 
 class ReceptorControl:
     def __init__(self):
@@ -37,7 +37,7 @@ class ReceptorControl:
         self.writestr(f"{command}\n")
         return self.read_and_parse_json()
 
-    def connect(self, address):
+    def connect(self, address, rootcas):
         if self.socket is not None:
             raise ValueError("Already connected")
         m = re.compile("tcp:(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
@@ -64,7 +64,14 @@ class ReceptorControl:
                         self.socket = None
                         continue
                     try:
-                        self.socket.connect(sockaddr)
+                        if rootcas != "":
+                            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                            context.load_verify_locations(rootcas)
+                            with self.socket as sock:
+                                with context.wrap_socket(sock, server_hostname=host) as ssock:
+                                    ssock.connect(sockaddr)
+                        else:
+                            self.socket.connect(sockaddr)
                     except OSError:
                         self.socket.close()
                         self.socket = None

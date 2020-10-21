@@ -31,14 +31,17 @@ class IgnoreRequiredWithHelp(click.Group):
 @click.pass_context
 @click.option('--socket', envvar='RECEPTORCTL_SOCKET', required=True, show_envvar=True,
               help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)")
-def cli(ctx, socket):
+@click.option('--rootcas', default="", envvar='RECEPTORCTL_ROOTCAS', required=False, show_envvar=True,
+              help="Root CA bundle to use instead of system trust when connecting with tls")
+def cli(ctx, socket, rootcas):
     ctx.obj = dict()
     ctx.obj['socket'] = socket
+    ctx.obj['rootcas'] = rootcas
 
 
 def get_rc(ctx):
     rc = ReceptorControl()
-    rc.connect(ctx.obj['socket'])
+    rc.connect(ctx.obj['socket'], ctx.obj['rootcas'])
     return rc
 
 

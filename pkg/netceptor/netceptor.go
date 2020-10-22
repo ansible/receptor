@@ -15,6 +15,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"math"
+	"math/rand"
 	"reflect"
 	"strings"
 	"sync"
@@ -82,8 +83,9 @@ type Netceptor struct {
 	connLock               *sync.RWMutex
 	connections            map[string]*connInfo
 	knownNodeLock          *sync.RWMutex
-	seenUpdates            map[string]time.Time
 	knownNodeInfo          map[string]*nodeInfo
+	seenUpdatesLock        *sync.RWMutex
+	seenUpdates            map[string]time.Time
 	knownConnectionCosts   map[string]map[string]float64
 	routingTableLock       *sync.RWMutex
 	routingTable           map[string]string
@@ -167,12 +169,13 @@ type nodeInfo struct {
 }
 
 type routingUpdate struct {
-	NodeID         string
-	UpdateID       string
-	UpdateEpoch    uint64
-	UpdateSequence uint64
-	Connections    map[string]float64
-	ForwardingNode string
+	NodeID             string
+	UpdateID           string
+	UpdateEpoch        uint64
+	UpdateSequence     uint64
+	Connections        map[string]float64
+	ForwardingNode     string
+	SuspectedDuplicate uint64
 }
 
 // ServiceAdvertisement is the data associated with a service advertisement
@@ -235,13 +238,14 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s := Netceptor{
 		nodeID:                 NodeID,
 		allowedPeers:           AllowedPeers,
-		epoch:                  uint64(time.Now().Unix()),
+		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:               0,
 		connLock:               &sync.RWMutex{},
 		connections:            make(map[string]*connInfo),
 		knownNodeLock:          &sync.RWMutex{},
-		seenUpdates:            make(map[string]time.Time),
 		knownNodeInfo:          make(map[string]*nodeInfo),
+		seenUpdatesLock:        &sync.RWMutex{},
+		seenUpdates:            make(map[string]time.Time),
 		knownConnectionCosts:   make(map[string]map[string]float64),
 		routingTableLock:       &sync.RWMutex{},
 		routingTable:           make(map[string]string),
@@ -274,7 +278,7 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
-	s.sendRouteFloodChan = tickrunner.Run(s.context, s.sendRoutingUpdate, RouteUpdateTime, time.Millisecond*100)
+	s.sendRouteFloodChan = tickrunner.Run(s.context, func() { s.sendRoutingUpdate(0) }, RouteUpdateTime, time.Millisecond*100)
 	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
 	go s.monitorConnectionAging()
 	go s.expireSeenUpdates()
@@ -515,13 +519,13 @@ func (s *Netceptor) expireSeenUpdates() {
 		select {
 		case <-time.After(SeenUpdateExpireTime / 2):
 			thresholdTime := time.Now().Add(-SeenUpdateExpireTime)
-			s.knownNodeLock.Lock()
+			s.seenUpdatesLock.Lock()
 			for id := range s.seenUpdates {
 				if s.seenUpdates[id].Before(thresholdTime) {
 					delete(s.seenUpdates, id)
 				}
 			}
-			s.knownNodeLock.Unlock()
+			s.seenUpdatesLock.Unlock()
 		case <-s.context.Done():
 			return
 		}
@@ -869,7 +873,7 @@ func (s *Netceptor) printRoutingTable() {
 }
 
 // Constructs a routing update message
-func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
+func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate {
 	s.sequence++
 	s.connLock.RLock()
 	conns := make(map[string]float64)
@@ -878,12 +882,13 @@ func (s *Netceptor) makeRoutingUpdate() *routingUpdate {
 	}
 	s.connLock.RUnlock()
 	update := &routingUpdate{
-		NodeID:         s.nodeID,
-		UpdateID:       randstr.RandomString(8),
-		UpdateEpoch:    s.epoch,
-		UpdateSequence: s.sequence,
-		Connections:    conns,
-		ForwardingNode: s.nodeID,
+		NodeID:             s.nodeID,
+		UpdateID:           randstr.RandomString(8),
+		UpdateEpoch:        s.epoch,
+		UpdateSequence:     s.sequence,
+		Connections:        conns,
+		ForwardingNode:     s.nodeID,
+		SuspectedDuplicate: suspectedDuplicate,
 	}
 	return update
 }
@@ -901,16 +906,20 @@ func (s *Netceptor) translateStructToNetwork(messageType byte, content interface
 }
 
 // Sends a routing update to all neighbors.
-func (s *Netceptor) sendRoutingUpdate() {
+func (s *Netceptor) sendRoutingUpdate(suspectedDuplicate uint64) {
 	if len(s.connections) == 0 {
 		return
 	}
-	ru := s.makeRoutingUpdate()
+	ru := s.makeRoutingUpdate(suspectedDuplicate)
 	sb := make([]string, 0)
 	for conn := range ru.Connections {
 		sb = append(sb, fmt.Sprintf("%s(%.2f)", conn, ru.Connections[conn]))
 	}
-	logger.Debug("Sending routing update. Connections: %s\n", strings.Join(sb, " "))
+	if suspectedDuplicate == 0 {
+		logger.Debug("Sending routing update %s. Connections: %s\n", ru.UpdateID, strings.Join(sb, " "))
+	} else {
+		logger.Warning("Sending duplicate node notification %s. Connections: %s\n", ru.UpdateID, strings.Join(sb, " "))
+	}
 	message, err := s.translateStructToNetwork(MsgTypeRoute, ru)
 	if err != nil {
 		return
@@ -920,68 +929,102 @@ func (s *Netceptor) sendRoutingUpdate() {
 
 // Processes a routing update received from a connection.
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
-	logger.Debug("Received routing update from %s via %s\n", ri.NodeID, recvConn)
-	if ri.NodeID == s.nodeID || ri.NodeID == "" {
+	if ri.NodeID == "" {
+		// Our peer is still trying to initialize
 		return
 	}
-	s.knownNodeLock.RLock()
+	if ri.NodeID == s.nodeID {
+		if ri.UpdateEpoch == s.epoch {
+			return
+		}
+		if ri.SuspectedDuplicate == s.epoch {
+			// We are the duplicate!
+			logger.Error("We are a duplicate node with ID %s and epoch %d.  Shutting down.\n", s.nodeID, s.epoch)
+			s.Shutdown()
+			return
+		}
+		if ri.UpdateEpoch > s.epoch {
+			// Update has our node ID but a newer epoch - so if clocks are in sync they are a duplicate
+			logger.Error("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
+			// Send routing update noting our suspicion
+			s.sendRoutingUpdate(ri.UpdateEpoch)
+			return
+		}
+		return
+	}
+	s.seenUpdatesLock.Lock()
 	_, ok := s.seenUpdates[ri.UpdateID]
-	s.knownNodeLock.RUnlock()
 	if ok {
+		s.seenUpdatesLock.Unlock()
 		return
 	}
-	s.knownNodeLock.Lock()
 	s.seenUpdates[ri.UpdateID] = time.Now()
-	ni, ok := s.knownNodeInfo[ri.NodeID]
-	if ok {
-		if ri.UpdateEpoch < ni.Epoch {
-			s.knownNodeLock.Unlock()
-			return
+	s.seenUpdatesLock.Unlock()
+	if ri.SuspectedDuplicate != 0 {
+		logger.Warning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
+		s.knownNodeLock.Lock()
+		ni, ok := s.knownNodeInfo[ri.NodeID]
+		if ok {
+			if ni.Epoch == ri.SuspectedDuplicate {
+				s.knownNodeInfo[ri.NodeID].Epoch = ri.UpdateEpoch
+				s.knownNodeInfo[ri.NodeID].Sequence = ri.UpdateSequence
+			}
 		}
-		if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence {
-			s.knownNodeLock.Unlock()
-			return
-		}
+		s.knownNodeLock.Unlock()
 	} else {
-		s.sendRouteFloodChan <- 0
-		ni = &nodeInfo{}
-	}
-	ni.Epoch = ri.UpdateEpoch
-	ni.Sequence = ri.UpdateSequence
-	changed := false
-	if !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID]) {
-		changed = true
-	}
-	_, ok = s.knownNodeInfo[ri.NodeID]
-	if !ok {
-		_ = s.addNameHash(ri.NodeID)
-	}
-	s.knownNodeInfo[ri.NodeID] = ni
-	if changed {
-		s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
-		for k, v := range ri.Connections {
-			s.knownConnectionCosts[ri.NodeID][k] = v
-		}
-		for conn := range s.knownConnectionCosts {
-			if conn == s.nodeID {
-				continue
+		logger.Debug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
+		s.knownNodeLock.Lock()
+		ni, ok := s.knownNodeInfo[ri.NodeID]
+		if ok {
+			if ri.UpdateEpoch < ni.Epoch {
+				s.knownNodeLock.Unlock()
+				return
 			}
-			_, ok = ri.Connections[conn]
-			if !ok {
-				delete(s.knownConnectionCosts[conn], ri.NodeID)
+			if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence {
+				s.knownNodeLock.Unlock()
+				return
+			}
+		} else {
+			s.sendRouteFloodChan <- 0
+			ni = &nodeInfo{}
+		}
+		ni.Epoch = ri.UpdateEpoch
+		ni.Sequence = ri.UpdateSequence
+		changed := false
+		if !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID]) {
+			changed = true
+		}
+		_, ok = s.knownNodeInfo[ri.NodeID]
+		if !ok {
+			_ = s.addNameHash(ri.NodeID)
+		}
+		s.knownNodeInfo[ri.NodeID] = ni
+		if changed {
+			s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
+			for k, v := range ri.Connections {
+				s.knownConnectionCosts[ri.NodeID][k] = v
+			}
+			for conn := range s.knownConnectionCosts {
+				if conn == s.nodeID {
+					continue
+				}
+				_, ok = ri.Connections[conn]
+				if !ok {
+					delete(s.knownConnectionCosts[conn], ri.NodeID)
+				}
 			}
 		}
+		s.knownNodeLock.Unlock()
+		if changed {
+			s.updateRoutingTableChan <- 100 * time.Millisecond
+		}
 	}
-	s.knownNodeLock.Unlock()
 	ri.ForwardingNode = s.nodeID
 	message, err := s.translateStructToNetwork(MsgTypeRoute, ri)
 	if err != nil {
 		return
 	}
 	s.flood(message, recvConn)
-	if changed {
-		s.updateRoutingTableChan <- 100 * time.Millisecond
-	}
 }
 
 // Handles a ping request
@@ -1165,7 +1208,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
-		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate())
+		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate(0))
 		if err != nil {
 			logger.Error("Error Sending initial connection message: %s\n", err)
 			return
@@ -1311,7 +1354,21 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					}
 					remoteNodeID = ri.ForwardingNode
 					// Decide whether the remote node is acceptable
+					if remoteNodeID == s.nodeID {
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
+					}
 					remoteNodeAccepted := true
+					s.connLock.RLock()
+					for conn := range s.connections {
+						if remoteNodeID == conn {
+							remoteNodeAccepted = false
+							break
+						}
+					}
+					s.connLock.RUnlock()
+					if !remoteNodeAccepted {
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
+					}
 					if s.allowedPeers != nil {
 						remoteNodeAccepted = false
 						for i := range s.allowedPeers {

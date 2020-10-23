@@ -56,6 +56,9 @@ func (cfg nodeCfg) Init() error {
 	var allowedPeers []string
 	if cfg.AllowedPeers != "" {
 		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
+		for i := range allowedPeers {
+			allowedPeers[i] = strings.TrimSpace(allowedPeers[i])
+		}
 	}
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
 	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)

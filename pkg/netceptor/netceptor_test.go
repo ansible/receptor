@@ -319,3 +319,126 @@ func TestLotsOfPings(t *testing.T) {
 		nodes[i].BackendWait()
 	}
 }
+
+func TestDuplicateNodeDetection(t *testing.T) {
+
+	// Create Netceptor nodes
+	netsize := 4
+	nodes := make([]*Netceptor, netsize)
+	backends := make([]*ExternalBackend, netsize)
+	routingChans := make([]chan map[string]string, netsize)
+	for i := 0; i < netsize; i++ {
+		nodes[i] = New(context.Background(), fmt.Sprintf("node%d", i), nil)
+		routingChans[i] = nodes[i].SubscribeRoutingUpdates()
+		var err error
+		backends[i], err = NewExternalBackend()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = nodes[i].AddBackend(backends[i], 1.0, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Connect the nodes in a circular network
+	for i := 0; i < netsize; i++ {
+		c1, c2, err := socketpair.New("unix")
+		if err != nil {
+			t.Fatal(err)
+		}
+		peer := (i + 1) % netsize
+		backends[i].NewConnection(MessageConnFromNetConn(c1), true)
+		backends[peer].NewConnection(MessageConnFromNetConn(c2), true)
+	}
+
+	// Wait for the nodes to establish routing to each other
+	knownRoutes := make([]map[string]string, netsize)
+	knownRoutesLock := sync.RWMutex{}
+	for i := 0; i < netsize; i++ {
+		knownRoutes[i] = make(map[string]string)
+		go func(i int) {
+			for {
+				select {
+				case routes := <-routingChans[i]:
+					knownRoutesLock.Lock()
+					knownRoutes[i] = routes
+					knownRoutesLock.Unlock()
+				case <-nodes[i].context.Done():
+					return
+				}
+			}
+		}(i)
+	}
+	timeout, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	for {
+		select {
+		case <-timeout.Done():
+			t.Fatal("timed out waiting for nodes to connect")
+		case <-time.After(200 * time.Millisecond):
+		}
+		for i := 0; i < netsize; i++ {
+			peer := (i + 1) % 3
+			knownRoutesLock.RLock()
+			_, ok := knownRoutes[i][fmt.Sprintf("node%d", peer)]
+			if !ok {
+				knownRoutesLock.RUnlock()
+				continue
+			}
+			_, ok = knownRoutes[peer][fmt.Sprintf("node%d", i)]
+			if !ok {
+				knownRoutesLock.RUnlock()
+				continue
+			}
+			knownRoutesLock.RUnlock()
+		}
+		break
+	}
+
+	// Make sure the new node gets a more recent timestamp than the old one
+	time.Sleep(1 * time.Second)
+
+	for i := 0; i < 5; i++ {
+		// Create and connect a new node with a duplicate name
+		n := New(context.Background(), "node0", nil)
+		logger.Info("Duplicate node0 has epoch %d\n", n.epoch)
+		b, err := NewExternalBackend()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = n.AddBackend(b, 1.0, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c1, c2, err := socketpair.New("unix")
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.NewConnection(MessageConnFromNetConn(c1), true)
+		backends[netsize/2].NewConnection(MessageConnFromNetConn(c2), true)
+
+		// Wait for duplicate node to self-terminate
+		backendCloseChan := make(chan struct{})
+		go func() {
+			n.BackendWait()
+			close(backendCloseChan)
+		}()
+		select {
+		case <-backendCloseChan:
+		case <-time.After(60 * time.Second):
+			t.Fatal("timed out waiting for duplicate node to terminate")
+		}
+
+		// Force close the connection to the connected node
+		_ = c2.Close()
+
+	}
+
+	// Shut down the rest of the network
+	for i := 0; i < netsize; i++ {
+		nodes[i].Shutdown()
+	}
+	for i := 0; i < netsize; i++ {
+		nodes[i].BackendWait()
+	}
+}

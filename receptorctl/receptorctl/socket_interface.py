@@ -6,12 +6,17 @@ import socket
 import shutil
 import json
 import ssl
+import yaml
 
 class ReceptorControl:
     def __init__(self):
         self.socket = None
         self.sockfile = None
         self.remote_node = None
+        self.yaml = None
+        self.key = None
+        self.cert = None
+        self.rootcas = None
 
     def readstr(self):
         return self.sockfile.readline().decode().strip()
@@ -33,16 +38,31 @@ class ReceptorControl:
         data = json.loads(text)
         return data
 
+    def readyaml(self, yamlfile, tlsclient):
+        if yamlfile and tlsclient:
+            with open(yamlfile, "r") as yam:
+                self.yaml = yaml.load(yam, Loader=yaml.FullLoader)
+                yam.close()
+            for i in self.yaml:
+                key = i.get("tls-client", None)
+                if key:
+                     if key["name"] == tlsclient:
+                         self.key = key.get("key", None)
+                         self.cert = key.get("cert", None)
+                         self.rootcas = key.get("rootcas", None)
+                         self.insecureskipverify = key.get("insecureskipverify", None)
+                         break
+
     def simple_command(self, command):
         self.writestr(f"{command}\n")
         return self.read_and_parse_json()
 
-    def connect(self, address, rootcas):
+    def connect(self, address):
         if self.socket is not None:
             raise ValueError("Already connected")
-        m = re.compile("tcp:(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
+        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
         if m:
-            if m[6]:
+            if m[7]:
                 path = os.path.expanduser(m[6])
                 if not os.path.exists(path):
                     raise ValueError(f"Socket path does not exist: {path}")
@@ -51,9 +71,10 @@ class ReceptorControl:
                 self.sockfile = self.socket.makefile('rwb')
                 self.handshake()
                 return
-            elif m[2] and m[3]:
-                host = m[2]
-                port = m[3]
+            elif m[3] and m[4]:
+                import sdb; sdb.set_trace()
+                host = m[3]
+                port = m[4]
                 self.socket = None
                 addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)
                 for addr in addrs:
@@ -64,14 +85,14 @@ class ReceptorControl:
                         self.socket = None
                         continue
                     try:
-                        if rootcas != "":
-                            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-                            context.load_verify_locations(rootcas)
-                            with self.socket as sock:
-                                with context.wrap_socket(sock, server_hostname=host) as ssock:
-                                    ssock.connect(sockaddr)
-                        else:
-                            self.socket.connect(sockaddr)
+                        if m[1] == "tls":
+                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=self.rootcas)
+                            if self.key and self.cert:
+                                context.load_cert_chain(certfile=self.cert, keyfile=self.key)
+                            if self.insecureskipverify:
+                                context.check_hostname = False
+                            self.socket = context.wrap_socket(self.socket, server_hostname=host)
+                        self.socket.connect(sockaddr)
                     except OSError:
                         self.socket.close()
                         self.socket = None
@@ -105,23 +126,17 @@ class ReceptorControl:
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
 
-    def submit_work(self, worktype, payload, node=None, tlsclient=None, ttl=None, params=None):
+    def submit_work(self, node, worktype, payload, tlsclient, ttl, params):
         if node is None:
             node = "localhost"
-
         commandMap = {
             "command": "work",
             "subcommand": "submit",
             "node": node,
             "worktype": worktype,
+            "tlsclient": tlsclient,
+            "ttl": ttl,
         }
-
-        if tlsclient:
-            commandMap['tlsclient'] = tlsclient
-
-        if ttl:
-            commandMap['ttl'] = ttl
-
         if params:
             for k,v in params.items():
                 if k not in commandMap:

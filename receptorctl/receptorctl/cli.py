@@ -31,17 +31,23 @@ class IgnoreRequiredWithHelp(click.Group):
 @click.pass_context
 @click.option('--socket', envvar='RECEPTORCTL_SOCKET', required=True, show_envvar=True,
               help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)")
-@click.option('--rootcas', default="", envvar='RECEPTORCTL_ROOTCAS', required=False, show_envvar=True,
-              help="Root CA bundle to use instead of system trust when connecting with tls")
-def cli(ctx, socket, rootcas):
+# @click.option('--rootcas', default="", envvar='RECEPTORCTL_ROOTCAS', required=False, show_envvar=True,
+#               help="Root CA bundle to use instead of system trust when connecting with tls")
+@click.option('--tlsclient', default=None, envvar='RECEPTORCTL_TLSCLIENT', required=False, show_envvar=True,
+              help="TLS client name specified in yaml")
+@click.option('--yaml', default=None, envvar='RECEPTORCTL_YAML', required=False, show_envvar=True,
+              help="Yaml file name configured for receptor")
+def cli(ctx, socket, yaml, tlsclient):
     ctx.obj = dict()
     ctx.obj['socket'] = socket
-    ctx.obj['rootcas'] = rootcas
-
+    # ctx.obj['rootcas'] = rootcas
+    ctx.obj['yaml'] = yaml
+    ctx.obj['tlsclient'] = tlsclient
 
 def get_rc(ctx):
     rc = ReceptorControl()
-    rc.connect(ctx.obj['socket'], ctx.obj['rootcas'])
+    rc.readyaml(ctx.obj['yaml'], ctx.obj['tlsclient'])
+    rc.connect(ctx.obj['socket'])
     return rc
 
 

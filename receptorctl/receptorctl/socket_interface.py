@@ -13,10 +13,6 @@ class ReceptorControl:
         self.socket = None
         self.sockfile = None
         self.remote_node = None
-        self.yaml = None
-        self.key = None
-        self.cert = None
-        self.rootcas = None
 
     def readstr(self):
         return self.sockfile.readline().decode().strip()
@@ -38,7 +34,9 @@ class ReceptorControl:
         data = json.loads(text)
         return data
 
-    def readyaml(self, yamlfile, tlsclient):
+    def readyaml(self, ctxobj):
+        yamlfile = ctxobj["yaml"]
+        tlsclient = ctxobj["tlsclient"]
         if yamlfile and tlsclient:
             with open(yamlfile, "r") as yam:
                 self.yaml = yaml.load(yam, Loader=yaml.FullLoader)
@@ -47,17 +45,22 @@ class ReceptorControl:
                 key = i.get("tls-client", None)
                 if key:
                      if key["name"] == tlsclient:
-                         self.key = key.get("key", None)
-                         self.cert = key.get("cert", None)
-                         self.rootcas = key.get("rootcas", None)
-                         self.insecureskipverify = key.get("insecureskipverify", None)
+                         ctxobj["key"] = key.get("key", ctxobj["key"])
+                         ctxobj["cert"]= key.get("cert", ctxobj["cert"])
+                         ctxobj["rootcas"] = key.get("rootcas", ctxobj["rootcas"])
+                         ctxobj["insecureskipverify"] = key.get("insecureskipverify", ctxobj["insecureskipverify"])
                          break
 
     def simple_command(self, command):
         self.writestr(f"{command}\n")
         return self.read_and_parse_json()
 
-    def connect(self, address):
+    def connect(self, ctxobj):
+        address = ctxobj["socket"]
+        key = ctxobj["key"]
+        cert = ctxobj["cert"]
+        rootcas = ctxobj["rootcas"]
+        insecureskipverify = ctxobj["insecureskipverify"]
         if self.socket is not None:
             raise ValueError("Already connected")
         m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
@@ -72,7 +75,6 @@ class ReceptorControl:
                 self.handshake()
                 return
             elif m[3] and m[4]:
-                import sdb; sdb.set_trace()
                 host = m[3]
                 port = m[4]
                 self.socket = None
@@ -86,10 +88,10 @@ class ReceptorControl:
                         continue
                     try:
                         if m[1] == "tls":
-                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=self.rootcas)
-                            if self.key and self.cert:
-                                context.load_cert_chain(certfile=self.cert, keyfile=self.key)
-                            if self.insecureskipverify:
+                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=rootcas)
+                            if key and cert:
+                                context.load_cert_chain(certfile=cert, keyfile=key)
+                            if insecureskipverify:
                                 context.check_hostname = False
                             self.socket = context.wrap_socket(self.socket, server_hostname=host)
                         self.socket.connect(sockaddr)

@@ -45,7 +45,7 @@ class ReceptorControl:
                 key = i.get("tls-client", None)
                 if key:
                      if key["name"] == tlsclient:
-                         ctxobj["key"] = key.get("key", ctxobj["key"])
+                         ctxobj["key"] = key.get("key", ctxobj["key"]) # if not in yaml, keep the value
                          ctxobj["cert"]= key.get("cert", ctxobj["cert"])
                          ctxobj["rootcas"] = key.get("rootcas", ctxobj["rootcas"])
                          ctxobj["insecureskipverify"] = key.get("insecureskipverify", ctxobj["insecureskipverify"])
@@ -66,10 +66,11 @@ class ReceptorControl:
         m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
         if m:
             if m[7]:
-                path = os.path.expanduser(m[6])
+                path = os.path.expanduser(m[7])
                 if not os.path.exists(path):
                     raise ValueError(f"Socket path does not exist: {path}")
                 self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                print(path)
                 self.socket.connect(path)
                 self.sockfile = self.socket.makefile('rwb')
                 self.handshake()

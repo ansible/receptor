@@ -32,17 +32,13 @@ class IgnoreRequiredWithHelp(click.Group):
 @click.option('--socket', envvar='RECEPTORCTL_SOCKET', required=True, show_envvar=True,
               help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)")
 @click.option('--yaml', default=None, envvar='RECEPTORCTL_YAML', required=False, show_envvar=True,
-              help="Yaml file name configured for receptor")
+              help="Yaml filename configured for receptor")
 @click.option('--tlsclient', default=None, envvar='RECEPTORCTL_TLSCLIENT', required=False, show_envvar=True,
               help="TLS client name specified in yaml")
-@click.option('--rootcas', default=None, envvar='RECEPTORCTL_ROOTCAS', required=False, show_envvar=True,
-              help="Root CA bundle to use instead of system trust when connecting with tls")
-@click.option('--key', default=None, envvar='RECEPTORCTL_KEY', required=False, show_envvar=True,
-              help="")
-@click.option('--cert', default=None, envvar='RECEPTORCTL_CERT', required=False, show_envvar=True,
-              help="")
-@click.option('--insecureskipverify', default=False, envvar='RECEPTORCTL_INSECURESKIPVERIFY', required=False, show_envvar=True,
-              help="")
+@click.option('--rootcas', default=None, help="Root CA bundle to use instead of system trust when connecting with tls")
+@click.option('--key', default=None, help="Client private key filename")
+@click.option('--cert', default=None, help="Client certificate filename")
+@click.option('--insecureskipverify', default=False, help="Accept any server cert", show_default=True)
 def cli(ctx, socket, yaml, tlsclient, rootcas, key, cert, insecureskipverify):
     ctx.obj = dict()
     ctx.obj['socket'] = socket

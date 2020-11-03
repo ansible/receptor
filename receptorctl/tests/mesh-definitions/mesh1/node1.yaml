@@ -8,3 +8,13 @@
     port: 11112
     remotenode: localhost
     remoteservice: control
+- tls-server:
+    name: tlsserver
+    key: /tmp/receptorctltest.key
+    cert: /tmp/receptorctltest.crt
+    # requireclientcert: false
+    # clientcas: /tmp/receptorctltest_ca.crt
+- control-service:
+    service: ctltls
+    tcplisten: 11113
+    tcptls: tlsserver

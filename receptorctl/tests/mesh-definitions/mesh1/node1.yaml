@@ -10,8 +10,8 @@
     remoteservice: control
 - tls-server:
     name: tlsserver
-    key: /tmp/receptorctltest.key
-    cert: /tmp/receptorctltest.crt
+    key: /tmp/receptorctltest/ca.key
+    cert: /tmp/receptorctltest/ca.crt
     # requireclientcert: false
     # clientcas: /tmp/receptorctltest_ca.crt
 - control-service:

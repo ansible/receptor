@@ -1,6 +1,7 @@
 import pytest
 import subprocess
 import os
+import shutil
 from receptorctl import ReceptorControl
 import time
 
@@ -12,27 +13,39 @@ connDict = {
     "insecureskipverify":False,
 }
 
-@pytest.fixture(scope="class")
-def receptor_mesh(request):
-    caKeyPath = "/tmp/receptorctltest_ca.key"
-    caCrtPath = "/tmp/receptorctltest_ca.crt"
-    keyPath = "/tmp/receptorctltest.key"
-    crtPath = "/tmp/receptorctltest.crt"
-    csrPath = "/tmp/receptorctltest.csa"
-    extPath = "/tmp/receptorctltest.ext"
+tmpDir = "/tmp/receptorctltest"
+if os.path.exists(tmpDir):
+    shutil.rmtree(tmpDir)
+os.mkdir(tmpDir)
+
+def generate_cert(name, commonName):
+    keyPath = os.path.join(tmpDir, name + ".key")
+    crtPath = os.path.join(tmpDir, name + ".crt")
+    os.system("openssl genrsa -out " + keyPath + " 1024")
+    os.system("openssl req -x509 -new -nodes -key " + keyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=ca -sha256 -out " + crtPath)
+    return keyPath, crtPath
+
+def generate_cert_with_ca(name, caKeyPath, caCrtPath, commonName):
+    keyPath = os.path.join(tmpDir, name + ".key")
+    crtPath = os.path.join(tmpDir, name + ".crt")
+    csrPath = os.path.join(tmpDir, name + ".csa")
+    extPath = os.path.join(tmpDir, name + ".ext")
     # create x509 extension
     with open(extPath, "w") as ext:
-        ext.write("subjectAltName=DNS:localhost")
+        ext.write("subjectAltName=DNS:" + commonName)
         ext.close()
-    # create CA
-    os.system("openssl genrsa -out " + caKeyPath + " 1024")
-    os.system("openssl req -x509 -new -nodes -key " + caKeyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=ca -sha256 -out " + caCrtPath)
-    # create key
     os.system("openssl genrsa -out " + keyPath + " 1024")
     # create cert request
-    os.system("openssl req -new -sha256 -key " + keyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=localhost -out " + csrPath)
+    os.system("openssl req -new -sha256 -key " + keyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=" + commonName + " -out " + csrPath)
     # sign cert request
     os.system("openssl x509 -req -extfile " + extPath + " -in " + csrPath + " -CA " + caCrtPath + " -CAkey " + caKeyPath + " -CAcreateserial -out " + crtPath + " -sha256")
+
+caKeyPath, caCrtPath = generate_cert("ca", "ca")
+generate_cert_with_ca("client", caKeyPath, caCrtPath, "localhost")
+generate_cert_with_ca("server", caKeyPath, caCrtPath, "localhost")
+
+@pytest.fixture(scope="class")
+def receptor_mesh(request):
 
     node1 = subprocess.Popen(["receptor", "-c", "tests/mesh-definitions/mesh1/node1.yaml"])
     node2 = subprocess.Popen(["receptor", "-c", "tests/mesh-definitions/mesh1/node2.yaml"])
@@ -84,7 +97,7 @@ class TestReceptorCTL:
     def test_tcp_control_service_tls(self):
         node1_controller = ReceptorControl()
         connDict["socket"] = "tls://localhost:11113"
-        connDict["rootcas"] = "/tmp/receptorctltest_ca.crt"
+        connDict["rootcas"] = caCrtPath
         connDict["insecureskipverify"] = True
         node1_controller.connect(connDict)
         status = node1_controller.simple_command("status")

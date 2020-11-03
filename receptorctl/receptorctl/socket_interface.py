@@ -45,7 +45,7 @@ class ReceptorControl:
                 key = i.get("tls-client", None)
                 if key:
                      if key["name"] == tlsclient:
-                         ctxobj["key"] = key.get("key", ctxobj["key"]) # if not in yaml, keep the value
+                         ctxobj["key"] = key.get("key", ctxobj["key"]) # if not in yaml, keep the previous value
                          ctxobj["cert"]= key.get("cert", ctxobj["cert"])
                          ctxobj["rootcas"] = key.get("rootcas", ctxobj["rootcas"])
                          ctxobj["insecureskipverify"] = key.get("insecureskipverify", ctxobj["insecureskipverify"])

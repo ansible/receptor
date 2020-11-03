@@ -70,7 +70,6 @@ class ReceptorControl:
                 if not os.path.exists(path):
                     raise ValueError(f"Socket path does not exist: {path}")
                 self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                print(path)
                 self.socket.connect(path)
                 self.sockfile = self.socket.makefile('rwb')
                 self.handshake()

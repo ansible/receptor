@@ -128,17 +128,23 @@ class ReceptorControl:
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
 
-    def submit_work(self, node, worktype, payload, tlsclient, ttl, params):
+    def submit_work(self, worktype, payload, node=None, tlsclient=None, ttl=None, params=None):
         if node is None:
             node = "localhost"
+
         commandMap = {
             "command": "work",
             "subcommand": "submit",
             "node": node,
             "worktype": worktype,
-            "tlsclient": tlsclient,
-            "ttl": ttl,
         }
+
+        if tlsclient:
+            commandMap['tlsclient'] = tlsclient
+
+        if ttl:
+            commandMap['ttl'] = ttl
+
         if params:
             for k,v in params.items():
                 if k not in commandMap:

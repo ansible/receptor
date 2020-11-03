@@ -39,9 +39,10 @@ def generate_cert_with_ca(name, caKeyPath, caCrtPath, commonName):
     os.system("openssl req -new -sha256 -key " + keyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=" + commonName + " -out " + csrPath)
     # sign cert request
     os.system("openssl x509 -req -extfile " + extPath + " -in " + csrPath + " -CA " + caCrtPath + " -CAkey " + caKeyPath + " -CAcreateserial -out " + crtPath + " -sha256")
+    return keyPath, crtPath
 
 caKeyPath, caCrtPath = generate_cert("ca", "ca")
-generate_cert_with_ca("client", caKeyPath, caCrtPath, "localhost")
+clientKeyPath, clientCrtPath = generate_cert_with_ca("client", caKeyPath, caCrtPath, "localhost")
 generate_cert_with_ca("server", caKeyPath, caCrtPath, "localhost")
 
 @pytest.fixture(scope="class")
@@ -52,7 +53,7 @@ def receptor_mesh(request):
 
     time.sleep(0.5)
     node1_controller = ReceptorControl()
-    connDict["socket"] = "unix:///tmp/node1.sock"
+    connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
     node1_controller.connect(connDict)
 
     while True:
@@ -72,7 +73,7 @@ def receptor_mesh(request):
 class TestReceptorCTL:
     def test_simple_command(self):
         node1_controller = ReceptorControl()
-        connDict["socket"] = "unix:///tmp/node1.sock"
+        connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
         node1_controller.connect(connDict)
         status = node1_controller.simple_command("status")
         node1_controller.close()
@@ -80,7 +81,7 @@ class TestReceptorCTL:
 
     def test_simple_command_fail(self):
         node1_controller = ReceptorControl()
-        connDict["socket"] = "unix:///tmp/node1.sock"
+        connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
         node1_controller.connect(connDict)
         with pytest.raises(RuntimeError):
             node1_controller.simple_command("doesnotexist")
@@ -99,6 +100,8 @@ class TestReceptorCTL:
         connDict["socket"] = "tls://localhost:11113"
         connDict["rootcas"] = caCrtPath
         connDict["insecureskipverify"] = True
+        connDict["key"] = clientKeyPath
+        connDict["cert"] = clientCrtPath
         node1_controller.connect(connDict)
         status = node1_controller.simple_command("status")
         node1_controller.close()
@@ -106,7 +109,7 @@ class TestReceptorCTL:
 
     def test_connect_to_service(self):
         node1_controller = ReceptorControl()
-        connDict["socket"] = "unix:///tmp/node1.sock"
+        connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
         node1_controller.connect(connDict)
         node1_controller.connect_to_service("node2", "control", "")
         node1_controller.handshake()

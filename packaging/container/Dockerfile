@@ -7,7 +7,7 @@ LABEL vendor="project-receptor"
 LABEL version="${VERSION}"
 
 RUN dnf -y update && \
-    dnf -y install dumb-init python3-click python3-dateutil python3-pip && \
+    dnf -y install dumb-init python3-click python3-pyyaml python3-dateutil python3-pip && \
     dnf clean all
 
 COPY receptorctl-${VERSION}-py3-none-any.whl /tmp

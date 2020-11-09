@@ -36,6 +36,7 @@ setup(
         "setuptools",
         "python-dateutil",
         "click",
+        "pyyaml"
     ],
     zip_safe=False,
     entry_points={

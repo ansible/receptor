@@ -3,8 +3,18 @@
 - tcp-listener:
     port: 11111
 - control-service:
-    filename: /tmp/node1.sock
+    filename: /tmp/receptorctltest/node1.sock
 - tcp-server:
     port: 11112
     remotenode: localhost
     remoteservice: control
+- tls-server:
+    name: tlsserver
+    key: /tmp/receptorctltest/server.key
+    cert: /tmp/receptorctltest/server.crt
+    requireclientcert: true
+    clientcas: /tmp/receptorctltest/ca.crt
+- control-service:
+    service: ctltls
+    tcplisten: 11113
+    tcptls: tlsserver

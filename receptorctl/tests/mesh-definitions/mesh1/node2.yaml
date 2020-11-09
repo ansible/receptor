@@ -3,4 +3,4 @@
 - tcp-peer:
     address: localhost:11111
 - control-service:
-    filename: /tmp/node2.sock
+    filename: /tmp/receptorctltest/node2.sock

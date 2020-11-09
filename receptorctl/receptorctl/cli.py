@@ -31,7 +31,7 @@ class IgnoreRequiredWithHelp(click.Group):
 @click.pass_context
 @click.option('--socket', envvar='RECEPTORCTL_SOCKET', required=True, show_envvar=True,
               help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)")
-@click.option('--config', default=None, envvar='RECEPTORCTL_CONFIG', required=False, show_envvar=True,
+@click.option('--config', '-c', default=None, envvar='RECEPTORCTL_CONFIG', required=False, show_envvar=True,
               help="Config filename configured for receptor")
 @click.option('--tls-client', default=None, envvar='RECEPTORCTL_TLSCLIENT', required=False, show_envvar=True,
               help="TLS client name specified in config")
@@ -39,11 +39,11 @@ class IgnoreRequiredWithHelp(click.Group):
 @click.option('--key', default=None, help="Client private key filename")
 @click.option('--cert', default=None, help="Client certificate filename")
 @click.option('--insecureskipverify', default=False, help="Accept any server cert", show_default=True)
-def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
+def cli(ctx, socket, config, tls_client, rootcas, key, cert, insecureskipverify):
     ctx.obj = dict()
     ctx.obj['socket'] = socket
     ctx.obj['config'] = config
-    ctx.obj['tlsclient'] = tlsclient
+    ctx.obj['tls-client'] = tls_client
     ctx.obj['rootcas'] = rootcas
     ctx.obj['key'] = key
     ctx.obj['cert'] = cert

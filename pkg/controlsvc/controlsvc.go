@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions
@@ -303,50 +304,47 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 			return
 		}
 	}()
-	if uli != nil {
-		go func() {
-			for {
-				conn, err := uli.Accept()
-				if ctx.Err() != nil {
-					return
+	for _, listener := range []net.Listener{uli, tli, li} {
+		if listener != nil {
+			go func(listener net.Listener) {
+				for {
+					conn, err := listener.Accept()
+					if ctx.Err() != nil {
+						return
+					}
+					if err != nil {
+						logger.Error("Error accepting connection: %s. Closing listener.\n", err)
+						_ = listener.Close()
+						return
+					}
+					go func() {
+						tlsConn, ok := conn.(*tls.Conn)
+						if ok {
+							// Explicitly run server TLS handshake so we can deal with timeout and errors here
+							err = conn.SetDeadline(time.Now().Add(10 * time.Second))
+							if err != nil {
+								logger.Error("Error setting timeout: %s. Closing socket.\n", err)
+								_ = conn.Close()
+								return
+							}
+							err = tlsConn.Handshake()
+							if err != nil {
+								logger.Error("TLS handshake error: %s. Closing socket.\n", err)
+								_ = conn.Close()
+								return
+							}
+							err = conn.SetDeadline(time.Time{})
+							if err != nil {
+								logger.Error("Error clearing timeout: %s. Closing socket.\n", err)
+								_ = conn.Close()
+								return
+							}
+						}
+						s.RunControlSession(conn)
+					}()
 				}
-				if err != nil {
-					logger.Error("Error accepting Unix socket connection: %s. Closing socket.\n", err)
-					return
-				}
-				go s.RunControlSession(conn)
-			}
-		}()
-	}
-	if tli != nil {
-		go func() {
-			for {
-				conn, err := tli.Accept()
-				if ctx.Err() != nil {
-					return
-				}
-				if err != nil {
-					logger.Error("Error accepting TCP connection: %s. Closing socket.\n", err)
-					return
-				}
-				go s.RunControlSession(conn)
-			}
-		}()
-	}
-	if li != nil {
-		go func() {
-			for {
-				conn, err := li.Accept()
-				if ctx.Err() != nil {
-					return
-				}
-				if err != nil {
-					logger.Error("Error accepting connection: %s. Closing socket.\n", err)
-					return
-				}
-				go s.RunControlSession(conn)
-			}
-		}()
+			}(listener)
+		}
 	}
 	return nil
 }

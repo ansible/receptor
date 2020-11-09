@@ -34,9 +34,9 @@ class ReceptorControl:
         data = json.loads(text)
         return data
 
-    def readyaml(self, ctxobj):
-        yamlfile = ctxobj["yaml"]
-        tlsclient = ctxobj["tlsclient"]
+    def readconfig(self, ctxobj):
+        yamlfile = ctxobj["config"]
+        tlsclient = ctxobj["tls-client"]
         if yamlfile and tlsclient:
             with open(yamlfile, "r") as yam:
                 self.yaml = yaml.load(yam, Loader=yaml.FullLoader)
@@ -45,7 +45,7 @@ class ReceptorControl:
                 key = i.get("tls-client", None)
                 if key:
                      if key["name"] == tlsclient:
-                         ctxobj["key"] = key.get("key", ctxobj["key"]) # if not in yaml, keep the previous value
+                         ctxobj["key"] = key.get("key", ctxobj["key"]) # if not in config, keep the previous value
                          ctxobj["cert"]= key.get("cert", ctxobj["cert"])
                          ctxobj["rootcas"] = key.get("rootcas", ctxobj["rootcas"])
                          ctxobj["insecureskipverify"] = key.get("insecureskipverify", ctxobj["insecureskipverify"])
@@ -65,8 +65,11 @@ class ReceptorControl:
             raise ValueError("Already connected")
         m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
         if m:
-            if m[7]:
-                path = os.path.expanduser(m[7])
+            unixsocket = m[7]
+            host = m[3]
+            port = m[4]
+            if unixsocket:
+                path = os.path.expanduser(unixsocket)
                 if not os.path.exists(path):
                     raise ValueError(f"Socket path does not exist: {path}")
                 self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -74,9 +77,7 @@ class ReceptorControl:
                 self.sockfile = self.socket.makefile('rwb')
                 self.handshake()
                 return
-            elif m[3] and m[4]:
-                host = m[3]
-                port = m[4]
+            elif host and port:
                 self.socket = None
                 addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)
                 for addr in addrs:

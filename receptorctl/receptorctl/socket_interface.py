@@ -24,7 +24,7 @@ class ReceptorControl:
     def handshake(self):
         m = re.compile("Receptor Control, node (.+)").fullmatch(self.readstr())
         if not m:
-            raise RuntimeError("Failed to handshake with Receptor socket")
+            raise RuntimeError("Failed to connect to Receptor socket")
         self.remote_node = m[1]
 
     def read_and_parse_json(self):

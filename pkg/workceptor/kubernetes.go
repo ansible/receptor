@@ -163,6 +163,11 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		},
 	}
 	ev, err := watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
+	var ok bool
+	kw.pod, ok = ev.Object.(*corev1.Pod)
+	if !ok {
+		return fmt.Errorf("watch did not return a pod")
+	}
 	if err == ErrPodCompleted {
 		if len(kw.pod.Status.ContainerStatuses) != 1 {
 			return fmt.Errorf("expected 1 container in pod but there were %d", len(kw.pod.Status.ContainerStatuses))
@@ -178,7 +183,6 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if ev == nil {
 		return fmt.Errorf("pod disappeared during watch")
 	}
-	kw.pod = ev.Object.(*corev1.Pod)
 	return nil
 }
 

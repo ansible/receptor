@@ -259,7 +259,7 @@ def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient,
         if node == "":
             node = None
         rc = get_rc(ctx)
-        work = rc.submit_work(node, worktype, payload_data, tlsclient, ttl, params)
+        work = rc.submit_work(worktype, payload_data, node=node, tlsclient=tlsclient, ttl=ttl, params=params)
         result = work.pop('result')
         unitid = work.pop('unitid')
         if follow:

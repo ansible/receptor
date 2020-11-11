@@ -112,7 +112,7 @@ class ReceptorControl:
                     raise ValueError(f"Could not connect to host {host} port {port}")
                 self.handshake()
                 return
-        raise ValueError(f"Invalid socket address {self.socketfile}")
+        raise ValueError(f"Invalid socket address {self.socketaddress}")
 
     def close(self):
         if self.sockfile is not None:

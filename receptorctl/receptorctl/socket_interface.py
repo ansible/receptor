@@ -30,7 +30,6 @@ class ReceptorControl:
         self.insecureskipverify = insecureskipverify
         if config and tlsclient:
             self.readconfig(config, tlsclient)
-        self.connect()
 
     def readstr(self):
         return self.sockfile.readline().decode().strip()

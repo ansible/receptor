@@ -14,25 +14,22 @@ class ReceptorControl:
             raise RuntimeError("Cannot specify both config and rootcas, key, cert")
         if config and not tlsclient:
             raise RuntimeError("Must specify both config and tlsclient")
-        self.socketaddress = socketaddress
         self.socket = None
         self.sockfile = None
         self.remote_node = None
+        self.socketaddress = socketaddress
         self.rootcas = rootcas
         self.key = key
         self.cert = cert
         self.insecureskipverify = insecureskipverify
-
         if config and tlsclient:
             self.readconfig(config, tlsclient)
-
         self.connect()
 
     def readstr(self):
         return self.sockfile.readline().decode().strip()
 
     def writestr(self, str):
-        import pdb; pdb.set_trace()
         self.sockfile.write(str.encode())
         self.sockfile.flush()
 
@@ -69,7 +66,6 @@ class ReceptorControl:
         return self.read_and_parse_json()
 
     def connect(self):
-        import pdb; pdb.set_trace()
         if self.socket is not None:
             return
         m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self.socketaddress)

@@ -123,16 +123,14 @@ class ReceptorControl:
         if self.sockfile is not None:
             try:
                 self.sockfile.close()
-            except:
-                pass
-            self.sockfile = None
+            finally:
+                self.sockfile = None
 
         if self.socket is not None:
             try:
                 self.socket.close()
-            except:
-                pass
-            self.socket = None
+            finally:
+                self.socket = None
 
     def connect_to_service(self, node, service, tlsclient):
         self.connect()
@@ -203,9 +201,9 @@ class ReceptorControl:
                 errmsg = errmsg + ": " + text[7:]
             raise RuntimeError(errmsg)
         shutdown_write(self.socket)
+        # Close socket but not sockfile.  This leaves the connection open until the caller closes sockfile.
         try:
             self.socket.close()
-        except:
-            pass
-        self.socket = None
+        finally:
+            self.socket = None
         return self.sockfile

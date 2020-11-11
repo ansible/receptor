@@ -8,6 +8,12 @@ import json
 import ssl
 import yaml
 
+def shutdown_write(sock):
+    if isinstance(sock, ssl.SSLSocket):
+        super(ssl.SSLSocket, sock).shutdown(socket.SHUT_WR)
+    else:
+        sock.shutdown(socket.SHUT_WR)
+
 class ReceptorControl:
     def __init__(self, socketaddress, config=None, tlsclient=None, rootcas=None, key=None, cert=None, insecureskipverify=False):
         if config and any((rootcas, key, cert)):
@@ -179,7 +185,7 @@ class ReceptorControl:
         else:
             raise RuntimeError("Unknown payload type")
         self.sockfile.flush()
-        self.socket.shutdown(socket.SHUT_WR)
+        shutdown_write(self.socket)
         text = self.readstr()
         self.close()
         if text.startswith("ERROR:"):
@@ -197,5 +203,5 @@ class ReceptorControl:
             if str.startswith(text, "ERROR: "):
                 errmsg = errmsg + ": " + text[7:]
             raise RuntimeError(errmsg)
-        self.socket.shutdown(socket.SHUT_WR)
+        shutdown_write(self.socket)
         return self.sockfile

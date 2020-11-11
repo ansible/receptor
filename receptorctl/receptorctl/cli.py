@@ -33,27 +33,17 @@ class IgnoreRequiredWithHelp(click.Group):
               help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)")
 @click.option('--config', '-c', default=None, envvar='RECEPTORCTL_CONFIG', required=False, show_envvar=True,
               help="Config filename configured for receptor")
-@click.option('--tls-client', default=None, envvar='RECEPTORCTL_TLSCLIENT', required=False, show_envvar=True,
+@click.option('--tls-client', 'tlsclient', default=None, envvar='RECEPTORCTL_TLSCLIENT', required=False, show_envvar=True,
               help="TLS client name specified in config")
 @click.option('--rootcas', default=None, help="Root CA bundle to use instead of system trust when connecting with tls")
 @click.option('--key', default=None, help="Client private key filename")
 @click.option('--cert', default=None, help="Client certificate filename")
 @click.option('--insecureskipverify', default=False, help="Accept any server cert", show_default=True)
-def cli(ctx, socket, config, tls_client, rootcas, key, cert, insecureskipverify):
+def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
     ctx.obj = dict()
-    ctx.obj['socket'] = socket
-    ctx.obj['config'] = config
-    ctx.obj['tls-client'] = tls_client
-    ctx.obj['rootcas'] = rootcas
-    ctx.obj['key'] = key
-    ctx.obj['cert'] = cert
-    ctx.obj['insecureskipverify'] = insecureskipverify
-
+    ctx.obj['rc'] = ReceptorControl(socket, config=config, tlsclient=tlsclient, rootcas=rootcas, key=key, cert=cert, insecureskipverify=insecureskipverify)
 def get_rc(ctx):
-    rc = ReceptorControl()
-    rc.readconfig(ctx.obj)
-    rc.connect(ctx.obj)
-    return rc
+    return ctx.obj['rc']
 
 
 @cli.command(help="Show the status of the Receptor network.")

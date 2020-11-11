@@ -9,15 +9,30 @@ import ssl
 import yaml
 
 class ReceptorControl:
-    def __init__(self):
+    def __init__(self, socketaddress, config=None, tlsclient=None, rootcas=None, key=None, cert=None, insecureskipverify=False):
+        if config and any((rootcas, key, cert)):
+            raise RuntimeError("Cannot specify both config and rootcas, key, cert")
+        if config and not tlsclient:
+            raise RuntimeError("Must specify both config and tlsclient")
+        self.socketaddress = socketaddress
         self.socket = None
         self.sockfile = None
         self.remote_node = None
+        self.rootcas = rootcas
+        self.key = key
+        self.cert = cert
+        self.insecureskipverify = insecureskipverify
+
+        if config and tlsclient:
+            self.readconfig(config, tlsclient)
+
+        self.connect()
 
     def readstr(self):
         return self.sockfile.readline().decode().strip()
 
     def writestr(self, str):
+        import pdb; pdb.set_trace()
         self.sockfile.write(str.encode())
         self.sockfile.flush()
 
@@ -34,40 +49,35 @@ class ReceptorControl:
         data = json.loads(text)
         return data
 
-    def readconfig(self, ctxobj):
-        yamlfile = ctxobj["config"]
-        tlsclient = ctxobj["tls-client"]
-        if yamlfile and tlsclient:
-            with open(yamlfile, "r") as yam:
-                self.yaml = yaml.load(yam, Loader=yaml.FullLoader)
-                yam.close()
-            for i in self.yaml:
-                key = i.get("tls-client", None)
-                if key:
-                     if key["name"] == tlsclient:
-                         ctxobj["key"] = key.get("key", ctxobj["key"]) # if not in config, keep the previous value
-                         ctxobj["cert"]= key.get("cert", ctxobj["cert"])
-                         ctxobj["rootcas"] = key.get("rootcas", ctxobj["rootcas"])
-                         ctxobj["insecureskipverify"] = key.get("insecureskipverify", ctxobj["insecureskipverify"])
-                         break
+    def readconfig(self, config, tlsclient):
+        with open(config, "r") as yamlfid:
+            yamldata = yaml.load(yamlfid, Loader=yaml.FullLoader)
+            yamlfid.close()
+        for i in yamldata:
+            key = i.get("tls-client", None)
+            if key:
+                 if key["name"] == tlsclient:
+                     self.rootcas = key.get("rootcas", self.rootcas)
+                     self.key = key.get("key", self.key)
+                     self.cert = key.get("cert", self.cert)
+                     self.insecureskipverify = key.get("insecureskipverify", self.insecureskipverify)
+                     break
 
     def simple_command(self, command):
+        self.connect()
         self.writestr(f"{command}\n")
         return self.read_and_parse_json()
 
-    def connect(self, ctxobj):
-        address = ctxobj["socket"]
-        key = ctxobj["key"]
-        cert = ctxobj["cert"]
-        rootcas = ctxobj["rootcas"]
-        insecureskipverify = ctxobj["insecureskipverify"]
+    def connect(self):
+        import pdb; pdb.set_trace()
         if self.socket is not None:
-            raise ValueError("Already connected")
-        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(address)
+            return
+        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self.socketaddress)
         if m:
             unixsocket = m[7]
             host = m[3]
             port = m[4]
+            protocol = m[1]
             if unixsocket:
                 path = os.path.expanduser(unixsocket)
                 if not os.path.exists(path):
@@ -88,11 +98,11 @@ class ReceptorControl:
                         self.socket = None
                         continue
                     try:
-                        if m[1] == "tls":
-                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=rootcas)
-                            if key and cert:
-                                context.load_cert_chain(certfile=cert, keyfile=key)
-                            if insecureskipverify:
+                        if protocol == "tls":
+                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=self.rootcas)
+                            if self.key and self.cert:
+                                context.load_cert_chain(certfile=self.cert, keyfile=self.key)
+                            if self.insecureskipverify:
                                 context.check_hostname = False
                             self.socket = context.wrap_socket(self.socket, server_hostname=host)
                         self.socket.connect(sockaddr)
@@ -106,7 +116,7 @@ class ReceptorControl:
                     raise ValueError(f"Could not connect to host {host} port {port}")
                 self.handshake()
                 return
-        raise ValueError(f"Invalid socket address {address}")
+        raise ValueError(f"Invalid socket address {self.socketfile}")
 
     def close(self):
         if self.sockfile is not None:
@@ -124,12 +134,14 @@ class ReceptorControl:
             self.socket = None
 
     def connect_to_service(self, node, service, tlsclient):
+        self.connect()
         self.writestr(f"connect {node} {service} {tlsclient}\n")
         text = self.readstr()
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
 
     def submit_work(self, worktype, payload, node=None, tlsclient=None, ttl=None, params=None):
+        self.connect()
         if node is None:
             node = "localhost"
 
@@ -180,6 +192,7 @@ class ReceptorControl:
         return result
 
     def get_work_results(self, unit_id):
+        self.connect()
         self.writestr(f"work results {unit_id}\n")
         text = self.readstr()
         m = re.compile("Streaming results for work unit (.+)").fullmatch(text)

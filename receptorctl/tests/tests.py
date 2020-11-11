@@ -52,9 +52,8 @@ def receptor_mesh(request):
     node2 = subprocess.Popen(["receptor", "-c", "tests/mesh-definitions/mesh1/node2.yaml"])
 
     time.sleep(0.5)
-    node1_controller = ReceptorControl()
-    connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
-    node1_controller.connect(connDict)
+    socketaddress = "unix://" + os.path.join(tmpDir, "node1.sock")
+    node1_controller = ReceptorControl(socketaddress)
 
     while True:
         status = node1_controller.simple_command("status")
@@ -72,45 +71,40 @@ def receptor_mesh(request):
 @pytest.mark.usefixtures('receptor_mesh')
 class TestReceptorCTL:
     def test_simple_command(self):
-        node1_controller = ReceptorControl()
-        connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
-        node1_controller.connect(connDict)
+        socketaddress = "unix://" + os.path.join(tmpDir, "node1.sock")
+        node1_controller = ReceptorControl(socketaddress)
         status = node1_controller.simple_command("status")
         node1_controller.close()
         assert not (set(["Advertisements", "Connections", "KnownConnectionCosts", "NodeID", "RoutingTable"]) - status.keys())
 
     def test_simple_command_fail(self):
-        node1_controller = ReceptorControl()
-        connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
-        node1_controller.connect(connDict)
+        socketaddress = "unix://" + os.path.join(tmpDir, "node1.sock")
+        node1_controller = ReceptorControl(socketaddress)
         with pytest.raises(RuntimeError):
             node1_controller.simple_command("doesnotexist")
         node1_controller.close()
 
     def test_tcp_control_service(self):
-        node1_controller = ReceptorControl()
-        connDict["socket"] = "tcp://localhost:11112"
-        node1_controller.connect(connDict)
+        socketaddress = "tcp://localhost:11112"
+        node1_controller = ReceptorControl(socketaddress)
         status = node1_controller.simple_command("status")
         node1_controller.close()
         assert not (set(["Advertisements", "Connections", "KnownConnectionCosts", "NodeID", "RoutingTable"]) - status.keys())
 
     def test_tcp_control_service_tls(self):
-        node1_controller = ReceptorControl()
-        connDict["socket"] = "tls://localhost:11113"
-        connDict["rootcas"] = caCrtPath
-        connDict["insecureskipverify"] = True
-        connDict["key"] = clientKeyPath
-        connDict["cert"] = clientCrtPath
-        node1_controller.connect(connDict)
+        socketaddress = "tls://localhost:11113"
+        rootcas = caCrtPath
+        key = clientKeyPath
+        cert = clientCrtPath
+        insecureskipverify = True
+        node1_controller = ReceptorControl(socketaddress, rootcas=rootcas, key=key, cert=cert, insecureskipverify=insecureskipverify)
         status = node1_controller.simple_command("status")
         node1_controller.close()
         assert not (set(["Advertisements", "Connections", "KnownConnectionCosts", "NodeID", "RoutingTable"]) - status.keys())
 
     def test_connect_to_service(self):
-        node1_controller = ReceptorControl()
-        connDict["socket"] = "unix://" + os.path.join(tmpDir, "node1.sock")
-        node1_controller.connect(connDict)
+        socketaddress = "unix://" + os.path.join(tmpDir, "node1.sock")
+        node1_controller = ReceptorControl(socketaddress)
         node1_controller.connect_to_service("node2", "control", "")
         node1_controller.handshake()
         status = node1_controller.simple_command("status")

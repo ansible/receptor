@@ -203,4 +203,9 @@ class ReceptorControl:
                 errmsg = errmsg + ": " + text[7:]
             raise RuntimeError(errmsg)
         shutdown_write(self.socket)
+        try:
+            self.socket.close()
+        except:
+            pass
+        self.socket = None
         return self.sockfile

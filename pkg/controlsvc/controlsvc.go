@@ -373,6 +373,9 @@ type CmdlineConfigUnix struct {
 
 // Run runs the action
 func (cfg CmdlineConfigUnix) Run() error {
+	if cfg.TLS != "" && cfg.TCPListen != "" && cfg.TCPTLS == "" {
+		logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
+	}
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

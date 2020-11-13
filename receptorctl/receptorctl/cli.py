@@ -97,10 +97,16 @@ def status(ctx):
     ads = status.pop('Advertisements', None)
     if ads:
         print()
-        print(f"{'Node':<{longest_node}} Service   Last Seen            Tags")
+        print(f"{'Node':<{longest_node}} Service   Type       Last Seen            Tags")
         for ad in ads:
             time = dateutil.parser.parse(ad['Time'])
-            print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<8}  {time:%Y-%m-%d %H:%M:%S}  ", end="")
+            if ad['ConnType'] == 0:
+                conn_type = 'Datagram'
+            elif ad['ConnType'] == 1:
+                conn_type = 'Stream'
+            elif ad['ConnType'] == 2:
+                conn_type = 'StreamTLS'
+            print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S}  ", end="")
             pprint(ad['Tags'])
 
     if status:

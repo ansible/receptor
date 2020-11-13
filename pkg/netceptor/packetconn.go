@@ -18,6 +18,7 @@ type PacketConn struct {
 	writeDeadline      time.Time
 	advertise          bool
 	adTags             map[string]string
+	connType           byte
 	hopsToLive         byte
 	unreachableMsgChan chan interface{}
 	unreachableSubs    *utils.Broker
@@ -48,6 +49,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 		recvChan:     make(chan *messageData),
 		advertise:    false,
 		adTags:       nil,
+		connType:     ConnTypeDatagram,
 		hopsToLive:   MaxForwardingHops,
 	}
 	pc.startUnreachable()
@@ -64,7 +66,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	}
 	pc.advertise = true
 	pc.adTags = tags
-	s.addLocalServiceAdvertisement(service, tags)
+	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
 	return pc, nil
 }
 

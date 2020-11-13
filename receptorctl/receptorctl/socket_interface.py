@@ -20,29 +20,29 @@ class ReceptorControl:
             raise RuntimeError("Cannot specify both config and rootcas, key, cert")
         if config and not tlsclient:
             raise RuntimeError("Must specify both config and tlsclient")
-        self.socket = None
-        self.sockfile = None
-        self.remote_node = None
-        self.socketaddress = socketaddress
-        self.rootcas = rootcas
-        self.key = key
-        self.cert = cert
-        self.insecureskipverify = insecureskipverify
+        self._socket = None
+        self._sockfile = None
+        self._remote_node = None
+        self._socketaddress = socketaddress
+        self._rootcas = rootcas
+        self._key = key
+        self._cert = cert
+        self._insecureskipverify = insecureskipverify
         if config and tlsclient:
             self.readconfig(config, tlsclient)
 
     def readstr(self):
-        return self.sockfile.readline().decode().strip()
+        return self._sockfile.readline().decode().strip()
 
     def writestr(self, str):
-        self.sockfile.write(str.encode())
-        self.sockfile.flush()
+        self._sockfile.write(str.encode())
+        self._sockfile.flush()
 
     def handshake(self):
         m = re.compile("Receptor Control, node (.+)").fullmatch(self.readstr())
         if not m:
             raise RuntimeError("Failed to connect to Receptor socket")
-        self.remote_node = m[1]
+        self._remote_node = m[1]
 
     def read_and_parse_json(self):
         text = self.readstr()
@@ -58,12 +58,12 @@ class ReceptorControl:
         for i in yamldata:
             key = i.get("tls-client", None)
             if key:
-                 if key["name"] == tlsclient:
-                     self.rootcas = key.get("rootcas", self.rootcas)
-                     self.key = key.get("key", self.key)
-                     self.cert = key.get("cert", self.cert)
-                     self.insecureskipverify = key.get("insecureskipverify", self.insecureskipverify)
-                     break
+                if key["name"] == tlsclient:
+                    self._rootcas = key.get("rootcas", self._rootcas)
+                    self._key = key.get("key", self._key)
+                    self._cert = key.get("cert", self._cert)
+                    self._insecureskipverify = key.get("insecureskipverify", self._insecureskipverify)
+                    break
 
     def simple_command(self, command):
         self.connect()
@@ -71,9 +71,9 @@ class ReceptorControl:
         return self.read_and_parse_json()
 
     def connect(self):
-        if self.socket is not None:
+        if self._socket is not None:
             return
-        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self.socketaddress)
+        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self._socketaddress)
         if m:
             unixsocket = m[7]
             host = m[3]
@@ -83,54 +83,54 @@ class ReceptorControl:
                 path = os.path.expanduser(unixsocket)
                 if not os.path.exists(path):
                     raise ValueError(f"Socket path does not exist: {path}")
-                self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                self.socket.connect(path)
-                self.sockfile = self.socket.makefile('rwb')
+                self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self._socket.connect(path)
+                self._sockfile = self._socket.makefile('rwb')
                 self.handshake()
                 return
             elif host and port:
-                self.socket = None
+                self._socket = None
                 addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)
                 for addr in addrs:
                     family, type, proto, canonname, sockaddr = addr
                     try:
-                        self.socket = socket.socket(family, type, proto)
+                        self._socket = socket.socket(family, type, proto)
                     except OSError:
-                        self.socket = None
+                        self._socket = None
                         continue
                     try:
                         if protocol == "tls":
-                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=self.rootcas)
-                            if self.key and self.cert:
-                                context.load_cert_chain(certfile=self.cert, keyfile=self.key)
-                            if self.insecureskipverify:
+                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=self._rootcas)
+                            if self._key and self._cert:
+                                context.load_cert_chain(certfile=self._cert, keyfile=self._key)
+                            if self._insecureskipverify:
                                 context.check_hostname = False
-                            self.socket = context.wrap_socket(self.socket, server_hostname=host)
-                        self.socket.connect(sockaddr)
+                            self._socket = context.wrap_socket(self._socket, server_hostname=host)
+                        self._socket.connect(sockaddr)
                     except OSError:
-                        self.socket.close()
-                        self.socket = None
+                        self._socket.close()
+                        self._socket = None
                         continue
-                    self.sockfile = self.socket.makefile('rwb')
+                    self._sockfile = self._socket.makefile('rwb')
                     break
-                if self.socket is None:
+                if self._socket is None:
                     raise ValueError(f"Could not connect to host {host} port {port}")
                 self.handshake()
                 return
-        raise ValueError(f"Invalid socket address {self.socketaddress}")
+        raise ValueError(f"Invalid socket address {self._socketaddress}")
 
     def close(self):
-        if self.sockfile is not None:
+        if self._sockfile is not None:
             try:
-                self.sockfile.close()
+                self._sockfile.close()
             finally:
-                self.sockfile = None
+                self._sockfile = None
 
-        if self.socket is not None:
+        if self._socket is not None:
             try:
-                self.socket.close()
+                self._socket.close()
             finally:
-                self.socket = None
+                self._socket = None
 
     def connect_to_service(self, node, service, tlsclient):
         self.connect()
@@ -174,15 +174,15 @@ class ReceptorControl:
                 errmsg = errmsg + ": " + text[7:]
             raise RuntimeError(errmsg)
         if isinstance(payload, io.IOBase):
-            shutil.copyfileobj(payload, self.sockfile)
+            shutil.copyfileobj(payload, self._sockfile)
         elif isinstance(payload, str):
             self.writestr(payload)
         elif isinstance(payload, bytes):
-            self.sockfile.write(payload)
+            self._sockfile.write(payload)
         else:
             raise RuntimeError("Unknown payload type")
-        self.sockfile.flush()
-        shutdown_write(self.socket)
+        self._sockfile.flush()
+        shutdown_write(self._socket)
         text = self.readstr()
         self.close()
         if text.startswith("ERROR:"):
@@ -190,7 +190,7 @@ class ReceptorControl:
         result = json.loads(text)
         return result
 
-    def get_work_results(self, unit_id):
+    def get_work_results(self, unit_id, return_socket=False, return_sockfile=True):
         self.connect()
         self.writestr(f"work results {unit_id}\n")
         text = self.readstr()
@@ -200,10 +200,28 @@ class ReceptorControl:
             if str.startswith(text, "ERROR: "):
                 errmsg = errmsg + ": " + text[7:]
             raise RuntimeError(errmsg)
-        shutdown_write(self.socket)
-        # Close socket but not sockfile.  This leaves the connection open until the caller closes sockfile.
+        shutdown_write(self._socket)
+
+        # We return the filelike object created by makefile() by default, or optionally
+        # the socket itself.  Either way, we close the other dup'd handle so the caller's
+        # close will be effective.
+
+        socket = self._socket
+        sockfile = self._sockfile
         try:
-            self.socket.close()
+            if not return_socket:
+                self._socket.close()
+            if not return_sockfile:
+                self.sockfile.close()
         finally:
-            self.socket = None
-        return self.sockfile
+            self._socket = None
+            self._sockfile = None
+
+        if return_socket and return_sockfile:
+            return socket, sockfile
+        elif return_socket:
+            return socket
+        elif return_sockfile:
+            return sockfile
+        else:
+            return

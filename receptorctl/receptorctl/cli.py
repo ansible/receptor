@@ -163,10 +163,10 @@ def connect(ctx, node, service, raw, tlsclient):
 
     try:
         while True:
-            r, _, _ = select.select([rc.socket, sys.stdin], [], [])
+            r, _, _ = select.select([rc._socket, sys.stdin], [], [])
             for readable in r:
-                if readable is rc.socket:
-                    data = rc.socket.recv(4096)
+                if readable is rc._socket:
+                    data = rc._socket.recv(4096)
                     if not data:
                         return
                     sys.stdout.write(data.decode())
@@ -175,7 +175,7 @@ def connect(ctx, node, service, raw, tlsclient):
                     data = sys.stdin.read()
                     if not data:
                         return
-                    rc.socket.send(data.encode())
+                    rc._socket.send(data.encode())
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, stdin_tattrs)
         print()

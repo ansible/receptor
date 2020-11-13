@@ -179,9 +179,12 @@ type routingUpdate struct {
 }
 
 const (
-	typePacketConn = 0
-	typeConnNonTLS = 1
-	typeConnTLS    = 2
+	// ConnTypeDatagram indicates a packetconn (datagram) service listener
+	ConnTypeDatagram = 0
+	// ConnTypeStream indicates a conn (stream) service listener, without a user-defined TLS
+	ConnTypeStream = 1
+	// ConnTypeStreamTLS indicates the service listens on a packetconn connection, with a user-defined TLS
+	ConnTypeStreamTLS = 2
 )
 
 // ServiceAdvertisement is the data associated with a service advertisement

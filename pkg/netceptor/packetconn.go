@@ -49,7 +49,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 		recvChan:     make(chan *messageData),
 		advertise:    false,
 		adTags:       nil,
-		connType:     typePacketConn,
+		connType:     ConnTypeDatagram,
 		hopsToLive:   MaxForwardingHops,
 	}
 	pc.startUnreachable()
@@ -66,7 +66,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	}
 	pc.advertise = true
 	pc.adTags = tags
-	s.addLocalServiceAdvertisement(service, typePacketConn, tags)
+	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
 	return pc, nil
 }
 

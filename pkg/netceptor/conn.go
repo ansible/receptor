@@ -64,10 +64,10 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	_ = s.addNameHash(service)
 	var connType byte
 	if tlscfg == nil {
-		connType = typeConnNonTLS
+		connType = ConnTypeStream
 		tlscfg = generateServerTLSConfig()
 	} else {
-		connType = typeConnTLS
+		connType = ConnTypeStreamTLS
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
 		if tlscfg.GetConfigForClient != nil {

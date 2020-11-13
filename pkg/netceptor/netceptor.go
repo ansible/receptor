@@ -178,12 +178,19 @@ type routingUpdate struct {
 	SuspectedDuplicate uint64
 }
 
+const (
+	typePacketConn = 0
+	typeConnNonTLS = 1
+	typeConnTLS    = 2
+)
+
 // ServiceAdvertisement is the data associated with a service advertisement
 type ServiceAdvertisement struct {
-	NodeID  string
-	Service string
-	Time    time.Time
-	Tags    map[string]string
+	NodeID   string
+	Service  string
+	Time     time.Time
+	ConnType byte
+	Tags     map[string]string
 }
 
 // serviceAdvertisementFull is the whole message from the network
@@ -410,7 +417,7 @@ func (s *Netceptor) PathCost(nodeID string) (float64, error) {
 	return cost, nil
 }
 
-func (s *Netceptor) addLocalServiceAdvertisement(service string, tags map[string]string) {
+func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
@@ -419,10 +426,11 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, tags map[string
 		s.serviceAdsReceived[s.nodeID] = n
 	}
 	n[service] = &ServiceAdvertisement{
-		NodeID:  s.nodeID,
-		Service: service,
-		Time:    time.Now(),
-		Tags:    tags,
+		NodeID:   s.nodeID,
+		Service:  service,
+		Time:     time.Now(),
+		ConnType: connType,
+		Tags:     tags,
 	}
 	s.sendServiceAdsChan <- 0
 }
@@ -431,15 +439,17 @@ func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
+	connType := n[service].ConnType
 	if ok {
 		delete(n, service)
 	}
 	sa := &serviceAdvertisementFull{
 		ServiceAdvertisement: &ServiceAdvertisement{
-			NodeID:  s.nodeID,
-			Service: service,
-			Time:    time.Now(),
-			Tags:    nil,
+			NodeID:   s.nodeID,
+			Service:  service,
+			Time:     time.Now(),
+			ConnType: connType,
+			Tags:     nil,
 		},
 		Cancel: true,
 	}
@@ -453,7 +463,8 @@ func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
 
 // Send a single service broadcast
 func (s *Netceptor) sendServiceAd(si *ServiceAdvertisement) error {
-	logger.Debug("Sending service advertisement: %s\n", si)
+
+	logger.Debug("Sending service advertisement: %v\n", si)
 	sf := serviceAdvertisementFull{
 		ServiceAdvertisement: si,
 		Cancel:               false,
@@ -473,10 +484,11 @@ func (s *Netceptor) sendServiceAds() {
 	for sn := range s.listenerRegistry {
 		if s.listenerRegistry[sn].advertise {
 			sa := ServiceAdvertisement{
-				NodeID:  s.nodeID,
-				Service: sn,
-				Time:    time.Now(),
-				Tags:    s.listenerRegistry[sn].adTags,
+				NodeID:   s.nodeID,
+				Service:  sn,
+				Time:     time.Now(),
+				ConnType: s.listenerRegistry[sn].connType,
+				Tags:     s.listenerRegistry[sn].adTags,
 			}
 			ads = append(ads, sa)
 		}

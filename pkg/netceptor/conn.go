@@ -62,19 +62,12 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
 	_ = s.addNameHash(service)
-	pc := &PacketConn{
-		s:            s,
-		localService: service,
-		recvChan:     make(chan *messageData),
-		advertise:    advertise,
-		adTags:       adTags,
-		hopsToLive:   MaxForwardingHops,
-	}
-	pc.startUnreachable()
-	s.listenerRegistry[service] = pc
+	var connType byte
 	if tlscfg == nil {
+		connType = typeConnNonTLS
 		tlscfg = generateServerTLSConfig()
 	} else {
+		connType = typeConnTLS
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
 		if tlscfg.GetConfigForClient != nil {
@@ -84,12 +77,23 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 			}
 		}
 	}
+	pc := &PacketConn{
+		s:            s,
+		localService: service,
+		recvChan:     make(chan *messageData),
+		advertise:    advertise,
+		adTags:       adTags,
+		connType:     connType,
+		hopsToLive:   MaxForwardingHops,
+	}
+	pc.startUnreachable()
+	s.listenerRegistry[service] = pc
 	ql, err := quic.Listen(pc, tlscfg, nil)
 	if err != nil {
 		return nil, err
 	}
 	if advertise {
-		s.addLocalServiceAdvertisement(service, adTags)
+		s.addLocalServiceAdvertisement(service, connType, adTags)
 	}
 	doneChan := make(chan struct{})
 	go func() {

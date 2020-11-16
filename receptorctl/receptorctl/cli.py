@@ -197,7 +197,7 @@ def work():
 @click.option('--node', default=None, type=str, help="Receptor node to list work from. Defaults to the local node.")
 @click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
 @click.pass_context
-def list(ctx, node, quiet, tlsclient):
+def list(ctx, node, tlsclient, quiet):
     rc = get_rc(ctx)
     if node:
         rc.connect_to_service(node, "control", tlsclient)

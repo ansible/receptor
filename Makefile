@@ -145,8 +145,8 @@ $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-pytho
 	@cd receptor-python-worker && python3 setup.py bdist_wheel
 
 container: .container-flag-$(VERSION)
-.container-flag-$(VERSION): receptor $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
-	@cp receptor packaging/container
+.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
 	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t $(TAG) $(if $(OFFICIAL),-t receptor:$(VERSION),)

@@ -1,3 +1,11 @@
+FROM fedora:32 as builder
+
+RUN dnf -y update && dnf install -y golang make
+
+ADD source.tar.gz /source
+WORKDIR /source
+RUN make
+
 FROM fedora:32
 ARG VERSION
 
@@ -16,7 +24,7 @@ RUN pip3 install /tmp/*.whl
 RUN rm /tmp/*.whl
 
 COPY receptor.conf /etc/receptor/receptor.conf
-COPY receptor /usr/bin/receptor
+COPY --from=builder /source/receptor /usr/bin/receptor
 
 ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
 

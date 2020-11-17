@@ -92,6 +92,7 @@ func New(stdServices bool, nc *netceptor.Netceptor) *Server {
 		s.controlTypes["status"] = &statusCommandType{}
 		s.controlTypes["connect"] = &connectCommandType{}
 		s.controlTypes["traceroute"] = &tracerouteCommandType{}
+		s.controlTypes["info"] = &infoCommandType{}
 	}
 	return s
 }

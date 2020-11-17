@@ -95,6 +95,7 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
+	controlsvc.Version = version
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
 	cmdline.AddConfigType("version", "Show the Receptor version", versionCfg{}, cmdline.Exclusive)

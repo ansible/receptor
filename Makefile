@@ -48,7 +48,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	go build -ldflags "-X main.version=$(APPVER)" $(TAGPARAM) cmd/receptor.go
+	go build -ldflags "-X 'main.version=$(APPVER)'" $(TAGPARAM) cmd/receptor.go
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -133,7 +133,7 @@ $(RECEPTOR_PYTHON_WORKER_RPM): packaging/rpm/receptor-python-worker.spec $(RPMSO
 	rpmbuild -ba packaging/rpm/receptor-python-worker.spec -D "%_topdir $$PWD/rpmbuild"
 
 rpms: $(RPMS)
-	
+
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
 $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
 	@echo $(VERSION) > .VERSION

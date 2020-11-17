@@ -95,8 +95,8 @@ ci: pre-commit build-all test receptorctl-tests
 	@echo "All done"
 
 version:
-	@echo $(VERSION) > .VERSION
-	@echo ".VERSION created for $(VERSION)"
+	@echo $(APPVER) > .VERSION
+	@echo ".VERSION created for $(APPVER)"
 
 SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec packaging/rpm/receptor-python-worker.spec
 

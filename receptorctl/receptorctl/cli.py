@@ -51,6 +51,8 @@ def get_rc(ctx):
 def status(ctx):
     rc = get_rc(ctx)
     status = rc.simple_command("status")
+    version = status.pop('Version')
+    print(f"Version: {version}")
 
     node_id = status.pop('NodeID')
     print(f"Node ID: {node_id}")

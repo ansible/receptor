@@ -68,7 +68,7 @@ class ReceptorControl:
 
     def raise_error(self, error):
         try:
-            receptorVersion = self.simple_command("info")["Version"]
+            receptorVersion = self.simple_command('{"command":"status","fields":["Version"]}')["Version"]
             receptorctlVersion = pkg_resources.get_distribution('receptorctl').version
             if receptorVersion != receptorctlVersion:
                 print("Warning: receptorctl and receptor are different versions, which may be the cause of the error")

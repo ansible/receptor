@@ -66,14 +66,19 @@ class ReceptorControl:
                     self._insecureskipverify = key.get("insecureskipverify", self._insecureskipverify)
                     break
 
+    def check_version(self):
+        receptorVersion = self.simple_command('{"command":"status","fields":["Version"]}')["Version"]
+        receptorctlVersion = pkg_resources.get_distribution('receptorctl').version
+        if receptorVersion != receptorctlVersion:
+            print("Warning: receptorctl and receptor are different versions, they may not be compatible")
+        else:
+            print("Versions match and should be compatible")
+        print(f"\treceptorctl  {receptorctlVersion}")
+        print(f"\treceptor     {receptorVersion}")
+
     def raise_error(self, error):
         try:
-            receptorVersion = self.simple_command('{"command":"status","fields":["Version"]}')["Version"]
-            receptorctlVersion = pkg_resources.get_distribution('receptorctl').version
-            if receptorVersion != receptorctlVersion:
-                print("Warning: receptorctl and receptor are different versions, which may be the cause of the error")
-                print(f"\treceptorctl version: {receptorctlVersion}")
-                print(f"\treceptor version: {receptorVersion}")
+            self.check_version()
         except OSError:
             pass
         raise error
@@ -154,7 +159,6 @@ class ReceptorControl:
 
     def submit_work(self, worktype, payload, node=None, tlsclient=None, ttl=None, params=None):
         self.connect()
-        self.raise_error(ValueError(f"Could not submit work"))
         if node is None:
             node = "localhost"
 

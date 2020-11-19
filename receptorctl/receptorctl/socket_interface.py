@@ -67,7 +67,7 @@ class ReceptorControl:
                     break
 
     def check_version(self):
-        receptorVersion = self.simple_command('{"command":"status","fields":["Version"]}')["Version"]
+        receptorVersion = self.simple_command('{"command":"status","requested_fields":["Version"]}')["Version"]
         receptorctlVersion = pkg_resources.get_distribution('receptorctl').version
         if receptorVersion != receptorctlVersion:
             print("Warning: receptorctl and receptor are different versions, they may not be compatible")

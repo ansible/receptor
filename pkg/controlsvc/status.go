@@ -22,14 +22,14 @@ func (t *statusCommandType) InitFromString(params string) (ControlCommand, error
 }
 
 func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
-	fields, ok := config["fields"]
+	fields, ok := config["requested_fields"]
 	var fieldsStr []string
 	if ok {
 		fieldsStr = make([]string, 0)
 		for _, v := range fields.([]interface{}) {
 			vStr, ok := v.(string)
 			if !ok {
-				return nil, fmt.Errorf("each element of fields must be a string")
+				return nil, fmt.Errorf("each element of requested_fields must be a string")
 			}
 			fieldsStr = append(fieldsStr, vStr)
 		}

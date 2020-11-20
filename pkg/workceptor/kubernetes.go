@@ -38,6 +38,7 @@ type kubeUnit struct {
 	cancel              context.CancelFunc
 	authMethod          string
 	streamMethod        string
+	baseParams          string
 	allowRuntimeAuth    bool
 	allowRuntimeTLS     bool
 	allowRuntimeCommand bool
@@ -99,10 +100,10 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 func (kw *kubeUnit) createPod(env map[string]string) error {
 	ked := kw.Status().ExtraData.(*kubeExtraData)
 	command, err := shlex.Split(ked.Command)
-	var args []string
-	if err == nil {
-		args, err = shlex.Split(ked.Params)
+	if err != nil {
+		return err
 	}
+	params, err := shlex.Split(ked.Params)
 	if err != nil {
 		return err
 	}
@@ -116,7 +117,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 				Name:      "worker",
 				Image:     ked.Image,
 				Command:   command,
-				Args:      args,
+				Args:      params,
 				Stdin:     true,
 				StdinOnce: true,
 				TTY:       false,
@@ -602,10 +603,11 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		}
 		return ssf
 	}
+	userParams := ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
-		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&ked.Params)},
+		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "kube_host", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeHost)},
 		{name: "kube_api_path", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeAPIPath)},
@@ -628,6 +630,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 			}
 		}
 	}
+	ked.Params = combineParams(kw.baseParams, userParams)
 	return nil
 }
 
@@ -741,7 +744,8 @@ type WorkKubeCfg struct {
 	WorkType            string `required:"true" description:"Name for this worker type"`
 	Namespace           string `description:"Kubernetes namespace to create pods in"`
 	Image               string `description:"Container image to use for the worker pod"`
-	Command             string `description:"Command to run in the container (default: entrypoint)"`
+	Command             string `description:"Command to run in the container (overrides entrypoint)"`
+	Params              string `description:"Command-line parameters to pass to the entrypoint"`
 	AuthMethod          string `description:"One of: kubeconfig, incluster, params" default:"incluster"`
 	KubeConfig          string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
 	KubeHost            string `description:"k8s API hostname (for authmethod=params)"`
@@ -778,15 +782,16 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 				},
 			},
 		},
-		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 		authMethod:          strings.ToLower(cfg.AuthMethod),
 		streamMethod:        strings.ToLower(cfg.StreamMethod),
-		kubeConfig:          cfg.KubeConfig,
+		baseParams:          cfg.Params,
 		allowRuntimeAuth:    cfg.AllowRuntimeAuth,
 		allowRuntimeTLS:     cfg.AllowRuntimeTLS,
 		allowRuntimeCommand: cfg.AllowRuntimeCommand,
 		allowRuntimeParams:  cfg.AllowRuntimeParams,
 		deletePodOnRestart:  cfg.DeletePodOnRestart,
+		kubeConfig:          cfg.KubeConfig,
+		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
 	ku.BaseWorkUnit.Init(w, unitID, workType)
 	return ku

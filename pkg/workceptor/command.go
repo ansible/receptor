@@ -138,6 +138,18 @@ loop:
 	return nil
 }
 
+func combineParams(baseParams string, userParams string) string {
+	var allParams string
+	if userParams == "" {
+		allParams = baseParams
+	} else if baseParams == "" {
+		allParams = userParams
+	} else {
+		allParams = strings.Join([]string{baseParams, userParams}, " ")
+	}
+	return allParams
+}
+
 // SetFromParams sets the in-memory state from parameters
 func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	cmdParams, ok := params["params"]
@@ -147,15 +159,7 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	if cmdParams != "" && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
-	var allParams string
-	if cmdParams == "" {
-		allParams = cw.baseParams
-	} else if cw.baseParams == "" {
-		allParams = cmdParams
-	} else {
-		allParams = strings.Join([]string{cw.baseParams, cmdParams}, " ")
-	}
-	cw.status.ExtraData.(*commandExtraData).Params = allParams
+	cw.status.ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
 	return nil
 }
 

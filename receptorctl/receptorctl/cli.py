@@ -341,6 +341,7 @@ def release(ctx, force, unit_ids):
     op_on_unit_ids(ctx, op, unit_ids)
     print("Released:", unit_ids)
 
+
 def run():
     try:
         cli.main(sys.argv[1:], standalone_mode=False)

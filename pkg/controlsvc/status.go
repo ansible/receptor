@@ -3,15 +3,13 @@ package controlsvc
 import (
 	"fmt"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/version"
 )
 
 type statusCommandType struct{}
 type statusCommand struct {
-	fields []string
+	requestedFields []string
 }
-
-// Version is receptor app version
-var Version string
 
 func (t *statusCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params != "" {
@@ -22,42 +20,46 @@ func (t *statusCommandType) InitFromString(params string) (ControlCommand, error
 }
 
 func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
-	fields, ok := config["requested_fields"]
-	var fieldsStr []string
+	requestedFields, ok := config["requested_fields"]
+	var requestedFieldsStr []string
 	if ok {
-		fieldsStr = make([]string, 0)
-		for _, v := range fields.([]interface{}) {
+		requestedFieldsStr = make([]string, 0)
+		for _, v := range requestedFields.([]interface{}) {
 			vStr, ok := v.(string)
 			if !ok {
 				return nil, fmt.Errorf("each element of requested_fields must be a string")
 			}
-			fieldsStr = append(fieldsStr, vStr)
+			requestedFieldsStr = append(requestedFieldsStr, vStr)
 		}
 	} else {
-		fieldsStr = nil
+		requestedFieldsStr = nil
 	}
 	c := &statusCommand{
-		fields: fieldsStr,
+		requestedFields: requestedFieldsStr,
 	}
 	return c, nil
 }
 
 func (c *statusCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	status := nc.Status()
-	precfr := make(map[string]interface{})
-	precfr["Version"] = Version
-	precfr["NodeID"] = status.NodeID
-	precfr["Connections"] = status.Connections
-	precfr["RoutingTable"] = status.RoutingTable
-	precfr["Advertisements"] = status.Advertisements
-	precfr["KnownConnectionCosts"] = status.KnownConnectionCosts
+	statusGetters := make(map[string]func() interface{})
+	statusGetters["Version"] = func() interface{} { return version.Version }
+	statusGetters["NodeID"] = func() interface{} { return status.NodeID }
+	statusGetters["Connections"] = func() interface{} { return status.Connections }
+	statusGetters["RoutingTable"] = func() interface{} { return status.RoutingTable }
+	statusGetters["Advertisements"] = func() interface{} { return status.Advertisements }
+	statusGetters["KnownConnectionCosts"] = func() interface{} { return status.KnownConnectionCosts }
 	cfr := make(map[string]interface{})
-	if c.fields != nil {
-		for _, f := range c.fields {
-			cfr[f] = precfr[f]
+	if c.requestedFields == nil { // if nil, fill it with the keys in statusGetters
+		for field := range statusGetters {
+			c.requestedFields = append(c.requestedFields, field)
 		}
-	} else {
-		cfr = precfr
+	}
+	for _, field := range c.requestedFields {
+		getter, ok := statusGetters[field]
+		if ok {
+			cfr[field] = getter()
+		}
 	}
 	return cfr, nil
 }

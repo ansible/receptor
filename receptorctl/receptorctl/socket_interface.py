@@ -18,9 +18,9 @@ def shutdown_write(sock):
 class ReceptorControl:
     def __init__(self, socketaddress, config=None, tlsclient=None, rootcas=None, key=None, cert=None, insecureskipverify=False):
         if config and any((rootcas, key, cert)):
-            self.raise_error(RuntimeError("Cannot specify both config and rootcas, key, cert"))
+            raise RuntimeError("Cannot specify both config and rootcas, key, cert")
         if config and not tlsclient:
-            self.raise_error(RuntimeError("Must specify both config and tlsclient"))
+            raise RuntimeError("Must specify both config and tlsclient")
         self._socket = None
         self._sockfile = None
         self._remote_node = None
@@ -42,13 +42,13 @@ class ReceptorControl:
     def handshake(self):
         m = re.compile("Receptor Control, node (.+)").fullmatch(self.readstr())
         if not m:
-            self.raise_error(RuntimeError("Failed to connect to Receptor socket"))
+            raise RuntimeError("Failed to connect to Receptor socket")
         self._remote_node = m[1]
 
     def read_and_parse_json(self):
         text = self.readstr()
         if str.startswith(text, "ERROR:"):
-            self.raise_error(RuntimeError(text[7:]))
+            raise RuntimeError(text[7:])
         data = json.loads(text)
         return data
 
@@ -65,23 +65,6 @@ class ReceptorControl:
                     self._cert = key.get("cert", self._cert)
                     self._insecureskipverify = key.get("insecureskipverify", self._insecureskipverify)
                     break
-
-    def check_version(self):
-        receptorVersion = self.simple_command('{"command":"status","requested_fields":["Version"]}')["Version"]
-        receptorctlVersion = pkg_resources.get_distribution('receptorctl').version
-        if receptorVersion != receptorctlVersion:
-            print("Warning: receptorctl and receptor are different versions, they may not be compatible")
-        else:
-            print("Versions match and should be compatible")
-        print(f"\treceptorctl  {receptorctlVersion}")
-        print(f"\treceptor     {receptorVersion}")
-
-    def raise_error(self, error):
-        try:
-            self.check_version()
-        except OSError:
-            pass
-        raise error
 
     def simple_command(self, command):
         self.connect()
@@ -100,7 +83,7 @@ class ReceptorControl:
             if unixsocket:
                 path = os.path.expanduser(unixsocket)
                 if not os.path.exists(path):
-                    self.raise_error(ValueError(f"Socket path does not exist: {path}"))
+                    raise ValueError(f"Socket path does not exist: {path}")
                 self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self._socket.connect(path)
                 self._sockfile = self._socket.makefile('rwb')
@@ -132,10 +115,10 @@ class ReceptorControl:
                     self._sockfile = self._socket.makefile('rwb')
                     break
                 if self._socket is None:
-                    self.raise_error(ValueError(f"Could not connect to host {host} port {port}"))
+                    raise ValueError(f"Could not connect to host {host} port {port}")
                 self.handshake()
                 return
-        self.raise_error(ValueError(f"Invalid socket address {self._socketaddress}"))
+        raise ValueError(f"Invalid socket address {self._socketaddress}")
 
     def close(self):
         if self._sockfile is not None:
@@ -155,7 +138,7 @@ class ReceptorControl:
         self.writestr(f"connect {node} {service} {tlsclient}\n")
         text = self.readstr()
         if not str.startswith(text, "Connecting"):
-            self.raise_error(RuntimeError(text))
+            raise RuntimeError(text)
 
     def submit_work(self, worktype, payload, node=None, tlsclient=None, ttl=None, params=None):
         self.connect()
@@ -180,7 +163,7 @@ class ReceptorControl:
                 if k not in commandMap:
                     commandMap[k] = v
                 else:
-                    self.raise_error(RuntimeError(f"Duplicate or illegal parameter {k}"))
+                    raise RuntimeError(f"Duplicate or illegal parameter {k}")
         commandJson = json.dumps(commandMap)
         command = f"{commandJson}\n"
         self.writestr(command)
@@ -190,7 +173,7 @@ class ReceptorControl:
             errmsg = "Failed to start work unit"
             if str.startswith(text, "ERROR: "):
                 errmsg = errmsg + ": " + text[7:]
-            self.raise_error(RuntimeError(errmsg))
+            raise RuntimeError(errmsg)
         if isinstance(payload, io.IOBase):
             shutil.copyfileobj(payload, self._sockfile)
         elif isinstance(payload, str):
@@ -198,13 +181,13 @@ class ReceptorControl:
         elif isinstance(payload, bytes):
             self._sockfile.write(payload)
         else:
-            self.raise_error(RuntimeError("Unknown payload type"))
+            raise RuntimeError("Unknown payload type")
         self._sockfile.flush()
         shutdown_write(self._socket)
         text = self.readstr()
         self.close()
         if text.startswith("ERROR:"):
-            self.raise_error(RuntimeError(f"Remote error: {text}"))
+            raise RuntimeError(f"Remote error: {text}")
         result = json.loads(text)
         return result
 
@@ -217,7 +200,7 @@ class ReceptorControl:
             errmsg = "Failed to get results"
             if str.startswith(text, "ERROR: "):
                 errmsg = errmsg + ": " + text[7:]
-            self.raise_error(RuntimeError(errmsg))
+            raise RuntimeError(errmsg)
         shutdown_write(self._socket)
 
         # We return the filelike object created by makefile() by default, or optionally

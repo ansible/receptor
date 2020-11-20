@@ -153,7 +153,7 @@ def traceroute(ctx, node):
 @click.argument('node')
 @click.argument('service')
 @click.option('--raw', '-r', default=False, is_flag=True, help="Set terminal to raw mode")
-@click.option('--tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
+@click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
 def connect(ctx, node, service, raw, tlsclient):
     rc = get_rc(ctx)
     rc.connect_to_service(node, service, tlsclient)
@@ -194,9 +194,14 @@ def work():
 
 @work.command(help="List known units of work.")
 @click.option('--quiet', '-q', is_flag=True, help="Only list unit IDs with no detail")
+@click.option('--node', default=None, type=str, help="Receptor node to list work from. Defaults to the local node.")
+@click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
 @click.pass_context
-def list(ctx, quiet):
+def list(ctx, node, tlsclient, quiet):
     rc = get_rc(ctx)
+    if node:
+        rc.connect_to_service(node, "control", tlsclient)
+        rc.handshake()
     work = rc.simple_command("work list")
     if quiet:
         for k in work.keys():
@@ -212,7 +217,7 @@ def list(ctx, quiet):
 @click.option('--payload', '-p', type=str, help="File containing unit of work data. Use - for stdin.")
 @click.option('--payload-literal', '-l', type=str, help="Use the command line string as the literal unit of work data.")
 @click.option('--no-payload', '-n', is_flag=True, help="Send an empty payload.")
-@click.option('--tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
+@click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
 @click.option('--ttl', type=str, default="", help="Time to live until remote work must start, e.g. 1h20m30s or 30m10s")
 @click.option('--follow', '-f', help="Remain attached to the job and print its results to stdout", is_flag=True)
 @click.option('--rm', help="Release unit after completion", is_flag=True)

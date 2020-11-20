@@ -40,13 +40,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					return
 				}
 			}
-			done := false
-			select {
-			case <-ctx.Done():
-				done = true
-			default:
-			}
-			if redial && !done {
+			if redial && ctx.Err() == nil {
 				if err != nil {
 					logger.Warning("Backend connection failed (will retry): %s\n", err)
 				} else {
@@ -61,7 +55,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 			} else {
 				if err != nil {
 					logger.Error("Backend connection failed: %s\n", err)
-				} else if !done {
+				} else if ctx.Err() != nil {
 					logger.Error("Backend connection exited\n")
 				}
 				return

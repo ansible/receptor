@@ -10,6 +10,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	_ "github.com/project-receptor/receptor/pkg/services"
+	"github.com/project-receptor/receptor/pkg/version"
 	"github.com/project-receptor/receptor/pkg/workceptor"
 	_ "github.com/project-receptor/receptor/pkg/workceptor"
 	"os"
@@ -17,15 +18,13 @@ import (
 	"time"
 )
 
-var version string
-
 type versionCfg struct{}
 
 func (cfg versionCfg) Init() error {
-	if version == "" {
+	if version.Version == "" {
 		fmt.Printf("Version unknown\n")
 	} else {
-		fmt.Printf("%s\n", version)
+		fmt.Printf("%s\n", version.Version)
 	}
 	os.Exit(0)
 	return nil

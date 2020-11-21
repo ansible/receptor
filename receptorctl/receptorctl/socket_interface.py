@@ -7,6 +7,7 @@ import shutil
 import json
 import ssl
 import yaml
+import pkg_resources
 
 def shutdown_write(sock):
     if isinstance(sock, ssl.SSLSocket):

@@ -9,6 +9,7 @@ import click
 from pprint import pprint
 from functools import partial
 import dateutil.parser
+import pkg_resources
 from .socket_interface import ReceptorControl
 
 
@@ -54,6 +55,9 @@ def status(ctx):
 
     node_id = status.pop('NodeID')
     print(f"Node ID: {node_id}")
+
+    version = status.pop('Version')
+    print(f"Version: {version}")
 
     longest_node = 12
 
@@ -190,6 +194,19 @@ def connect(ctx, node, service, raw, tlsclient):
 @cli.group(help="Commands related to unit-of-work processing")
 def work():
     pass
+
+@cli.command(help="Show version information for receptorctl and the receptor node")
+@click.pass_context
+def version(ctx):
+    rc = get_rc(ctx)
+    receptorVersion = rc.simple_command('{"command":"status","requested_fields":["Version"]}')["Version"]
+    receptorctlVersion = pkg_resources.get_distribution('receptorctl').version
+    delim = ""
+    if receptorVersion != receptorctlVersion:
+        delim = "\t"
+        print("Warning: receptorctl and receptor are different versions, they may not be compatible")
+    print(f"{delim}receptorctl  {receptorctlVersion}")
+    print(f"{delim}receptor     {receptorVersion}")
 
 
 @work.command(help="List known units of work.")

@@ -341,6 +341,62 @@ func TestCosts(t *testing.T) {
 
 }
 
+func TestDuplicateNodes(t *testing.T) {
+	t.Parallel()
+	// Setup our mesh yaml data
+	data := mesh.YamlData{}
+	data.Nodes = make(map[string]*mesh.YamlNode)
+
+	// Generate a mesh where each node n is connected to only n+1 and n-1
+	// if they exist
+	data.Nodes["node1"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
+			},
+		},
+	}
+	data.Nodes["node2"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{
+			"node1": mesh.YamlConnection{
+				Index: 0,
+			},
+		},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
+			},
+		},
+	}
+	data.Nodes["node1_dup"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{
+			"node2": mesh.YamlConnection{
+				Index: 0,
+			},
+		},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"node": map[interface{}]interface{}{
+					"id": "node1",
+				},
+			},
+		},
+	}
+	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	err = m.WaitForReady(ctx)
+	if err == nil {
+		t.Fatal("duplicate nodes were not expected to exist together")
+	}
+}
+
 func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Setup our mesh yaml data

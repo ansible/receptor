@@ -497,12 +497,12 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
-			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
+			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
-			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
 				t.Fatal(err)
 			}

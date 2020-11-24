@@ -57,8 +57,8 @@ def status(ctx):
     print(f"Node ID: {node_id}")
     version = status.pop('Version')
     print(f"Version: {version}")
-    sysCores = status.pop('SystemCPUCores')
-    print(f"System CPU Cores: {sysCores}")
+    sysCPU = status.pop('SystemCPUCount')
+    print(f"System CPU Count: {sysCPU}")
     sysMemory = status.pop('SystemMemoryMB')
     print(f"System Memory MB: {sysMemory}")
 

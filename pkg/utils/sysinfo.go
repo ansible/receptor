@@ -5,8 +5,8 @@ import (
 	"runtime"
 )
 
-// GetSysCPUCores returns number of CPU cores on the system
-func GetSysCPUCores() int {
+// GetSysCPUCount returns number of logical CPU cores on the system
+func GetSysCPUCount() int {
 	return runtime.NumCPU()
 }
 

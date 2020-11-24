@@ -45,7 +45,7 @@ func (c *statusCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 	status := nc.Status()
 	statusGetters := make(map[string]func() interface{})
 	statusGetters["Version"] = func() interface{} { return version.Version }
-	statusGetters["SystemCPUCores"] = func() interface{} { return utils.GetSysCPUCores() }
+	statusGetters["SystemCPUCount"] = func() interface{} { return utils.GetSysCPUCount() }
 	statusGetters["SystemMemoryMB"] = func() interface{} { return utils.GetSysMemoryMB() }
 	statusGetters["NodeID"] = func() interface{} { return status.NodeID }
 	statusGetters["Connections"] = func() interface{} { return status.Connections }

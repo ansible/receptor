@@ -11,6 +11,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"net"
 	"sync"
@@ -169,7 +170,7 @@ func (ns *TCPSession) Send(data []byte) error {
 
 // Recv receives data via the session
 func (ns *TCPSession) Recv(timeout time.Duration) ([]byte, error) {
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ns.framer.MessageReady() {
 			break

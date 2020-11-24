@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/project-receptor/receptor/pkg/framer"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"time"
 )
@@ -57,7 +58,7 @@ func (mc *netMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 
 // ReadMessage reads a message from the connection
 func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
-	buf := make([]byte, MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	err := mc.conn.SetReadDeadline(time.Now().Add(timeout))
 	if err != nil {
 		return nil, err

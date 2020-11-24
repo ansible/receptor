@@ -107,7 +107,7 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 }
 
 func (c *pingCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
-	pingTime, pingRemote, err := ping(nc, c.target, netceptor.MaxForwardingHops)
+	pingTime, pingRemote, err := ping(nc, c.target, nc.MaxForwardingHops())
 	cfr := make(map[string]interface{})
 	if err == nil {
 		cfr["Success"] = true

@@ -22,20 +22,23 @@ import (
 	"time"
 )
 
-// MTU is the largest message sendable over the Netecptor network
-const MTU = 16384
+// defaultMTU is the largest message sendable over the Netecptor network
+const defaultMTU = 16384
 
-// RouteUpdateTime is the interval at which regular route updates will be sent
-const RouteUpdateTime = 10 * time.Second
+// defaultRouteUpdateTime is the interval at which regular route updates will be sent
+const defaultRouteUpdateTime = 10 * time.Second
 
-// ServiceAdTime is the interval at which regular service advertisements will be sent
-const ServiceAdTime = 60 * time.Second
+// defaultServiceAdTime is the interval at which regular service advertisements will be sent
+const defaultServiceAdTime = 60 * time.Second
 
-// SeenUpdateExpireTime is the age after which routing update IDs can be discarded
-const SeenUpdateExpireTime = 1 * time.Hour
+// defaultSeenUpdateExpireTime is the age after which routing update IDs can be discarded
+const defaultSeenUpdateExpireTime = 1 * time.Hour
 
-// MaxForwardingHops is the maximum number of times that Netceptor will forward a data packet
-const MaxForwardingHops = 30
+// defaultMaxForwardingHops is the maximum number of times that Netceptor will forward a data packet
+const defaultMaxForwardingHops = 30
+
+// defaultMaxConnectionIdleTime is the maximum time a connection can go without data before we consider it failed
+const defaultMaxConnectionIdleTime = 2*defaultRouteUpdateTime + 1*time.Second
 
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function
 var MainInstance *Netceptor
@@ -77,6 +80,12 @@ type BackendSession interface {
 // Netceptor is the main object of the Receptor mesh network protocol
 type Netceptor struct {
 	nodeID                 string
+	mtu                    int
+	routeUpdateTime        time.Duration
+	serviceAdTime          time.Duration
+	seenUpdateExpireTime   time.Duration
+	maxForwardingHops      byte
+	maxConnectionIdleTime  time.Duration
 	allowedPeers           []string
 	epoch                  uint64
 	sequence               uint64
@@ -243,10 +252,18 @@ func makeNetworkName(nodeID string) string {
 	}
 }
 
-// New constructs a new Receptor network protocol instance
-func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
+// NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants
+func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
+	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
+	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
 	s := Netceptor{
 		nodeID:                 NodeID,
+		mtu:                    mtu,
+		routeUpdateTime:        routeUpdateTime,
+		serviceAdTime:          serviceAdTime,
+		seenUpdateExpireTime:   seenUpdateExpireTime,
+		maxForwardingHops:      maxForwardingHops,
+		maxConnectionIdleTime:  maxConnectionIdleTime,
 		allowedPeers:           AllowedPeers,
 		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:               0,
@@ -288,11 +305,31 @@ func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
-	s.sendRouteFloodChan = tickrunner.Run(s.context, func() { s.sendRoutingUpdate(0) }, RouteUpdateTime, time.Millisecond*100)
-	s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, ServiceAdTime, time.Second*5)
+	s.sendRouteFloodChan = tickrunner.Run(s.context, func() { s.sendRoutingUpdate(0) }, s.routeUpdateTime, time.Millisecond*100)
+	if s.serviceAdTime > 0 {
+		s.sendServiceAdsChan = tickrunner.Run(s.context, s.sendServiceAds, s.serviceAdTime, time.Second*5)
+	} else {
+		s.sendServiceAdsChan = make(chan time.Duration)
+		go func() {
+			for {
+				select {
+				case <-s.sendServiceAdsChan:
+					// do nothing
+				case <-s.context.Done():
+					return
+				}
+			}
+		}()
+	}
 	go s.monitorConnectionAging()
 	go s.expireSeenUpdates()
 	return &s
+}
+
+// New constructs a new Receptor network protocol instance
+func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
+	return NewWithConsts(ctx, NodeID, AllowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
+		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
 // NewAddr generates a Receptor network address from a node ID and service name
@@ -317,6 +354,36 @@ func (s *Netceptor) Shutdown() {
 // NodeID returns the local Node ID of this Netceptor instance
 func (s *Netceptor) NodeID() string {
 	return s.nodeID
+}
+
+// MTU returns the configured MTU of this Netceptor instance
+func (s *Netceptor) MTU() int {
+	return s.mtu
+}
+
+// RouteUpdateTime returns the configured RouteUpdateTime of this Netceptor instance
+func (s *Netceptor) RouteUpdateTime() time.Duration {
+	return s.routeUpdateTime
+}
+
+// ServiceAdTime returns the configured ServiceAdTime of this Netceptor instance
+func (s *Netceptor) ServiceAdTime() time.Duration {
+	return s.serviceAdTime
+}
+
+// SeenUpdateExpireTime returns the configured SeenUpdateExpireTime of this Netceptor instance
+func (s *Netceptor) SeenUpdateExpireTime() time.Duration {
+	return s.seenUpdateExpireTime
+}
+
+// MaxForwardingHops returns the configured MaxForwardingHops of this Netceptor instance
+func (s *Netceptor) MaxForwardingHops() byte {
+	return s.maxForwardingHops
+}
+
+// MaxConnectionIdleTime returns the configured MaxConnectionIdleTime of this Netceptor instance
+func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
+	return s.maxConnectionIdleTime
 }
 
 // AddBackend adds a backend to the Netceptor system
@@ -513,7 +580,7 @@ func (s *Netceptor) monitorConnectionAging() {
 			timedOut := make([]context.CancelFunc, 0)
 			s.connLock.RLock()
 			for i := range s.connections {
-				if time.Since(s.connections[i].lastReceivedData) > (2*RouteUpdateTime + 1*time.Second) {
+				if time.Since(s.connections[i].lastReceivedData) > s.maxConnectionIdleTime {
 					timedOut = append(timedOut, s.connections[i].CancelFunc)
 				}
 			}
@@ -532,8 +599,8 @@ func (s *Netceptor) monitorConnectionAging() {
 func (s *Netceptor) expireSeenUpdates() {
 	for {
 		select {
-		case <-time.After(SeenUpdateExpireTime / 2):
-			thresholdTime := time.Now().Add(-SeenUpdateExpireTime)
+		case <-time.After(s.seenUpdateExpireTime / 2):
+			thresholdTime := time.Now().Add(-s.seenUpdateExpireTime)
 			s.seenUpdatesLock.Lock()
 			for id := range s.seenUpdates {
 				if s.seenUpdates[id].Before(thresholdTime) {
@@ -843,7 +910,7 @@ func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string,
 
 // Generates and sends a message over the Receptor network
 func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
-	return s.sendMessageWithHopsToLive(fromService, toNode, toService, data, MaxForwardingHops)
+	return s.sendMessageWithHopsToLive(fromService, toNode, toService, data, s.maxForwardingHops)
 }
 
 // Returns an unused random service name to use as the equivalent of a TCP/IP ephemeral port number.

@@ -50,7 +50,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 		advertise:    false,
 		adTags:       nil,
 		connType:     ConnTypeDatagram,
-		hopsToLive:   MaxForwardingHops,
+		hopsToLive:   s.maxForwardingHops,
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc

@@ -9,6 +9,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/randstr"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -378,7 +379,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 					return
 				}
 				var n int
-				buf := make([]byte, netceptor.MTU)
+				buf := make([]byte, utils.NormalBufferSize)
 				n, err = stdout.Read(buf)
 				if n > 0 {
 					filePos += int64(n)

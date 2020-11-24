@@ -469,6 +469,45 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		t.Run(testGroup+"/results on restarted node", func(t *testing.T) {
+			t.Parallel()
+			controllers, m, expectedResults := workSetup(t.Name())
+			defer tearDown(controllers, m)
+			nodes := m.Nodes()
+
+			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes["node3"].Shutdown()
+			nodes["node3"].WaitForShutdown()
+			err = nodes["node3"].Start()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Wait for node3 to join the mesh again
+			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			err = m.WaitForReady(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+
 	}
 }
 

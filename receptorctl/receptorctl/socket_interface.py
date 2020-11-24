@@ -74,7 +74,7 @@ class ReceptorControl:
     def connect(self):
         if self._socket is not None:
             return
-        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self._socketaddress)
+        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-.:]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self._socketaddress)
         if m:
             unixsocket = m[7]
             host = m[3]

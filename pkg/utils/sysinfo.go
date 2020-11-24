@@ -12,5 +12,5 @@ func GetSysCPUCount() int {
 
 // GetSysMemoryMiB returns the capacity (in mebibytes) of the physical memory installed on the system
 func GetSysMemoryMiB() uint64 {
-	return memory.TotalMemory() / 1048576
+	return memory.TotalMemory() / 1048576 // bytes to MiB
 }

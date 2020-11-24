@@ -8,13 +8,14 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 )
 
 // UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service
 func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node string, service string) error {
 	connMap := make(map[string]*netceptor.PacketConn)
-	buffer := make([]byte, netceptor.MTU)
+	buffer := make([]byte, utils.NormalBufferSize)
 
 	addrStr := fmt.Sprintf("%s:%d", host, port)
 	udpAddr, err := net.ResolveUDPAddr("udp", addrStr)
@@ -59,7 +60,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 }
 
 func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr net.Addr, expectedAddr netceptor.Addr) {
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		n, addr, err := pc.ReadFrom(buf)
 		if err != nil {
@@ -85,7 +86,7 @@ func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr
 // UDPProxyServiceOutbound listens on the Receptor network and forwards packets via UDP
 func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address string) error {
 	connMap := make(map[string]*net.UDPConn)
-	buffer := make([]byte, netceptor.MTU)
+	buffer := make([]byte, utils.NormalBufferSize)
 	udpAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return fmt.Errorf("could not resolve UDP address %s", address)
@@ -131,7 +132,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 }
 
 func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr net.Addr) {
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		n, err := uc.Read(buf)
 		if err != nil {

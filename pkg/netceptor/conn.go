@@ -84,7 +84,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		advertise:    advertise,
 		adTags:       adTags,
 		connType:     connType,
-		hopsToLive:   MaxForwardingHops,
+		hopsToLive:   s.maxForwardingHops,
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc

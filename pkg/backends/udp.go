@@ -9,6 +9,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"sync"
 	"time"
@@ -86,7 +87,7 @@ func (ns *UDPDialerSession) Recv(timeout time.Duration) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	n, err := ns.conn.Read(buf)
 	if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 		return nil, netceptor.ErrTimeout
@@ -149,7 +150,7 @@ func (b *UDPListener) LocalAddr() net.Addr {
 func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
 	go func() {
-		buf := make([]byte, netceptor.MTU)
+		buf := make([]byte, utils.NormalBufferSize)
 		for {
 			select {
 			case <-ctx.Done():

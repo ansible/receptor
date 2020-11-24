@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+// NormalBufferSize is the size of buffers used by various processes when copying data between sockets
+const NormalBufferSize = 65536
+
 // BridgeConns bridges two connections, like netcat.
 func BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string) {
 	doneChan := make(chan bool)
@@ -20,7 +23,7 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 	defer func() {
 		done <- true
 	}()
-	buf := make([]byte, 65536)
+	buf := make([]byte, NormalBufferSize)
 	shouldClose := false
 	for {
 		n, err := c1.Read(buf)

@@ -38,7 +38,7 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 
 func (c *tracerouteCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
-	for i := 0; i <= netceptor.MaxForwardingHops; i++ {
+	for i := 0; i <= int(nc.MaxForwardingHops()); i++ {
 		thisResult := make(map[string]interface{})
 		pingTime, pingRemote, err := ping(nc, c.target, byte(i))
 		thisResult["From"] = pingRemote

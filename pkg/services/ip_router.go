@@ -9,6 +9,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/utils"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"
@@ -196,7 +197,7 @@ func (ipr *IPRouterService) runAdvertisingWatcher() {
 
 func (ipr *IPRouterService) runTunToNetceptor() {
 	logger.Debug("Running tunnel-to-Receptor forwarder\n")
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ipr.nc.Context().Err() != nil {
 			return
@@ -260,7 +261,7 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 
 func (ipr *IPRouterService) runNetceptorToTun() {
 	logger.Debug("Running netceptor to tunnel forwarder\n")
-	buf := make([]byte, netceptor.MTU)
+	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ipr.nc.Context().Err() != nil {
 			return

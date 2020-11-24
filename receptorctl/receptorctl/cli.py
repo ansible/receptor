@@ -59,8 +59,8 @@ def status(ctx):
     print(f"Version: {version}")
     sysCPU = status.pop('SystemCPUCount')
     print(f"System CPU Count: {sysCPU}")
-    sysMemory = status.pop('SystemMemoryMB')
-    print(f"System Memory MB: {sysMemory}")
+    sysMemory = status.pop('SystemMemoryMiB')
+    print(f"System Memory MiB: {sysMemory}")
 
     longest_node = 12
 

@@ -10,7 +10,7 @@ func GetSysCPUCount() int {
 	return runtime.NumCPU()
 }
 
-// GetSysMemoryMB returns the capacity (in MB) of the physical memory installed on the system
-func GetSysMemoryMB() uint {
-	return uint(memory.TotalMemory() / 1e6)
+// GetSysMemoryMiB returns the capacity (in mebibytes) of the physical memory installed on the system
+func GetSysMemoryMiB() uint64 {
+	return memory.TotalMemory() / 1048576
 }

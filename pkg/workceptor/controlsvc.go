@@ -296,7 +296,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		doneChan := make(chan struct{})
 		defer func() {
-			doneChan <- struct{}{}
+			close(doneChan)
 		}()
 		resultChan, err := c.w.GetResults(unitid, startPos, doneChan)
 		if err != nil {

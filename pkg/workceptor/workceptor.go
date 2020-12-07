@@ -374,6 +374,10 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 			for err == nil {
 				var newPos int64
 				newPos, err = stdout.Seek(filePos, 0)
+				if err != nil {
+					logger.Warning("Seek error processing stdout: %s\n", err)
+					return
+				}
 				if newPos != filePos {
 					logger.Warning("Seek error processing stdout\n")
 					return

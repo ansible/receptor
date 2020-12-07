@@ -33,6 +33,10 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 	go func() {
 		for {
 			n, addr, err := uc.ReadFrom(buffer)
+			if err != nil {
+				logger.Error("Error reading from UDP: %s\n", err)
+				return
+			}
 			raddrStr := addr.String()
 			pc, ok := connMap[raddrStr]
 			if !ok {

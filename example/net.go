@@ -43,6 +43,10 @@ func main() {
 		os.Exit(1)
 	}
 	err = n2.AddBackend(b2, 1.0, nil)
+	if err != nil {
+		fmt.Printf("Error starting backend: %s\n", err)
+		os.Exit(1)
+	}
 
 	// Start an echo server on node 1
 	l1, err := n1.Listen("echo", nil)

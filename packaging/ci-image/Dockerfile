@@ -12,6 +12,7 @@ USER test-user
 RUN go get -u golang.org/x/lint/golint
 # Warm up the Go build cache
 RUN cd /home/test-user && git clone https://github.com/project-receptor/receptor receptor-tmp && cd receptor-tmp && go get -t ./... && make build-all && cd .. && rm -rf receptor-tmp
+RUN go get -u github.com/jstemmer/go-junit-report
 
 WORKDIR /home/test-user/receptor
 COPY entrypoint.sh /home/test-user/entrypoint.sh

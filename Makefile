@@ -70,7 +70,9 @@ build-all:
 	go build cmd/receptor.go
 
 test: receptor
-	@go test ./... -p 1 -parallel=16 -count=1
+	@echo "Running receptor tests" && \
+	go test -v ./... -p 1 -parallel=16 -count=1 | tee test-output.log | grep FAIL ; \
+	echo "See test-output.log for a more comprehensive report"
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)
@@ -162,7 +164,7 @@ receptorctl-test-venv/bin/pytest:
 	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
 
 receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
-	cd receptorctl && ../receptorctl-test-venv/bin/pytest tests/tests.py
+	receptorctl-test-venv/bin/pytest --junitxml=../receptorctl-test-junit.xml receptorctl/tests/tests.py
 
 clean:
 	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)
@@ -176,5 +178,6 @@ clean:
 	@rm -fv .VERSION
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
+	@rm -fv test-output.log test-junit.xml receptorctl-test-junit.xml
 
 .PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests kubetest

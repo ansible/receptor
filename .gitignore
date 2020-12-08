@@ -10,3 +10,6 @@ rpmbuild/
 .rpm-builder-flag
 .VERSION
 kubectl
+test-output.log
+test-junit.xml
+receptorctl-test-junit.xml

@@ -608,6 +608,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
+		{name: "kube_config", permission: kw.allowRuntimeAuth, setter: setString(&kw.kubeConfig)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "kube_host", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeHost)},
 		{name: "kube_api_path", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeAPIPath)},

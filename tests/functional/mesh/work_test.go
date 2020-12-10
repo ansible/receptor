@@ -9,9 +9,17 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func checkSkipKube(t *testing.T) {
+	skip := os.Getenv("SKIP_KUBE")
+	if skip == "1" {
+		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
+	}
+}
 
 func TestWork(t *testing.T) {
 	t.Parallel()
@@ -229,6 +237,9 @@ func TestWork(t *testing.T) {
 			// tests connecting to remote control service with tlsclient
 			// tests that having a ttl that never times out (10 hours) works fine
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, _ := workSetup(t.Name())
 			defer tearDown(controllers, m)
 
@@ -249,6 +260,9 @@ func TestWork(t *testing.T) {
 			// also tests that releasing a job that has not been started on remote
 			// will not attempt to connect to remote
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, _ := workSetup(t.Name())
 			defer tearDown(controllers, m)
 			nodes := m.Nodes()
@@ -281,6 +295,9 @@ func TestWork(t *testing.T) {
 
 		t.Run(testGroup+"/start remote work with ttl", func(t *testing.T) {
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, _ := workSetup(t.Name())
 			defer tearDown(controllers, m)
 			nodes := m.Nodes()
@@ -317,6 +334,9 @@ func TestWork(t *testing.T) {
 		t.Run(testGroup+"/cancel then release remote work", func(t *testing.T) {
 			// also tests that release still works after control service restarts
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, _ := workSetup(t.Name())
 			defer tearDown(controllers, m)
 			nodes := m.Nodes()
@@ -389,6 +409,9 @@ func TestWork(t *testing.T) {
 
 		t.Run(testGroup+"/work submit while remote node is down", func(t *testing.T) {
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, _ := workSetup(t.Name())
 			defer tearDown(controllers, m)
 			nodes := m.Nodes()
@@ -423,6 +446,9 @@ func TestWork(t *testing.T) {
 
 		t.Run(testGroup+"/work streaming resumes when relay node restarts", func(t *testing.T) {
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, expectedResults := workSetup(t.Name())
 			defer tearDown(controllers, m)
 			nodes := m.Nodes()
@@ -471,6 +497,9 @@ func TestWork(t *testing.T) {
 		})
 		t.Run(testGroup+"/results on restarted node", func(t *testing.T) {
 			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
 			controllers, m, expectedResults := workSetup(t.Name())
 			defer tearDown(controllers, m)
 			nodes := m.Nodes()
@@ -605,6 +634,7 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 }
 
 func TestKubeContainerFailure(t *testing.T) {
+	checkSkipKube(t)
 	home := os.Getenv("HOME")
 	command := map[interface{}]interface{}{
 		"work-kubernetes": map[interface{}]interface{}{

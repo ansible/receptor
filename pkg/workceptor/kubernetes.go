@@ -64,6 +64,7 @@ type kubeExtraData struct {
 	KubeBearerToken string
 	KubeVerifyTLS   bool
 	KubeTLSCAData   string
+	KubeConfig      string
 	PodName         string
 }
 
@@ -522,7 +523,11 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 			sfd.ExtraData.(*kubeExtraData).KubeNamespace = c.Contexts[c.CurrentContext].Namespace
 		})
 	}
-	kw.config, err = clientcmd.BuildConfigFromFlags("", clr.GetDefaultFilename())
+	if ked.KubeConfig != "" {
+		kw.config, err = clientcmd.RESTConfigFromKubeConfig([]byte(ked.KubeConfig))
+	} else {
+		kw.config, err = clientcmd.BuildConfigFromFlags("", clr.GetDefaultFilename())
+	}
 	if err != nil {
 		return err
 	}
@@ -608,11 +613,11 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
-		{name: "kube_config", permission: kw.allowRuntimeAuth, setter: setString(&kw.kubeConfig)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "kube_host", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeHost)},
 		{name: "kube_api_path", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeAPIPath)},
 		{name: "kube_username", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeUsername)},
+		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
 		{name: "secret_kube_password", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubePassword)},
 		{name: "secret_kube_bearer_token", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeBearerToken)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
@@ -642,6 +647,7 @@ func (kw *kubeUnit) Status() *StatusFileData {
 	if ok {
 		ed.KubePassword = ""
 		ed.KubeBearerToken = ""
+		ed.KubeConfig = ""
 	}
 	return status
 }

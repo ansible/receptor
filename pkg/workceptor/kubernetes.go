@@ -508,7 +508,7 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 	if kw.kubeConfig != "" {
 		clr.ExplicitPath = kw.kubeConfig
 	}
-	ked := kw.Status().ExtraData.(*kubeExtraData)
+	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
 	if ked.KubeNamespace == "" {
 		c, err := clr.Load()
 		if err != nil {

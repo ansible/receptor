@@ -161,7 +161,18 @@ class ReceptorControl:
         if params:
             for k,v in params.items():
                 if k not in commandMap:
-                    commandMap[k] = v
+                    if v[0] == '@' and v[:2] != '@@':
+                        fname = v[1:]
+                        if not os.path.exists(fname):
+                            raise FileNotFoundError("{} does not exist".format(fname))
+                        try:
+                            with open(fname, 'r') as f:
+                                v_contents = f.read()
+                        except:
+                            raise OSError("could not read from file {}".format(fname))
+                        commandMap[k] = v_contents
+                    else:
+                        commandMap[k] = v
                 else:
                     raise RuntimeError(f"Duplicate or illegal parameter {k}")
         commandJson = json.dumps(commandMap)

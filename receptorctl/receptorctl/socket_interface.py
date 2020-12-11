@@ -169,7 +169,7 @@ class ReceptorControl:
                             with open(fname, 'r') as f:
                                 v_contents = f.read()
                         except:
-                            raise OSError("count not read from file {}".format(fname))
+                            raise OSError("could not read from file {}".format(fname))
                         commandMap[k] = v_contents
                     else:
                         commandMap[k] = v

@@ -53,19 +53,14 @@ type kubeUnit struct {
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker
 type kubeExtraData struct {
-	Image           string
-	Command         string
-	Params          string
-	KubeHost        string
-	KubeAPIPath     string
-	KubeNamespace   string
-	KubeUsername    string
-	KubePassword    string
-	KubeBearerToken string
-	KubeVerifyTLS   bool
-	KubeTLSCAData   string
-	KubeConfig      string
-	PodName         string
+	Image         string
+	Command       string
+	Params        string
+	KubeNamespace string
+	KubeVerifyTLS bool
+	KubeTLSCAData string
+	KubeConfig    string
+	PodName       string
 }
 
 // ErrPodCompleted is returned when pod has already completed before we could attach
@@ -543,32 +538,12 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 	return nil
 }
 
-func (kw *kubeUnit) connectUsingParams() error {
-	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
-	kw.config = &rest.Config{
-		Host:        ked.KubeHost,
-		APIPath:     ked.KubeAPIPath,
-		Username:    ked.KubeUsername,
-		Password:    ked.KubePassword,
-		BearerToken: ked.KubeBearerToken,
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: !ked.KubeVerifyTLS,
-		},
-	}
-	if ked.KubeTLSCAData != "" {
-		kw.config.TLSClientConfig.CAData = []byte(ked.KubeTLSCAData)
-	}
-	return nil
-}
-
 func (kw *kubeUnit) connectToKube() error {
 	var err error
 	if kw.authMethod == "kubeconfig" {
 		err = kw.connectUsingKubeconfig()
 	} else if kw.authMethod == "incluster" {
 		err = kw.connectUsingIncluster()
-	} else if kw.authMethod == "params" {
-		err = kw.connectUsingParams()
 	} else {
 		return fmt.Errorf("unknown auth method %s", kw.authMethod)
 	}
@@ -614,12 +589,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
-		{name: "kube_host", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeHost)},
-		{name: "kube_api_path", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeAPIPath)},
-		{name: "kube_username", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeUsername)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
-		{name: "secret_kube_password", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubePassword)},
-		{name: "secret_kube_bearer_token", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeBearerToken)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
 		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 	}
@@ -645,8 +615,6 @@ func (kw *kubeUnit) Status() *StatusFileData {
 	status := kw.UnredactedStatus()
 	ed, ok := status.ExtraData.(*kubeExtraData)
 	if ok {
-		ed.KubePassword = ""
-		ed.KubeBearerToken = ""
 		ed.KubeConfig = ""
 	}
 	return status
@@ -753,13 +721,8 @@ type WorkKubeCfg struct {
 	Image               string `description:"Container image to use for the worker pod"`
 	Command             string `description:"Command to run in the container (overrides entrypoint)"`
 	Params              string `description:"Command-line parameters to pass to the entrypoint"`
-	AuthMethod          string `description:"One of: kubeconfig, incluster, params" default:"incluster"`
+	AuthMethod          string `description:"One of: kubeconfig, incluster" default:"incluster"`
 	KubeConfig          string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
-	KubeHost            string `description:"k8s API hostname (for authmethod=params)"`
-	KubeAPIPath         string `description:"k8s API path (for authmethod=params)"`
-	KubeUsername        string `description:"k8s API username (for authmethod=params)"`
-	KubePassword        string `description:"k8s API password (for authmethod=params)"`
-	KubeBearerToken     string `description:"k8s API bearer token (for authmethod=params)"`
 	KubeVerifyTLS       bool   `description:"verify server TLS certificate/hostname" default:"true"`
 	KubeTLSCAData       string `description:"CA certificate PEM data to verify against"`
 	AllowRuntimeAuth    bool   `description:"Allow passing API parameters at runtime" default:"false"`
@@ -776,16 +739,11 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
 				ExtraData: &kubeExtraData{
-					Image:           cfg.Image,
-					Command:         cfg.Command,
-					KubeHost:        cfg.KubeHost,
-					KubeAPIPath:     cfg.KubeAPIPath,
-					KubeNamespace:   cfg.Namespace,
-					KubeUsername:    cfg.KubeUsername,
-					KubePassword:    cfg.KubePassword,
-					KubeBearerToken: cfg.KubeBearerToken,
-					KubeVerifyTLS:   cfg.KubeVerifyTLS,
-					KubeTLSCAData:   cfg.KubeTLSCAData,
+					Image:         cfg.Image,
+					Command:       cfg.Command,
+					KubeNamespace: cfg.Namespace,
+					KubeVerifyTLS: cfg.KubeVerifyTLS,
+					KubeTLSCAData: cfg.KubeTLSCAData,
 				},
 			},
 		},
@@ -807,7 +765,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 // Prepare inspects the configuration for validity
 func (cfg WorkKubeCfg) Prepare() error {
 	lcAuth := strings.ToLower(cfg.AuthMethod)
-	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "params" {
+	if lcAuth != "kubeconfig" && lcAuth != "incluster" {
 		return fmt.Errorf("invalid AuthMethod: %s", cfg.AuthMethod)
 	}
 	if cfg.Namespace == "" && !(lcAuth == "kubeconfig" || cfg.AllowRuntimeAuth) {
@@ -820,14 +778,6 @@ func (cfg WorkKubeCfg) Prepare() error {
 		_, err := os.Stat(cfg.KubeConfig)
 		if err != nil {
 			return fmt.Errorf("error accessing kubeconfig file: %s", err)
-		}
-	}
-	if lcAuth == "params" && !cfg.AllowRuntimeAuth {
-		if cfg.KubeHost == "" {
-			return fmt.Errorf("when AuthMethod=params, must provide KubeHost")
-		}
-		if (cfg.KubeUsername == "" || cfg.KubePassword == "") && cfg.KubeBearerToken == "" {
-			return fmt.Errorf("when AuthMethod=params, must provide either KubeBearerToken or KubeUsername and KubePassword")
 		}
 	}
 	if cfg.KubeTLSCAData != "" {

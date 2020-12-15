@@ -4,6 +4,7 @@ package workceptor
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"github.com/google/shlex"
@@ -60,6 +61,7 @@ type kubeExtraData struct {
 	KubeVerifyTLS bool
 	KubeTLSCAData string
 	KubeConfig    string
+	KubePodSpec   string
 	PodName       string
 }
 
@@ -94,7 +96,7 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 }
 
 func (kw *kubeUnit) createPod(env map[string]string) error {
-	ked := kw.Status().ExtraData.(*kubeExtraData)
+	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
 	command, err := shlex.Split(ked.Command)
 	if err != nil {
 		return err
@@ -103,12 +105,33 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if err != nil {
 		return err
 	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: kw.namePrefix,
-			Namespace:    ked.KubeNamespace,
-		},
-		Spec: corev1.PodSpec{
+	spec := corev1.PodSpec{}
+	if ked.KubePodSpec != "" {
+		json.Unmarshal([]byte(ked.KubePodSpec), &spec)
+		foundWorker := false
+		for _, container := range spec.Containers {
+			logger.Debug("========= %s ========", container.Name)
+			if container.Name == "worker" {
+				if !container.Stdin {
+					return fmt.Errorf("worker container Stdin must be true")
+				}
+				if !container.StdinOnce {
+					return fmt.Errorf("worker container StdinOnce must be true")
+				}
+				foundWorker = true
+				break
+			}
+		}
+		if !foundWorker {
+			return fmt.Errorf("At least one container must be named worker")
+		}
+		kw.UpdateFullStatus(func(status *StatusFileData) {
+			status.ExtraData.(*kubeExtraData).Image = ""
+			status.ExtraData.(*kubeExtraData).Params = ""
+			status.ExtraData.(*kubeExtraData).Command = ""
+		})
+	} else {
+		spec = corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      "worker",
 				Image:     ked.Image,
@@ -119,7 +142,14 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 				TTY:       false,
 			}},
 			RestartPolicy: corev1.RestartPolicyNever,
+		}
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: kw.namePrefix,
+			Namespace:    ked.KubeNamespace,
 		},
+		Spec: spec,
 	}
 	if env != nil {
 		evs := make([]corev1.EnvVar, 0)
@@ -212,7 +242,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 	// Open the pod log for stdout
 	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
-		Follow: true,
+		Container: "worker",
+		Follow:    true,
 	})
 	logStream, err := logreq.Stream(kw.ctx)
 	if err != nil {
@@ -590,6 +621,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
+		{name: "secret_kube_podspec", permission: kw.allowRuntimeCommand && kw.allowRuntimeParams, setter: setString(&ked.KubePodSpec)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
 		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 	}
@@ -616,6 +648,7 @@ func (kw *kubeUnit) Status() *StatusFileData {
 	ed, ok := status.ExtraData.(*kubeExtraData)
 	if ok {
 		ed.KubeConfig = ""
+		ed.KubePodSpec = ""
 	}
 	return status
 }

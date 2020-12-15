@@ -110,7 +110,6 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		json.Unmarshal([]byte(ked.KubePodSpec), &spec)
 		foundWorker := false
 		for _, container := range spec.Containers {
-			logger.Debug("========= %s ========", container.Name)
 			if container.Name == "worker" {
 				if !container.Stdin {
 					return fmt.Errorf("worker container Stdin must be true")

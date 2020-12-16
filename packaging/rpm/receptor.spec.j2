@@ -56,7 +56,7 @@ install -m 0644 -vp receptor.completion %{buildroot}%{_datadir}/bash-completion/
 %if %{with check}
 %check
 export PATH=$PATH:%{buildroot}%{_bindir}
-go test ./... -p 1 -parallel=16 -count=1 -failfast
+SKIP_KUBE=1 go test ./... -p 1 -parallel=16 -count=1 -failfast
 %endif
 
 %files

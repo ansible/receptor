@@ -164,7 +164,7 @@ receptorctl-test-venv/bin/pytest:
 	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
 
 receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
-	receptorctl-test-venv/bin/pytest --junitxml=../receptorctl-test-junit.xml receptorctl/tests/tests.py
+	receptorctl-test-venv/bin/pytest --junitxml=receptorctl-test-junit.xml receptorctl/tests/tests.py
 
 clean:
 	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)

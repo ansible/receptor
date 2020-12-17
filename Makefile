@@ -70,9 +70,8 @@ build-all:
 	go build cmd/receptor.go
 
 test: receptor
-	@echo "Running receptor tests" && \
-	go test -v ./... -p 1 -parallel=16 -count=1 | tee test-output.log | grep FAIL ; \
-	echo "See test-output.log for a more comprehensive report"
+	@set -o pipefail && echo "Running receptor tests" && \
+	go test -v ./... -p 1 -parallel=16 -count=1 | tee test-output.log | grep FAIL
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)

@@ -71,6 +71,7 @@ def receptor_mesh(request):
 @pytest.mark.usefixtures('receptor_mesh')
 class TestReceptorCTL:
     def test_simple_command(self):
+        pytest.fail("Test our failed test reporting")
         socketaddress = "unix://" + os.path.join(tmpDir, "node1.sock")
         node1_controller = ReceptorControl(socketaddress)
         status = node1_controller.simple_command("status")

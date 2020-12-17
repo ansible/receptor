@@ -51,6 +51,7 @@ func TestMeshStartup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			t.Fatal("Testing a failed test")
 			// Test that each Node can ping each Node
 			for _, nodeSender := range m.Nodes() {
 				controller := receptorcontrol.New()

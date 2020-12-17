@@ -3,8 +3,8 @@
 package workceptor
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"github.com/google/shlex"
@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -107,15 +108,20 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 	spec := corev1.PodSpec{}
 	if ked.KubePodSpec != "" {
-		json.Unmarshal([]byte(ked.KubePodSpec), &spec)
+		reader := bytes.NewReader([]byte(ked.KubePodSpec))
+		decoder := yaml.NewYAMLOrJSONDecoder(reader, 1024)
+		err := decoder.Decode(&spec)
+		if err != nil {
+			return err
+		}
 		foundWorker := false
 		for _, container := range spec.Containers {
 			if container.Name == "worker" {
 				if !container.Stdin {
-					return fmt.Errorf("worker container Stdin must be true")
+					container.Stdin = true
 				}
 				if !container.StdinOnce {
-					return fmt.Errorf("worker container StdinOnce must be true")
+					container.StdinOnce = true
 				}
 				foundWorker = true
 				break
@@ -123,6 +129,9 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		}
 		if !foundWorker {
 			return fmt.Errorf("At least one container must be named worker")
+		}
+		if spec.RestartPolicy != corev1.RestartPolicyNever {
+			spec.RestartPolicy = corev1.RestartPolicyNever
 		}
 		kw.UpdateFullStatus(func(status *StatusFileData) {
 			status.ExtraData.(*kubeExtraData).Image = ""
@@ -614,9 +623,11 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		return ssf
 	}
 	userParams := ""
+	userCommand := ""
+	userImage := ""
 	values := []value{
-		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&ked.Command)},
-		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&ked.Image)},
+		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
+		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&userImage)},
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
@@ -637,6 +648,11 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 			}
 		}
 	}
+	if ked.KubePodSpec != "" && (userParams != "" || userCommand != "" || userImage != "") {
+		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_podspec")
+	}
+	ked.Command = userCommand
+	ked.Image = userImage
 	ked.Params = combineParams(kw.baseParams, userParams)
 	return nil
 }

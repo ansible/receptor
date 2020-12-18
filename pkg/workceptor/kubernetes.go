@@ -630,7 +630,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	userParams := ""
 	userCommand := ""
 	userImage := ""
-	userPodSpec != ""
+	userPodSpec := ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&userImage)},

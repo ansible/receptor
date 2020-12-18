@@ -11,6 +11,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"io"
+	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,6 @@ type kubeUnit struct {
 	allowRuntimeCommand bool
 	allowRuntimeParams  bool
 	deletePodOnRestart  bool
-	kubeConfig          string
 	namePrefix          string
 	config              *rest.Config
 	clientset           *kubernetes.Clientset
@@ -109,20 +109,15 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	spec := corev1.PodSpec{}
 	if ked.KubePodSpec != "" {
 		reader := bytes.NewReader([]byte(ked.KubePodSpec))
-		decoder := yaml.NewYAMLOrJSONDecoder(reader, 1024)
-		err := decoder.Decode(&spec)
+		err := yaml.NewYAMLOrJSONDecoder(reader, 1024).Decode(&spec)
 		if err != nil {
 			return err
 		}
 		foundWorker := false
 		for _, container := range spec.Containers {
 			if container.Name == "worker" {
-				if !container.Stdin {
-					container.Stdin = true
-				}
-				if !container.StdinOnce {
-					container.StdinOnce = true
-				}
+				container.Stdin = true
+				container.StdinOnce = true
 				foundWorker = true
 				break
 			}
@@ -130,14 +125,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		if !foundWorker {
 			return fmt.Errorf("At least one container must be named worker")
 		}
-		if spec.RestartPolicy != corev1.RestartPolicyNever {
-			spec.RestartPolicy = corev1.RestartPolicyNever
-		}
-		kw.UpdateFullStatus(func(status *StatusFileData) {
-			status.ExtraData.(*kubeExtraData).Image = ""
-			status.ExtraData.(*kubeExtraData).Params = ""
-			status.ExtraData.(*kubeExtraData).Command = ""
-		})
+		spec.RestartPolicy = corev1.RestartPolicyNever
 	} else {
 		spec = corev1.PodSpec{
 			Containers: []corev1.Container{{
@@ -544,9 +532,6 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 func (kw *kubeUnit) connectUsingKubeconfig() error {
 	var err error
 	clr := clientcmd.NewDefaultClientConfigLoadingRules()
-	if kw.kubeConfig != "" {
-		clr.ExplicitPath = kw.kubeConfig
-	}
 	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
 	if ked.KubeNamespace == "" {
 		c, err := clr.Load()
@@ -596,6 +581,17 @@ func (kw *kubeUnit) connectToKube() error {
 	return nil
 }
 
+func readFileToString(filename string) (string, error) {
+	if filename == "" {
+		return "", nil
+	}
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
 // SetFromParams sets the in-memory state from parameters
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	ked := kw.status.ExtraData.(*kubeExtraData)
@@ -622,16 +618,26 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		}
 		return ssf
 	}
+	var err error
+	ked.KubePodSpec, err = readFileToString(ked.KubePodSpec)
+	if err != nil {
+		return fmt.Errorf("could not read podspec: %s", err)
+	}
+	ked.KubeConfig, err = readFileToString(ked.KubeConfig)
+	if err != nil {
+		return fmt.Errorf("could not read kubeconfig: %s", err)
+	}
 	userParams := ""
 	userCommand := ""
 	userImage := ""
+	userPodSpec != ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&userImage)},
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
-		{name: "secret_kube_podspec", permission: kw.allowRuntimeCommand && kw.allowRuntimeParams, setter: setString(&ked.KubePodSpec)},
+		{name: "secret_kube_podspec", permission: kw.allowRuntimeCommand && kw.allowRuntimeParams, setter: setString(&userPodSpec)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
 		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 	}
@@ -648,11 +654,12 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 			}
 		}
 	}
-	if ked.KubePodSpec != "" && (userParams != "" || userCommand != "" || userImage != "") {
+	if userPodSpec != "" && (userParams != "" || userCommand != "" || userImage != "") {
 		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_podspec")
 	}
 	ked.Command = userCommand
 	ked.Image = userImage
+	ked.KubePodSpec = userPodSpec
 	ked.Params = combineParams(kw.baseParams, userParams)
 	return nil
 }
@@ -771,6 +778,7 @@ type WorkKubeCfg struct {
 	Params              string `description:"Command-line parameters to pass to the entrypoint"`
 	AuthMethod          string `description:"One of: kubeconfig, incluster" default:"incluster"`
 	KubeConfig          string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
+	PodSpec             string `description:"Podspec filename"`
 	KubeVerifyTLS       bool   `description:"verify server TLS certificate/hostname" default:"true"`
 	KubeTLSCAData       string `description:"CA certificate PEM data to verify against"`
 	AllowRuntimeAuth    bool   `description:"Allow passing API parameters at runtime" default:"false"`
@@ -790,6 +798,8 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 					Image:         cfg.Image,
 					Command:       cfg.Command,
 					KubeNamespace: cfg.Namespace,
+					KubePodSpec:   cfg.PodSpec,
+					KubeConfig:    cfg.KubeConfig,
 					KubeVerifyTLS: cfg.KubeVerifyTLS,
 					KubeTLSCAData: cfg.KubeTLSCAData,
 				},
@@ -803,7 +813,6 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		allowRuntimeCommand: cfg.AllowRuntimeCommand,
 		allowRuntimeParams:  cfg.AllowRuntimeParams,
 		deletePodOnRestart:  cfg.DeletePodOnRestart,
-		kubeConfig:          cfg.KubeConfig,
 		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
 	ku.BaseWorkUnit.Init(w, unitID, workType)
@@ -827,6 +836,9 @@ func (cfg WorkKubeCfg) Prepare() error {
 		if err != nil {
 			return fmt.Errorf("error accessing kubeconfig file: %s", err)
 		}
+	}
+	if cfg.PodSpec != "" && (cfg.Image != "" || cfg.Command != "" || cfg.Params != "") {
+		return fmt.Errorf("can only provide PodSpec when Image, Command, and Params are empty")
 	}
 	if cfg.KubeTLSCAData != "" {
 		block, _ := pem.Decode([]byte(cfg.KubeTLSCAData))

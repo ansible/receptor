@@ -582,6 +582,7 @@ func (kw *kubeUnit) connectToKube() error {
 }
 
 func readFileToString(filename string) (string, error) {
+	// If filename is "", the function returns ""
 	if filename == "" {
 		return "", nil
 	}

@@ -658,12 +658,12 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	if userPodSpec != "" && (userParams != "" || userCommand != "" || userImage != "") {
 		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_podspec")
 	}
-	ked.Command = userCommand
-	ked.Image = userImage
-	ked.KubePodSpec = userPodSpec
 	if userPodSpec == "" {
+		ked.Command = userCommand
+		ked.Image = userImage
 		ked.Params = combineParams(kw.baseParams, userParams)
 	} else {
+		ked.KubePodSpec = userPodSpec
 		kw.baseParams = ""
 	}
 	return nil

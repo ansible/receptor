@@ -664,11 +664,13 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	if userImage != "" {
 		ked.Image = userImage
 	}
-	if userPodSpec == "" {
-		ked.Params = combineParams(kw.baseParams, userParams)
-	} else {
+	if userPodSpec != "" {
 		ked.KubePodSpec = userPodSpec
+		ked.Image = ""
+		ked.Command = ""
 		kw.baseParams = ""
+	} else {
+		ked.Params = combineParams(kw.baseParams, userParams)
 	}
 	return nil
 }

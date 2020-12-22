@@ -290,7 +290,7 @@ func (cfg WebsocketDialerCfg) Run() error {
 	if u.Scheme == "wss" && tlsCfgName == "" {
 		tlsCfgName = "default"
 	}
-	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(tlsCfgName, u.Hostname())
+	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(tlsCfgName, u.Hostname(), "dns")
 	if err != nil {
 		return err
 	}

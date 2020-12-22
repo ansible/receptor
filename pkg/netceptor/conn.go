@@ -34,18 +34,6 @@ type Listener struct {
 	doneOnce   *sync.Once
 }
 
-func getClientValidator(helloInfo *tls.ClientHelloInfo, clientCAs *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
-	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		opts := x509.VerifyOptions{
-			Roots:     clientCAs,
-			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-			DNSName:   strings.Split(helloInfo.Conn.RemoteAddr().String(), ":")[0],
-		}
-		_, err := verifiedChains[0][0].Verify(opts)
-		return err
-	}
-}
-
 // Internal implementation of Listen and ListenAndAdvertise
 func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
@@ -70,9 +58,10 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		connType = ConnTypeStreamTLS
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
-		if tlscfg.GetConfigForClient != nil {
+		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
-				tlscfg.VerifyPeerCertificate = getClientValidator(hi, tlscfg.ClientCAs)
+				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
+				tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, remoteNode, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth})
 				return tlscfg, nil
 			}
 		}
@@ -120,24 +109,24 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) Listen(service string, tls *tls.Config) (*Listener, error) {
-	return s.listen(context.Background(), service, tls, false, nil)
+func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
+	return s.listen(context.Background(), service, tlscfg, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
-func (s *Netceptor) ListenAndAdvertise(service string, tls *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(context.Background(), service, tls, true, tags)
+func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
+	return s.listen(context.Background(), service, tlscfg, true, tags)
 }
 
 // ListenContext returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) ListenContext(ctx context.Context, service string, tls *tls.Config) (*Listener, error) {
-	return s.listen(ctx, service, tls, false, nil)
+func (s *Netceptor) ListenContext(ctx context.Context, service string, tlscfg *tls.Config) (*Listener, error) {
+	return s.listen(ctx, service, tlscfg, false, nil)
 }
 
 // ListenContextAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
-func (s *Netceptor) ListenContextAndAdvertise(ctx context.Context, service string, tls *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(ctx, service, tls, true, tags)
+func (s *Netceptor) ListenContextAndAdvertise(ctx context.Context, service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
+	return s.listen(ctx, service, tlscfg, true, tags)
 }
 
 func (li *Listener) sendResult(conn net.Conn, err error) {
@@ -267,12 +256,12 @@ type Conn struct {
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
-func (s *Netceptor) Dial(node string, service string, tls *tls.Config) (*Conn, error) {
-	return s.DialContext(context.Background(), node, service, tls)
+func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn, error) {
+	return s.DialContext(context.Background(), node, service, tlscfg)
 }
 
 // DialContext is like Dial but uses a context to allow timeout or cancellation.
-func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tls *tls.Config) (*Conn, error) {
+func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*Conn, error) {
 	_ = s.addNameHash(node)
 	_ = s.addNameHash(service)
 	pc, err := s.ListenPacket("")
@@ -284,11 +273,11 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		HandshakeTimeout: 15 * time.Second,
 		KeepAlive:        true,
 	}
-	if tls == nil {
-		tls = generateClientTLSConfig()
+	if tlscfg == nil {
+		tlscfg = generateClientTLSConfig()
 	} else {
-		tls = tls.Clone()
-		tls.NextProtos = []string{"netceptor"}
+		tlscfg = tlscfg.Clone()
+		tlscfg.NextProtos = []string{"netceptor"}
 	}
 	okChan := make(chan struct{})
 	closeOnce := sync.Once{}
@@ -310,7 +299,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}()
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tls, cfg)
+	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
 	if err != nil {
 		close(okChan)
 		pcClose()

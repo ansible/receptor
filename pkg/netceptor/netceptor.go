@@ -4,6 +4,7 @@ package netceptor
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -717,7 +718,7 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 	}
 }
 
-// GetServerTLSConfig retrieves a server TLS config by name
+// GetServerTLSConfig retrieves a server TLS config by name.
 func (s *Netceptor) GetServerTLSConfig(name string) (*tls.Config, error) {
 	if name == "" {
 		return nil, nil
@@ -738,18 +739,90 @@ func (s *Netceptor) SetServerTLSConfig(name string, config *tls.Config) error {
 	return nil
 }
 
-// GetClientTLSConfig retrieves a client TLS config by name
-func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string) (*tls.Config, error) {
+// ReceptorCertNameError is the error produced when Receptor certificate name verification fails
+type ReceptorCertNameError struct {
+	ValidNodes   []string
+	ExpectedNode string
+}
+
+func (rce ReceptorCertNameError) Error() string {
+	if len(rce.ValidNodes) == 0 {
+		return fmt.Sprintf("x509: certificate is not valid for any Receptor node IDs, but wanted to match %s",
+			rce.ExpectedNode)
+	}
+	var plural string
+	if len(rce.ValidNodes) > 1 {
+		plural = "s"
+	}
+	return fmt.Sprintf("x509: certificate is valid for Receptor node ID%s %s, not %s",
+		plural, strings.Join(rce.ValidNodes, ", "), rce.ExpectedNode)
+}
+
+// receptorVerifyFunc generates a function that verifies a Receptor node ID
+func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
+	allowedUsages []x509.ExtKeyUsage) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		certs := make([]*x509.Certificate, len(rawCerts))
+		for i, asn1Data := range rawCerts {
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				return fmt.Errorf("failed to parse certificate from server: " + err.Error())
+			}
+			certs[i] = cert
+		}
+		opts := x509.VerifyOptions{
+			Intermediates: x509.NewCertPool(),
+			Roots:         tlscfg.RootCAs,
+			CurrentTime:   time.Now(),
+			KeyUsages:     allowedUsages,
+		}
+		for _, cert := range certs[1:] {
+			opts.Intermediates.AddCert(cert)
+		}
+		var err error
+		verifiedChains, err = certs[0].Verify(opts)
+		if err != nil {
+			return err
+		}
+		var receptorNames []string
+		receptorNames, err = utils.ReceptorNames(certs[0])
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, receptorName := range receptorNames {
+			if receptorName == expectedNodeID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedNodeID}
+		}
+		return nil
+	}
+}
+
+// GetClientTLSConfig retrieves a client TLS config by name.  Supported host name types
+// are dns and receptor.
+func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType string) (*tls.Config, error) {
 	if name == "" {
 		return nil, nil
 	}
-	cc, ok := s.clientTLSConfigs[name]
+	tlscfg, ok := s.clientTLSConfigs[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown TLS config %s", name)
 	}
-	cc = cc.Clone()
-	cc.ServerName = expectedHostName
-	return cc, nil
+	tlscfg = tlscfg.Clone()
+	if tlscfg.InsecureSkipVerify {
+		// noop
+	} else if expectedHostNameType == "receptor" {
+		tlscfg.InsecureSkipVerify = true
+		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth})
+	} else {
+		tlscfg.ServerName = expectedHostName
+	}
+	return tlscfg, nil
 }
 
 // SetClientTLSConfig stores a client TLS config by name

@@ -274,7 +274,7 @@ func (cfg TCPDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host)
+	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host, "dns")
 	if err != nil {
 		return err
 	}

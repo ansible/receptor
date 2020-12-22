@@ -47,7 +47,7 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	if !ok {
 		return nil, nil, fmt.Errorf("remote ExtraData missing")
 	}
-	tlsConfig, err := rw.w.nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode)
+	tlsConfig, err := rw.w.nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, "receptor")
 	if err != nil {
 		return nil, nil, err
 	}

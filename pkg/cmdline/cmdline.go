@@ -69,8 +69,7 @@ func AddConfigType(name string, description string, configType interface{}, opti
 		description: description,
 		objType:     reflect.TypeOf(configType),
 	}
-	for i := range options {
-		opt := options[i]
+	for _, opt := range options {
 		opt(newCT)
 	}
 	configTypes = append(configTypes, newCT)
@@ -91,25 +90,54 @@ func printableTypeName(typ reflect.Type) string {
 	return typ.String()
 }
 
+// recursiveEnumerateFields is the recursive companion of enumerateFields and should only be called from there.
+func recursiveEnumerateFields(typ reflect.Type, results chan<- reflect.StructField) {
+	for i := 0; i < typ.NumField(); i++ {
+		ctf := typ.Field(i)
+		if ctf.Type.Kind() == reflect.Struct {
+			recursiveEnumerateFields(ctf.Type, results)
+		} else {
+			results <- ctf
+		}
+	}
+}
+
+// enumerateFields enumerates primitive fields in a struct, including composed structs.
+// If a composed struct has the same name as a struct member, that name will be returned twice.
+func enumerateFields(typ reflect.Type) <-chan reflect.StructField {
+	results := make(chan reflect.StructField)
+	go func() {
+		recursiveEnumerateFields(typ, results)
+		close(results)
+	}()
+	return results
+}
+
 func printCmdHelp(p *ConfigType) {
 	if p.hidden {
 		return
 	}
-	fmt.Printf("   --%s: %s", strings.ToLower(p.name), p.description)
+	fmt.Printf("   --%s", strings.ToLower(p.name))
+	if p.description != "" {
+		fmt.Printf(": %s", p.description)
+	}
 	if p.required {
 		fmt.Printf(" (required)")
 	}
 	fmt.Printf("\n")
-	for i := 0; i < p.objType.NumField(); i++ {
-		fmt.Printf("      %s=<%s>: %s", strings.ToLower(p.objType.Field(i).Name),
-			printableTypeName(p.objType.Field(i).Type),
-			p.objType.Field(i).Tag.Get("description"))
+	for ctf := range enumerateFields(p.objType) {
+		fmt.Printf("      %s=<%s>", strings.ToLower(ctf.Name),
+			printableTypeName(ctf.Type))
+		descr := ctf.Tag.Get("description")
+		if descr != "" {
+			fmt.Printf(": %s", descr)
+		}
 		extras := make([]string, 0)
-		req, err := betterParseBool(p.objType.Field(i).Tag.Get("required"))
+		req, err := betterParseBool(ctf.Tag.Get("required"))
 		if err == nil && req {
 			extras = append(extras, "required")
 		}
-		def := p.objType.Field(i).Tag.Get("default")
+		def := ctf.Tag.Get("default")
 		if def != "" {
 			extras = append(extras, fmt.Sprintf("default: %s", def))
 		}
@@ -213,8 +241,8 @@ func bashCompletion() {
 		}
 		fmt.Printf("      --%s)\n", strings.ToLower(ct.name))
 		params := make([]string, 0)
-		for j := 0; j < ct.objType.NumField(); j++ {
-			params = append(params, fmt.Sprintf("%s=", strings.ToLower(ct.objType.Field(j).Name)))
+		for ctf := range enumerateFields(ct.objType) {
+			params = append(params, fmt.Sprintf("%s=", strings.ToLower(ctf.Name)))
 		}
 		fmt.Printf("        COMPREPLY=($(compgen -W \"%s\" -- ${cur}))\n", strings.Join(params, " "))
 		fmt.Printf("        ;;\n")
@@ -379,8 +407,7 @@ func getCfgObjType(objType string) (*ConfigType, error) {
 }
 
 func getBareParam(commandType reflect.Type) (string, error) {
-	for i := 0; i < commandType.NumField(); i++ {
-		ctf := commandType.Field(i)
+	for ctf := range enumerateFields(commandType) {
 		if convTagToBool(ctf.Tag.Get("barevalue"), false) {
 			return ctf.Name, nil
 		}
@@ -388,13 +415,12 @@ func getBareParam(commandType reflect.Type) (string, error) {
 	return "", fmt.Errorf("command does not allow bare values")
 }
 
+// getFieldByName searches for a field by case-insensitive name and returns it if found
 func getFieldByName(obj *reflect.Value, fieldName string) (*reflect.Value, error) {
-	commandType := obj.Type()
-	for i := 0; i < commandType.NumField(); i++ {
-		ctf := commandType.Field(i)
+	for ctf := range enumerateFields(obj.Type()) {
 		if strings.ToLower(ctf.Name) == strings.ToLower(fieldName) {
-			f := obj.FieldByName(ctf.Name)
-			return &f, nil
+			fobj := obj.FieldByName(ctf.Name)
+			return &fobj, nil
 		}
 	}
 	return nil, fmt.Errorf("unknown field name %s", fieldName)
@@ -402,8 +428,7 @@ func getFieldByName(obj *reflect.Value, fieldName string) (*reflect.Value, error
 
 func buildRequiredParams(commandType reflect.Type) map[string]bool {
 	requiredParams := make(map[string]bool)
-	for j := 0; j < commandType.NumField(); j++ {
-		ctf := commandType.Field(j)
+	for ctf := range enumerateFields(commandType) {
 		if convTagToBool(ctf.Tag.Get("required"), false) {
 			requiredParams[strings.ToLower(ctf.Name)] = true
 		}
@@ -749,13 +774,12 @@ func ParseAndRun(args []string, phases []string) {
 	for i := range activeObjs {
 		cfgObj := activeObjs[i]
 		cfgType := reflect.TypeOf(cfgObj.obj.Interface())
-		for j := 0; j < cfgType.NumField(); j++ {
-			f := cfgType.Field(j)
-			defaultValue := f.Tag.Get("default")
+		for ctf := range enumerateFields(cfgType) {
+			defaultValue := ctf.Tag.Get("default")
 			if defaultValue == "" {
 				continue
 			}
-			lcname := strings.ToLower(f.Name)
+			lcname := strings.ToLower(ctf.Name)
 			hasBeenSet := false
 			for i := range cfgObj.fieldsSet {
 				if strings.ToLower(cfgObj.fieldsSet[i]) == lcname {
@@ -764,11 +788,11 @@ func ParseAndRun(args []string, phases []string) {
 				}
 			}
 			if !hasBeenSet {
-				s := cfgObj.obj.FieldByName(f.Name)
+				s := cfgObj.obj.FieldByName(ctf.Name)
 				if s.CanSet() {
 					err := setValue(&s, defaultValue)
 					if err != nil {
-						fmt.Printf("Error setting default value for field %s: %s\n", f.Name, err)
+						fmt.Printf("Error setting default value for field %s: %s\n", ctf.Name, err)
 						os.Exit(1)
 					}
 				}

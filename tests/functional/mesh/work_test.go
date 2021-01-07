@@ -7,6 +7,7 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,7 +59,6 @@ func TestWork(t *testing.T) {
 			"command":    "sh -c \"for i in `seq 1 5`; do echo $i;done\"",
 		},
 	}
-
 	testTable := []struct {
 		testGroup    string
 		shortCommand map[interface{}]interface{}
@@ -586,6 +586,62 @@ func TestRuntimeParams(t *testing.T) {
 	}
 
 	err = controller.AssertWorkResults(unitID, []byte("it worked!"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestKubeRuntimeParams(t *testing.T) {
+	home := os.Getenv("HOME")
+	configfilename := filepath.Join(home, ".kube/config")
+	reader, err := os.Open(configfilename)
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kubeconfig := string(buf)
+	kubeconfig = strings.ReplaceAll(kubeconfig, "\n", "\\n")
+	data := mesh.YamlData{}
+	data.Nodes = make(map[string]*mesh.YamlNode)
+	data.Nodes["node0"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{},
+		Nodedef: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
+			},
+			map[interface{}]interface{}{
+				"work-kubernetes": map[interface{}]interface{}{
+					"workType":            "echo",
+					"authmethod":          "runtime",
+					"namespace":           "default",
+					"allowruntimepodspec": true,
+					"allowruntimeauth":    true,
+				},
+			},
+		},
+	}
+	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	err = m.WaitForReady(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := m.Nodes()
+	controller := receptorcontrol.New()
+	err = controller.Connect(nodes["node0"].ControlSocket())
+	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_podspec": "---\ncontainers:\n- name: worker\n  image: centos:8\n  command:\n  - bash\n  args:\n  - \"-c\"\n  - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
+	unitID, err := controller.WorkSubmitJSON(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controller.AssertWorkSucceeded(ctx, unitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controller.AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -46,6 +46,7 @@ type kubeUnit struct {
 	allowRuntimeTLS     bool
 	allowRuntimeCommand bool
 	allowRuntimeParams  bool
+	allowRuntimePodSpec bool
 	deletePodOnRestart  bool
 	namePrefix          string
 	config              *rest.Config
@@ -564,7 +565,7 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 
 func (kw *kubeUnit) connectToKube() error {
 	var err error
-	if kw.authMethod == "kubeconfig" {
+	if kw.authMethod == "kubeconfig" || kw.authMethod == "runtime" {
 		err = kw.connectUsingKubeconfig()
 	} else if kw.authMethod == "incluster" {
 		err = kw.connectUsingIncluster()
@@ -638,7 +639,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
-		{name: "secret_kube_podspec", permission: kw.allowRuntimeCommand && kw.allowRuntimeParams, setter: setString(&userPodSpec)},
+		{name: "secret_kube_podspec", permission: kw.allowRuntimePodSpec, setter: setString(&userPodSpec)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
 		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 	}
@@ -654,6 +655,9 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 				return fmt.Errorf("error setting value for %s: %s", v.name, err)
 			}
 		}
+	}
+	if kw.authMethod == "runtime" && ked.KubeConfig == "" {
+		return fmt.Errorf("param secret_kube_config must be provided if AuthMethod=runtime")
 	}
 	if userPodSpec != "" && (userParams != "" || userCommand != "" || userImage != "") {
 		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_podspec")
@@ -796,6 +800,7 @@ type WorkKubeCfg struct {
 	AllowRuntimeTLS     bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
 	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
 	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
+	AllowRuntimePodSpec bool   `description:"Allow passing PodSpec at runtime" default: "false"`
 	DeletePodOnRestart  bool   `description:"On restart, delete the pod if in pending state" default:"true"`
 	StreamMethod        string `description:"Method for connecting to worker pods: logger or tcp" default:"logger"`
 }
@@ -823,6 +828,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		allowRuntimeTLS:     cfg.AllowRuntimeTLS,
 		allowRuntimeCommand: cfg.AllowRuntimeCommand,
 		allowRuntimeParams:  cfg.AllowRuntimeParams,
+		allowRuntimePodSpec: cfg.AllowRuntimePodSpec,
 		deletePodOnRestart:  cfg.DeletePodOnRestart,
 		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
@@ -833,7 +839,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 // Prepare inspects the configuration for validity
 func (cfg WorkKubeCfg) Prepare() error {
 	lcAuth := strings.ToLower(cfg.AuthMethod)
-	if lcAuth != "kubeconfig" && lcAuth != "incluster" {
+	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "runtime" {
 		return fmt.Errorf("invalid AuthMethod: %s", cfg.AuthMethod)
 	}
 	if cfg.Namespace == "" && !(lcAuth == "kubeconfig" || cfg.AllowRuntimeAuth) {
@@ -857,7 +863,7 @@ func (cfg WorkKubeCfg) Prepare() error {
 			return fmt.Errorf("could not decode KubeTLSCAData as a PEM formatted certificate")
 		}
 	}
-	if cfg.Image == "" && !cfg.AllowRuntimeCommand {
+	if cfg.Image == "" && !cfg.AllowRuntimeCommand && !cfg.AllowRuntimePodSpec {
 		return fmt.Errorf("must specify a container image to run")
 	}
 	method := strings.ToLower(cfg.StreamMethod)

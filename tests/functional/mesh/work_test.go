@@ -592,6 +592,7 @@ func TestRuntimeParams(t *testing.T) {
 }
 
 func TestKubeRuntimeParams(t *testing.T) {
+	checkSkipKube(t)
 	home := os.Getenv("HOME")
 	configfilename := filepath.Join(home, ".kube/config")
 	reader, err := os.Open(configfilename)

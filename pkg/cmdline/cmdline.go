@@ -83,6 +83,9 @@ func printableTypeName(typ reflect.Type) string {
 	} else if typ.Kind() == reflect.Map {
 		return fmt.Sprintf("JSON dict of %s to %s", printableTypeName(typ.Key()), printableTypeName(typ.Elem()))
 	} else if typ.Kind() == reflect.Slice {
+		if typ.Elem() == reflect.TypeOf("") {
+			return fmt.Sprintf("%s (may be repeated)", typ.String())
+		}
 		return fmt.Sprintf("JSON list of %s", printableTypeName(typ.Elem()))
 	} else if typ.String() == "interface {}" {
 		return "anything"
@@ -360,6 +363,14 @@ func setValue(field *reflect.Value, value interface{}) error {
 				return err
 			}
 			field.SetBool(v)
+			return nil
+		}
+
+		// If param is a string and field is a string array, append it
+		stringSlice, ok := field.Interface().([]string)
+		if ok {
+			stringSlice = append(stringSlice, valueStr)
+			field.Set(reflect.ValueOf(stringSlice))
 			return nil
 		}
 	}

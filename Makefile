@@ -69,15 +69,15 @@ build-all:
 	go build --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor cmd/receptor.go && \
 	go build cmd/receptor.go
 
-test: receptor
-	@go test ./... -p 1 -parallel=16 -count=1
-
 RUNTEST ?=
 ifeq ($(RUNTEST),)
 TESTCMD =
 else
 TESTCMD = -run $(RUNTEST)
 endif
+
+test: receptor
+	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \

@@ -634,7 +634,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
-	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_podspec": "---\ncontainers:\n- name: worker\n  image: centos:8\n  command:\n  - bash\n  args:\n  - \"-c\"\n  - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
+	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_podspec": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
 	unitID, err := controller.WorkSubmitJSON(command)
 	if err != nil {
 		t.Fatal(err)

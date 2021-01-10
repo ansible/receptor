@@ -3,22 +3,26 @@
 package workceptor
 
 import (
-	"bytes"
 	"context"
 	"encoding/pem"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/google/shlex"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
-	"io"
-	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -27,11 +31,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	watch2 "k8s.io/client-go/tools/watch"
-	"net"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 // kubeUnit implements the WorkUnit interface

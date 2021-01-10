@@ -1,10 +1,11 @@
 FROM fedora:32
+ARG UID=1001
 RUN dnf -y update && \
   dnf -y install git golang python3 python3-pip python3-pyyaml make iproute openssl && \
   dnf clean all
 RUN pip3 install pre-commit
 
-RUN useradd -u 1001 -ms /bin/bash test-user && mkdir /home/test-user/receptor \
+RUN useradd -u $UID -ms /bin/bash test-user && mkdir /home/test-user/receptor \
     && chown test-user /home/test-user/receptor
 
 USER test-user

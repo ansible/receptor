@@ -106,18 +106,20 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if err != nil {
 		return err
 	}
-	spec := corev1.PodSpec{}
+	pod := &corev1.Pod{}
+	spec := &corev1.PodSpec{}
 	if ked.KubePodSpec != "" {
-		reader := bytes.NewReader([]byte(ked.KubePodSpec))
-		err := yaml.NewYAMLOrJSONDecoder(reader, 1024).Decode(&spec)
+		decode := scheme.Codecs.UniversalDeserializer().Decode
+		_, _, err := decode([]byte(ked.KubePodSpec), nil, pod)
 		if err != nil {
 			return err
 		}
 		foundWorker := false
-		for _, container := range spec.Containers {
-			if container.Name == "worker" {
-				container.Stdin = true
-				container.StdinOnce = true
+		spec = &pod.Spec
+		for i := range spec.Containers {
+			if spec.Containers[i].Name == "worker" {
+				spec.Containers[i].Stdin = true
+				spec.Containers[i].StdinOnce = true
 				foundWorker = true
 				break
 			}
@@ -126,8 +128,16 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 			return fmt.Errorf("At least one container must be named worker")
 		}
 		spec.RestartPolicy = corev1.RestartPolicyNever
+		userNamespace := pod.ObjectMeta.Namespace
+		if userNamespace != "" {
+			ked.KubeNamespace = userNamespace
+		}
+		userPodName := pod.ObjectMeta.Name
+		if userPodName != "" {
+			kw.namePrefix = userPodName + "-"
+		}
 	} else {
-		spec = corev1.PodSpec{
+		spec = &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      "worker",
 				Image:     ked.Image,
@@ -140,13 +150,15 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 			RestartPolicy: corev1.RestartPolicyNever,
 		}
 	}
-	pod := &corev1.Pod{
+
+	pod = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: kw.namePrefix,
 			Namespace:    ked.KubeNamespace,
 		},
-		Spec: spec,
+		Spec: *spec,
 	}
+
 	if env != nil {
 		evs := make([]corev1.EnvVar, 0)
 		for k, v := range env {
@@ -237,7 +249,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	}
 
 	// Open the pod log for stdout
-	logreq := kw.clientset.CoreV1().Pods(ked.KubeNamespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
+	logreq := kw.clientset.CoreV1().Pods(kw.pod.ObjectMeta.Namespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
 		Container: "worker",
 		Follow:    true,
 	})

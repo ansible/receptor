@@ -3,16 +3,17 @@ package mesh
 import (
 	"context"
 	"fmt"
-	_ "github.com/fortytw2/leaktest"
-	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/fortytw2/leaktest"
+	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 )
 
 func checkSkipKube(t *testing.T) {

@@ -17,11 +17,12 @@ type initCA struct {
 	Bits       int    `description:"Bit length of the encryption keys of the certificate" required:"Yes"`
 	NotBefore  string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
 	NotAfter   string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
-	OutFile    string `description:"File to save the certificate and key to" required:"Yes"`
+	OutCert    string `description:"File to save the CA certificate to" required:"Yes"`
+	OutKey     string `description:"File to save the CA private key to" required:"Yes"`
 }
 
 func (ica initCA) Run() error {
-	opts := CertOptions{
+	opts := &CertOptions{
 		CommonName: ica.CommonName,
 		Bits:       ica.Bits,
 	}
@@ -41,7 +42,10 @@ func (ica initCA) Run() error {
 	}
 	ca, err := CreateCA(opts)
 	if err == nil {
-		err = ca.SaveToFile(ica.OutFile)
+		err = SaveToPEMFile(ica.OutCert, []interface{}{ca.Certificate})
+	}
+	if err == nil {
+		err = SaveToPEMFile(ica.OutKey, []interface{}{ca.PrivateKey})
 	}
 	return err
 }
@@ -52,11 +56,12 @@ type makeReq struct {
 	DNSName    []string `description:"DNS names to add to the certificate"`
 	IPAddress  []string `description:"IP addresses to add to the certificate"`
 	NodeID     []string `description:"Receptor node IDs to add to the certificate"`
-	OutFile    string   `description:"File to save the certificate and key to" required:"Yes"`
+	OutReq     string   `description:"File to save the certificate request to" required:"Yes"`
+	OutKey     string   `description:"File to save the private key to" required:"Yes"`
 }
 
 func (mr makeReq) Run() error {
-	opts := CertOptions{
+	opts := &CertOptions{
 		CommonName: mr.CommonName,
 		Bits:       mr.Bits,
 	}
@@ -72,19 +77,23 @@ func (mr makeReq) Run() error {
 		}
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
-	req, err := CreateCertReq(opts)
+	req, key, err := CreateCertReq(opts)
 	if err == nil {
-		err = req.SaveToFile(mr.OutFile)
+		err = SaveToPEMFile(mr.OutReq, []interface{}{req})
+	}
+	if err == nil {
+		err = SaveToPEMFile(mr.OutKey, []interface{}{key})
 	}
 	return err
 }
 
 type signReq struct {
 	Req       string `description:"Certificate Request PEM filename" required:"Yes"`
-	CA        string `description:"Certificate Authority PEM filename" required:"Yes"`
+	CACert    string `description:"CA certificate PEM filename" required:"Yes"`
+	CAKey     string `description:"CA private key PEM filename" required:"Yes"`
 	NotBefore string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
 	NotAfter  string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
-	OutFile   string `description:"File to save the signed certificate to" required:"Yes"`
+	OutCert   string `description:"File to save the signed certificate to" required:"Yes"`
 }
 
 func (sr signReq) Run() error {
@@ -104,17 +113,22 @@ func (sr signReq) Run() error {
 		opts.NotAfter = t
 	}
 	ca := &CA{}
-	err := ca.LoadFromFile(sr.CA)
+	var err error
+	ca.Certificate, err = LoadCertificate(sr.CACert)
 	if err != nil {
 		return err
 	}
-	req := &ReqKeyPair{}
-	err = req.LoadFromFile(sr.Req)
+	ca.PrivateKey, err = LoadPrivateKey(sr.CAKey)
+	if err != nil {
+		return err
+	}
+	var req *x509.CertificateRequest
+	req, err = LoadRequest(sr.Req)
 	if err != nil {
 		return err
 	}
 	var names *CertNames
-	names, err = GetReqNames(req.Request)
+	names, err = GetReqNames(req)
 	if err != nil {
 		return err
 	}
@@ -122,14 +136,14 @@ func (sr signReq) Run() error {
 		return fmt.Errorf("cannot sign: no names found in certificate")
 	}
 	fmt.Printf("Requested certificate:\n")
-	fmt.Printf("  Subject: %s\n", req.Request.Subject)
-	algo := req.Request.PublicKeyAlgorithm.String()
+	fmt.Printf("  Subject: %s\n", req.Subject)
+	algo := req.PublicKeyAlgorithm.String()
 	if algo == "RSA" {
-		rpk := req.Request.PublicKey.(*rsa.PublicKey)
+		rpk := req.PublicKey.(*rsa.PublicKey)
 		algo = fmt.Sprintf("%s (%d bits)", algo, rpk.Size()*8)
 	}
 	fmt.Printf("  Encryption Algorithm: %s\n", algo)
-	fmt.Printf("  Signature Algorithm: %s\n", req.Request.SignatureAlgorithm.String())
+	fmt.Printf("  Signature Algorithm: %s\n", req.SignatureAlgorithm.String())
 	fmt.Printf("  Names:\n")
 	for _, name := range names.DNSNames {
 		fmt.Printf("    DNS Name: %s\n", name)
@@ -151,45 +165,15 @@ func (sr signReq) Run() error {
 		return fmt.Errorf("user declined")
 	}
 	var cert *x509.Certificate
-	cert, err = SignCertReq(req.Request, ca, opts)
+	cert, err = SignCertReq(req, ca, opts)
 	if err != nil {
 		return err
 	}
-	certData := []interface{}{cert}
-	return SaveToPEMFile(sr.OutFile, certData)
-}
-
-type completeReq struct {
-	Req      string `description:"Certificate Request PEM filename" required:"Yes"`
-	Response string `description:"Signed certificate from CA" required:"Yes"`
-	OutFile  string `description:"File to save the signed certificate to" required:"Yes"`
-}
-
-func (sr completeReq) Run() error {
-	req := &ReqKeyPair{}
-	err := req.LoadFromFile(sr.Req)
-	if err != nil {
-		return err
-	}
-	var certData []interface{}
-	certData, err = LoadFromPEMFile(sr.Response)
-	if len(certData) != 1 {
-		return fmt.Errorf("response file should contain only one item")
-	}
-	cert, ok := certData[0].(*x509.Certificate)
-	if !ok {
-		return fmt.Errorf("response file should contain a certificate")
-	}
-	certPair := CertKeyPair{
-		Certificate: cert,
-		PrivateKey:  req.PrivateKey,
-	}
-	return certPair.SaveToFile(sr.OutFile)
+	return SaveToPEMFile(sr.OutCert, []interface{}{cert})
 }
 
 func init() {
 	cmdline.AddConfigType("cert-init", "Initialize PKI CA", initCA{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.AddConfigType("cert-makereq", "Create certificate request", makeReq{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.AddConfigType("cert-signreq", "Sign request and produce certificate", signReq{}, cmdline.Exclusive, cmdline.Section(certSection))
-	cmdline.AddConfigType("cert-complete", "Complete a request based on cert returned from CA", completeReq{}, cmdline.Exclusive, cmdline.Section(certSection))
 }

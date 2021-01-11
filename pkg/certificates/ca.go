@@ -124,113 +124,62 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0600)
 }
 
-// CertKeyPair contains a certificate and private key.
-type CertKeyPair struct {
-	Certificate *x509.Certificate
-	PrivateKey  *rsa.PrivateKey
-}
-
-// SaveToFile saves the certificate and private key to a PEM file.
-func (ckp *CertKeyPair) SaveToFile(filename string) error {
-	data := []interface{}{ckp.Certificate, ckp.PrivateKey}
-	return SaveToPEMFile(filename, data)
-}
-
-// LoadFromFile loads the certificate and private key from a PEM file.
-func (ckp *CertKeyPair) LoadFromFile(filename string) error {
+// LoadCertificate loads a single certificate from a file
+func LoadCertificate(filename string) (*x509.Certificate, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var newCert *x509.Certificate
-	var newKey *rsa.PrivateKey
-	var ok bool
-	for _, elem := range data {
-		var cert *x509.Certificate
-		cert, ok = elem.(*x509.Certificate)
-		if ok {
-			if newCert != nil {
-				return fmt.Errorf("PEM file should only contain one certificate")
-			}
-			newCert = cert
-		}
-		var key *rsa.PrivateKey
-		key, ok = elem.(*rsa.PrivateKey)
-		if ok {
-			if newKey != nil {
-				return fmt.Errorf("PEM file should only contain one private key")
-			}
-			newKey = key
-		}
+	if len(data) != 1 {
+		return nil, fmt.Errorf("certificate file should contain exactly one item")
 	}
-	if newCert == nil {
-		return fmt.Errorf("PEM file did not include a certificate")
+	cert, ok := data[0].(*x509.Certificate)
+	if !ok {
+		return nil, fmt.Errorf("certificate file does not contain certificate data")
 	}
-	if newKey == nil {
-		return fmt.Errorf("PEM file did not include a private key")
-	}
-	ckp.Certificate = newCert
-	ckp.PrivateKey = newKey
-	return nil
+	return cert, nil
 }
 
-// ReqKeyPair contains a certificate request and private key.
-type ReqKeyPair struct {
-	Request    *x509.CertificateRequest
-	PrivateKey *rsa.PrivateKey
-}
-
-// SaveToFile saves the certificate request and private key to a PEM file.
-func (rkp *ReqKeyPair) SaveToFile(filename string) error {
-	data := []interface{}{rkp.Request, rkp.PrivateKey}
-	return SaveToPEMFile(filename, data)
-}
-
-// LoadFromFile loads the certificate and private key from a PEM file.
-func (rkp *ReqKeyPair) LoadFromFile(filename string) error {
+// LoadRequest loads a single certificate request from a file
+func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var newReq *x509.CertificateRequest
-	var newKey *rsa.PrivateKey
-	var ok bool
-	for _, elem := range data {
-		var req *x509.CertificateRequest
-		req, ok = elem.(*x509.CertificateRequest)
-		if ok {
-			if newReq != nil {
-				return fmt.Errorf("PEM file should only contain one certificate request")
-			}
-			newReq = req
-		}
-		var key *rsa.PrivateKey
-		key, ok = elem.(*rsa.PrivateKey)
-		if ok {
-			if newKey != nil {
-				return fmt.Errorf("PEM file should only contain one private key")
-			}
-			newKey = key
-		}
+	if len(data) != 1 {
+		return nil, fmt.Errorf("certificate request file should contain exactly one item")
 	}
-	if newReq == nil {
-		return fmt.Errorf("PEM file did not include a certificate request")
+	req, ok := data[0].(*x509.CertificateRequest)
+	if !ok {
+		return nil, fmt.Errorf("certificate request file does not contain certificate request data")
 	}
-	if newKey == nil {
-		return fmt.Errorf("PEM file did not include a private key")
+	return req, nil
+}
+
+// LoadPrivateKey loads a single RSA private key from a file
+func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
+	data, err := LoadFromPEMFile(filename)
+	if err != nil {
+		return nil, err
 	}
-	rkp.Request = newReq
-	rkp.PrivateKey = newKey
-	return nil
+	if len(data) != 1 {
+		return nil, fmt.Errorf("private key file should contain exactly one item")
+	}
+	key, ok := data[0].(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("private key file does not contain private key data")
+	}
+	return key, nil
 }
 
 // CA contains internal data for a certificate authority.
 type CA struct {
-	CertKeyPair
+	Certificate *x509.Certificate
+	PrivateKey  *rsa.PrivateKey
 }
 
 // CreateCA initializes a new CertKeyPair from given parameters.
-func CreateCA(opts CertOptions) (*CA, error) {
+func CreateCA(opts *CertOptions) (*CA, error) {
 	if opts.CommonName == "" {
 		return nil, fmt.Errorf("must provide CommonName")
 	}
@@ -280,9 +229,9 @@ func CreateCA(opts CertOptions) (*CA, error) {
 }
 
 // CreateCertReq creates a new x.509 certificate request, potentially containing Receptor node ID names.
-func CreateCertReq(opts CertOptions) (*ReqKeyPair, error) {
+func CreateCertReq(opts *CertOptions) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
 	if opts.CommonName == "" {
-		return nil, fmt.Errorf("must provide CommonName")
+		return nil, nil, fmt.Errorf("must provide CommonName")
 	}
 	if opts.Bits == 0 {
 		opts.Bits = 2048
@@ -292,7 +241,7 @@ func CreateCertReq(opts CertOptions) (*ReqKeyPair, error) {
 	var san *pkix.Extension
 	san, err = utils.MakeReceptorSAN(opts.DNSNames, opts.IPAddresses, opts.NodeIDs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	reqTemplate := &x509.CertificateRequest{
 		Subject: pkix.Name{
@@ -304,25 +253,22 @@ func CreateCertReq(opts CertOptions) (*ReqKeyPair, error) {
 	var reqPrivKey *rsa.PrivateKey
 	reqPrivKey, err = rsa.GenerateKey(rand.Reader, opts.Bits)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var reqBytes []byte
 	reqBytes, err = x509.CreateCertificateRequest(rand.Reader, reqTemplate, reqPrivKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var req *x509.CertificateRequest
 	req, err = x509.ParseCertificateRequest(reqBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &ReqKeyPair{
-		Request:    req,
-		PrivateKey: reqPrivKey,
-	}, nil
+	return req, reqPrivKey, nil
 }
 
 // GetReqNames returns the names coded into a certificate request, including Receptor node IDs.

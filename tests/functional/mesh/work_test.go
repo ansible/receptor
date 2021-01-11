@@ -613,11 +613,11 @@ func TestKubeRuntimeParams(t *testing.T) {
 			},
 			map[interface{}]interface{}{
 				"work-kubernetes": map[interface{}]interface{}{
-					"workType":            "echo",
-					"authmethod":          "runtime",
-					"namespace":           "default",
-					"allowruntimepodspec": true,
-					"allowruntimeauth":    true,
+					"workType":         "echo",
+					"authmethod":       "runtime",
+					"namespace":        "default",
+					"allowruntimepod":  true,
+					"allowruntimeauth": true,
 				},
 			},
 		},
@@ -634,7 +634,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
-	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_podspec": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
+	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_pod": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
 	unitID, err := controller.WorkSubmitJSON(command)
 	if err != nil {
 		t.Fatal(err)

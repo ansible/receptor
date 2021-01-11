@@ -3,11 +3,10 @@ package utils
 import (
 	"context"
 	"errors"
-	"fmt"
+	"github.com/project-receptor/receptor/pkg/certificates"
 	"io/ioutil"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -139,24 +138,68 @@ func FreeUDPPort(portNum int) {
 	udpPortPool = append(udpPortPool, portNum)
 }
 
-// GenerateCert generates a private and public key for testing in the directory
-// specified
-func GenerateCert(name, commonName string) (string, string, error) {
+// GenerateCA generates a CA certificate and key
+func GenerateCA(name, commonName string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}
 	keyPath := filepath.Join(dir, name+".key")
 	crtPath := filepath.Join(dir, name+".crt")
-	// Create our private key
-	cmd := exec.Command("openssl", "genrsa", "-out", keyPath, "1024")
-	err = cmd.Run()
+
+	// Create our certificate and private key
+	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: commonName, Bits: 2048})
 	if err != nil {
 		return "", "", err
 	}
-	// Create our certificate
-	cmd = exec.Command("openssl", "req", "-x509", "-new", "-nodes", "-key", keyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-addext", fmt.Sprintf("subjectAltName=DNS:%s", commonName), "-sha256", "-out", crtPath)
-	err = cmd.Run()
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{CA.Certificate})
+	if err != nil {
+		return "", "", err
+	}
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{CA.PrivateKey})
+	if err != nil {
+		return "", "", err
+	}
+	return keyPath, crtPath, nil
+}
+
+// GenerateCert generates a private and public key for testing in the directory specified
+func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, string, error) {
+	dir, err := ioutil.TempDir(CertBaseDir, "")
+	if err != nil {
+		return "", "", err
+	}
+	keyPath := filepath.Join(dir, name+".key")
+	crtPath := filepath.Join(dir, name+".crt")
+
+	// Create a temporary CA to sign this certificate
+	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: "temp ca", Bits: 2048})
+	if err != nil {
+		return "", "", err
+	}
+	// Create certificate request
+	req, key, err := certificates.CreateCertReq(&certificates.CertOptions{
+		CommonName: commonName,
+		Bits:       2048,
+		CertNames: certificates.CertNames{
+			DNSNames: DNSNames,
+			NodeIDs:  NodeIDs,
+		},
+	})
+	if err != nil {
+		return "", "", err
+	}
+	// Sign the certificate
+	cert, err := certificates.SignCertReq(req, CA, &certificates.CertOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	// Save cert and key to files
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert})
+	if err != nil {
+		return "", "", err
+	}
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{key})
 	if err != nil {
 		return "", "", err
 	}
@@ -165,42 +208,45 @@ func GenerateCert(name, commonName string) (string, string, error) {
 
 // GenerateCertWithCA generates a private and public key for testing in the directory
 // specified using the ca specified
-func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string) (string, string, error) {
+func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames, NodeIDs []string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
+	if err != nil {
+		return "", "", err
+	}
+	CA := &certificates.CA{}
+	CA.Certificate, err = certificates.LoadCertificate(caCrtPath)
+	if err != nil {
+		return "", "", err
+	}
+	CA.PrivateKey, err = certificates.LoadPrivateKey(caKeyPath)
 	if err != nil {
 		return "", "", err
 	}
 	keyPath := filepath.Join(dir, name+".key")
 	crtPath := filepath.Join(dir, name+".crt")
-	csrPath := filepath.Join(dir, name+".csa")
-	extPath := filepath.Join(dir, name+".ext")
-	// Create our private key
-	cmd := exec.Command("openssl", "genrsa", "-out", keyPath, "1024")
-	err = cmd.Run()
+	// Create certificate request
+	req, key, err := certificates.CreateCertReq(&certificates.CertOptions{
+		CommonName: commonName,
+		Bits:       2048,
+		CertNames: certificates.CertNames{
+			DNSNames: DNSNames,
+			NodeIDs:  NodeIDs,
+		},
+	})
 	if err != nil {
 		return "", "", err
 	}
-
-	// Create our certificate request
-	cmd = exec.Command("openssl", "req", "-new", "-sha256", "-key", keyPath, "-subj", fmt.Sprintf("/C=/ST=/L=/O=Receptor Testing/OU=/CN=%s", commonName), "-out", csrPath)
-	err = cmd.Run()
+	// Sign the certificate
+	cert, err := certificates.SignCertReq(req, CA, &certificates.CertOptions{})
 	if err != nil {
 		return "", "", err
 	}
-
-	// Create tmp configuration for the x509 extension
-	fid, err := os.Create(extPath)
-	defer fid.Close()
+	// Save cert and key to files
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert})
 	if err != nil {
-		return "", "", nil
+		return "", "", err
 	}
-	_, err = fid.WriteString(fmt.Sprintf("subjectAltName=DNS:%s", commonName))
-	if err != nil {
-		return "", "", nil
-	}
-	// Create our certificate using the CA
-	cmd = exec.Command("openssl", "x509", "-req", "-extfile", extPath, "-in", csrPath, "-CA", caCrtPath, "-CAkey", caKeyPath, "-CAcreateserial", "-out", crtPath, "-sha256")
-	err = cmd.Run()
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{key})
 	if err != nil {
 		return "", "", err
 	}

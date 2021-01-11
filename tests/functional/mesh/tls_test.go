@@ -22,15 +22,15 @@ func TestTCPSSLConnections(t *testing.T) {
 		listener := data.listener
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
-			caKey, caCrt, err := utils.GenerateCert("ca", "localhost")
+			caKey, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "localhost")
+			key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "localhost")
+			key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,11 +156,11 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			_, caCrt, err := utils.GenerateCert("ca", "localhost")
+			_, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert("node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -240,16 +240,16 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			_, caCrt, err := utils.GenerateCert("ca", "localhost")
+			_, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert("node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			key2, crt2, err := utils.GenerateCert("node2", "localhost")
+			key2, crt2, err := utils.GenerateCert("node2", "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -329,11 +329,11 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			_, caCrt, err := utils.GenerateCert("ca", "localhost")
+			_, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert("node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -402,16 +402,16 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			_, caCrt, err := utils.GenerateCert("ca", "localhost")
+			_, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert("node1", "localhost")
+			key1, crt1, err := utils.GenerateCert("node1", "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			key2, crt2, err := utils.GenerateCert("node2", "localhost")
+			key2, crt2, err := utils.GenerateCert("node2", "localhost", []string{"localhost"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

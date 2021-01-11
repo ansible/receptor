@@ -87,7 +87,7 @@ func TestSSLListeners(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			key, crt, err := utils.GenerateCert("test", "localhost")
+			key, crt, err := utils.GenerateCert("test", "localhost", []string{"localhost"}, nil)
 
 			receptorStdOut := bytes.Buffer{}
 			port := utils.ReserveTCPPort()

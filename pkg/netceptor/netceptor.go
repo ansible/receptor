@@ -758,23 +758,43 @@ func (rce ReceptorCertNameError) Error() string {
 		plural, strings.Join(rce.ValidNodes, ", "), rce.ExpectedNode)
 }
 
+const (
+	// VerifyServer indicates we are the client, verifying a server
+	VerifyServer = 1
+	// VerifyClient indicates we are the server, verifying a client
+	VerifyClient = 2
+)
+
 // receptorVerifyFunc generates a function that verifies a Receptor node ID
 func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
-	allowedUsages []x509.ExtKeyUsage) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	VerifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		certs := make([]*x509.Certificate, len(rawCerts))
 		for i, asn1Data := range rawCerts {
 			cert, err := x509.ParseCertificate(asn1Data)
 			if err != nil {
+				logger.Error("RVF failed to parse: %s", err)
 				return fmt.Errorf("failed to parse certificate from server: " + err.Error())
 			}
 			certs[i] = cert
 		}
-		opts := x509.VerifyOptions{
-			Intermediates: x509.NewCertPool(),
-			Roots:         tlscfg.RootCAs,
-			CurrentTime:   time.Now(),
-			KeyUsages:     allowedUsages,
+		var opts x509.VerifyOptions
+		if VerifyType == VerifyServer {
+			opts = x509.VerifyOptions{
+				Intermediates: x509.NewCertPool(),
+				Roots:         tlscfg.RootCAs,
+				CurrentTime:   time.Now(),
+				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			}
+		} else if VerifyType == VerifyClient {
+			opts = x509.VerifyOptions{
+				Intermediates: x509.NewCertPool(),
+				Roots:         tlscfg.ClientCAs,
+				CurrentTime:   time.Now(),
+				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			}
+		} else {
+			return fmt.Errorf("invalid verification type: must be client or server")
 		}
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
@@ -782,11 +802,13 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 		var err error
 		verifiedChains, err = certs[0].Verify(opts)
 		if err != nil {
+			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 			return err
 		}
 		var receptorNames []string
 		receptorNames, err = utils.ReceptorNames(certs[0].Extensions)
 		if err != nil {
+			logger.Error("RVF failed to get ReceptorNames: %s", err)
 			return err
 		}
 		found := false
@@ -797,6 +819,7 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 			}
 		}
 		if !found {
+			logger.Error("RVF ReceptorNameError: %s", err)
 			return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedNodeID}
 		}
 		return nil
@@ -818,7 +841,7 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 		// noop
 	} else if expectedHostNameType == "receptor" {
 		tlscfg.InsecureSkipVerify = true
-		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth})
+		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, VerifyServer)
 	} else {
 		tlscfg.ServerName = expectedHostName
 	}

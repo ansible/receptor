@@ -543,21 +543,42 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 
 func (kw *kubeUnit) connectUsingKubeconfig() error {
 	var err error
-	clr := clientcmd.NewDefaultClientConfigLoadingRules()
 	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
-	if ked.KubeNamespace == "" {
-		c, err := clr.Load()
+	if ked.KubeConfig == "" {
+		clr := clientcmd.NewDefaultClientConfigLoadingRules()
+		kw.config, err = clientcmd.BuildConfigFromFlags("", clr.GetDefaultFilename())
+		if ked.KubeNamespace == "" {
+			c, err := clr.Load()
+			if err != nil {
+				return err
+			}
+			curContext, ok := c.Contexts[c.CurrentContext]
+			if ok && curContext != nil {
+				kw.UpdateFullStatus(func(sfd *StatusFileData) {
+					sfd.ExtraData.(*kubeExtraData).KubeNamespace = curContext.Namespace
+				})
+			} else {
+				return fmt.Errorf("could not determine namespace")
+			}
+		}
+	} else {
+		cfg, err := clientcmd.NewClientConfigFromBytes([]byte(ked.KubeConfig))
 		if err != nil {
 			return err
 		}
-		kw.UpdateFullStatus(func(sfd *StatusFileData) {
-			sfd.ExtraData.(*kubeExtraData).KubeNamespace = c.Contexts[c.CurrentContext].Namespace
-		})
-	}
-	if ked.KubeConfig != "" {
-		kw.config, err = clientcmd.RESTConfigFromKubeConfig([]byte(ked.KubeConfig))
-	} else {
-		kw.config, err = clientcmd.BuildConfigFromFlags("", clr.GetDefaultFilename())
+		if ked.KubeNamespace == "" {
+			namespace, _, err := cfg.Namespace()
+			if err != nil {
+				return err
+			}
+			kw.UpdateFullStatus(func(sfd *StatusFileData) {
+				sfd.ExtraData.(*kubeExtraData).KubeNamespace = namespace
+			})
+		}
+		kw.config, err = cfg.ClientConfig()
+		if err != nil {
+			return err
+		}
 	}
 	if err != nil {
 		return err

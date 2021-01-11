@@ -1,15 +1,16 @@
 package utils
 
 import (
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"net"
 )
 
 var (
-	oidSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
-	oidReceptorName   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 2312, 19, 1}
+	// OIDSubjectAltName is the OID for subjectAltName
+	OIDSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
+	// OIDReceptorName is the OID for a Receptor node ID
+	OIDReceptorName = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 2312, 19, 1}
 )
 
 // OtherNameDecode is used for decoding the OtherName field type of an x.509 subjectAltName
@@ -19,10 +20,10 @@ type OtherNameDecode struct {
 }
 
 // ReceptorNames returns a list of Receptor node IDs found in the subjectAltName field of an x.509 certificate
-func ReceptorNames(cert *x509.Certificate) ([]string, error) {
+func ReceptorNames(extensions []pkix.Extension) ([]string, error) {
 	names := make([]string, 0)
-	for _, extension := range cert.Extensions {
-		if extension.Id.Equal(oidSubjectAltName) {
+	for _, extension := range extensions {
+		if extension.Id.Equal(OIDSubjectAltName) {
 			values := make([]asn1.RawValue, 0)
 			_, err := asn1.Unmarshal(extension.Value, &values)
 			if err != nil {
@@ -35,7 +36,7 @@ func ReceptorNames(cert *x509.Certificate) ([]string, error) {
 					if err != nil {
 						return nil, err
 					}
-					if on.ID.Equal(oidReceptorName) {
+					if on.ID.Equal(OIDReceptorName) {
 						var name string
 						_, err = asn1.Unmarshal(on.Value.Bytes, &name)
 						if err != nil {
@@ -93,7 +94,7 @@ func MakeReceptorSAN(DNSNames []string, IPAddresses []net.IP, NodeIDs []string) 
 		var err error
 		var asnOtherName []byte
 		asnOtherName, err = asn1.Marshal(OtherNameEncode{
-			OID:   oidReceptorName,
+			OID:   OIDReceptorName,
 			Value: UTFString{A: nodeID},
 		})
 		if err != nil {
@@ -106,7 +107,7 @@ func MakeReceptorSAN(DNSNames []string, IPAddresses []net.IP, NodeIDs []string) 
 		return nil, err
 	}
 	sanExt := pkix.Extension{
-		Id:       oidSubjectAltName,
+		Id:       OIDSubjectAltName,
 		Critical: false,
 		Value:    sanBytes,
 	}

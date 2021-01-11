@@ -578,8 +578,9 @@ func loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 
 // ParseAndRun parses the command line configuration and runs the selected actions.  Phases is a list of function
 // names that will be called on each config objects.  If some objects need to be configured before others, use
-// multiple phases.  Each phase is run against all objects before moving to the next phase.
-func ParseAndRun(args []string, phases []string) {
+// multiple phases.  Each phase is run against all objects before moving to the next phase.  The return value is
+// the name of the exclusive object that was run, if any, or an empty string if the normal, non-exclusive command ran.
+func ParseAndRun(args []string, phases []string) string {
 	var accumulator *cfgObjInfo
 	var commandType reflect.Type
 	var requiredParams map[string]bool
@@ -831,4 +832,6 @@ func ParseAndRun(args []string, phases []string) {
 	for i := range phases {
 		runMethod(phases[i])
 	}
+
+	return exclusiveName
 }

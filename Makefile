@@ -39,6 +39,8 @@ TAG ?= receptor:latest
 # no_tls_config:  Disable the ability to configure TLS server/client configs
 #
 # no_workceptor:  Disable the unit-of-work subsystem (be network only)
+#
+# no_cert_auth:   Disable commands related to CA and certificate generation
 
 TAGS ?=
 ifeq ($(TAGS),)
@@ -62,11 +64,11 @@ pre-commit:
 	@pre-commit run --all-files
 
 build-all:
-	@echo "Running Go builds..." && go build cmd/*.go && \
+	@echo "Running Go builds..." && \
 	GOOS=windows go build -o receptor.exe cmd/receptor.go && \
 	GOOS=darwin go build -o receptor.app cmd/receptor.go && \
 	go build example/*.go && \
-	go build --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor cmd/receptor.go && \
+	go build --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
 	go build cmd/receptor.go
 
 RUNTEST ?=

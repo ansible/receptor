@@ -785,7 +785,7 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 			return err
 		}
 		var receptorNames []string
-		receptorNames, err = utils.ReceptorNames(certs[0])
+		receptorNames, err = utils.ReceptorNames(certs[0].Extensions)
 		if err != nil {
 			return err
 		}

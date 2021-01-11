@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	_ "github.com/project-receptor/receptor/pkg/backends"
+	_ "github.com/project-receptor/receptor/pkg/certificates"
 	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
 	_ "github.com/project-receptor/receptor/pkg/controlsvc"
@@ -17,18 +18,6 @@ import (
 	"strings"
 	"time"
 )
-
-type versionCfg struct{}
-
-func (cfg versionCfg) Init() error {
-	if version.Version == "" {
-		fmt.Printf("Version unknown\n")
-	} else {
-		fmt.Printf("%s\n", version.Version)
-	}
-	os.Exit(0)
-	return nil
-}
 
 type nodeCfg struct {
 	ID           string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
@@ -96,8 +85,12 @@ func (cfg nullBackendCfg) Run() error {
 func main() {
 	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
-	cmdline.AddConfigType("version", "Show the Receptor version", versionCfg{}, cmdline.Exclusive)
-	cmdline.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"})
+	cmdline.AddConfigType("version", "Show the Receptor version", version.CmdlineCfg{}, cmdline.Exclusive)
+	whatRan := cmdline.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"})
+	if whatRan != "" {
+		// We ran an exclusive command, so we aren't starting any back-ends
+		os.Exit(0)
+	}
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})

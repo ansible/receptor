@@ -78,19 +78,19 @@ func TestWork(t *testing.T) {
 			data.Nodes = make(map[string]*mesh.YamlNode)
 			expectedResults := []byte("1\n2\n3\n4\n5\n")
 			// Setup certs
-			caKey, caCrt, err := utils.GenerateCert("ca", "localhost")
+			caKey, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "node1")
+			key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "node1", nil, []string{"node1"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "node2")
+			key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "node2", nil, []string{"node2"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			key3, crt3, err := utils.GenerateCertWithCA("node1wrongCN", caKey, caCrt, "node1wrongCN")
+			key3, crt3, err := utils.GenerateCertWithCA("node1wrongCN", caKey, caCrt, "node1wrongCN", nil, []string{"node1wrongCN"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -109,12 +109,11 @@ func TestWork(t *testing.T) {
 					},
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
-							"name":               "control_tls",
-							"cert":               crt2,
-							"key":                key2,
-							"requireclientcert":  true,
-							"verifyclientnodeid": true,
-							"clientcas":          caCrt,
+							"name":              "control_tls",
+							"cert":              crt2,
+							"key":               key2,
+							"requireclientcert": true,
+							"clientcas":         caCrt,
 						},
 					},
 					map[interface{}]interface{}{

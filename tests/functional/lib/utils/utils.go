@@ -178,7 +178,7 @@ func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, 
 		return "", "", err
 	}
 	// Create certificate request
-	req, key, err := certificates.CreateCertReq(&certificates.CertOptions{
+	req, key, err := certificates.CreateCertReqWithKey(&certificates.CertOptions{
 		CommonName: commonName,
 		Bits:       2048,
 		CertNames: certificates.CertNames{
@@ -225,7 +225,7 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames,
 	keyPath := filepath.Join(dir, name+".key")
 	crtPath := filepath.Join(dir, name+".crt")
 	// Create certificate request
-	req, key, err := certificates.CreateCertReq(&certificates.CertOptions{
+	req, key, err := certificates.CreateCertReqWithKey(&certificates.CertOptions{
 		CommonName: commonName,
 		Bits:       2048,
 		CertNames: certificates.CertNames{

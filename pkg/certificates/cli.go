@@ -52,12 +52,29 @@ func (ica initCA) Run() error {
 
 type makeReq struct {
 	CommonName string   `description:"Common name to assign to the certificate" required:"Yes"`
-	Bits       int      `description:"Bit length of the encryption keys of the certificate" required:"Yes"`
+	Bits       int      `description:"Bit length of the encryption keys of the certificate"`
 	DNSName    []string `description:"DNS names to add to the certificate"`
 	IPAddress  []string `description:"IP addresses to add to the certificate"`
 	NodeID     []string `description:"Receptor node IDs to add to the certificate"`
 	OutReq     string   `description:"File to save the certificate request to" required:"Yes"`
-	OutKey     string   `description:"File to save the private key to" required:"Yes"`
+	InKey      string   `description:"Private key to use for the request"`
+	OutKey     string   `description:"File to save the private key to (new key will be generated)"`
+}
+
+func (mr makeReq) Prepare() error {
+	if mr.InKey == "" && mr.OutKey == "" {
+		return fmt.Errorf("must provide either InKey or OutKey")
+	}
+	if mr.InKey != "" && mr.OutKey != "" {
+		return fmt.Errorf("cannot use both InKey and OutKey")
+	}
+	if mr.InKey != "" && mr.Bits != 0 {
+		return fmt.Errorf("cannot specify key bits when reading an already-existing key")
+	}
+	if mr.OutKey != "" && mr.Bits == 0 {
+		return fmt.Errorf("must specify key bits when creating a new key")
+	}
+	return nil
 }
 
 func (mr makeReq) Run() error {
@@ -77,14 +94,48 @@ func (mr makeReq) Run() error {
 		}
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
-	req, key, err := CreateCertReq(opts)
-	if err == nil {
-		err = SaveToPEMFile(mr.OutReq, []interface{}{req})
+	var req *x509.CertificateRequest
+	var key *rsa.PrivateKey
+	if mr.InKey != "" {
+		data, err := LoadFromPEMFile(mr.InKey)
+		if err != nil {
+			return err
+		}
+		for _, elem := range data {
+			ckey, ok := elem.(*rsa.PrivateKey)
+			if !ok {
+				continue
+			}
+			if key != nil {
+				return fmt.Errorf("multiple private keys in file %s", mr.InKey)
+			}
+			key = ckey
+		}
+		if key == nil {
+			return fmt.Errorf("no private keys in file %s", mr.InKey)
+		}
+		req, err = CreateCertReq(opts, key)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		req, key, err = CreateCertReqWithKey(opts)
+		if err != nil {
+			return err
+		}
 	}
-	if err == nil {
+	err := SaveToPEMFile(mr.OutReq, []interface{}{req})
+	if err != nil {
+		return err
+	}
+	if mr.OutKey != "" {
 		err = SaveToPEMFile(mr.OutKey, []interface{}{key})
+		if err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 type signReq struct {
@@ -94,6 +145,7 @@ type signReq struct {
 	NotBefore string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
 	NotAfter  string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
 	OutCert   string `description:"File to save the signed certificate to" required:"Yes"`
+	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
 }
 
 func (sr signReq) Run() error {
@@ -135,34 +187,36 @@ func (sr signReq) Run() error {
 	if len(names.DNSNames) == 0 && len(names.IPAddresses) == 0 && len(names.NodeIDs) == 0 {
 		return fmt.Errorf("cannot sign: no names found in certificate")
 	}
-	fmt.Printf("Requested certificate:\n")
-	fmt.Printf("  Subject: %s\n", req.Subject)
-	algo := req.PublicKeyAlgorithm.String()
-	if algo == "RSA" {
-		rpk := req.PublicKey.(*rsa.PublicKey)
-		algo = fmt.Sprintf("%s (%d bits)", algo, rpk.Size()*8)
-	}
-	fmt.Printf("  Encryption Algorithm: %s\n", algo)
-	fmt.Printf("  Signature Algorithm: %s\n", req.SignatureAlgorithm.String())
-	fmt.Printf("  Names:\n")
-	for _, name := range names.DNSNames {
-		fmt.Printf("    DNS Name: %s\n", name)
-	}
-	for _, ip := range names.IPAddresses {
-		fmt.Printf("    IP Address: %v\n", ip)
-	}
-	for _, node := range names.NodeIDs {
-		fmt.Printf("    Receptor Node ID: %s\n", node)
-	}
-	fmt.Printf("Sign certificate (yes/no)? ")
-	var response string
-	_, err = fmt.Scanln(&response)
-	if err != nil {
-		return err
-	}
-	response = strings.ToLower(response)
-	if response != "y" && response != "yes" {
-		return fmt.Errorf("user declined")
+	if !sr.Verify {
+		fmt.Printf("Requested certificate:\n")
+		fmt.Printf("  Subject: %s\n", req.Subject)
+		algo := req.PublicKeyAlgorithm.String()
+		if algo == "RSA" {
+			rpk := req.PublicKey.(*rsa.PublicKey)
+			algo = fmt.Sprintf("%s (%d bits)", algo, rpk.Size()*8)
+		}
+		fmt.Printf("  Encryption Algorithm: %s\n", algo)
+		fmt.Printf("  Signature Algorithm: %s\n", req.SignatureAlgorithm.String())
+		fmt.Printf("  Names:\n")
+		for _, name := range names.DNSNames {
+			fmt.Printf("    DNS Name: %s\n", name)
+		}
+		for _, ip := range names.IPAddresses {
+			fmt.Printf("    IP Address: %v\n", ip)
+		}
+		for _, node := range names.NodeIDs {
+			fmt.Printf("    Receptor Node ID: %s\n", node)
+		}
+		fmt.Printf("Sign certificate (yes/no)? ")
+		var response string
+		_, err = fmt.Scanln(&response)
+		if err != nil {
+			return err
+		}
+		response = strings.ToLower(response)
+		if response != "y" && response != "yes" {
+			return fmt.Errorf("user declined")
+		}
 	}
 	var cert *x509.Certificate
 	cert, err = SignCertReq(req, ca, opts)

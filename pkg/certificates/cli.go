@@ -146,6 +146,7 @@ type signReq struct {
 	NotAfter  string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
 	OutCert   string `description:"File to save the signed certificate to" required:"Yes"`
 	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
+	Confirm   bool   `description:"Optionally, skip interactive confirmation" default:"True"`
 }
 
 func (sr signReq) Run() error {
@@ -207,15 +208,17 @@ func (sr signReq) Run() error {
 		for _, node := range names.NodeIDs {
 			fmt.Printf("    Receptor Node ID: %s\n", node)
 		}
-		fmt.Printf("Sign certificate (yes/no)? ")
-		var response string
-		_, err = fmt.Scanln(&response)
-		if err != nil {
-			return err
-		}
-		response = strings.ToLower(response)
-		if response != "y" && response != "yes" {
-			return fmt.Errorf("user declined")
+		if sr.Confirm {
+			fmt.Printf("Sign certificate (yes/no)? ")
+			var response string
+			_, err = fmt.Scanln(&response)
+			if err != nil {
+				return err
+			}
+			response = strings.ToLower(response)
+			if response != "y" && response != "yes" {
+				return fmt.Errorf("user declined")
+			}
 		}
 	}
 	var cert *x509.Certificate

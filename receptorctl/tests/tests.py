@@ -21,7 +21,7 @@ os.mkdir(tmpDir)
 def generate_cert(name, commonName):
     keyPath = os.path.join(tmpDir, name + ".key")
     crtPath = os.path.join(tmpDir, name + ".crt")
-    os.system("openssl genrsa -out " + keyPath + " 1024")
+    os.system("openssl genrsa -out " + keyPath + " 2048")
     os.system("openssl req -x509 -new -nodes -key " + keyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=ca -sha256 -out " + crtPath)
     return keyPath, crtPath
 
@@ -34,7 +34,7 @@ def generate_cert_with_ca(name, caKeyPath, caCrtPath, commonName):
     with open(extPath, "w") as ext:
         ext.write("subjectAltName=DNS:" + commonName)
         ext.close()
-    os.system("openssl genrsa -out " + keyPath + " 1024")
+    os.system("openssl genrsa -out " + keyPath + " 2048")
     # create cert request
     os.system("openssl req -new -sha256 -key " + keyPath + " -subj /C=/ST=/L=/O=/OU=ReceptorTesting/CN=" + commonName + " -out " + csrPath)
     # sign cert request

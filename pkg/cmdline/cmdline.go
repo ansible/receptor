@@ -334,7 +334,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 			if !item.Type().ConvertibleTo(fieldType.Elem()) {
 				return fmt.Errorf("invalid value %s: must be type %s", item, fieldType.Elem())
 			}
-			reflect.Append(fieldSlice, item.Convert(fieldType.Elem()))
+			fieldSlice = reflect.Append(fieldSlice, item.Convert(fieldType.Elem()))
 		}
 		field.Set(fieldSlice)
 		return nil

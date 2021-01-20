@@ -228,10 +228,23 @@ func CreateCA(opts *CertOptions) (*CA, error) {
 	return ca, nil
 }
 
-// CreateCertReq creates a new x.509 certificate request, potentially containing Receptor node ID names.
-func CreateCertReq(opts *CertOptions) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
+// CreateCertReqWithKey creates a new x.509 certificate request with a newly generated private key.
+func CreateCertReqWithKey(opts *CertOptions) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
+	key, err := rsa.GenerateKey(rand.Reader, opts.Bits)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := CreateCertReq(opts, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	return req, key, nil
+}
+
+// CreateCertReq creates a new x.509 certificate request for an existing private key.
+func CreateCertReq(opts *CertOptions, privateKey *rsa.PrivateKey) (*x509.CertificateRequest, error) {
 	if opts.CommonName == "" {
-		return nil, nil, fmt.Errorf("must provide CommonName")
+		return nil, fmt.Errorf("must provide CommonName")
 	}
 	if opts.Bits == 0 {
 		opts.Bits = 2048
@@ -241,7 +254,7 @@ func CreateCertReq(opts *CertOptions) (*x509.CertificateRequest, *rsa.PrivateKey
 	var san *pkix.Extension
 	san, err = utils.MakeReceptorSAN(opts.DNSNames, opts.IPAddresses, opts.NodeIDs)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	reqTemplate := &x509.CertificateRequest{
 		Subject: pkix.Name{
@@ -250,25 +263,19 @@ func CreateCertReq(opts *CertOptions) (*x509.CertificateRequest, *rsa.PrivateKey
 		ExtraExtensions: []pkix.Extension{*san},
 	}
 
-	var reqPrivKey *rsa.PrivateKey
-	reqPrivKey, err = rsa.GenerateKey(rand.Reader, opts.Bits)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	var reqBytes []byte
-	reqBytes, err = x509.CreateCertificateRequest(rand.Reader, reqTemplate, reqPrivKey)
+	reqBytes, err = x509.CreateCertificateRequest(rand.Reader, reqTemplate, privateKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var req *x509.CertificateRequest
 	req, err = x509.ParseCertificateRequest(reqBytes)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return req, reqPrivKey, nil
+	return req, nil
 }
 
 // GetReqNames returns the names coded into a certificate request, including Receptor node IDs.

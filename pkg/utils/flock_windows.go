@@ -4,6 +4,7 @@ package utils
 
 import (
 	"fmt"
+	"time"
 )
 
 // ErrLocked is returned when the flock is already held
@@ -14,7 +15,7 @@ type FLock struct {
 }
 
 // TryFLock is not implemented on Windows
-func TryFLock(filename string) (*FLock, error) {
+func TryFLock(filename string, retries int, delay time.Duration) (*FLock, error) {
 	return nil, fmt.Errorf("file locks not implemented on Windows")
 }
 

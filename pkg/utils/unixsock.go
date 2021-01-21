@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 )
 
 // UnixSocketListen listens on a Unix socket, handling file locking and permissions
 func UnixSocketListen(filename string, permissions os.FileMode) (net.Listener, *FLock, error) {
-	lock, err := TryFLock(filename + ".lock")
+	lock, err := TryFLock(filename+".lock", 3, 100*time.Millisecond)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not acquire lock on socket file: %s", err)
 	}

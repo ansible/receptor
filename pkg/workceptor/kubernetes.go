@@ -338,34 +338,37 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	// Actually run the streams.  This blocks until the pod finishes.
 	var errStdin error
 	var errStdout error
-	streamWait := sync.WaitGroup{}
-	streamWait.Add(2)
+	stdinWait := sync.WaitGroup{}
+	stdinWait.Add(1)
+	stdoutWait := sync.WaitGroup{}
+	stdoutWait.Add(1)
 	if skipStdin {
-		streamWait.Done()
+		stdinWait.Done()
 	} else {
 		go func() {
 			errStdin = exec.Stream(remotecommand.StreamOptions{
 				Stdin: stdin,
 				Tty:   false,
 			})
-			streamWait.Done()
+			stdinWait.Done()
 		}()
 	}
 	go func() {
 		_, errStdout = io.Copy(stdout, logStream)
-		streamWait.Done()
+		stdoutWait.Done()
 	}()
-	streamWait.Wait()
-	close(finishedChan)
-	if errStdin != nil || errStdout != nil {
+	stdinWait.Wait()
+	if errStdin != nil {
 		var errDetail string
-		if errStdin == nil {
-			errDetail = fmt.Sprintf("%s", errStdout)
-		} else if errStdout == nil {
-			errDetail = fmt.Sprintf("%s", errStdin)
-		} else {
-			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", errStdin, errStdout)
-		}
+		errDetail = fmt.Sprintf("%s", errStdin)
+		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stdin error running pod: %s", errDetail), stdout.Size())
+		return
+	}
+	stdoutWait.Wait()
+	close(finishedChan)
+	if errStdout != nil {
+		var errDetail string
+		errDetail = fmt.Sprintf("%s", errStdout)
 		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
 		return
 	}

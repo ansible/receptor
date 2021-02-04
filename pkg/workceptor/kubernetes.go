@@ -348,6 +348,9 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				Stdin: stdin,
 				Tty:   false,
 			})
+			if errStdin != nil {
+				logStream.Close()
+			}
 			streamWait.Done()
 		}()
 	}

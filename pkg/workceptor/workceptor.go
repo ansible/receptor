@@ -92,6 +92,9 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc
 	w.workTypes[typeName] = &workType{
 		newWorkerFunc: newWorkerFunc,
 	}
+	if typeName != "remote" { // all workceptors get a remote command by default
+		w.nc.AddWorkCommand(typeName)
+	}
 	w.workTypesLock.Unlock()
 
 	// Check if any unknown units have now become known

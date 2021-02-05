@@ -104,7 +104,7 @@ def status(ctx):
     ads = status.pop('Advertisements', None)
     if ads:
         print()
-        print(f"{'Node':<{longest_node}} Service   Type       Last Seen            Tags")
+        print(f"{'Node':<{longest_node}} Service   Type       Last Seen           Tags            Work Types")
         for ad in ads:
             time = dateutil.parser.parse(ad['Time'])
             if ad['ConnType'] == 0:
@@ -113,8 +113,16 @@ def status(ctx):
                 conn_type = 'Stream'
             elif ad['ConnType'] == 2:
                 conn_type = 'StreamTLS'
-            print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S}  ", end="")
-            pprint(ad['Tags'])
+            print(
+                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S} {(ad['Tags'] or '-'):<16}",
+                end=""
+            )
+            commands = ad['WorkCommands']
+            if commands:
+                commands = ', '.join(commands)
+            else:
+                commands = '-'
+            print(commands)
 
     if status:
         print("Additional data returned from Receptor:")

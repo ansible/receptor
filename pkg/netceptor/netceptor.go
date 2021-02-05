@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-// defaultMTU is the largest message sendable over the Netecptor network
+// defaultMTU is the largest message sendable over the Netceptor network
 const defaultMTU = 16384
 
 // defaultRouteUpdateTime is the interval at which regular route updates will be sent
@@ -88,6 +88,7 @@ type Netceptor struct {
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
 	allowedPeers           []string
+	workCommands           []string
 	epoch                  uint64
 	sequence               uint64
 	connLock               *sync.RWMutex
@@ -199,11 +200,12 @@ const (
 
 // ServiceAdvertisement is the data associated with a service advertisement
 type ServiceAdvertisement struct {
-	NodeID   string
-	Service  string
-	Time     time.Time
-	ConnType byte
-	Tags     map[string]string
+	NodeID       string
+	Service      string
+	Time         time.Time
+	ConnType     byte
+	Tags         map[string]string
+	WorkCommands []string
 }
 
 // serviceAdvertisementFull is the whole message from the network
@@ -497,11 +499,12 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 		s.serviceAdsReceived[s.nodeID] = n
 	}
 	n[service] = &ServiceAdvertisement{
-		NodeID:   s.nodeID,
-		Service:  service,
-		Time:     time.Now(),
-		ConnType: connType,
-		Tags:     tags,
+		NodeID:       s.nodeID,
+		Service:      service,
+		Time:         time.Now(),
+		ConnType:     connType,
+		Tags:         tags,
+		WorkCommands: s.workCommands,
 	}
 	s.sendServiceAdsChan <- 0
 }
@@ -555,11 +558,12 @@ func (s *Netceptor) sendServiceAds() {
 	for sn := range s.listenerRegistry {
 		if s.listenerRegistry[sn].advertise {
 			sa := ServiceAdvertisement{
-				NodeID:   s.nodeID,
-				Service:  sn,
-				Time:     time.Now(),
-				ConnType: s.listenerRegistry[sn].connType,
-				Tags:     s.listenerRegistry[sn].adTags,
+				NodeID:       s.nodeID,
+				Service:      sn,
+				Time:         time.Now(),
+				ConnType:     s.listenerRegistry[sn].connType,
+				Tags:         s.listenerRegistry[sn].adTags,
+				WorkCommands: s.workCommands,
 			}
 			ads = append(ads, sa)
 		}
@@ -728,6 +732,25 @@ func (s *Netceptor) GetServerTLSConfig(name string) (*tls.Config, error) {
 		return nil, fmt.Errorf("unknown TLS config %s", name)
 	}
 	return sc.Clone(), nil
+}
+
+// AddWorkCommand records a work command so it can be included in service announcements
+func (s *Netceptor) AddWorkCommand(command string) error {
+	if command == "" {
+		return fmt.Errorf("must provide a name")
+	}
+	s.serviceAdsLock.Lock()
+	defer s.serviceAdsLock.Unlock()
+	if n, ok := s.serviceAdsReceived[s.NodeID()]; ok {
+		// if it's the local node, just update the local service advertisement
+		// structs directly
+		for _, ad := range n {
+			ad.WorkCommands = append(ad.WorkCommands, command)
+		}
+	} else {
+		s.workCommands = append(s.workCommands, command)
+	}
+	return nil
 }
 
 // SetServerTLSConfig stores a server TLS config by name

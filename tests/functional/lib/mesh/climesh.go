@@ -467,6 +467,39 @@ func (m *CLIMesh) CheckConnections() bool {
 	return false
 }
 
+// CheckAdvertisements returns true if the advertisements are recorded in
+// a manner consistent with the work-commands defined for the mesh
+func (m *CLIMesh) CheckAdvertisements() bool {
+	statusList, err := m.Status()
+	if err != nil {
+		return false
+	}
+	for _, status := range statusList {
+		actual := map[string][]string{}
+		for _, ad := range status.Advertisements {
+			if len(ad.WorkCommands) > 0 {
+				actual[ad.NodeID] = ad.WorkCommands
+			}
+		}
+		expected := map[string][]string{}
+		for node := range m.MeshDefinition.Nodes {
+			for _, attr := range m.MeshDefinition.Nodes[node].Nodedef {
+				attrMap := attr.(map[interface{}]interface{})
+				for _, cmd := range []string{"work-command", "work-kubernetes", "work-python"} {
+					if v, ok := attrMap[cmd]; ok {
+						v, _ := v.(map[interface{}]interface{})
+						expected[node] = append(expected[node], v["workType"].(string))
+					}
+				}
+			}
+		}
+		if reflect.DeepEqual(actual, expected) {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh
 func (m *CLIMesh) CheckKnownConnectionCosts() bool {
 	meshStatus, err := m.Status()
@@ -535,6 +568,9 @@ func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
 		return errors.New("Timed out while waiting for routes to converge")
+	}
+	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckAdvertisements) {
+		return errors.New("Timed out while waiting for Advertisements")
 	}
 	return nil
 }

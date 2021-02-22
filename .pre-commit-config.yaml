@@ -5,4 +5,4 @@ repos:
     hooks:
       - id: go-fmt
       - id: go-lint
-    exclude: ^vendor/
+exclude: ^vendor/

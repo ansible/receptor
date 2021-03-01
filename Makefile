@@ -93,7 +93,7 @@ kubectl:
 kubetest: kubectl
 	./kubectl get nodes
 
-ci: pre-commit build-all test receptorctl-tests
+ci: pre-commit build-all
 	@echo "All done"
 
 version:

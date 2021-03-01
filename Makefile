@@ -50,7 +50,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	go build -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) cmd/receptor.go
+	go build -mod=mod -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) cmd/receptor.go
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -65,8 +65,8 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	# GOOS=windows go build -o receptor.exe cmd/receptor.go && \
-	# GOOS=darwin go build -o receptor.app cmd/receptor.go && \
+	GOOS=windows go build -mod=mod -o receptor.exe cmd/receptor.go && \
+	GOOS=darwin go build -mod=mod -o receptor.app cmd/receptor.go && \
 	go build -mod=mod example/*.go && \
 	go build -mod=mod --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
 	go build -mod=mod cmd/receptor.go
@@ -93,7 +93,7 @@ kubectl:
 kubetest: kubectl
 	./kubectl get nodes
 
-ci: pre-commit build-all
+ci: pre-commit build-all test receptorctl-tests
 	@echo "All done"
 
 version:

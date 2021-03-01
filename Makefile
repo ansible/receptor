@@ -50,7 +50,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	go build -mod=mod -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) cmd/receptor.go
+	go build -mod=vendor -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) cmd/receptor.go
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -65,11 +65,11 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows go build -mod=mod -o receptor.exe cmd/receptor.go && \
-	GOOS=darwin go build -mod=mod -o receptor.app cmd/receptor.go && \
-	go build -mod=mod example/*.go && \
-	go build -mod=mod --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
-	go build -mod=mod cmd/receptor.go
+	GOOS=windows go build -mod=vendor -o receptor.exe cmd/receptor.go && \
+	GOOS=darwin go build -mod=vendor -o receptor.app cmd/receptor.go && \
+	go build -mod=vendor example/*.go && \
+	go build -mod=vendor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
+	go build -mod=vendor cmd/receptor.go
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)
@@ -79,7 +79,7 @@ TESTCMD = -run $(RUNTEST)
 endif
 
 test: receptor
-	@go test -mod=mod ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+	@go test -mod=vendor ./... -p 1 -parallel=16 $(TESTCMD) -count=1
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \

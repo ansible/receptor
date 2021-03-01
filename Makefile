@@ -65,8 +65,8 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows go build -mod=vendor -o receptor.exe cmd/receptor.go && \
-	GOOS=darwin go build -mod=vendor -o receptor.app cmd/receptor.go && \
+	# GOOS=windows go build -mod=vendor -o receptor.exe cmd/receptor.go && \
+	# GOOS=darwin go build -mod=vendor -o receptor.app cmd/receptor.go && \
 	go build -mod=vendor example/*.go && \
 	go build -mod=vendor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
 	go build -mod=vendor cmd/receptor.go

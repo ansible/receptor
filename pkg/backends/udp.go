@@ -6,7 +6,7 @@ package backends
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -316,6 +316,6 @@ func (cfg UDPDialerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("UDP-listener", "Run a backend listener on a UDP port", UDPListenerCfg{}, cmdline.Section(backendSection))
-	cmdline.AddConfigType("UDP-peer", "Make an outbound backend connection to a UDP peer", UDPDialerCfg{}, cmdline.Section(backendSection))
+	cmdline.GlobalInstance().AddConfigType("UDP-listener", "Run a backend listener on a UDP port", UDPListenerCfg{}, cmdline.Section(backendSection))
+	cmdline.GlobalInstance().AddConfigType("UDP-peer", "Make an outbound backend connection to a UDP peer", UDPDialerCfg{}, cmdline.Section(backendSection))
 }

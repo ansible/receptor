@@ -6,7 +6,7 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -110,7 +110,7 @@ func (cfg UnixProxyOutboundCfg) Run() error {
 
 func init() {
 	if runtime.GOOS != "windows" {
-		cmdline.AddConfigType("unix-socket-server", "Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, cmdline.Section(servicesSection))
-		cmdline.AddConfigType("unix-socket-client", "Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, cmdline.Section(servicesSection))
+		cmdline.GlobalInstance().AddConfigType("unix-socket-server", "Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, cmdline.Section(servicesSection))
+		cmdline.GlobalInstance().AddConfigType("unix-socket-client", "Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, cmdline.Section(servicesSection))
 	}
 }

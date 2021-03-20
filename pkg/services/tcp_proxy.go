@@ -6,7 +6,7 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -127,6 +127,6 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("tcp-server", "Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, cmdline.Section(servicesSection))
-	cmdline.AddConfigType("tcp-client", "Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, cmdline.Section(servicesSection))
+	cmdline.GlobalInstance().AddConfigType("tcp-server", "Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, cmdline.Section(servicesSection))
+	cmdline.GlobalInstance().AddConfigType("tcp-client", "Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, cmdline.Section(servicesSection))
 }

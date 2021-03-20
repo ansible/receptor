@@ -4,8 +4,8 @@ package workceptor
 
 import (
 	"fmt"
+	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"os"
 	"os/exec"
@@ -327,6 +327,6 @@ func (cfg CommandRunnerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, cmdline.Section(workersSection))
-	cmdline.AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Exclusive, cmdline.Hidden)
+	cmdline.GlobalInstance().AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, cmdline.Section(workersSection))
+	cmdline.GlobalInstance().AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Exclusive, cmdline.Hidden)
 }

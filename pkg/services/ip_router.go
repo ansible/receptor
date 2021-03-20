@@ -6,7 +6,7 @@ package services
 import (
 	"bytes"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -367,5 +367,5 @@ func (cfg IPRouterCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, cmdline.Section(servicesSection))
+	cmdline.GlobalInstance().AddConfigType("ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, cmdline.Section(servicesSection))
 }

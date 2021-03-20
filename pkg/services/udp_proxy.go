@@ -5,7 +5,7 @@ package services
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -182,6 +182,6 @@ func (cfg UDPProxyOutboundCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("udp-server", "Listen for UDP and forward via Receptor", UDPProxyInboundCfg{}, cmdline.Section(servicesSection))
-	cmdline.AddConfigType("udp-client", "Listen on a Receptor service and forward via UDP", UDPProxyOutboundCfg{}, cmdline.Section(servicesSection))
+	cmdline.GlobalInstance().AddConfigType("udp-server", "Listen for UDP and forward via Receptor", UDPProxyInboundCfg{}, cmdline.Section(servicesSection))
+	cmdline.GlobalInstance().AddConfigType("udp-client", "Listen on a Receptor service and forward via UDP", UDPProxyOutboundCfg{}, cmdline.Section(servicesSection))
 }

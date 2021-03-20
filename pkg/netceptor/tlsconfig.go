@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"io/ioutil"
 )
 
@@ -116,6 +116,7 @@ func (cfg TLSClientCfg) Prepare() error {
 }
 
 func init() {
-	cmdline.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, cmdline.Section(configSection))
-	cmdline.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, cmdline.Section(configSection))
+	cl := cmdline.GlobalInstance()
+	cl.AddConfigType("tls-server", "Define a TLS server configuration", TLSServerCfg{}, cmdline.Section(configSection))
+	cl.AddConfigType("tls-client", "Define a TLS client configuration", TLSClientCfg{}, cmdline.Section(configSection))
 }

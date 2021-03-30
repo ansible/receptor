@@ -141,6 +141,14 @@ $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find re
 	@echo $(VERSION) > .VERSION
 	@cd receptorctl && python3 setup.py bdist_wheel
 
+receptorctl_wheel: $(RECEPTORCTL_WHEEL)
+
+RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
+$(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && python3 setup.py sdist
+
+receptorctl_sdist: $(RECEPTORCTL_SDIST)
+
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION)-py3-none-any.whl
 $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
 	@echo $(VERSION) > .VERSION

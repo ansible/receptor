@@ -108,6 +108,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 	pod := &corev1.Pod{}
 	spec := &corev1.PodSpec{}
+	objectMeta := &metav1.ObjectMeta{}
 	if ked.KubePod != "" {
 		decode := scheme.Codecs.UniversalDeserializer().Decode
 		_, _, err := decode([]byte(ked.KubePod), nil, pod)
@@ -136,7 +137,15 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		if userPodName != "" {
 			kw.namePrefix = userPodName + "-"
 		}
+		objectMeta = &pod.ObjectMeta
+		objectMeta.Name = ""
+		objectMeta.GenerateName = kw.namePrefix
+		objectMeta.Namespace = ked.KubeNamespace
 	} else {
+		objectMeta = &metav1.ObjectMeta{
+			GenerateName: kw.namePrefix,
+			Namespace:    ked.KubeNamespace,
+		}
 		spec = &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:      "worker",
@@ -152,11 +161,8 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 
 	pod = &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: kw.namePrefix,
-			Namespace:    ked.KubeNamespace,
-		},
-		Spec: *spec,
+		ObjectMeta: *objectMeta,
+		Spec:       *spec,
 	}
 
 	if env != nil {

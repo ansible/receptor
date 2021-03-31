@@ -11,3 +11,5 @@ rpmbuild/
 .rpm-builder-flag
 .VERSION
 kubectl
+/receptorctl/AUTHORS
+/receptorctl/ChangeLog

@@ -138,7 +138,6 @@ rpms: $(RPMS)
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
 $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@echo $(VERSION) > .VERSION
 	@cd receptorctl && python3 setup.py bdist_wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
@@ -151,7 +150,6 @@ receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION)-py3-none-any.whl
 $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
-	@echo $(VERSION) > .VERSION
 	@cd receptor-python-worker && python3 setup.py bdist_wheel
 
 container: .container-flag-$(VERSION)

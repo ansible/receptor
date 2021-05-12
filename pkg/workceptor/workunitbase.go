@@ -251,6 +251,8 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 // UpdateFullStatus atomically updates the whole status record.  Changes should be made in the callback function.
 // Errors are logged rather than returned.
 func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
+	bwu.statusLock.Lock()
+	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
 	bwu.lastUpdateError = err
 	if err != nil {

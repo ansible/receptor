@@ -114,6 +114,7 @@ func (bwu *BaseWorkUnit) StdoutFileName() string {
 func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, error) {
 	lockFileName := filename + ".lock"
 	lockFile, err := lockedfile.OpenFile(lockFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	sfd.LockFile = lockFile
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +124,7 @@ func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, er
 // unlockStatusFile releases the lock on the status file
 func (sfd *StatusFileData) unlockStatusFile(filename string, lockFile *lockedfile.File) {
 	err := lockFile.Close()
+	sfd.LockFile = nil
 	if err != nil {
 		logger.Error("Error closing %s.lock: %s", filename, err)
 	}
@@ -366,8 +368,14 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
+	if bwu.status.LockFile != nil {
+		// There seems to be a race condition with the `defer`s that
+		// handle closing this lockfile.
+		bwu.status.LockFile.Close()
+	}
 	err := os.RemoveAll(bwu.UnitDir())
 	if err != nil && !force {
+		logger.Error("Error when releasing work: %s\n", err)
 		return err
 	}
 	bwu.w.activeUnitsLock.Lock()

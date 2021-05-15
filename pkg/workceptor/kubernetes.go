@@ -860,6 +860,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 					KubeVerifyTLS: cfg.KubeVerifyTLS,
 					KubeTLSCAData: cfg.KubeTLSCAData,
 				},
+				Lock: &sync.RWMutex{},
 			},
 		},
 		authMethod:          strings.ToLower(cfg.AuthMethod),

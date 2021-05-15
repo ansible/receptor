@@ -4,10 +4,12 @@ package workceptor
 
 import (
 	"context"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
@@ -15,6 +17,7 @@ func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
 				ExtraData: &commandExtraData{},
+				Lock:      &sync.RWMutex{},
 			},
 		},
 		command:            "echo",

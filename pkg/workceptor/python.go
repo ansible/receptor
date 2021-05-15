@@ -5,8 +5,10 @@ package workceptor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"os/exec"
+	"sync"
+
+	"github.com/project-receptor/receptor/pkg/cmdline"
 )
 
 // pythonUnit implements the WorkUnit interface
@@ -53,6 +55,7 @@ func (cfg WorkPythonCfg) newWorker(w *Workceptor, unitID string, workType string
 			BaseWorkUnit: BaseWorkUnit{
 				status: StatusFileData{
 					ExtraData: &commandExtraData{},
+					Lock:      &sync.RWMutex{},
 				},
 			},
 		},

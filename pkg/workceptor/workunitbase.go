@@ -83,6 +83,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
+	bwu.status.Lock = bwu.statusLock
 }
 
 // SetFromParams sets the in-memory state from parameters
@@ -203,6 +204,8 @@ func (bwu *BaseWorkUnit) Load() error {
 // UpdateFullStatus atomically updates the status metadata file.  Changes should be made in the callback function.
 // Errors are logged rather than returned.
 func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*StatusFileData)) error {
+	sfd.Lock.RLock()
+	defer sfd.Lock.RUnlock()
 	lockFile, err := sfd.lockStatusFile(filename)
 	if err != nil {
 		return err
@@ -273,8 +276,6 @@ func (sfd *StatusFileData) UpdateBasicStatus(filename string, state int, detail 
 // UpdateBasicStatus atomically updates key fields in the status metadata file.  Errors are logged rather than returned.
 // Passing -1 as stdoutSize leaves it unchanged.
 func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize int64) {
-	bwu.statusLock.Lock()
-	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize)
 	bwu.lastUpdateError = err
 	if err != nil {

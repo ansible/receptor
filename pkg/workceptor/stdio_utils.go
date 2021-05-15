@@ -13,6 +13,7 @@ import (
 func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	statusFilename := path.Join(unitdir, "status")
 	si := &StatusFileData{}
+	si.Lock = &sync.RWMutex{}
 	return si.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
 		status.StdoutSize = stdoutSize
 	})

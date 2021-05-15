@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"net"
 	"os"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin
@@ -290,6 +291,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			return
 		}
 		si := StatusFileData{}
+		si.Lock = &sync.RWMutex{}
 		err = json.Unmarshal([]byte(status), &si)
 		if err != nil {
 			logger.Error("Error unmarshalling JSON: %s\n", status)

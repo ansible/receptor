@@ -5,11 +5,6 @@ package workceptor
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/randstr"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,6 +13,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/controlsvc"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/randstr"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // Workceptor is the main object that handles unit-of-work management
@@ -217,6 +218,7 @@ func (w *Workceptor) scanForUnits() {
 			_, ok := w.activeUnits[ident]
 			if !ok {
 				sfd := &StatusFileData{}
+				sfd.Lock = &sync.RWMutex{}
 				statusFilename := path.Join(unitdir, "status")
 				_ = sfd.Load(statusFilename)
 				w.workTypesLock.RLock()

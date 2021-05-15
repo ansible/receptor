@@ -1,5 +1,9 @@
 package workceptor
 
+import (
+	"sync"
+)
+
 // WorkUnit represents a local unit of work
 type WorkUnit interface {
 	ID() string
@@ -31,4 +35,5 @@ type StatusFileData struct {
 	StdoutSize int64
 	WorkType   string
 	ExtraData  interface{}
+	Lock       *sync.RWMutex
 }

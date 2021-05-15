@@ -35,6 +35,7 @@ func TestStatusFileLock(t *testing.T) {
 		totalWaitTime = totalWaitTime + waitTime
 		go func(iter int, waitTime time.Duration) {
 			sfd := StatusFileData{}
+			sfd.Lock = &sync.RWMutex{}
 			err = sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
 				time.Sleep(waitTime)
 				status.State = iter
@@ -50,6 +51,8 @@ func TestStatusFileLock(t *testing.T) {
 	for i := 0; i < numReaderThreads; i++ {
 		go func() {
 			sfd := StatusFileData{}
+			sfd.Lock = &sync.RWMutex{}
+			sfd.Lock = &sync.RWMutex{}
 			fileHasExisted := false
 			for {
 				if ctx.Err() != nil {

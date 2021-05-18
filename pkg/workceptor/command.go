@@ -70,17 +70,6 @@ func commandRunner(command string, params string, unitdir string) error {
 		cmd = exec.Command(command, paramList...)
 	}
 	termChan := make(chan os.Signal)
-	sigKilled := false
-	go func() {
-		<-termChan
-		sigKilled = true
-		termThenKill(cmd)
-		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
-		if err != nil {
-			logger.Error("Error updating status file %s: %s", statusFilename, err)
-		}
-		os.Exit(-1)
-	}()
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	stdin, err := os.Open(path.Join(unitdir, "stdin"))
 	if err != nil {
@@ -104,6 +93,13 @@ loop:
 		select {
 		case <-doneChan:
 			break loop
+		case <-termChan:
+			termThenKill(cmd)
+			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
+			if err != nil {
+				logger.Error("Error updating status file %s: %s", statusFilename, err)
+			}
+			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
@@ -113,13 +109,9 @@ loop:
 		}
 	}
 	if err != nil {
-		if sigKilled {
-			time.Sleep(50 * time.Millisecond)
-		} else {
-			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
-			if err != nil {
-				logger.Error("Error updating status file %s: %s", statusFilename, err)
-			}
+		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
+		if err != nil {
+			logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
 		return err
 	}

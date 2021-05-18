@@ -7,8 +7,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/ghjm/cmdline"
 	"github.com/gorilla/websocket"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
@@ -307,6 +307,6 @@ func (cfg WebsocketDialerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
-	cmdline.AddConfigType("ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, cmdline.Section(backendSection))
+	cmdline.GlobalInstance().AddConfigType("ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
+	cmdline.GlobalInstance().AddConfigType("ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, cmdline.Section(backendSection))
 }

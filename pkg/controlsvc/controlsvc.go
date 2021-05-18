@@ -7,7 +7,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -407,8 +407,8 @@ func (cfg CmdlineConfigWindows) Run() error {
 
 func init() {
 	if runtime.GOOS == "windows" {
-		cmdline.AddConfigType("control-service", "Run a control service", CmdlineConfigWindows{})
+		cmdline.GlobalInstance().AddConfigType("control-service", "Run a control service", CmdlineConfigWindows{})
 	} else {
-		cmdline.AddConfigType("control-service", "Run a control service", CmdlineConfigUnix{})
+		cmdline.GlobalInstance().AddConfigType("control-service", "Run a control service", CmdlineConfigUnix{})
 	}
 }

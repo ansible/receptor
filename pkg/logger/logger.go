@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"log"
 	"os"
 	"strings"
@@ -133,6 +133,6 @@ func init() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
-	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+	cmdline.GlobalInstance().AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+	cmdline.GlobalInstance().AddConfigType("trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
 }

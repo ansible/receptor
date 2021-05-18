@@ -14,8 +14,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -921,5 +921,5 @@ func (cfg WorkKubeCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, cmdline.Section(workersSection))
+	cmdline.GlobalInstance().AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, cmdline.Section(workersSection))
 }

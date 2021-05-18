@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ghjm/cmdline"
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	_ "github.com/project-receptor/receptor/pkg/certificates"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
 	_ "github.com/project-receptor/receptor/pkg/controlsvc"
 	"github.com/project-receptor/receptor/pkg/logger"
@@ -83,11 +83,16 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cmdline.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
-	cmdline.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
-	cmdline.AddConfigType("version", "Show the Receptor version", version.CmdlineCfg{}, cmdline.Exclusive)
-	whatRan := cmdline.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"})
-	if whatRan != "" {
+	cl := cmdline.GlobalInstance()
+	cl.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
+	cl.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
+	cl.AddConfigType("version", "Show the Receptor version", version.CmdlineCfg{}, cmdline.Exclusive)
+	err := cl.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
+	}
+	if cl.WhatRan() != "" {
 		// We ran an exclusive command, so we aren't starting any back-ends
 		os.Exit(0)
 	}

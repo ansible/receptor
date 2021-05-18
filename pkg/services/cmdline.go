@@ -1,6 +1,6 @@
 package services
 
-import "github.com/project-receptor/receptor/pkg/cmdline"
+import "github.com/ghjm/cmdline"
 
 var servicesSection = &cmdline.ConfigSection{
 	Description: "Commands to configure services that run on top of the Receptor mesh:",

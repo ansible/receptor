@@ -235,10 +235,12 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		return cfr, nil
 	case "list":
-		unitList := c.w.ListKnownUnitIDs()
+		var unitList []string
 		targetUnitID, ok := c.params["unitid"].(string)
 		if ok {
 			unitList = []string{targetUnitID}
+		} else {
+			unitList = c.w.ListKnownUnitIDs()
 		}
 		cfr := make(map[string]interface{})
 		for i := range unitList {

@@ -238,7 +238,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		var unitList []string
 		targetUnitID, ok := c.params["unitid"].(string)
 		if ok {
-			unitList = []string{targetUnitID}
+			unitList = append(unitList, targetUnitID)
 		} else {
 			unitList = c.w.ListKnownUnitIDs()
 		}

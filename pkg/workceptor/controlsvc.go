@@ -44,7 +44,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 		}
 	case "list":
 		if len(tokens) > 1 {
-			return nil, fmt.Errorf("work list does not take parameters")
+			c.params["unitid"] = tokens[1]
 		}
 	case "status", "cancel", "release", "force-release":
 		if len(tokens) < 2 {
@@ -144,6 +144,11 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err != nil {
 			return nil, err
 		}
+	case "list":
+		unitID, err := strFromMap(config, "unitid")
+		if err == nil {
+			c.params["unitid"] = unitID
+		}
 	case "results":
 		c.params["unitid"], err = strFromMap(config, "unitid")
 		if err != nil {
@@ -230,7 +235,13 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		return cfr, nil
 	case "list":
-		unitList := c.w.ListKnownUnitIDs()
+		var unitList []string
+		targetUnitID, ok := c.params["unitid"].(string)
+		if ok {
+			unitList = append(unitList, targetUnitID)
+		} else {
+			unitList = c.w.ListKnownUnitIDs()
+		}
 		cfr := make(map[string]interface{})
 		for i := range unitList {
 			unitID := unitList[i]

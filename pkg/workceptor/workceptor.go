@@ -202,50 +202,63 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 	return rw, nil
 }
 
+func (w *Workceptor) scanForUnit(unitID string) {
+	unitdir := path.Join(w.dataDir, unitID)
+	fi, _ := os.Stat(unitdir)
+	if fi == nil || !fi.IsDir() {
+		logger.Error("Error locating unit: %s", unitID)
+		return
+	}
+	ident := fi.Name()
+	w.activeUnitsLock.RLock()
+	_, ok := w.activeUnits[ident]
+	w.activeUnitsLock.RUnlock()
+	if !ok {
+		statusFilename := path.Join(unitdir, "status")
+		sfd := &StatusFileData{}
+		_ = sfd.Load(statusFilename)
+		w.workTypesLock.RLock()
+		wt, ok := w.workTypes[sfd.WorkType]
+		w.workTypesLock.RUnlock()
+		var worker WorkUnit
+		if ok {
+			worker = wt.newWorkerFunc(w, ident, sfd.WorkType)
+		} else {
+			worker = newUnknownWorker(w, ident, sfd.WorkType)
+		}
+		if _, err := os.Stat(statusFilename); os.IsNotExist(err) {
+			logger.Error("Status file has disappeared for %s.", ident)
+			return
+		}
+		err := worker.Load()
+		if err != nil {
+			logger.Warning("Failed to restart worker %s due to read error: %s", unitdir, err)
+			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
+		}
+		err = worker.Restart()
+		if err != nil && !IsPending(err) {
+			logger.Warning("Failed to restart worker %s: %s", unitdir, err)
+			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
+		}
+		w.activeUnitsLock.Lock()
+		defer w.activeUnitsLock.Unlock()
+		w.activeUnits[ident] = worker
+	}
+}
+
 func (w *Workceptor) scanForUnits() {
 	files, err := ioutil.ReadDir(w.dataDir)
 	if err != nil {
 		return
 	}
-	w.activeUnitsLock.Lock()
-	defer w.activeUnitsLock.Unlock()
 	for i := range files {
 		fi := files[i]
-		if fi.IsDir() {
-			ident := fi.Name()
-			unitdir := path.Join(w.dataDir, ident)
-			_, ok := w.activeUnits[ident]
-			if !ok {
-				sfd := &StatusFileData{}
-				statusFilename := path.Join(unitdir, "status")
-				_ = sfd.Load(statusFilename)
-				w.workTypesLock.RLock()
-				wt, ok := w.workTypes[sfd.WorkType]
-				w.workTypesLock.RUnlock()
-				var worker WorkUnit
-				if ok {
-					worker = wt.newWorkerFunc(w, ident, sfd.WorkType)
-				} else {
-					worker = newUnknownWorker(w, ident, sfd.WorkType)
-				}
-				err = worker.Load()
-				if err != nil {
-					logger.Warning("Failed to restart worker %s due to read error: %s", unitdir, err)
-					worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
-				}
-				err = worker.Restart()
-				if err != nil && !IsPending(err) {
-					logger.Warning("Failed to restart worker %s: %s", unitdir, err)
-					worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
-				}
-				w.activeUnits[ident] = worker
-			}
-		}
+		w.scanForUnit(fi.Name())
 	}
 }
 
 func (w *Workceptor) findUnit(unitID string) (WorkUnit, error) {
-	w.scanForUnits()
+	w.scanForUnit(unitID)
 	w.activeUnitsLock.RLock()
 	defer w.activeUnitsLock.RUnlock()
 	unit, ok := w.activeUnits[unitID]
@@ -331,7 +344,7 @@ func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 
 // GetResults returns a live stream of the results of a unit
 func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan struct{}) (chan []byte, error) {
-	w.scanForUnits()
+	w.scanForUnit(unitID)
 	w.activeUnitsLock.RLock()
 	unit, ok := w.activeUnits[unitID]
 	w.activeUnitsLock.RUnlock()
@@ -403,7 +416,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 				stdoutSize := stdoutSize(unitdir)
 				if IsComplete(unit.Status().State) && stdoutSize >= unit.Status().StdoutSize {
 					close(resultChan)
-					logger.Info("Stdout complete - closing channel\n")
+					logger.Info("Stdout complete - closing channel for: %s \n", unitID)
 					return
 				}
 				continue

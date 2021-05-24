@@ -368,9 +368,25 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
-	err := os.RemoveAll(bwu.UnitDir())
-	if err != nil && !force {
-		return err
+	attemptsLeft := 3
+	for {
+		err := os.RemoveAll(bwu.UnitDir())
+		if force {
+			break
+		} else if err != nil {
+			attemptsLeft--
+
+			if attemptsLeft > 0 {
+				logger.Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
+				time.Sleep(time.Second)
+				continue
+			} else {
+				logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+				return err
+			}
+		}
+
+		break
 	}
 	bwu.w.activeUnitsLock.Lock()
 	defer bwu.w.activeUnitsLock.Unlock()

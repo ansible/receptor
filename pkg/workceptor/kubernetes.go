@@ -342,6 +342,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		})
 		go func() {
 			select {
+			case <-kw.ctx.Done():
+				return
 			case <-finishedChan:
 				return
 			case <-stdin.Done():
@@ -381,6 +383,11 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	streamWait.Wait()
 	close(finishedChan)
 	if errStdin != nil || errStdout != nil {
+		select {
+		case <-kw.ctx.Done():
+			return
+		default:
+		}
 		var errDetail string
 		if errStdin == nil {
 			errDetail = fmt.Sprintf("%s", errStdout)

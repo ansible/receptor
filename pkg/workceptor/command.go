@@ -177,6 +177,8 @@ func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	cmdSetDetach(cmd)
 	cw.done = false
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err := cmd.Start()
 	if err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)
@@ -203,8 +205,10 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
+	level := logger.GetLogLevel()
+	levelName, _ := logger.LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
-	cmd := exec.Command(os.Args[0], "--command-runner",
+	cmd := exec.Command(os.Args[0], "--log-level", levelName, "--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
 		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*commandExtraData).Params),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))
@@ -320,5 +324,5 @@ func (cfg CommandRunnerCfg) Run() error {
 
 func init() {
 	cmdline.GlobalInstance().AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, cmdline.Section(workersSection))
-	cmdline.GlobalInstance().AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Exclusive, cmdline.Hidden)
+	cmdline.GlobalInstance().AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Hidden)
 }

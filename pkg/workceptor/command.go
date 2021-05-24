@@ -249,6 +249,8 @@ func (cw *commandUnit) Cancel() error {
 		}
 		return err
 	}
+
+	proc.Wait()
 	return nil
 }
 

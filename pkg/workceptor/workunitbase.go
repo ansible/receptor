@@ -3,6 +3,7 @@
 package workceptor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -69,6 +70,8 @@ type BaseWorkUnit struct {
 	stdoutFileName  string
 	statusLock      *sync.RWMutex
 	lastUpdateError error
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 // Init initializes the basic work unit data, in memory only.
@@ -83,6 +86,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
+	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 }
 
 // SetFromParams sets the in-memory state from parameters
@@ -316,8 +320,11 @@ func (bwu *BaseWorkUnit) monitorLocalStatus() {
 	} else {
 		watcherEvents = watcher.Events
 	}
+loop:
 	for {
 		select {
+		case <-bwu.ctx.Done():
+			break loop
 		case event := <-watcherEvents:
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				err = bwu.Load()

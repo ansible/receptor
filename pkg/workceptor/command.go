@@ -236,6 +236,7 @@ func (cw *commandUnit) Restart() error {
 
 // Cancel stops a running job.
 func (cw *commandUnit) Cancel() error {
+	cw.cancel()
 	status := cw.Status()
 	ced, ok := status.ExtraData.(*commandExtraData)
 	if !ok || ced.Pid <= 0 {

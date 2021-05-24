@@ -37,8 +37,6 @@ import (
 // kubeUnit implements the WorkUnit interface
 type kubeUnit struct {
 	BaseWorkUnit
-	ctx                 context.Context
-	cancel              context.CancelFunc
 	authMethod          string
 	streamMethod        string
 	baseParams          string
@@ -429,7 +427,7 @@ func getDefaultInterface() (string, error) {
 
 func (kw *kubeUnit) runWorkUsingTCP() {
 	// Create local cancellable context
-	ctx, cancel := context.WithCancel(kw.ctx)
+	ctx, cancel := kw.ctx, kw.cancel
 	defer cancel()
 
 	// Create the TCP listener
@@ -780,7 +778,6 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 
 // startOrRestart is a shared implementation of Start() and Restart()
 func (kw *kubeUnit) startOrRestart() error {
-	kw.ctx, kw.cancel = context.WithCancel(kw.w.ctx)
 	// Connect to the Kubernetes API
 	err := kw.connectToKube()
 	if err != nil {
@@ -834,6 +831,7 @@ func (kw *kubeUnit) Start() error {
 
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (kw *kubeUnit) Cancel() error {
+	kw.cancel()
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {

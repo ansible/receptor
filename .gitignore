@@ -13,3 +13,5 @@ rpmbuild/
 kubectl
 /receptorctl/AUTHORS
 /receptorctl/ChangeLog
+/receptor-python-worker/ChangeLog
+/receptor-python-worker/AUTHORS

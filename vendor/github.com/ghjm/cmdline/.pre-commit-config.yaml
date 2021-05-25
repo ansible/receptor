@@ -1,0 +1,7 @@
+---
+repos:
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: master
+    hooks:
+      - id: go-fmt
+      - id: go-lint

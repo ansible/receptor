@@ -6,7 +6,7 @@ package services
 import (
 	"crypto/tls"
 	"github.com/creack/pty"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
@@ -70,5 +70,5 @@ func (cfg CommandSvcCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("command-service", "Run an interactive command via a Receptor service", CommandSvcCfg{}, cmdline.Section(servicesSection))
+	cmdline.GlobalInstance().AddConfigType("command-service", "Run an interactive command via a Receptor service", CommandSvcCfg{}, cmdline.Section(servicesSection))
 }

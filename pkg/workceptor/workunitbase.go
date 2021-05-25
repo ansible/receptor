@@ -3,6 +3,7 @@
 package workceptor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -69,6 +70,8 @@ type BaseWorkUnit struct {
 	stdoutFileName  string
 	statusLock      *sync.RWMutex
 	lastUpdateError error
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 // Init initializes the basic work unit data, in memory only.
@@ -83,6 +86,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
+	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 }
 
 // SetFromParams sets the in-memory state from parameters
@@ -251,6 +255,8 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 // UpdateFullStatus atomically updates the whole status record.  Changes should be made in the callback function.
 // Errors are logged rather than returned.
 func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
+	bwu.statusLock.Lock()
+	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
 	bwu.lastUpdateError = err
 	if err != nil {
@@ -314,8 +320,11 @@ func (bwu *BaseWorkUnit) monitorLocalStatus() {
 	} else {
 		watcherEvents = watcher.Events
 	}
+loop:
 	for {
 		select {
+		case <-bwu.ctx.Done():
+			break loop
 		case event := <-watcherEvents:
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				err = bwu.Load()
@@ -366,9 +375,25 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
-	err := os.RemoveAll(bwu.UnitDir())
-	if err != nil && !force {
-		return err
+	attemptsLeft := 3
+	for {
+		err := os.RemoveAll(bwu.UnitDir())
+		if force {
+			break
+		} else if err != nil {
+			attemptsLeft--
+
+			if attemptsLeft > 0 {
+				logger.Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
+				time.Sleep(time.Second)
+				continue
+			} else {
+				logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+				return err
+			}
+		}
+
+		break
 	}
 	bwu.w.activeUnitsLock.Lock()
 	defer bwu.w.activeUnitsLock.Unlock()

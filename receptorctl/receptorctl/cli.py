@@ -223,14 +223,17 @@ def version(ctx):
 @work.command(help="List known units of work.")
 @click.option('--quiet', '-q', is_flag=True, help="Only list unit IDs with no detail")
 @click.option('--node', default=None, type=str, help="Receptor node to list work from. Defaults to the local node.")
+@click.option('--unit_id', type=str, required=False, default="", help="Only show detail for a specific unit id")
 @click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
 @click.pass_context
-def list(ctx, node, tlsclient, quiet):
+def list(ctx, unit_id, node, tlsclient, quiet):
     rc = get_rc(ctx)
     if node:
         rc.connect_to_service(node, "control", tlsclient)
         rc.handshake()
-    work = rc.simple_command("work list")
+    if unit_id:
+        unit_id = " " + unit_id
+    work = rc.simple_command("work list" + unit_id)
     if quiet:
         for k in work.keys():
             print(k)

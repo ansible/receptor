@@ -5,7 +5,7 @@ package workceptor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"os/exec"
 )
 
@@ -71,5 +71,5 @@ func (cfg WorkPythonCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-python", "Run a worker using a Python plugin", WorkPythonCfg{}, cmdline.Section(workersSection))
+	cmdline.GlobalInstance().AddConfigType("work-python", "Run a worker using a Python plugin", WorkPythonCfg{}, cmdline.Section(workersSection))
 }

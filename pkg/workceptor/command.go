@@ -4,8 +4,8 @@ package workceptor
 
 import (
 	"fmt"
+	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"os"
 	"os/exec"
@@ -70,17 +70,6 @@ func commandRunner(command string, params string, unitdir string) error {
 		cmd = exec.Command(command, paramList...)
 	}
 	termChan := make(chan os.Signal)
-	sigKilled := false
-	go func() {
-		<-termChan
-		sigKilled = true
-		termThenKill(cmd)
-		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
-		if err != nil {
-			logger.Error("Error updating status file %s: %s", statusFilename, err)
-		}
-		os.Exit(-1)
-	}()
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	stdin, err := os.Open(path.Join(unitdir, "stdin"))
 	if err != nil {
@@ -104,6 +93,13 @@ loop:
 		select {
 		case <-doneChan:
 			break loop
+		case <-termChan:
+			termThenKill(cmd)
+			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
+			if err != nil {
+				logger.Error("Error updating status file %s: %s", statusFilename, err)
+			}
+			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
@@ -113,13 +109,9 @@ loop:
 		}
 	}
 	if err != nil {
-		if sigKilled {
-			time.Sleep(50 * time.Millisecond)
-		} else {
-			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
-			if err != nil {
-				logger.Error("Error updating status file %s: %s", statusFilename, err)
-			}
+		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
+		if err != nil {
+			logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
 		return err
 	}
@@ -185,6 +177,8 @@ func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	cmdSetDetach(cmd)
 	cw.done = false
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err := cmd.Start()
 	if err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)
@@ -211,8 +205,10 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
+	level := logger.GetLogLevel()
+	levelName, _ := logger.LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
-	cmd := exec.Command(os.Args[0], "--command-runner",
+	cmd := exec.Command(os.Args[0], "--log-level", levelName, "--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
 		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*commandExtraData).Params),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))
@@ -240,6 +236,7 @@ func (cw *commandUnit) Restart() error {
 
 // Cancel stops a running job.
 func (cw *commandUnit) Cancel() error {
+	cw.cancel()
 	status := cw.Status()
 	ced, ok := status.ExtraData.(*commandExtraData)
 	if !ok || ced.Pid <= 0 {
@@ -257,6 +254,8 @@ func (cw *commandUnit) Cancel() error {
 		}
 		return err
 	}
+
+	proc.Wait()
 	return nil
 }
 
@@ -327,6 +326,6 @@ func (cfg CommandRunnerCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, cmdline.Section(workersSection))
-	cmdline.AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Exclusive, cmdline.Hidden)
+	cmdline.GlobalInstance().AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, cmdline.Section(workersSection))
+	cmdline.GlobalInstance().AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Hidden)
 }

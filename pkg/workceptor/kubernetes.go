@@ -13,9 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,8 +37,6 @@ import (
 // kubeUnit implements the WorkUnit interface
 type kubeUnit struct {
 	BaseWorkUnit
-	ctx                 context.Context
-	cancel              context.CancelFunc
 	authMethod          string
 	streamMethod        string
 	baseParams          string
@@ -51,6 +50,7 @@ type kubeUnit struct {
 	config              *rest.Config
 	clientset           *kubernetes.Clientset
 	pod                 *corev1.Pod
+	podPendingTimeout   time.Duration
 }
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker
@@ -106,6 +106,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if err != nil {
 		return err
 	}
+
 	pod := &corev1.Pod{}
 	spec := &corev1.PodSpec{}
 	objectMeta := &metav1.ObjectMeta{}
@@ -203,7 +204,12 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).Watch(kw.ctx, options)
 		},
 	}
-	ev, err := watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
+
+	ctxPodReady := kw.ctx
+	if kw.podPendingTimeout != time.Duration(0) {
+		ctxPodReady, _ = context.WithTimeout(kw.ctx, kw.podPendingTimeout)
+	}
+	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady)
 	var ok bool
 	kw.pod, ok = ev.Object.(*corev1.Pod)
 	if !ok {
@@ -219,6 +225,12 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		}
 		return err
 	} else if err != nil {
+		kw.Cancel()
+		if len(kw.pod.Status.ContainerStatuses) == 1 {
+			if kw.pod.Status.ContainerStatuses[0].State.Waiting != nil {
+				return fmt.Errorf("%s, %s", err.Error(), kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)
+			}
+		}
 		return err
 	}
 	if ev == nil {
@@ -328,6 +340,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		})
 		go func() {
 			select {
+			case <-kw.ctx.Done():
+				return
 			case <-finishedChan:
 				return
 			case <-stdin.Done():
@@ -408,7 +422,7 @@ func getDefaultInterface() (string, error) {
 
 func (kw *kubeUnit) runWorkUsingTCP() {
 	// Create local cancellable context
-	ctx, cancel := context.WithCancel(kw.ctx)
+	ctx, cancel := kw.ctx, kw.cancel
 	defer cancel()
 
 	// Create the TCP listener
@@ -661,6 +675,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		}
 		return ssf
 	}
+
 	var err error
 	ked.KubePod, err = readFileToString(ked.KubePod)
 	if err != nil {
@@ -674,6 +689,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	userCommand := ""
 	userImage := ""
 	userPod := ""
+	podPendingTimeoutString := ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&userImage)},
@@ -683,6 +699,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "secret_kube_pod", permission: kw.allowRuntimePod, setter: setString(&userPod)},
 		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
 		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
+		{name: "pod_pending_timeout", permission: kw.allowRuntimeParams, setter: setString(&podPendingTimeoutString)},
 	}
 	for i := range values {
 		v := values[i]
@@ -703,6 +720,16 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	if userPod != "" && (userParams != "" || userCommand != "" || userImage != "") {
 		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_pod")
 	}
+
+	if podPendingTimeoutString != "" {
+		podPendingTimeout, err := time.ParseDuration(podPendingTimeoutString)
+		if err != nil {
+			logger.Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
+			return err
+		}
+		kw.podPendingTimeout = podPendingTimeout
+	}
+
 	if userCommand != "" {
 		ked.Command = userCommand
 	}
@@ -746,7 +773,6 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 
 // startOrRestart is a shared implementation of Start() and Restart()
 func (kw *kubeUnit) startOrRestart() error {
-	kw.ctx, kw.cancel = context.WithCancel(kw.w.ctx)
 	// Connect to the Kubernetes API
 	err := kw.connectToKube()
 	if err != nil {
@@ -800,6 +826,7 @@ func (kw *kubeUnit) Start() error {
 
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (kw *kubeUnit) Cancel() error {
+	kw.cancel()
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
@@ -921,5 +948,5 @@ func (cfg WorkKubeCfg) Run() error {
 }
 
 func init() {
-	cmdline.AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, cmdline.Section(workersSection))
+	cmdline.GlobalInstance().AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, cmdline.Section(workersSection))
 }

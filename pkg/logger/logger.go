@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/cmdline"
+	"github.com/ghjm/cmdline"
 	"log"
 	"os"
 	"strings"
@@ -50,6 +50,18 @@ func GetLogLevel() int {
 	return logLevel
 }
 
+// LogLevelToName takes an int and returns the corresponding log level name
+func LogLevelToName(logLevel int) (string, error) {
+	var err error
+	for k, v := range logLevelMap {
+		if v == logLevel {
+			return k, nil
+		}
+	}
+	err = fmt.Errorf("%d is not a valid log level", logLevel)
+	return "", err
+}
+
 // logLevelMap maps strings to log level int
 // allows for --LogLevel Debug at command line
 var logLevelMap = map[string]int{
@@ -62,16 +74,12 @@ var logLevelMap = map[string]int{
 // Log sends a log message at a given level
 func Log(level int, format string, v ...interface{}) {
 	var prefix string
-	for k, v := range logLevelMap {
-		if v == level {
-			prefix = fmt.Sprintf("%s ", strings.ToUpper(k))
-			break
-		}
-	}
-	if prefix == "" {
+	logLevelName, err := LogLevelToName(level)
+	if err != nil {
 		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
 		return
 	}
+	prefix = strings.ToUpper(logLevelName)
 	if logLevel >= level {
 		log.SetPrefix(prefix)
 		log.Printf(format, v...)
@@ -133,6 +141,6 @@ func init() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
-	cmdline.AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
-	cmdline.AddConfigType("trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+	cmdline.GlobalInstance().AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+	cmdline.GlobalInstance().AddConfigType("trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
 }

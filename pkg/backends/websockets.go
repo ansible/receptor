@@ -74,6 +74,7 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 // WebsocketListener implements Backend for inbound Websocket
 type WebsocketListener struct {
 	address string
+	path    string
 	tlscfg  *tls.Config
 	li      net.Listener
 	server  *http.Server
@@ -83,10 +84,17 @@ type WebsocketListener struct {
 func NewWebsocketListener(address string, tlscfg *tls.Config) (*WebsocketListener, error) {
 	ul := WebsocketListener{
 		address: address,
+		path:    "/",
 		tlscfg:  tlscfg,
 		li:      nil,
 	}
 	return &ul, nil
+}
+
+// SetPath sets the URI path that the listener will be hosted on.
+// It is only effective if used prior to calling Start.
+func (b *WebsocketListener) SetPath(path string) {
+	b.path = path
 }
 
 // Addr returns the network address the listener is listening on
@@ -97,12 +105,17 @@ func (b *WebsocketListener) Addr() net.Addr {
 	return b.li.Addr()
 }
 
+// Path returns the URI path the websocket is configured on
+func (b *WebsocketListener) Path() string {
+	return b.path
+}
+
 // Start runs the given session function over the WebsocketListener backend
 func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	var err error
 	sessChan := make(chan netceptor.BackendSession)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
 		var upgrader = websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -136,9 +149,7 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 		<-ctx.Done()
 		_ = b.server.Close()
 	}()
-	if err == nil {
-		logger.Debug("Listening on Websocket %s\n", b.Addr().String())
-	}
+	logger.Debug("Listening on Websocket %s path %s\n", b.Addr().String(), b.Path())
 	return sessChan, nil
 }
 
@@ -218,6 +229,7 @@ func (ns *WebsocketSession) Close() error {
 type WebsocketListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
+	Path     string             `description:"URI path to the websocket server" default:"/"`
 	TLS      string             `description:"Name of TLS server config"`
 	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
 	NodeCost map[string]float64 `description:"Per-node costs"`
@@ -248,6 +260,7 @@ func (cfg WebsocketListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
+	b.SetPath(cfg.Path)
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		return err

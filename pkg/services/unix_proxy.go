@@ -71,8 +71,8 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 	return nil
 }
 
-// UnixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy
-type UnixProxyInboundCfg struct {
+// unixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy
+type unixProxyInboundCfg struct {
 	Filename      string `required:"true" description:"Socket filename, which will be overwritten"`
 	Permissions   int    `description:"Socket file permissions" default:"0600"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
@@ -81,7 +81,7 @@ type UnixProxyInboundCfg struct {
 }
 
 // Run runs the action
-func (cfg UnixProxyInboundCfg) Run() error {
+func (cfg unixProxyInboundCfg) Run() error {
 	logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, "receptor")
 	if err != nil {
@@ -91,15 +91,15 @@ func (cfg UnixProxyInboundCfg) Run() error {
 		cfg.RemoteNode, cfg.RemoteService, tlscfg)
 }
 
-// UnixProxyOutboundCfg is the cmdline configuration object for a Unix socket outbound proxy
-type UnixProxyOutboundCfg struct {
+// unixProxyOutboundCfg is the cmdline configuration object for a Unix socket outbound proxy
+type unixProxyOutboundCfg struct {
 	Service  string `required:"true" description:"Receptor service name to bind to"`
 	Filename string `required:"true" description:"Socket filename, which must already exist"`
 	TLS      string `description:"Name of TLS server config for the Receptor connection"`
 }
 
 // Run runs the action
-func (cfg UnixProxyOutboundCfg) Run() error {
+func (cfg unixProxyOutboundCfg) Run() error {
 	logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -110,7 +110,9 @@ func (cfg UnixProxyOutboundCfg) Run() error {
 
 func init() {
 	if runtime.GOOS != "windows" {
-		cmdline.GlobalInstance().AddConfigType("unix-socket-server", "Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, cmdline.Section(servicesSection))
-		cmdline.GlobalInstance().AddConfigType("unix-socket-client", "Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, cmdline.Section(servicesSection))
+		cmdline.RegisterConfigTypeForApp("receptor-proxies",
+			"unix-socket-server", "Listen on a Unix socket and forward via Receptor", unixProxyInboundCfg{}, cmdline.Section(servicesSection))
+		cmdline.RegisterConfigTypeForApp("receptor-proxies",
+			"unix-socket-client", "Listen via Receptor and forward to a Unix socket", unixProxyOutboundCfg{}, cmdline.Section(servicesSection))
 	}
 }

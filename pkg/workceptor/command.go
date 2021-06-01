@@ -272,15 +272,15 @@ func (cw *commandUnit) Release(force bool) error {
 // Command line
 // **************************************************************************
 
-// CommandCfg is the cmdline configuration object for a worker that runs a command
-type CommandCfg struct {
+// commandCfg is the cmdline configuration object for a worker that runs a command
+type commandCfg struct {
 	WorkType           string `required:"true" description:"Name for this worker type"`
 	Command            string `required:"true" description:"Command to run to process units of work"`
 	Params             string `description:"Command-line parameters"`
 	AllowRuntimeParams bool   `description:"Allow users to add more parameters" default:"false"`
 }
 
-func (cfg CommandCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
@@ -296,20 +296,20 @@ func (cfg CommandCfg) newWorker(w *Workceptor, unitID string, workType string) W
 }
 
 // Run runs the action
-func (cfg CommandCfg) Run() error {
+func (cfg commandCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err
 }
 
-// CommandRunnerCfg is a hidden command line option for a command runner process
-type CommandRunnerCfg struct {
+// commandRunnerCfg is a hidden command line option for a command runner process
+type commandRunnerCfg struct {
 	Command string `required:"true"`
 	Params  string `required:"true"`
 	UnitDir string `required:"true"`
 }
 
 // Run runs the action
-func (cfg CommandRunnerCfg) Run() error {
+func (cfg commandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
 		statusFilename := path.Join(cfg.UnitDir, "status")
@@ -326,6 +326,8 @@ func (cfg CommandRunnerCfg) Run() error {
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("work-command", "Run a worker using an external command", CommandCfg{}, cmdline.Section(workersSection))
-	cmdline.GlobalInstance().AddConfigType("command-runner", "Wrapper around a process invocation", CommandRunnerCfg{}, cmdline.Hidden)
+	cmdline.RegisterConfigTypeForApp("receptor-workers",
+		"work-command", "Run a worker using an external command", commandCfg{}, cmdline.Section(workersSection))
+	cmdline.RegisterConfigTypeForApp("receptor-workers",
+		"command-runner", "Wrapper around a process invocation", commandRunnerCfg{}, cmdline.Hidden)
 }

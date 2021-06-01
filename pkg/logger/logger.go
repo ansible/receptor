@@ -141,6 +141,8 @@ func init() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
-	cmdline.GlobalInstance().AddConfigType("log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
-	cmdline.GlobalInstance().AddConfigType("trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+	cmdline.RegisterConfigTypeForApp("receptor-logging",
+		"log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+	cmdline.RegisterConfigTypeForApp("receptor-logging",
+		"trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
 }

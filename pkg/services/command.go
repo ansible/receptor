@@ -51,15 +51,15 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 	}
 }
 
-// CommandSvcCfg is the cmdline configuration object for a command service
-type CommandSvcCfg struct {
+// commandSvcCfg is the cmdline configuration object for a command service
+type commandSvcCfg struct {
 	Service string `required:"true" description:"Receptor service name to bind to"`
 	Command string `required:"true" description:"Command to execute on a connection"`
 	TLS     string `description:"Name of TLS server config"`
 }
 
 // Run runs the action
-func (cfg CommandSvcCfg) Run() error {
+func (cfg commandSvcCfg) Run() error {
 	logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -70,5 +70,6 @@ func (cfg CommandSvcCfg) Run() error {
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("command-service", "Run an interactive command via a Receptor service", CommandSvcCfg{}, cmdline.Section(servicesSection))
+	cmdline.RegisterConfigTypeForApp("receptor-command-service",
+		"command-service", "Run an interactive command via a Receptor service", commandSvcCfg{}, cmdline.Section(servicesSection))
 }

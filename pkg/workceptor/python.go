@@ -38,8 +38,8 @@ func (pw *pythonUnit) Start() error {
 // Command line
 // **************************************************************************
 
-// WorkPythonCfg is the cmdline configuration object for a Python worker plugin
-type WorkPythonCfg struct {
+// workPythonCfg is the cmdline configuration object for a Python worker plugin
+type workPythonCfg struct {
 	WorkType string                 `required:"true" description:"Name for this worker type"`
 	Plugin   string                 `required:"true" description:"Python module name of the worker plugin"`
 	Function string                 `required:"true" description:"Receptor-exported function to call"`
@@ -47,7 +47,7 @@ type WorkPythonCfg struct {
 }
 
 // newWorker is a factory to produce worker instances
-func (cfg WorkPythonCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
 			BaseWorkUnit: BaseWorkUnit{
@@ -65,11 +65,12 @@ func (cfg WorkPythonCfg) newWorker(w *Workceptor, unitID string, workType string
 }
 
 // Run runs the action
-func (cfg WorkPythonCfg) Run() error {
+func (cfg workPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("work-python", "Run a worker using a Python plugin", WorkPythonCfg{}, cmdline.Section(workersSection))
+	cmdline.RegisterConfigTypeForApp("receptor-workers",
+		"work-python", "Run a worker using a Python plugin", workPythonCfg{}, cmdline.Section(workersSection))
 }

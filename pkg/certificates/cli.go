@@ -227,8 +227,10 @@ func (sr signReq) Run() error {
 }
 
 func init() {
-	cl := cmdline.GlobalInstance()
-	cl.AddConfigType("cert-init", "Initialize PKI CA", initCA{}, cmdline.Exclusive, cmdline.Section(certSection))
-	cl.AddConfigType("cert-makereq", "Create certificate request", makeReq{}, cmdline.Exclusive, cmdline.Section(certSection))
-	cl.AddConfigType("cert-signreq", "Sign request and produce certificate", signReq{}, cmdline.Exclusive, cmdline.Section(certSection))
+	cmdline.RegisterConfigTypeForApp("receptor-certificates",
+		"cert-init", "Initialize PKI CA", initCA{}, cmdline.Exclusive, cmdline.Section(certSection))
+	cmdline.RegisterConfigTypeForApp("receptor-certificates",
+		"cert-makereq", "Create certificate request", makeReq{}, cmdline.Exclusive, cmdline.Section(certSection))
+	cmdline.RegisterConfigTypeForApp("receptor-certificates",
+		"cert-signreq", "Sign request and produce certificate", signReq{}, cmdline.Exclusive, cmdline.Section(certSection))
 }

@@ -407,8 +407,10 @@ func (cfg CmdlineConfigWindows) Run() error {
 
 func init() {
 	if runtime.GOOS == "windows" {
-		cmdline.GlobalInstance().AddConfigType("control-service", "Run a control service", CmdlineConfigWindows{})
+		cmdline.RegisterConfigTypeForApp("receptor-control-service",
+			"control-service", "Run a control service", CmdlineConfigWindows{})
 	} else {
-		cmdline.GlobalInstance().AddConfigType("control-service", "Run a control service", CmdlineConfigUnix{})
+		cmdline.RegisterConfigTypeForApp("receptor-control-service",
+			"control-service", "Run a control service", CmdlineConfigUnix{})
 	}
 }

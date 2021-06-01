@@ -852,8 +852,8 @@ func (kw *kubeUnit) Release(force bool) error {
 // Command line
 // **************************************************************************
 
-// WorkKubeCfg is the cmdline configuration object for a Kubernetes worker plugin
-type WorkKubeCfg struct {
+// workKubeCfg is the cmdline configuration object for a Kubernetes worker plugin
+type workKubeCfg struct {
 	WorkType            string `required:"true" description:"Name for this worker type"`
 	Namespace           string `description:"Kubernetes namespace to create pods in"`
 	Image               string `description:"Container image to use for the worker pod"`
@@ -874,7 +874,7 @@ type WorkKubeCfg struct {
 }
 
 // newWorker is a factory to produce worker instances
-func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
@@ -905,7 +905,7 @@ func (cfg WorkKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 }
 
 // Prepare inspects the configuration for validity
-func (cfg WorkKubeCfg) Prepare() error {
+func (cfg workKubeCfg) Prepare() error {
 	lcAuth := strings.ToLower(cfg.AuthMethod)
 	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "runtime" {
 		return fmt.Errorf("invalid AuthMethod: %s", cfg.AuthMethod)
@@ -942,11 +942,12 @@ func (cfg WorkKubeCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg WorkKubeCfg) Run() error {
+func (cfg workKubeCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("work-kubernetes", "Run a worker using Kubernetes", WorkKubeCfg{}, cmdline.Section(workersSection))
+	cmdline.RegisterConfigTypeForApp("receptor-workers",
+		"work-kubernetes", "Run a worker using Kubernetes", workKubeCfg{}, cmdline.Section(workersSection))
 }

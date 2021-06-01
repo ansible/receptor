@@ -6,7 +6,7 @@ require (
 	github.com/creack/pty v1.1.11
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/ghjm/cmdline v0.0.0-20210320234938-37c6bf80ce66
+	github.com/ghjm/cmdline v0.1.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.4.2
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde

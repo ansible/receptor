@@ -247,8 +247,8 @@ func (ns *UDPListenerSession) Close() error {
 // Command line
 // **************************************************************************
 
-// uDPListenerCfg is the cmdline configuration object for a UDP listener
-type uDPListenerCfg struct {
+// udpListenerCfg is the cmdline configuration object for a UDP listener
+type udpListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
 	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
@@ -256,7 +256,7 @@ type uDPListenerCfg struct {
 }
 
 // Prepare verifies the parameters are correct
-func (cfg uDPListenerCfg) Prepare() error {
+func (cfg udpListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -269,7 +269,7 @@ func (cfg uDPListenerCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg uDPListenerCfg) Run() error {
+func (cfg udpListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	b, err := NewUDPListener(address)
 	if err != nil {
@@ -284,15 +284,15 @@ func (cfg uDPListenerCfg) Run() error {
 	return nil
 }
 
-// uDPDialerCfg is the cmdline configuration object for a UDP listener
-type uDPDialerCfg struct {
+// udpDialerCfg is the cmdline configuration object for a UDP listener
+type udpDialerCfg struct {
 	Address string  `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
 	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
 	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
 // Prepare verifies the parameters are correct
-func (cfg uDPDialerCfg) Prepare() error {
+func (cfg udpDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -300,7 +300,7 @@ func (cfg uDPDialerCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg uDPDialerCfg) Run() error {
+func (cfg udpDialerCfg) Run() error {
 	logger.Debug("Running UDP peer connection %s\n", cfg.Address)
 	b, err := NewUDPDialer(cfg.Address, cfg.Redial)
 	if err != nil {
@@ -317,7 +317,7 @@ func (cfg uDPDialerCfg) Run() error {
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"UDP-listener", "Run a backend listener on a UDP port", uDPListenerCfg{}, cmdline.Section(backendSection))
+		"UDP-listener", "Run a backend listener on a UDP port", udpListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"UDP-peer", "Make an outbound backend connection to a UDP peer", uDPDialerCfg{}, cmdline.Section(backendSection))
+		"UDP-peer", "Make an outbound backend connection to a UDP peer", udpDialerCfg{}, cmdline.Section(backendSection))
 }

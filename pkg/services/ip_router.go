@@ -348,8 +348,8 @@ func (ipr *IPRouterService) run() error {
 	return nil
 }
 
-// iPRouterCfg is the cmdline configuration object for an IP router
-type iPRouterCfg struct {
+// ipRouterCfg is the cmdline configuration object for an IP router
+type ipRouterCfg struct {
 	NetworkName string `required:"true" description:"Name of this network and service."`
 	Interface   string `description:"Name of the local tun interface"`
 	LocalNet    string `required:"true" description:"Local /30 CIDR address"`
@@ -357,7 +357,7 @@ type iPRouterCfg struct {
 }
 
 // Run runs the action
-func (cfg iPRouterCfg) Run() error {
+func (cfg ipRouterCfg) Run() error {
 	logger.Debug("Running tun router service %s\n", cfg)
 	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)
 	if err != nil {
@@ -368,5 +368,5 @@ func (cfg iPRouterCfg) Run() error {
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-ip-router",
-		"ip-router", "Run an IP router using a tun interface", iPRouterCfg{}, cmdline.Section(servicesSection))
+		"ip-router", "Run an IP router using a tun interface", ipRouterCfg{}, cmdline.Section(servicesSection))
 }

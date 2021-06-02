@@ -353,16 +353,16 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 // Command line
 // **************************************************************************
 
-// CmdlineConfigWindows is the cmdline configuration object for a control service on Windows
-type CmdlineConfigWindows struct {
+// cmdlineConfigWindows is the cmdline configuration object for a control service on Windows
+type cmdlineConfigWindows struct {
 	Service   string `description:"Receptor service name to listen on" default:"control"`
 	TLS       string `description:"Name of TLS server config for the Receptor listener"`
 	TCPListen string `description:"Local TCP port or host:port to bind to the control service"`
 	TCPTLS    string `description:"Name of TLS server config for the TCP listener"`
 }
 
-// CmdlineConfigUnix is the cmdline configuration object for a control service on Unix
-type CmdlineConfigUnix struct {
+// cmdlineConfigUnix is the cmdline configuration object for a control service on Unix
+type cmdlineConfigUnix struct {
 	Service     string `description:"Receptor service name to listen on" default:"control"`
 	Filename    string `description:"Filename of local Unix socket to bind to the service"`
 	Permissions int    `description:"Socket file permissions" default:"0600"`
@@ -372,7 +372,7 @@ type CmdlineConfigUnix struct {
 }
 
 // Run runs the action
-func (cfg CmdlineConfigUnix) Run() error {
+func (cfg cmdlineConfigUnix) Run() error {
 	if cfg.TLS != "" && cfg.TCPListen != "" && cfg.TCPTLS == "" {
 		logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
 	}
@@ -396,8 +396,8 @@ func (cfg CmdlineConfigUnix) Run() error {
 }
 
 // Run runs the action
-func (cfg CmdlineConfigWindows) Run() error {
-	return CmdlineConfigUnix{
+func (cfg cmdlineConfigWindows) Run() error {
+	return cmdlineConfigUnix{
 		Service:   cfg.Service,
 		TLS:       cfg.TLS,
 		TCPListen: cfg.TCPListen,
@@ -408,9 +408,9 @@ func (cfg CmdlineConfigWindows) Run() error {
 func init() {
 	if runtime.GOOS == "windows" {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Run a control service", CmdlineConfigWindows{})
+			"control-service", "Run a control service", cmdlineConfigWindows{})
 	} else {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Run a control service", CmdlineConfigUnix{})
+			"control-service", "Run a control service", cmdlineConfigUnix{})
 	}
 }

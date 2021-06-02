@@ -19,8 +19,8 @@ var configSection = &cmdline.ConfigSection{
 	Order:       5,
 }
 
-// tLSServerCfg stores the configuration options for a TLS server
-type tLSServerCfg struct {
+// tlsServerCfg stores the configuration options for a TLS server
+type tlsServerCfg struct {
 	Name              string `required:"true" description:"Name of this TLS server configuration"`
 	Cert              string `required:"true" description:"Server certificate filename"`
 	Key               string `required:"true" description:"Server private key filename"`
@@ -29,7 +29,7 @@ type tLSServerCfg struct {
 }
 
 // Prepare creates the tls.config and stores it in the global map
-func (cfg tLSServerCfg) Prepare() error {
+func (cfg tlsServerCfg) Prepare() error {
 	tlscfg := &tls.Config{}
 
 	certbytes, err := ioutil.ReadFile(cfg.Cert)
@@ -68,8 +68,8 @@ func (cfg tLSServerCfg) Prepare() error {
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
 
-// tLSClientConfig stores the configuration options for a TLS client
-type tLSClientConfig struct {
+// tlsClientConfig stores the configuration options for a TLS client
+type tlsClientConfig struct {
 	Name               string `required:"true" description:"Name of this TLS client configuration"`
 	Cert               string `required:"false" description:"Client certificate filename"`
 	Key                string `required:"false" description:"Client private key filename"`
@@ -78,7 +78,7 @@ type tLSClientConfig struct {
 }
 
 // Prepare creates the tls.config and stores it in the global map
-func (cfg tLSClientConfig) Prepare() error {
+func (cfg tlsClientConfig) Prepare() error {
 	tlscfg := &tls.Config{}
 
 	if cfg.Cert != "" || cfg.Key != "" {
@@ -117,7 +117,7 @@ func (cfg tLSClientConfig) Prepare() error {
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
-		"tls-server", "Define a TLS server configuration", tLSServerCfg{}, cmdline.Section(configSection))
+		"tls-server", "Define a TLS server configuration", tlsServerCfg{}, cmdline.Section(configSection))
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
-		"tls-client", "Define a TLS client configuration", tLSClientConfig{}, cmdline.Section(configSection))
+		"tls-client", "Define a TLS client configuration", tlsClientConfig{}, cmdline.Section(configSection))
 }

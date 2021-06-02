@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"net"
 	"os"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin
@@ -535,6 +536,7 @@ func (rw *remoteUnit) Restart() error {
 	if red.RemoteStarted {
 		return rw.startOrRestart(false)
 	}
+	rw.topJC = nil
 	return fmt.Errorf("remote work had not previously started")
 }
 
@@ -551,8 +553,10 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	})
 	// if remote work has not started, don't attempt to connect to remote
 	if !remoteStarted {
-		rw.topJC.Cancel()
-		rw.topJC.Wait()
+		if rw.topJC != nil {
+			rw.topJC.Cancel()
+			rw.topJC.Wait()
+		}
 		if release {
 			return rw.BaseWorkUnit.Release(true)
 		}

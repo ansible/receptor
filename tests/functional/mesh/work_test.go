@@ -536,6 +536,61 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		t.Run(testGroup+"/work submit and release to non-existent node", func(t *testing.T) {
+			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
+			controllers, m, _ := workSetup(t.Name())
+			defer tearDown(controllers, m)
+			nodes := m.Nodes()
+
+			// submit work from node1 to non-existent-node
+			// node999 was never initialised
+			unitID, err := controllers["node1"].WorkSubmit("node999", "echosleeplong")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// wait for 10 seconds, and check if the work is in pending state
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			err = controllers["node1"].AssertWorkPending(ctx, unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nodes["node1"].Shutdown()
+			nodes["node1"].WaitForShutdown()
+			err = nodes["node1"].Start()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			err = m.WaitForReady(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = controllers["node1"].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = controllers["node1"].Reconnect()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// release the work on node1
+			_, err = controllers["node1"].WorkRelease(unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
+			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+		})
 
 	}
 }

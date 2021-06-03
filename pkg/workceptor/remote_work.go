@@ -556,6 +556,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		if release {
 			return rw.BaseWorkUnit.Release(true)
 		}
+		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
 		return nil
 	}
 	if release && force {

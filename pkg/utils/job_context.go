@@ -63,8 +63,11 @@ func (mw *JobContext) WorkerDone() {
 }
 
 // Wait waits for the current job to complete, like sync.WaitGroup.Wait().
+// If no job has been started, always just returns.
 func (mw *JobContext) Wait() {
-	mw.wg.Wait()
+	if mw.wg != nil {
+		mw.wg.Wait()
+	}
 }
 
 // Done implements Context.Done()
@@ -87,9 +90,11 @@ func (mw *JobContext) Value(key interface{}) interface{} {
 	return mw.ctx.Value(key)
 }
 
-// Cancel cancels the JobContext's context
+// Cancel cancels the JobContext's context.  If no job has been started, this does nothing.
 func (mw *JobContext) Cancel() {
-	mw.cancel()
+	if mw.cancel != nil {
+		mw.cancel()
+	}
 }
 
 // Running returns true if a job is currently running

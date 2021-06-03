@@ -210,8 +210,8 @@ func (ns *TCPSession) Close() error {
 // Command line
 // **************************************************************************
 
-// TCPListenerCfg is the cmdline configuration object for a TCP listener
-type TCPListenerCfg struct {
+// tcpListenerCfg is the cmdline configuration object for a TCP listener
+type tcpListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
 	TLS      string             `description:"Name of TLS server config"`
@@ -220,7 +220,7 @@ type TCPListenerCfg struct {
 }
 
 // Prepare verifies the parameters are correct
-func (cfg TCPListenerCfg) Prepare() error {
+func (cfg tcpListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -233,7 +233,7 @@ func (cfg TCPListenerCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg TCPListenerCfg) Run() error {
+func (cfg tcpListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -251,8 +251,8 @@ func (cfg TCPListenerCfg) Run() error {
 	return nil
 }
 
-// TCPDialerCfg is the cmdline configuration object for a TCP dialer
-type TCPDialerCfg struct {
+// tcpDialerCfg is the cmdline configuration object for a TCP dialer
+type tcpDialerCfg struct {
 	Address string  `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
 	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
 	TLS     string  `description:"Name of TLS client config"`
@@ -260,7 +260,7 @@ type TCPDialerCfg struct {
 }
 
 // Prepare verifies the parameters are correct
-func (cfg TCPDialerCfg) Prepare() error {
+func (cfg tcpDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -268,7 +268,7 @@ func (cfg TCPDialerCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg TCPDialerCfg) Run() error {
+func (cfg tcpDialerCfg) Run() error {
 	logger.Debug("Running TCP peer connection %s\n", cfg.Address)
 	host, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
@@ -291,6 +291,8 @@ func (cfg TCPDialerCfg) Run() error {
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, cmdline.Section(backendSection))
-	cmdline.GlobalInstance().AddConfigType("tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, cmdline.Section(backendSection))
+	cmdline.RegisterConfigTypeForApp("receptor-backends",
+		"tcp-listener", "Run a backend listener on a TCP port", tcpListenerCfg{}, cmdline.Section(backendSection))
+	cmdline.RegisterConfigTypeForApp("receptor-backends",
+		"tcp-peer", "Make an outbound backend connection to a TCP peer", tcpDialerCfg{}, cmdline.Section(backendSection))
 }

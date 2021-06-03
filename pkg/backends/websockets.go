@@ -225,8 +225,8 @@ func (ns *WebsocketSession) Close() error {
 // Command line
 // **************************************************************************
 
-// WebsocketListenerCfg is the cmdline configuration object for a websocket listener
-type WebsocketListenerCfg struct {
+// websocketListenerCfg is the cmdline configuration object for a websocket listener
+type websocketListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
 	Path     string             `description:"URI path to the websocket server" default:"/"`
@@ -236,7 +236,7 @@ type WebsocketListenerCfg struct {
 }
 
 // Prepare verifies the parameters are correct
-func (cfg WebsocketListenerCfg) Prepare() error {
+func (cfg websocketListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -249,7 +249,7 @@ func (cfg WebsocketListenerCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg WebsocketListenerCfg) Run() error {
+func (cfg websocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -268,8 +268,8 @@ func (cfg WebsocketListenerCfg) Run() error {
 	return nil
 }
 
-// WebsocketDialerCfg is the cmdline configuration object for a Websocket listener
-type WebsocketDialerCfg struct {
+// websocketDialerCfg is the cmdline configuration object for a Websocket listener
+type websocketDialerCfg struct {
 	Address     string  `description:"URL to connect to" barevalue:"yes" required:"yes"`
 	Redial      bool    `description:"Keep redialing on lost connection" default:"true"`
 	ExtraHeader string  `description:"Sends extra HTTP header on initial connection"`
@@ -278,7 +278,7 @@ type WebsocketDialerCfg struct {
 }
 
 // Prepare verifies that we are reasonably ready to go
-func (cfg WebsocketDialerCfg) Prepare() error {
+func (cfg websocketDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -293,7 +293,7 @@ func (cfg WebsocketDialerCfg) Prepare() error {
 }
 
 // Run runs the action
-func (cfg WebsocketDialerCfg) Run() error {
+func (cfg websocketDialerCfg) Run() error {
 	logger.Debug("Running Websocket peer connection %s\n", cfg.Address)
 	u, err := url.Parse(cfg.Address)
 	if err != nil {
@@ -320,6 +320,8 @@ func (cfg WebsocketDialerCfg) Run() error {
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
-	cmdline.GlobalInstance().AddConfigType("ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, cmdline.Section(backendSection))
+	cmdline.RegisterConfigTypeForApp("receptor-backends",
+		"ws-listener", "Run an http server that accepts websocket connections", websocketListenerCfg{}, cmdline.Section(backendSection))
+	cmdline.RegisterConfigTypeForApp("receptor-backends",
+		"ws-peer", "Connect outbound to a websocket peer", websocketDialerCfg{}, cmdline.Section(backendSection))
 }

@@ -155,8 +155,8 @@ func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr n
 	}
 }
 
-// UDPProxyInboundCfg is the cmdline configuration object for a UDP inbound proxy
-type UDPProxyInboundCfg struct {
+// udpProxyInboundCfg is the cmdline configuration object for a UDP inbound proxy
+type udpProxyInboundCfg struct {
 	Port          int    `required:"true" description:"Local UDP port to bind to"`
 	BindAddr      string `description:"Address to bind UDP listener to" default:"0.0.0.0"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
@@ -164,24 +164,26 @@ type UDPProxyInboundCfg struct {
 }
 
 // Run runs the action
-func (cfg UDPProxyInboundCfg) Run() error {
+func (cfg udpProxyInboundCfg) Run() error {
 	logger.Debug("Running UDP inbound proxy service %v\n", cfg)
 	return UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService)
 }
 
-// UDPProxyOutboundCfg is the cmdline configuration object for a UDP outbound proxy
-type UDPProxyOutboundCfg struct {
+// udpProxyOutboundCfg is the cmdline configuration object for a UDP outbound proxy
+type udpProxyOutboundCfg struct {
 	Service string `required:"true" description:"Receptor service name to bind to"`
 	Address string `required:"true" description:"Address for outbound UDP connection"`
 }
 
 // Run runs the action
-func (cfg UDPProxyOutboundCfg) Run() error {
+func (cfg udpProxyOutboundCfg) Run() error {
 	logger.Debug("Running UDP outbound proxy service %s\n", cfg)
 	return UDPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, cfg.Address)
 }
 
 func init() {
-	cmdline.GlobalInstance().AddConfigType("udp-server", "Listen for UDP and forward via Receptor", UDPProxyInboundCfg{}, cmdline.Section(servicesSection))
-	cmdline.GlobalInstance().AddConfigType("udp-client", "Listen on a Receptor service and forward via UDP", UDPProxyOutboundCfg{}, cmdline.Section(servicesSection))
+	cmdline.RegisterConfigTypeForApp("receptor-proxies",
+		"udp-server", "Listen for UDP and forward via Receptor", udpProxyInboundCfg{}, cmdline.Section(servicesSection))
+	cmdline.RegisterConfigTypeForApp("receptor-proxies",
+		"udp-client", "Listen on a Receptor service and forward via UDP", udpProxyOutboundCfg{}, cmdline.Section(servicesSection))
 }

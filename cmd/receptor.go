@@ -7,13 +7,11 @@ import (
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	_ "github.com/project-receptor/receptor/pkg/certificates"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
-	_ "github.com/project-receptor/receptor/pkg/controlsvc"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	_ "github.com/project-receptor/receptor/pkg/services"
-	"github.com/project-receptor/receptor/pkg/version"
+	_ "github.com/project-receptor/receptor/pkg/version"
 	"github.com/project-receptor/receptor/pkg/workceptor"
-	_ "github.com/project-receptor/receptor/pkg/workceptor"
 	"os"
 	"strings"
 	"time"
@@ -83,10 +81,26 @@ func (cfg nullBackendCfg) Run() error {
 }
 
 func main() {
-	cl := cmdline.GlobalInstance()
+	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
-	cl.AddConfigType("version", "Show the Receptor version", version.CmdlineCfg{}, cmdline.Exclusive)
+
+	// Add registered config types from imported modules
+	for _, appName := range []string{
+		"receptor-version",
+		"receptor-logging",
+		"receptor-tls",
+		"receptor-certificates",
+		"receptor-control-service",
+		"receptor-command-service",
+		"receptor-ip-router",
+		"receptor-proxies",
+		"receptor-backends",
+		"receptor-workers",
+	} {
+		cl.AddRegisteredConfigTypes(appName)
+	}
+
 	err := cl.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)

@@ -279,7 +279,6 @@ func (w *Workceptor) StartUnit(unitID string) error {
 
 // ListKnownUnitIDs returns a slice containing the known unit IDs
 func (w *Workceptor) ListKnownUnitIDs() []string {
-	w.scanForUnits()
 	w.activeUnitsLock.RLock()
 	defer w.activeUnitsLock.RUnlock()
 	result := make([]string, 0, len(w.activeUnits))

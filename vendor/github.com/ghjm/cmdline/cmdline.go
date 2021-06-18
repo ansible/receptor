@@ -86,18 +86,8 @@ func (cl *Cmdline) WhatRan() string {
 	return cl.whatRan
 }
 
-var globalCmdline *Cmdline
-
-// GlobalInstance returns a singleton global instance of a Cmdline
-func GlobalInstance() *Cmdline {
-	if globalCmdline == nil {
-		globalCmdline = NewCmdline()
-	}
-	return globalCmdline
-}
-
-// AddConfigType registers a new config type with the system
-func (cl *Cmdline) AddConfigType(name string, description string, configType interface{}, options ...func(*ConfigType)) {
+// makeConfigTYpe constructs a new ConfigType object, applying given modifiers
+func makeConfigType(name string, description string, configType interface{}, options ...func(*ConfigType)) *ConfigType {
 	newCT := &ConfigType{
 		name:        name,
 		description: description,
@@ -106,9 +96,36 @@ func (cl *Cmdline) AddConfigType(name string, description string, configType int
 	for _, opt := range options {
 		opt(newCT)
 	}
-	cl.configTypes = append(cl.configTypes, newCT)
+	return newCT
 }
 
+// AddConfigType registers a new config type with the system
+func (cl *Cmdline) AddConfigType(name string, description string, configType interface{}, options ...func(*ConfigType)) {
+	cl.configTypes = append(cl.configTypes, makeConfigType(name, description, configType, options...))
+}
+
+var globalAppConfigTypes map[string][]*ConfigType
+
+// RegisterConfigTypeForApp globally registers a new config type that can be used with a named application
+func RegisterConfigTypeForApp(appName string, name string, description string, configType interface{},
+	options ...func(*ConfigType)) {
+	if globalAppConfigTypes == nil {
+		globalAppConfigTypes = make(map[string][]*ConfigType)
+	}
+	appCTs, _ := globalAppConfigTypes[appName]
+	appCTs = append(appCTs, makeConfigType(name, description, configType, options...))
+	globalAppConfigTypes[appName] = appCTs
+}
+
+// AddRegisteredConfigTypes adds the registered config types for an app to the system
+func (cl *Cmdline) AddRegisteredConfigTypes(appName string) {
+	appCTs, ok := globalAppConfigTypes[appName]
+	if ok {
+		cl.configTypes = append(cl.configTypes, appCTs...)
+	}
+}
+
+// printableTypeName returns a human-readable name of a type, suitable for use in help text
 func printableTypeName(typ reflect.Type) string {
 	if typ.String() == "interface {}" {
 		return fmt.Sprintf("JSON data")
@@ -131,6 +148,10 @@ func printableTypeName(typ reflect.Type) string {
 func recursiveEnumerateFields(typ reflect.Type, results chan<- reflect.StructField) {
 	for i := 0; i < typ.NumField(); i++ {
 		ctf := typ.Field(i)
+		ignore, err := betterParseBool(ctf.Tag.Get("ignore"))
+		if err == nil && ignore {
+			continue
+		}
 		if ctf.Type.Kind() == reflect.Struct {
 			recursiveEnumerateFields(ctf.Type, results)
 		} else {
@@ -141,15 +162,20 @@ func recursiveEnumerateFields(typ reflect.Type, results chan<- reflect.StructFie
 
 // enumerateFields enumerates primitive fields in a struct, including composed structs.
 // If a composed struct has the same name as a struct member, that name will be returned twice.
-func enumerateFields(typ reflect.Type) <-chan reflect.StructField {
-	results := make(chan reflect.StructField)
+func enumerateFields(typ reflect.Type) []reflect.StructField {
+	resultChan := make(chan reflect.StructField)
 	go func() {
-		recursiveEnumerateFields(typ, results)
-		close(results)
+		recursiveEnumerateFields(typ, resultChan)
+		close(resultChan)
 	}()
+	results := make([]reflect.StructField, 0)
+	for r := range resultChan {
+		results = append(results, r)
+	}
 	return results
 }
 
+// printCmdHelp prints the generated help text for a single config type
 func (cl *Cmdline) printCmdHelp(p *ConfigType) error {
 	if p.hidden {
 		return nil
@@ -175,7 +201,7 @@ func (cl *Cmdline) printCmdHelp(p *ConfigType) error {
 	if err != nil {
 		return err
 	}
-	for ctf := range enumerateFields(p.objType) {
+	for _, ctf := range enumerateFields(p.objType) {
 		_, err = fmt.Fprintf(cl.out, "      %s=<%s>", strings.ToLower(ctf.Name),
 			printableTypeName(ctf.Type))
 		if err != nil {
@@ -216,6 +242,7 @@ func (cl *Cmdline) printCmdHelp(p *ConfigType) error {
 	return nil
 }
 
+// multiPrintfItem represents a single item to be printed by multiPrintf
 type multiPrintfItem struct {
 	format string
 	values []interface{}
@@ -248,14 +275,13 @@ func (cl *Cmdline) ShowHelp() error {
 		Description: "",
 		Order:       0,
 	}
-	for i := range cl.configTypes {
-		ct := cl.configTypes[i]
+	for _, ct := range cl.configTypes {
 		if ct.section == nil || ct.hidden {
 			continue
 		}
 		found := false
-		for j := range sections {
-			if ct.section == sections[j] {
+		for _, sect := range sections {
+			if ct.section == sect {
 				found = true
 				break
 			}
@@ -286,21 +312,19 @@ func (cl *Cmdline) ShowHelp() error {
 			return err
 		}
 	}
-	for s := range sections {
-		sect := sections[s]
+	for s, sect := range sections {
 		if sect.Description != "" {
 			_, err = fmt.Fprintf(cl.out, "%s\n\n", sect.Description)
 			if err != nil {
 				return err
 			}
 		}
-		for i := 0; i <= 1; i++ {
-			for j := range cl.configTypes {
-				ct := cl.configTypes[j]
+		for _, req := range []bool{true, false} {
+			for _, ct := range cl.configTypes {
 				if (s == 0 && ct.section != nil) || (s != 0 && ct.section != sect) || ct.hidden {
 					continue
 				}
-				if (i == 0 && ct.required) || (i == 1 && !ct.required) {
+				if ct.required == req {
 					err = cl.printCmdHelp(ct)
 					if err != nil {
 						return err
@@ -329,13 +353,8 @@ func (cl *Cmdline) BashCompletion() error {
 	if err != nil {
 		return err
 	}
-	actions := make([]string, 0)
-	actions = append(actions, "--help")
-	actions = append(actions, "--bash-completion")
-	actions = append(actions, "--config")
-	actions = append(actions, "-c")
-	for i := range cl.configTypes {
-		ct := cl.configTypes[i]
+	actions := []string{"--help", "--bash-completion", "--config", "-c"}
+	for _, ct := range cl.configTypes {
 		actions = append(actions, fmt.Sprintf("--%s", strings.ToLower(ct.name)))
 	}
 	err = multiPrintf(cl.out,
@@ -350,8 +369,7 @@ func (cl *Cmdline) BashCompletion() error {
 	if err != nil {
 		return err
 	}
-	for i := range cl.configTypes {
-		ct := cl.configTypes[i]
+	for _, ct := range cl.configTypes {
 		if ct.hidden {
 			continue
 		}
@@ -360,7 +378,7 @@ func (cl *Cmdline) BashCompletion() error {
 			return err
 		}
 		params := make([]string, 0)
-		for ctf := range enumerateFields(ct.objType) {
+		for _, ctf := range enumerateFields(ct.objType) {
 			params = append(params, fmt.Sprintf("%s=", strings.ToLower(ctf.Name)))
 		}
 		err = multiPrintf(cl.out,
@@ -385,6 +403,7 @@ func (cl *Cmdline) BashCompletion() error {
 	return nil
 }
 
+// setValue attempts to write a single value to a struct field, performing all necessary type conversions
 func setValue(field *reflect.Value, value interface{}) error {
 	fieldType := field.Type()
 	fieldKind := fieldType.Kind()
@@ -447,6 +466,19 @@ func setValue(field *reflect.Value, value interface{}) error {
 		return nil
 	}
 
+	// If the field is a slice, check if we were given a JSON-encoded string
+	if fieldKind == reflect.Slice && valueKind == reflect.String && isString && strings.HasPrefix(valueStr, "[") {
+		valueType = reflect.SliceOf(fieldType.Elem())
+		valueKind = valueType.Kind()
+		dest := reflect.MakeSlice(valueType, 0, 0)
+		value = dest.Interface()
+		err := json.Unmarshal([]byte(valueStr), &value)
+		if err != nil {
+			return err
+		}
+		// We do not return here because we still need the slice copy below
+	}
+
 	// If the field and value are a slice type, attempt to copy the values
 	if fieldKind == reflect.Slice && valueKind == reflect.Slice {
 		valueSlice, ok := value.([]interface{})
@@ -454,8 +486,8 @@ func setValue(field *reflect.Value, value interface{}) error {
 			return fmt.Errorf("invalid value for slice type")
 		}
 		fieldSlice := reflect.MakeSlice(fieldType, 0, 0)
-		for i := range valueSlice {
-			item := reflect.ValueOf(valueSlice[i])
+		for _, v := range valueSlice {
+			item := reflect.ValueOf(v)
 			if !item.Type().ConvertibleTo(fieldType.Elem()) {
 				return fmt.Errorf("invalid value %s: must be type %s", item, fieldType.Elem())
 			}
@@ -503,6 +535,7 @@ func setValue(field *reflect.Value, value interface{}) error {
 	return fmt.Errorf("type error (expected %s)", fieldType)
 }
 
+// plural returns a singular or plural string, depending on whether count is 1 or more than 1
 func plural(count int, singular string, plural string) string {
 	if count > 1 {
 		return plural
@@ -510,6 +543,7 @@ func plural(count int, singular string, plural string) string {
 	return singular
 }
 
+// betterParseBool parses a single boolean value from a string, with a few more options than the go default
 func betterParseBool(s string) (bool, error) {
 	switch s {
 	case "1", "t", "T", "Y", "true", "TRUE", "True", "yes", "Yes", "YES":
@@ -520,6 +554,7 @@ func betterParseBool(s string) (bool, error) {
 	return false, fmt.Errorf("could not parse %s as boolean", s)
 }
 
+// convTagToBool converts a tag value to a boolean, returning a default if the tag value is empty
 func convTagToBool(tag string, def bool) (bool, error) {
 	if tag == "" {
 		return def, nil
@@ -531,9 +566,9 @@ func convTagToBool(tag string, def bool) (bool, error) {
 	return b, nil
 }
 
+// getCfgObjectType case-insensitively looks up a config type in the configTypes list
 func (cl *Cmdline) getCfgObjType(objType string) (*ConfigType, error) {
-	for i := range cl.configTypes {
-		ct := cl.configTypes[i]
+	for _, ct := range cl.configTypes {
 		if objType == strings.ToLower(ct.name) {
 			return ct, nil
 		}
@@ -541,8 +576,9 @@ func (cl *Cmdline) getCfgObjType(objType string) (*ConfigType, error) {
 	return nil, fmt.Errorf("unknown config type %s", objType)
 }
 
+// getBareParam searches a struct for a member with a true barevalue tag
 func getBareParam(commandType reflect.Type) (string, error) {
-	for ctf := range enumerateFields(commandType) {
+	for _, ctf := range enumerateFields(commandType) {
 		b, err := convTagToBool(ctf.Tag.Get("barevalue"), false)
 		if err != nil {
 			return "", err
@@ -556,7 +592,7 @@ func getBareParam(commandType reflect.Type) (string, error) {
 
 // getFieldByName searches for a field by case-insensitive name and returns it if found
 func getFieldByName(obj *reflect.Value, fieldName string) (*reflect.Value, error) {
-	for ctf := range enumerateFields(obj.Type()) {
+	for _, ctf := range enumerateFields(obj.Type()) {
 		if strings.ToLower(ctf.Name) == strings.ToLower(fieldName) {
 			fobj := obj.FieldByName(ctf.Name)
 			return &fobj, nil
@@ -565,39 +601,43 @@ func getFieldByName(obj *reflect.Value, fieldName string) (*reflect.Value, error
 	return nil, fmt.Errorf("unknown field name %s", fieldName)
 }
 
-func buildRequiredParams(commandType reflect.Type) (map[string]bool, error) {
-	requiredParams := make(map[string]bool)
-	for ctf := range enumerateFields(commandType) {
+// buildRequiredParams returns a map whose indexes are the parameters of a struct with a true "required" tag
+func buildRequiredParams(commandType reflect.Type) (map[string]struct{}, error) {
+	requiredParams := make(map[string]struct{})
+	for _, ctf := range enumerateFields(commandType) {
 		req, err := convTagToBool(ctf.Tag.Get("required"), false)
 		if err != nil {
 			return nil, err
 		}
 		if req {
-			requiredParams[strings.ToLower(ctf.Name)] = true
+			requiredParams[strings.ToLower(ctf.Name)] = struct{}{}
 		}
 	}
 	return requiredParams, nil
 }
 
-func checkRequiredParams(requiredParams map[string]bool, commandName string) error {
+// checkRequiredParams verifies that the requiredParams map is empty, otherwise returns an error listing the fields
+func checkRequiredParams(requiredParams map[string]struct{}) error {
 	if len(requiredParams) > 0 {
 		sl := make([]string, 0, len(requiredParams))
 		for p := range requiredParams {
 			sl = append(sl, p)
 		}
-		return fmt.Errorf("required parameter%s missing for %s: %s",
+		return fmt.Errorf("required parameter%s missing: %s",
 			plural(len(requiredParams), "", "s"),
-			commandName, strings.Join(sl, ", "))
+			strings.Join(sl, ", "))
 	}
 	return nil
 }
 
+// cfgObjInfo holds temporary data while parsing a config object
 type cfgObjInfo struct {
 	obj       reflect.Value
 	arg       string
 	fieldsSet []string
 }
 
+// newCOI instantiates a new cfgObjInfo
 func newCOI() *cfgObjInfo {
 	return &cfgObjInfo{
 		obj:       reflect.Value{},
@@ -606,8 +646,12 @@ func newCOI() *cfgObjInfo {
 	}
 }
 
+// loadConfigFromFile loads and parses a YAML config file
 func (cl *Cmdline) loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
-	data, err := ioutil.ReadFile(filename)
+	var err error
+	var ok bool
+	var data []byte
+	data, err = ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -617,16 +661,17 @@ func (cl *Cmdline) loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 		return nil, err
 	}
 	cfgObjs := make([]*cfgObjInfo, 0)
-	for i := range config {
-		cfg := config[i]
-		str, ok := cfg.(string)
+	for _, cfg := range config {
+		var str string
+		str, ok = cfg.(string)
 		var command string
 		var rawParams interface{}
 		if ok {
 			command = str
 			rawParams = nil
 		} else {
-			imap, ok := cfg.(map[interface{}]interface{})
+			var imap map[interface{}]interface{}
+			imap, ok = cfg.(map[interface{}]interface{})
 			if ok {
 				if len(imap) != 1 {
 					return nil, fmt.Errorf("config format invalid: item has multiple names")
@@ -646,7 +691,8 @@ func (cl *Cmdline) loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 				return nil, fmt.Errorf("unknown config file format")
 			}
 		}
-		ct, err := cl.getCfgObjType(command)
+		var ct *ConfigType
+		ct, err = cl.getCfgObjType(command)
 		if err != nil {
 			return nil, fmt.Errorf("could not get config type for command %s: %s", command, err)
 		}
@@ -654,22 +700,25 @@ func (cl *Cmdline) loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 		if rawParams == nil {
 			// this space intentionally left blank
 		} else {
-			str, ok := rawParams.(string)
+			str, ok = rawParams.(string)
 			if ok {
 				// param is a single string, so it is a barevalue
-				bareparam, err := getBareParam(ct.objType)
+				var bareparam string
+				bareparam, err = getBareParam(ct.objType)
 				if err != nil {
 					return nil, fmt.Errorf("could not get barevalue for command %s: %s", command, err)
 				}
 				params[bareparam] = str
 			} else {
 				// only other choice is for param to be a map
-				pmap, ok := rawParams.(map[interface{}]interface{})
+				var pmap map[interface{}]interface{}
+				pmap, ok = rawParams.(map[interface{}]interface{})
 				if !ok {
 					return nil, fmt.Errorf("invalid config format for %s", command)
 				}
 				for k, v := range pmap {
-					ks, ok := k.(string)
+					var ks string
+					ks, ok = k.(string)
 					if !ok {
 						return nil, fmt.Errorf("invalid config format for %s", command)
 					}
@@ -687,17 +736,19 @@ func (cl *Cmdline) loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 		coi := newCOI()
 		coi.obj = reflect.New(ct.objType).Elem()
 		coi.arg = command
-		requiredParams, err := buildRequiredParams(ct.objType)
+		var requiredParams map[string]struct{}
+		requiredParams, err = buildRequiredParams(ct.objType)
 		if err != nil {
 			return nil, err
 		}
 		for k, v := range params {
-			f, err := getFieldByName(&coi.obj, k)
+			var f *reflect.Value
+			f, err = getFieldByName(&coi.obj, k)
 			if err != nil {
 				return nil, fmt.Errorf("field %s not defined for command %s: %s", k, command, err)
 			}
 			if !f.CanSet() {
-				return nil, fmt.Errorf("field %s is not settable", k)
+				return nil, fmt.Errorf("field %s is  (maybe private)", k)
 			}
 			err = setValue(f, v)
 			if err != nil {
@@ -706,9 +757,9 @@ func (cl *Cmdline) loadConfigFromFile(filename string) ([]*cfgObjInfo, error) {
 			coi.fieldsSet = append(coi.fieldsSet, k)
 			delete(requiredParams, strings.ToLower(k))
 		}
-		err = checkRequiredParams(requiredParams, command)
+		err = checkRequiredParams(requiredParams)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error in %s: %s", command, err)
 		}
 		cfgObjs = append(cfgObjs, coi)
 	}
@@ -747,22 +798,20 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 
 	var accumulator *cfgObjInfo
 	var commandType reflect.Type
-	var requiredParams map[string]bool
+	var requiredParams map[string]struct{}
 	var err error
 
 	requiredObjs := make(map[string]bool)
 	activeObjs := make([]*cfgObjInfo, 0)
 	configCmd := false
 
-	for i := range cl.configTypes {
-		ct := cl.configTypes[i]
+	for _, ct := range cl.configTypes {
 		if ct.required {
 			requiredObjs[ct.objType.Name()] = true
 		}
 	}
 
-	for i := range args {
-		arg := args[i]
+	for _, arg := range args {
 		lcarg := strings.ToLower(arg)
 		if lcarg == "-h" || lcarg == "--help" && cl.out != nil {
 			err = cl.ShowHelp()
@@ -785,9 +834,9 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 			}
 			// If we were accumulating an action, store it (it is now complete)
 			if commandType != nil && accumulator != nil {
-				err = checkRequiredParams(requiredParams, accumulator.arg)
+				err = checkRequiredParams(requiredParams)
 				if err != nil {
-					return err
+					return fmt.Errorf("error in %s: %s", accumulator.arg, err)
 				}
 				activeObjs = append(activeObjs, accumulator)
 				accumulator = nil
@@ -847,7 +896,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 				}
 				f := accumulator.obj.FieldByName(bp)
 				if !f.CanSet() {
-					return fmt.Errorf("internal error: field %s is not settable", bp)
+					return fmt.Errorf("field %s is not settable (maybe private)", bp)
 				}
 				err = setValue(&f, sarg[0])
 				if err != nil {
@@ -864,7 +913,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 					return fmt.Errorf("config error: %s", err)
 				}
 				if !f.CanSet() {
-					return fmt.Errorf("internal error: field %s is not settable", lcname)
+					return fmt.Errorf("field %s is not settable (maybe private)", lcname)
 				}
 				err = setValue(f, sarg[1])
 				if err != nil {
@@ -877,9 +926,9 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 	}
 	if commandType != nil && accumulator != nil {
 		// If we were accumulating an object, store it now since we're done
-		err = checkRequiredParams(requiredParams, accumulator.arg)
+		err = checkRequiredParams(requiredParams)
 		if err != nil {
-			return err
+			return fmt.Errorf("error in %s: %s", accumulator.arg, err)
 		}
 		activeObjs = append(activeObjs, accumulator)
 	}
@@ -887,8 +936,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 	// Enforce exclusive objects
 	haveExclusive := false
 	exclusiveName := ""
-	for i := range activeObjs {
-		ao := activeObjs[i]
+	for _, ao := range activeObjs {
 		found := false
 		for j := range cl.configTypes {
 			ct := cl.configTypes[j]
@@ -902,7 +950,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 			}
 		}
 		if !found {
-			return fmt.Errorf("internal error: type %s not found", ao.obj.Type().String())
+			return fmt.Errorf("type %s not found", ao.obj.Type().String())
 		}
 		if haveExclusive {
 			break
@@ -914,8 +962,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 
 	// Add missing required singletons
 	if !haveExclusive {
-		for i := range cl.configTypes {
-			ct := cl.configTypes[i]
+		for _, ct := range cl.configTypes {
 			if ct.singleton && ct.required {
 				haveThis := false
 				for j := range activeObjs {
@@ -929,14 +976,14 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 					a := newCOI()
 					a.obj = reflect.New(ct.objType).Elem()
 					a.arg = fmt.Sprintf("implicit %s", ct.name)
-					var reqs map[string]bool
+					var reqs map[string]struct{}
 					reqs, err = buildRequiredParams(ct.objType)
 					if err != nil {
 						return err
 					}
-					err = checkRequiredParams(reqs, a.arg)
+					err = checkRequiredParams(reqs)
 					if err != nil {
-						return err
+						return fmt.Errorf("error in %s: %s", a.arg, err)
 					}
 					activeObjs = append(activeObjs, a)
 					delete(requiredObjs, ct.objType.Name())
@@ -949,8 +996,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 	if len(requiredObjs) > 0 && !haveExclusive {
 		sl := make([]string, 0, len(requiredObjs))
 		for p := range requiredObjs {
-			for i := range cl.configTypes {
-				ct := cl.configTypes[i]
+			for _, ct := range cl.configTypes {
 				if ct.objType.Name() == p {
 					sl = append(sl, ct.name)
 					break
@@ -963,18 +1009,17 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 	}
 
 	// Set default values where required
-	for i := range activeObjs {
-		cfgObj := activeObjs[i]
+	for _, cfgObj := range activeObjs {
 		cfgType := reflect.TypeOf(cfgObj.obj.Interface())
-		for ctf := range enumerateFields(cfgType) {
+		for _, ctf := range enumerateFields(cfgType) {
 			defaultValue := ctf.Tag.Get("default")
 			if defaultValue == "" {
 				continue
 			}
 			lcname := strings.ToLower(ctf.Name)
 			hasBeenSet := false
-			for i := range cfgObj.fieldsSet {
-				if strings.ToLower(cfgObj.fieldsSet[i]) == lcname {
+			for _, fs := range cfgObj.fieldsSet {
+				if strings.ToLower(fs) == lcname {
 					hasBeenSet = true
 					break
 				}
@@ -993,8 +1038,7 @@ func (cl *Cmdline) ParseAndRun(args []string, phases []string, options ...func(*
 
 	// Run a given named method on all the registered objects
 	runMethod := func(methodName string) error {
-		for i := range activeObjs {
-			cfgObj := activeObjs[i]
+		for _, cfgObj := range activeObjs {
 			m := cfgObj.obj.MethodByName(methodName)
 			if m.IsValid() {
 				result := m.Call(make([]reflect.Value, 0))

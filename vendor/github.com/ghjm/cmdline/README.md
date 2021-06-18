@@ -124,6 +124,8 @@ The following tags can be applied to a struct field:
 * `default`: Default value to use if the user does not specify one.
 * `barevalue`: If true, this field can be used as a bare value.    
   (A bare value is like `--item 37` rather than `--item id=37`.)
+* `ignore`: If true, do not use this field for command line processing at all.    
+  (This can be used for private data to be passed between phases, etc.)
 
 ## Data types
 

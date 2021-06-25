@@ -1,12 +1,12 @@
-FROM fedora:32 as builder
+FROM fedora:34 as builder
 
-RUN dnf -y update && dnf install -y golang make
+RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel
 
 ADD source.tar.gz /source
 WORKDIR /source
 RUN make
 
-FROM fedora:32
+FROM fedora:34
 ARG VERSION
 
 LABEL license="ASL2"
@@ -15,7 +15,7 @@ LABEL vendor="project-receptor"
 LABEL version="${VERSION}"
 
 RUN dnf -y update && \
-    dnf -y install dumb-init python3-click python3-pyyaml python3-dateutil python3-pip && \
+    dnf -y install dumb-init python3-click python3-pyyaml python3-dateutil python3-pip python3-wheel && \
     dnf clean all
 
 COPY receptorctl-${VERSION}-py3-none-any.whl /tmp

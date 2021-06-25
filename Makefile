@@ -2,7 +2,7 @@
 # - If we are on an exact Git tag, then this is official and gets a -1 release
 # - If we are not, then this is unofficial and gets a -0.date.gitref release
 OFFICIAL_VERSION = $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
-VERSION = $(shell cd receptorctl && python setup.py --version)
+VERSION = $(shell cd receptorctl && python3 setup.py --version)
 ifeq ($(OFFICIAL_VERSION),)
 RELEASE = 0.git$(shell date +'%Y%m%d').$(shell git rev-parse --short HEAD)
 OFFICIAL =

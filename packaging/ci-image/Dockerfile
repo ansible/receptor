@@ -1,4 +1,4 @@
-FROM fedora:32
+FROM fedora:34
 ARG UID=1001
 RUN dnf -y update && \
   dnf -y install git golang python3 python3-pip python3-pyyaml make iproute openssl && \

@@ -13,7 +13,7 @@ import (
 type PacketConn struct {
 	s                  *Netceptor
 	localService       string
-	recvChan           chan *messageData
+	recvChan           chan *MessageData
 	readDeadline       time.Time
 	writeDeadline      time.Time
 	advertise          bool
@@ -46,7 +46,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 	pc := &PacketConn{
 		s:            s,
 		localService: service,
-		recvChan:     make(chan *messageData),
+		recvChan:     make(chan *MessageData),
 		advertise:    false,
 		adTags:       nil,
 		connType:     ConnTypeDatagram,
@@ -123,7 +123,7 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 
 // ReadFrom reads a packet from the network and returns its data and address.
 func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	var m *messageData
+	var m *MessageData
 	if pc.readDeadline.IsZero() {
 		m = <-pc.recvChan
 	} else {

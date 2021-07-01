@@ -69,7 +69,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	pc := &PacketConn{
 		s:            s,
 		localService: service,
-		recvChan:     make(chan *messageData),
+		recvChan:     make(chan *MessageData),
 		advertise:    advertise,
 		adTags:       adTags,
 		connType:     connType,

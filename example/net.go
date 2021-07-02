@@ -22,8 +22,8 @@ func main() {
 	logger.QuietMode()
 
 	// Create two nodes of the Receptor network-layer protocol (Netceptors).
-	n1 := netceptor.New(context.Background(), "node1", nil)
-	n2 := netceptor.New(context.Background(), "node2", nil)
+	n1 := netceptor.New(context.Background(), "node1")
+	n2 := netceptor.New(context.Background(), "node2")
 
 	// Start a TCP listener on the first node
 	b1, err := backends.NewTCPListener("localhost:3333", nil)
@@ -31,7 +31,7 @@ func main() {
 		fmt.Printf("Error listening on TCP: %s\n", err)
 		os.Exit(1)
 	}
-	err = n1.AddBackend(b1, 1.0, nil)
+	err = n1.AddBackend(b1)
 	if err != nil {
 		fmt.Printf("Error starting backend: %s\n", err)
 		os.Exit(1)
@@ -43,7 +43,7 @@ func main() {
 		fmt.Printf("Error dialing on TCP: %s\n", err)
 		os.Exit(1)
 	}
-	err = n2.AddBackend(b2, 1.0, nil)
+	err = n2.AddBackend(b2)
 	if err != nil {
 		fmt.Printf("Error starting backend: %s\n", err)
 		os.Exit(1)

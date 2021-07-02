@@ -19,9 +19,8 @@ import (
 )
 
 type nodeCfg struct {
-	ID           string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
-	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow"`
-	DataDir      string `description:"Directory in which to store node data"`
+	ID      string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
+	DataDir string `description:"Directory in which to store node data"`
 }
 
 func (cfg nodeCfg) Init() error {
@@ -40,14 +39,7 @@ func (cfg nodeCfg) Init() error {
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
-	var allowedPeers []string
-	if cfg.AllowedPeers != "" {
-		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
-		for i := range allowedPeers {
-			allowedPeers[i] = strings.TrimSpace(allowedPeers[i])
-		}
-	}
-	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
+	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
 	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
 		return err
@@ -76,7 +68,7 @@ func (cfg nullBackendCfg) Start(ctx context.Context, wg *sync.WaitGroup) (chan n
 
 // Run runs the action, in this case adding a null backend to keep the wait group alive.
 func (cfg nullBackendCfg) Run() error {
-	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil)
+	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{})
 	if err != nil {
 		return err
 	}

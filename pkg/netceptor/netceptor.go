@@ -103,7 +103,6 @@ type Netceptor struct {
 	seenUpdateExpireTime   time.Duration
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
-	allowedPeers           []string
 	workCommands           []string
 	epoch                  uint64
 	sequence               uint64
@@ -293,7 +292,6 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		seenUpdateExpireTime:   seenUpdateExpireTime,
 		maxForwardingHops:      maxForwardingHops,
 		maxConnectionIdleTime:  maxConnectionIdleTime,
-		allowedPeers:           allowedPeers,
 		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:               0,
 		connLock:               &sync.RWMutex{},
@@ -360,9 +358,9 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	return &s
 }
 
-// New constructs a new Receptor network protocol instance.
-func New(ctx context.Context, nodeID string, allowedPeers []string) *Netceptor {
-	return NewWithConsts(ctx, nodeID, allowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
+// New constructs a new Receptor network protocol instance
+func New(ctx context.Context, NodeID string) *Netceptor {
+	return NewWithConsts(ctx, NodeID, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
 		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
@@ -425,8 +423,43 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
 }
 
+type backendInfo struct {
+	connectionCost float64
+	nodeCost       map[string]float64
+	allowedPeers   []string
+}
+
+// BackendConnectionCost is a modifier for AddBackend, which sets the global connection cost
+func BackendConnectionCost(cost float64) func(*backendInfo) {
+	return func(bi *backendInfo) {
+		bi.connectionCost = cost
+	}
+}
+
+// BackendNodeCost is a modifier for AddBackend, which sets the per-node connection costs
+func BackendNodeCost(nodeCost map[string]float64) func(*backendInfo) {
+	return func(bi *backendInfo) {
+		bi.nodeCost = nodeCost
+	}
+}
+
+// BackendAllowedPeers is a modifier for AddBackend, which sets the list of peers allowed to connect
+func BackendAllowedPeers(peers []string) func(*backendInfo) {
+	return func(bi *backendInfo) {
+		bi.allowedPeers = peers
+	}
+}
+
 // AddBackend adds a backend to the Netceptor system.
-func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
+func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*backendInfo)) error {
+	bi := &backendInfo{
+		connectionCost: 1.0,
+		nodeCost:       nil,
+		allowedPeers:   nil,
+	}
+	for _, mod := range modifiers {
+		mod(bi)
+	}
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
 	// Start() runs a go routine that attempts establish a session over this
@@ -460,7 +493,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 					// Start() method above)
 					go func() {
 						defer runProtocolWg.Done()
-						err := s.runProtocol(ctxBackend, sess, connectionCost, nodeCost)
+						err := s.runProtocol(ctxBackend, sess, bi)
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
 						}
@@ -1604,13 +1637,14 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 }
 
 // Main Netceptor protocol loop.
-func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
-	if connectionCost <= 0.0 {
+func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *backendInfo) error {
+	if bi.connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
 	established := false
 	remoteEstablished := false
 	remoteNodeID := ""
+	connectionCost := bi.connectionCost
 	defer func() {
 		_ = sess.Close()
 		if established {
@@ -1734,10 +1768,10 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connec
 					if !remoteNodeAccepted {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
 					}
-					if s.allowedPeers != nil {
+					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
-						for i := range s.allowedPeers {
-							if s.allowedPeers[i] == remoteNodeID {
+						for i := range bi.allowedPeers {
+							if bi.allowedPeers[i] == remoteNodeID {
 								remoteNodeAccepted = true
 
 								break
@@ -1745,10 +1779,10 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connec
 						}
 					}
 					if !remoteNodeAccepted {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the accepted connections list")
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
 					}
 
-					remoteNodeCost, ok := nodeCost[remoteNodeID]
+					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost

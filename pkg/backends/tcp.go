@@ -94,7 +94,7 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			var ok bool
 			tli, ok := li.(*net.TCPListener)
 			if !ok {
-				return fmt.Errorf("Listen returned a non-TCP listener")
+				return fmt.Errorf("listen returned a non-TCP listener")
 			}
 			if b.tls == nil {
 				b.li = li
@@ -212,11 +212,12 @@ func (ns *TCPSession) Close() error {
 
 // tcpListenerCfg is the cmdline configuration object for a TCP listener
 type tcpListenerCfg struct {
-	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
-	TLS      string             `description:"Name of TLS server config"`
-	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
-	NodeCost map[string]float64 `description:"Per-node costs"`
+	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
+	Port         int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
+	TLS          string             `description:"Name of TLS server config"`
+	Cost         float64            `description:"Connection cost (weight)" default:"1.0"`
+	NodeCost     map[string]float64 `description:"Per-node costs"`
+	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct
@@ -244,7 +245,10 @@ func (cfg tcpListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendNodeCost(cfg.NodeCost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		return err
 	}
@@ -253,10 +257,11 @@ func (cfg tcpListenerCfg) Run() error {
 
 // tcpDialerCfg is the cmdline configuration object for a TCP dialer
 type tcpDialerCfg struct {
-	Address string  `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
-	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
-	TLS     string  `description:"Name of TLS client config"`
-	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
+	Address      string   `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
+	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
+	TLS          string   `description:"Name of TLS client config"`
+	Cost         float64  `description:"Connection cost (weight)" default:"1.0"`
+	AllowedPeers []string `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct
@@ -283,7 +288,9 @@ func (cfg tcpDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		return err
 	}

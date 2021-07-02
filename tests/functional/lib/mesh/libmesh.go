@@ -50,7 +50,7 @@ func handleError(err error, fatal bool) {
 
 // NewLibNode builds a node with the name passed as the argument
 func NewLibNode(name string) *LibNode {
-	n1 := netceptor.New(context.Background(), name, nil)
+	n1 := netceptor.New(context.Background(), name)
 	return &LibNode{
 		NetceptorInstance: n1,
 		serverTLSConfigs:  make(map[string]*tls.Config),
@@ -112,7 +112,7 @@ func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]fl
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
+	err = n.NetceptorInstance.AddBackend(b1, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCost))
 	return err
 }
 
@@ -123,7 +123,7 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 	if err != nil {
 		return err
 	}
-	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+	err = n.NetceptorInstance.AddBackend(b1, netceptor.BackendConnectionCost(cost))
 	return err
 }
 
@@ -135,7 +135,7 @@ func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]fl
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
+	err = n.NetceptorInstance.AddBackend(b1, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCost))
 	return err
 }
 
@@ -146,7 +146,7 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 	if err != nil {
 		return err
 	}
-	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+	err = n.NetceptorInstance.AddBackend(b1, netceptor.BackendConnectionCost(cost))
 	return err
 }
 
@@ -159,7 +159,7 @@ func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[str
 		return err
 	}
 	n.Backends = append(n.Backends, b1)
-	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
+	err = n.NetceptorInstance.AddBackend(b1, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCost))
 	return err
 }
 
@@ -171,7 +171,7 @@ func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config
 	if err != nil {
 		return err
 	}
-	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+	err = n.NetceptorInstance.AddBackend(b1, netceptor.BackendConnectionCost(cost))
 	return err
 }
 

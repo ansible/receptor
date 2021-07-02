@@ -249,10 +249,11 @@ func (ns *UDPListenerSession) Close() error {
 
 // udpListenerCfg is the cmdline configuration object for a UDP listener
 type udpListenerCfg struct {
-	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
-	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
-	NodeCost map[string]float64 `description:"Per-node costs"`
+	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
+	Port         int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
+	Cost         float64            `description:"Connection cost (weight)" default:"1.0"`
+	NodeCost     map[string]float64 `description:"Per-node costs"`
+	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct
@@ -276,7 +277,10 @@ func (cfg udpListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendNodeCost(cfg.NodeCost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		logger.Error("Error creating backend for %s: %s\n", address, err)
 		return err
@@ -286,9 +290,10 @@ func (cfg udpListenerCfg) Run() error {
 
 // udpDialerCfg is the cmdline configuration object for a UDP listener
 type udpDialerCfg struct {
-	Address string  `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
-	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
-	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
+	Address      string   `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
+	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
+	Cost         float64  `description:"Connection cost (weight)" default:"1.0"`
+	AllowedPeers []string `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct
@@ -307,7 +312,9 @@ func (cfg udpDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		logger.Error("Error creating backend for %s: %s\n", cfg.Address, err)
 		return err

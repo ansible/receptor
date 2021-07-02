@@ -22,12 +22,12 @@ import (
 func TestWebsocketExternalInterop(t *testing.T) {
 
 	// Create a Netceptor with an external backend
-	n1 := netceptor.New(context.Background(), "node1", nil)
+	n1 := netceptor.New(context.Background(), "node1")
 	b1, err := netceptor.NewExternalBackend()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = n1.AddBackend(b1, 1.0, nil)
+	err = n1.AddBackend(b1)
 
 	// Create a server TLS certificate for "localhost"
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -88,7 +88,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 	}()
 
 	// Create a Netceptor websocket client that connects to our server
-	n2 := netceptor.New(context.Background(), "node2", nil)
+	n2 := netceptor.New(context.Background(), "node2")
 	CAcerts := x509.NewCertPool()
 	CAcerts.AppendCertsFromPEM(certPEM)
 	tls2 := &tls.Config{
@@ -99,7 +99,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = n2.AddBackend(b2, 1.0, nil)
+	err = n2.AddBackend(b2)
 	if err != nil {
 		t.Fatal(err)
 	}

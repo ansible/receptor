@@ -227,12 +227,13 @@ func (ns *WebsocketSession) Close() error {
 
 // websocketListenerCfg is the cmdline configuration object for a websocket listener
 type websocketListenerCfg struct {
-	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
-	Path     string             `description:"URI path to the websocket server" default:"/"`
-	TLS      string             `description:"Name of TLS server config"`
-	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
-	NodeCost map[string]float64 `description:"Per-node costs"`
+	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
+	Port         int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
+	Path         string             `description:"URI path to the websocket server" default:"/"`
+	TLS          string             `description:"Name of TLS server config"`
+	Cost         float64            `description:"Connection cost (weight)" default:"1.0"`
+	NodeCost     map[string]float64 `description:"Per-node costs"`
+	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct
@@ -261,7 +262,10 @@ func (cfg websocketListenerCfg) Run() error {
 		return err
 	}
 	b.SetPath(cfg.Path)
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendNodeCost(cfg.NodeCost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		return err
 	}
@@ -270,11 +274,12 @@ func (cfg websocketListenerCfg) Run() error {
 
 // websocketDialerCfg is the cmdline configuration object for a Websocket listener
 type websocketDialerCfg struct {
-	Address     string  `description:"URL to connect to" barevalue:"yes" required:"yes"`
-	Redial      bool    `description:"Keep redialing on lost connection" default:"true"`
-	ExtraHeader string  `description:"Sends extra HTTP header on initial connection"`
-	TLS         string  `description:"Name of TLS client config"`
-	Cost        float64 `description:"Connection cost (weight)" default:"1.0"`
+	Address      string   `description:"URL to connect to" barevalue:"yes" required:"yes"`
+	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
+	ExtraHeader  string   `description:"Sends extra HTTP header on initial connection"`
+	TLS          string   `description:"Name of TLS client config"`
+	Cost         float64  `description:"Connection cost (weight)" default:"1.0"`
+	AllowedPeers []string `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies that we are reasonably ready to go
@@ -312,7 +317,9 @@ func (cfg websocketDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		return err
 	}

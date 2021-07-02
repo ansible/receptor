@@ -18,9 +18,8 @@ import (
 )
 
 type nodeCfg struct {
-	ID           string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
-	AllowedPeers string `description:"Comma separated list of peer node-IDs to allow"`
-	DataDir      string `description:"Directory in which to store node data"`
+	ID      string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
+	DataDir string `description:"Directory in which to store node data"`
 }
 
 func (cfg nodeCfg) Init() error {
@@ -39,14 +38,7 @@ func (cfg nodeCfg) Init() error {
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
-	var allowedPeers []string
-	if cfg.AllowedPeers != "" {
-		allowedPeers = strings.Split(cfg.AllowedPeers, ",")
-		for i := range allowedPeers {
-			allowedPeers[i] = strings.TrimSpace(allowedPeers[i])
-		}
-	}
-	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID, allowedPeers)
+	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
 	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
 		return err
@@ -66,14 +58,14 @@ func (cfg nodeCfg) Run() error {
 
 type nullBackendCfg struct{}
 
-// make the nullBackendCfg object be usable as a do-nothing Backend
-func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+// Start makes the nullBackendCfg object usable as a do-nothing Backend
+func (cfg nullBackendCfg) Start(_ context.Context) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
 
 // Run runs the action, in this case adding a null backend to keep the wait group alive
 func (cfg nullBackendCfg) Run() error {
-	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil)
+	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{})
 	if err != nil {
 		return err
 	}
@@ -111,7 +103,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
+	// Fancy footwork to set an error exit code if we're immediately exiting at startup
 	done := make(chan struct{})
 	go func() {
 		netceptor.MainInstance.BackendWait()

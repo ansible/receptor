@@ -85,8 +85,10 @@ type FirewallRule func(*MessageData) FirewallResult
 type FirewallResult int
 
 const (
+	// FirewallResultContinue continues processing further rules (no result)
+	FirewallResultContinue FirewallResult = iota
 	// FirewallResultAccept accepts the message for normal processing
-	FirewallResultAccept FirewallResult = iota
+	FirewallResultAccept
 	// FirewallResultReject denies the message, sending an unreachable message to the originator
 	FirewallResultReject
 	// FirewallResultDrop denies the message silently, leaving the originator to time out
@@ -1340,26 +1342,29 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 
 	// Check firewall rules for this packet
 	s.firewallLock.RLock()
+	result := FirewallResultAccept
 	for _, rule := range s.firewallRules {
-		switch rule(md) {
-		case FirewallResultAccept:
-			// do nothing
-		case FirewallResultDrop:
-			s.firewallLock.RUnlock()
-			return nil
-		case FirewallResultReject:
-			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
-				FromNode:    md.FromNode,
-				ToNode:      md.ToNode,
-				FromService: md.FromService,
-				ToService:   md.ToService,
-				Problem:     ProblemRejected,
-			})
-			s.firewallLock.RUnlock()
-			return nil
+		result = rule(md)
+		if result != FirewallResultContinue {
+			break
 		}
 	}
 	s.firewallLock.RUnlock()
+	switch result {
+	case FirewallResultAccept:
+		// do nothing
+	case FirewallResultDrop:
+		return nil
+	case FirewallResultReject:
+		_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
+			FromNode:    md.FromNode,
+			ToNode:      md.ToNode,
+			FromService: md.FromService,
+			ToService:   md.ToService,
+			Problem:     ProblemRejected,
+		})
+		return nil
+	}
 
 	// If the destination is local, then dispatch the message to a service
 	if md.ToNode == s.nodeID {

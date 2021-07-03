@@ -19,8 +19,9 @@ import (
 )
 
 type nodeCfg struct {
-	ID      string `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
-	DataDir string `description:"Directory in which to store node data"`
+	ID            string   `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
+	DataDir       string   `description:"Directory in which to store node data"`
+	FirewallRules []string `description:"Firewall Rules (see documentation for syntax)"`
 }
 
 func (cfg nodeCfg) Init() error {
@@ -40,6 +41,16 @@ func (cfg nodeCfg) Init() error {
 		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
+	if len(cfg.FirewallRules) > 0 {
+		rules, err := netceptor.ParseFirewallRules(cfg.FirewallRules)
+		if err != nil {
+			return err
+		}
+		err = netceptor.MainInstance.AddFirewallRules(rules, true)
+		if err != nil {
+			return err
+		}
+	}
 	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
 		return err

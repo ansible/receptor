@@ -1,12 +1,12 @@
-FROM fedora:32 as builder
+FROM centos:8 as builder
 
-RUN dnf -y update && dnf install -y golang make
+RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel
 
 ADD source.tar.gz /source
 WORKDIR /source
 RUN make
 
-FROM fedora:32
+FROM centos:8
 ARG VERSION
 
 LABEL license="ASL2"
@@ -15,7 +15,8 @@ LABEL vendor="project-receptor"
 LABEL version="${VERSION}"
 
 RUN dnf -y update && \
-    dnf -y install dumb-init python3-click python3-pyyaml python3-dateutil python3-pip && \
+    dnf -y install epel-release && \
+    dnf -y install tini python3-click python3-pyyaml python3-dateutil python3-pip python3-wheel && \
     dnf clean all
 
 COPY receptorctl-${VERSION}-py3-none-any.whl /tmp
@@ -30,5 +31,5 @@ ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
 
 EXPOSE 7323
 
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/usr/bin/receptor", "-c", "/etc/receptor/receptor.conf"]

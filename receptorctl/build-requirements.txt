@@ -1,3 +1,5 @@
 pip
 build
 wheel
+PyYAML
+pre-commit

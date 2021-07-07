@@ -1,0 +1,51 @@
+FROM centos:8
+
+# Python options = [3.8, 3.9]
+ARG PYTHON_VERSION=3.8
+ARG GOLANG_VERSION=1.15.7
+
+ENV PATH=${PATH}:/usr/local/go/bin
+
+RUN set -x \
+    && echo 'fastestmirror=True' >> /etc/dnf/dnf.conf \
+    && dnf update -y \
+    # Receptor build tools
+    && dnf install -y \
+        git wget make iproute openssl findutils virtualenv \
+    # Install specific python version
+    && export PYTHON_PKG_NAME=python$(echo ${PYTHON_VERSION} | sed 's/\.//g') \
+    && dnf module install -y ${PYTHON_PKG_NAME} \
+    && dnf clean all \
+    && alternatives --set python /usr/bin/python${PYTHON_VERSION} \
+    # Install specific golang version
+    && cd /tmp/ \
+    && wget -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz \
+    && rm -rf /usr/local/go \
+    && tar -C /usr/local -xzf go${GOLANG_VERSION}.linux-amd64.tar.gz \
+    && rm -f go${GOLANG_VERSION}.linux-amd64.tar.gz \
+    && echo 'export PATH=${PATH}:/usr/local/go/bin' >> /etc/bashrc
+
+# Caching dependencies
+WORKDIR /dependencies
+ADD --chown=${UID}:${UID} \
+    ./go.mod \
+    ./go.sum \
+    ./receptorctl/requirements.txt \
+    ./receptorctl/test-requirements.txt \
+    ./receptorctl/build-requirements.txt .
+RUN set -x \
+    # Go
+    && go get -u golang.org/x/lint/golint \
+    && go get -d -v ./... \
+    # Python
+    && virtualenv -p python${PYTHON_VERSION} /opt/venv \
+    && source /opt/venv/bin/activate \
+    && pip3 install -r requirements.txt \
+    && pip3 install -r test-requirements.txt \
+    && pip3 install --upgrade -r build-requirements.txt
+
+ADD ./tests/environments/container/build-artifacts.sh /
+
+RUN chmod +x /build-artifacts.sh
+
+WORKDIR /

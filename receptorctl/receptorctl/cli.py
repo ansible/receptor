@@ -162,6 +162,17 @@ def ping(ctx, node, count, delay):
             time.sleep(delay)
 
 
+@cli.command(help="Reload receptor configuration.")
+@click.pass_context
+def reload(ctx):
+    rc = get_rc(ctx)
+    results = rc.simple_command(f"reload")
+    if "Success" in results and results["Success"]:
+        print(f"Reload successful")
+    else:
+        print(f"Error: {results['Error']}")
+
+
 @cli.command(help="Do a traceroute to a Receptor node.")
 @click.pass_context
 @click.argument('node')

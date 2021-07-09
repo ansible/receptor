@@ -2,6 +2,7 @@ package backends
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/project-receptor/receptor/pkg/logger"
@@ -15,12 +16,16 @@ const (
 
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
-// dialerSession is a convenience function for backends that use dial/retry logic.
-func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
+// dialerSession is a convenience function for backends that use dial/retry logic
+func dialerSession(ctx context.Context, wg *sync.WaitGroup, redial bool, redialDelay time.Duration,
 	df dialerFunc) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
+	wg.Add(1)
 	go func() {
-		defer close(sessChan)
+		defer func() {
+			wg.Done()
+			close(sessChan)
+		}()
 		redialDelayInc := utils.NewIncrementalDuration(redialDelay, maxRedialDelay, 1.5)
 		for {
 			closeChan := make(chan struct{})
@@ -75,14 +80,17 @@ type (
 	listenerCancelFunc func()
 )
 
-// listenerSession is a convenience function for backends that use listen/accept logic.
-func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
-	if err := lf(); err != nil {
+// listenerSession is a convenience function for backends that use listen/accept logic
+func listenerSession(ctx context.Context, wg *sync.WaitGroup, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
+	err := lf()
+	if err != nil {
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)
+	wg.Add(1)
 	go func() {
 		defer func() {
+			wg.Done()
 			lcf()
 			close(sessChan)
 		}()
@@ -107,4 +115,16 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 	}()
 
 	return sessChan, nil
+}
+
+func runFuncs(f []func() error) error {
+	// convenience for running an slice of functions and returning any
+	// errors along the way
+	for _, toRun := range f {
+		err := toRun()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

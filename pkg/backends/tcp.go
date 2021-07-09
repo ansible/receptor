@@ -37,9 +37,9 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 	return &td, nil
 }
 
-// Start runs the given session function over this backend service.
-func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
-	return dialerSession(ctx, b.redial, 5*time.Second,
+// Start runs the given session function over this backend service
+func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+	return dialerSession(ctx, wg, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			var conn net.Conn
 			var err error
@@ -86,9 +86,9 @@ func (b *TCPListener) Addr() net.Addr {
 	return b.li.Addr()
 }
 
-// Start runs the given session function over the WebsocketListener backend.
-func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
-	sessChan, err := listenerSession(ctx,
+// Start runs the given session function over the TCPListener backend
+func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+	sessChan, err := listenerSession(ctx, wg,
 		func() error {
 			var err error
 			lc := net.ListenConfig{}
@@ -307,6 +307,14 @@ func (cfg tcpDialerCfg) Run() error {
 	}
 
 	return nil
+}
+
+func (cfg tcpDialerCfg) Reload() error {
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+}
+
+func (cfg tcpListenerCfg) Reload() error {
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func init() {

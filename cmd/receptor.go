@@ -69,8 +69,8 @@ func (cfg nodeCfg) Run() error {
 
 type nullBackendCfg struct{}
 
-// make the nullBackendCfg object be usable as a do-nothing Backend.
-func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+// make the nullBackendCfg object be usable as a do-nothing Backend
+func (cfg nullBackendCfg) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
 
@@ -105,7 +105,16 @@ func main() {
 		cl.AddRegisteredConfigTypes(appName)
 	}
 
-	err := cl.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
+	osArgs := os.Args[1:]
+	// create closure with the passed in args to be ran during a reload
+	controlsvc.ReloadCL = func(dryRun bool) error {
+		if dryRun {
+			return cl.ParseAndRun(osArgs, []string{""}, cmdline.ShowHelpIfNoArgs)
+		}
+		return cl.ParseAndRun(osArgs, []string{"Reload"}, cmdline.ShowHelpIfNoArgs)
+	}
+
+	err := cl.ParseAndRun(osArgs, []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
@@ -115,12 +124,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})
 	go func() {
 		netceptor.MainInstance.BackendWait()
 		close(done)
 	}()
+
+	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	select {
 	case <-done:
 		if netceptor.MainInstance.BackendCount() > 0 {
@@ -134,5 +144,6 @@ func main() {
 	case <-time.After(100 * time.Millisecond):
 	}
 	logger.Info("Initialization complete\n")
-	<-done
+	doneMain := make(chan struct{})
+	<-doneMain
 }

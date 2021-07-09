@@ -55,6 +55,11 @@ func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 		})
 }
 
+// GetAddress returns the address of TCPDialer
+func (b *TCPDialer) GetAddress() string {
+	return b.address
+}
+
 // TCPListener implements Backend for inbound TCP
 type TCPListener struct {
 	address string
@@ -81,7 +86,7 @@ func (b *TCPListener) Addr() net.Addr {
 	return b.li.Addr()
 }
 
-// Start runs the given session function over the WebsocketListener backend
+// Start runs the given session function over the TCPListener backend
 func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	sessChan, err := listenerSession(ctx,
 		func() error {
@@ -135,6 +140,12 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 	}
 	return sessChan, err
 }
+
+// GetAddress returns the address of TCPListener
+func (b *TCPListener) GetAddress() string {
+	return b.address
+}
+
 
 // TCPSession implements BackendSession for TCP backend
 type TCPSession struct {
@@ -244,7 +255,7 @@ func (cfg tcpListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost, "")
 	if err != nil {
 		return err
 	}
@@ -283,9 +294,17 @@ func (cfg tcpDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil, cfg.Address)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (cfg tcpDialerCfg) Reload() error {
+	if !netceptor.MainInstance.IsBackend(cfg.Address) {
+		cfg.Prepare()
+		cfg.Run()
 	}
 	return nil
 }

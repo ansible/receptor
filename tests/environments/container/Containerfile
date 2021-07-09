@@ -2,8 +2,7 @@ FROM centos:8
 
 # Python options = [3.8, 3.9]
 ARG PYTHON_VERSION=3.8
-ARG GOLANG_VERSION=1.15.7
-
+``
 ENV PATH=${PATH}:/usr/local/go/bin
 
 RUN set -x \
@@ -15,15 +14,10 @@ RUN set -x \
     # Install specific python version
     && export PYTHON_PKG_NAME=python$(echo ${PYTHON_VERSION} | sed 's/\.//g') \
     && dnf module install -y ${PYTHON_PKG_NAME} \
-    && dnf clean all \
     && alternatives --set python /usr/bin/python${PYTHON_VERSION} \
     # Install specific golang version
-    && cd /tmp/ \
-    && wget -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz \
-    && rm -rf /usr/local/go \
-    && tar -C /usr/local -xzf go${GOLANG_VERSION}.linux-amd64.tar.gz \
-    && rm -f go${GOLANG_VERSION}.linux-amd64.tar.gz \
-    && echo 'export PATH=${PATH}:/usr/local/go/bin' >> /etc/bashrc
+    && dnf install -y golang \
+    && dnf clean all
 
 # Caching dependencies
 WORKDIR /dependencies

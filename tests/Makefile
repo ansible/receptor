@@ -3,10 +3,6 @@ CONTAINER_IMAGE_TAG_TEST=ansible/receptor:test
 
 # Tests
 GO_FUNCTIONAL_TESTS_DIRS:=$$(find ./functional -type d)
-tests:
-	for f in $(GO_FUNCTIONAL_TESTS_DIRS) ; do \
-		go test -v $$f ; \
-	done
 
 # Generate artifacts
 artifacts: container-image-base
@@ -14,6 +10,7 @@ artifacts: container-image-base
 	podman run -it --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v $(PWD)/artifacts/:/artifacts/:rw \
+		-v receptor_go_root_cache:/root/go:rw \
 		$(CONTAINER_IMAGE_TAG_BASE) \
 		/build-artifacts.sh
 
@@ -23,19 +20,12 @@ container-image: container-image-base
 container-image-base:
 	podman build -t $(CONTAINER_IMAGE_TAG_BASE) -f ./environments/container/Containerfile ./../
 
-# container-image-test:
-# 	podman build -t $(CONTAINER_IMAGE_TAG_BASE) -f ./environments/container/Containerfile ./../
-
 container-shell-base:
 	podman run -it --rm \
 		-v $(PWD)/../:/source/:ro \
-		$(CONTAINER_IMAGE_TAG_BASE) sh -c \
+		-v receptor_go_root_cache:/root/go:rw \
+		$(CONTAINER_IMAGE_TAG_BASE) bash -c \
 			'cp -r /source /build && cd /build && bash'
-
-# container-shell-test:
-# 	podman run -it --rm \
-# 		-v $(PWD)/../:/source/:ro \
-# 		$(CONTAINER_IMAGE_TAG_BASE) bash
 
 # VM (vagrant)
 vm: vm-create
@@ -47,8 +37,21 @@ vm-create:
 shell: vm-shell
 vm-shell:
 	@cd environments/vagrant && \
-	vagrant ssh -c "cd /vagrant && /bin/bash"
+	vagrant ssh -c "cd /vagrant/tests && /bin/bash"
 
 vm-destroy:
 	cd environments/vagrant && \
 	vagrant destroy
+
+vm-provision:
+	cd environments/vagrant && \
+	vagrant provision
+
+# Colored output
+ccblue=$(echo -e "\033[0;31m")
+ccred=$(echo -e "\033[0;31m")
+ccyellow=$(echo -e "\033[0;33m")
+ccend=$(echo -e "\033[0m")
+
+# Other configs
+SHELL:=/bin/bash

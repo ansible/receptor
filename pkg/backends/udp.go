@@ -59,11 +59,6 @@ func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 		})
 }
 
-// GetAddress returns address of UDPDialer
-func (b *UDPDialer) GetAddress() string {
-	return b.address
-}
-
 // UDPDialerSession implements BackendSession for UDPDialer
 type UDPDialerSession struct {
 	conn            *net.UDPConn
@@ -212,10 +207,6 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 	return sessChan, nil
 }
 
-// GetAddress returns the address of UDPListener
-func (b *UDPListener) GetAddress() string {
-	return b.laddr.String()
-}
 // UDPListenerSession implements BackendSession for UDPListener
 type UDPListenerSession struct {
 	li       *UDPListener

@@ -71,10 +71,6 @@ func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSess
 	return make(chan netceptor.BackendSession), nil
 }
 
-func (cfg nullBackendCfg) GetAddress() string {
-	return "nullBackendCfg"
-}
-
 // Run runs the action, in this case adding a null backend to keep the wait group alive
 func (cfg nullBackendCfg) Run() error {
 	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil, "nullBackendCfg")
@@ -127,22 +123,6 @@ func main() {
 		netceptor.MainInstance.BackendWait()
 		close(done)
 	}()
-
-	// go func() {
-	// 	for {
-	// 		select {
-	// 			case <- done:
-	// 				return
-	// 			case <-time.After(10 * time.Second):
-	// 				logger.Debug("Reload")
-	// 				err := cl.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Reload"})
-	// 				if err != nil {
-	// 					logger.Error(err.Error())
-	// 				}
-	// 		}
-	// 	}
-	// 	logger.Debug("Returning from reload routine")
-	// }()
 
 	select {
 	case <-done:

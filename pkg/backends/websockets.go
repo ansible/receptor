@@ -71,11 +71,6 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 		})
 }
 
-// GetAddress returns address of WebsocketDialer
-func (b *WebsocketDialer) GetAddress() string {
-	return b.address
-}
-
 // WebsocketListener implements Backend for inbound Websocket
 type WebsocketListener struct {
 	address string
@@ -156,11 +151,6 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 	}()
 	logger.Debug("Listening on Websocket %s path %s\n", b.Addr().String(), b.Path())
 	return sessChan, nil
-}
-
-// GetAddress returns address of WebsocketListener
-func (b *WebsocketListener) GetAddress() string {
-	return b.address
 }
 
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener

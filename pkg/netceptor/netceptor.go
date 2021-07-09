@@ -66,7 +66,6 @@ func (e *TimeoutError) Temporary() bool { return true }
 // Backend is the interface for back-ends that the Receptor network can run over
 type Backend interface {
 	Start(context.Context) (chan BackendSession, error)
-	GetAddress() string
 }
 
 // BackendSession is the interface for a single session of a back-end.

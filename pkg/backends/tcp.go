@@ -55,11 +55,6 @@ func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 		})
 }
 
-// GetAddress returns the address of TCPDialer
-func (b *TCPDialer) GetAddress() string {
-	return b.address
-}
-
 // TCPListener implements Backend for inbound TCP
 type TCPListener struct {
 	address string
@@ -140,12 +135,6 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 	}
 	return sessChan, err
 }
-
-// GetAddress returns the address of TCPListener
-func (b *TCPListener) GetAddress() string {
-	return b.address
-}
-
 
 // TCPSession implements BackendSession for TCP backend
 type TCPSession struct {

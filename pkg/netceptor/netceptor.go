@@ -236,10 +236,6 @@ type backendCancelInfo struct {
 	markForCancel bool
 }
 
-func (s *Netceptor) CancelBackend(backend string) {
-	s.backendCancel[backend].cancel()
-}
-
 func (s *Netceptor) MarkAllForCancel() {
 	for i,_ := range s.backendCancel {
 		s.backendCancel[i].markForCancel = true
@@ -256,7 +252,11 @@ func (s *Netceptor) CancelMarked() {
 	}
 }
 
-func (s *Netceptor) IsBackend(backend string) bool {
+func (s *Netceptor) UnmarkforCancel(backend string) {
+	s.backendCancel[backend].markForCancel = false
+}
+
+func (s *Netceptor) InBackendCancel(backend string) bool {
 	_, ok := s.backendCancel[backend]
 	return ok
 }

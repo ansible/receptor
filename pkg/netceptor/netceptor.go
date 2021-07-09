@@ -287,8 +287,6 @@ func makeNetworkName(nodeID string) string {
 	}
 }
 
-
-
 // NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants
 func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,

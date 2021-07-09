@@ -102,12 +102,13 @@ func main() {
 	}
 
 	osArgs := os.Args[1:]
+	// create closure with the passed in args to be ran during a reload
 	controlsvc.ReloadCL = func() error {
 		err := cl.ParseAndRun(osArgs, []string{"Reload"}, cmdline.ShowHelpIfNoArgs)
 		return err
 	}
 
-	err := cl.ParseAndRun(os.Args[1:], []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
+	err := cl.ParseAndRun(osArgs, []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)

@@ -291,7 +291,9 @@ func (cfg tcpDialerCfg) Run() error {
 }
 
 func (cfg tcpDialerCfg) Reload() error {
-	if !netceptor.MainInstance.IsBackend(cfg.Address) {
+	if netceptor.MainInstance.InBackendCancel(cfg.Address) {
+		netceptor.MainInstance.UnmarkforCancel(cfg.Address)
+	} else {
 		cfg.Prepare()
 		cfg.Run()
 	}

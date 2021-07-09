@@ -1,0 +1,12 @@
+---
+- node:
+    id: arceus
+
+- tcp-listener:
+    port: 2223
+
+- work-command:
+    worktype: echo
+    command: echo
+    params: arceus
+    allowruntimeparams: true

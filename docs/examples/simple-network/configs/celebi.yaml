@@ -1,0 +1,13 @@
+---
+- log-level:
+    level: debug
+
+- node:
+    id: celebi
+
+- tcp-peer:
+    address: arceus:2223
+
+- control-service:
+    service: control
+    filename: /socks/celebi.sock

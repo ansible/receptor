@@ -24,7 +24,6 @@ func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
   logger.Debug("Reloading")
   // mark the backends for cancel
 	nc.MarkAllForCancel()
-  // add each tcp-peer, but
   ReloadCL()
   nc.CancelMarked()
 	cfr := make(map[string]interface{})

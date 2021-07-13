@@ -572,11 +572,9 @@ func (s *Netceptor) sendServiceAds() {
 				ConnType:     s.listenerRegistry[sn].connType,
 				Tags:         s.listenerRegistry[sn].adTags,
 			}
-			if sn == "control" {
-				if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
-					if adControl,ok := ad["control"]; ok {
-							sa.WorkCommands = adControl.WorkCommands
-					}
+			if svcType, ok := sa.Tags["type"]; ok {
+				if svcType == "Control Service" {
+					sa.WorkCommands = s.serviceAdsReceived[s.NodeID()][sn].WorkCommands
 				}
 			}
 			ads = append(ads, sa)

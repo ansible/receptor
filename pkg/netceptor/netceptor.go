@@ -507,11 +507,11 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 		s.serviceAdsReceived[s.nodeID] = n
 	}
 	n[service] = &ServiceAdvertisement{
-		NodeID:       s.nodeID,
-		Service:      service,
-		Time:         time.Now(),
-		ConnType:     connType,
-		Tags:         tags,
+		NodeID:   s.nodeID,
+		Service:  service,
+		Time:     time.Now(),
+		ConnType: connType,
+		Tags:     tags,
 	}
 	s.sendServiceAdsChan <- 0
 }
@@ -566,11 +566,11 @@ func (s *Netceptor) sendServiceAds() {
 	for sn := range s.listenerRegistry {
 		if s.listenerRegistry[sn].advertise {
 			sa := ServiceAdvertisement{
-				NodeID:       s.nodeID,
-				Service:      sn,
-				Time:         time.Now(),
-				ConnType:     s.listenerRegistry[sn].connType,
-				Tags:         s.listenerRegistry[sn].adTags,
+				NodeID:   s.nodeID,
+				Service:  sn,
+				Time:     time.Now(),
+				ConnType: s.listenerRegistry[sn].connType,
+				Tags:     s.listenerRegistry[sn].adTags,
 			}
 			if svcType, ok := sa.Tags["type"]; ok {
 				if svcType == "Control Service" {

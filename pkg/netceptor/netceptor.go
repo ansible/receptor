@@ -574,7 +574,11 @@ func (s *Netceptor) sendServiceAds() {
 			}
 			if svcType, ok := sa.Tags["type"]; ok {
 				if svcType == "Control Service" {
-					sa.WorkCommands = s.serviceAdsReceived[s.NodeID()][sn].WorkCommands
+					if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
+						if adControl, ok := ad[sn]; ok {
+							sa.WorkCommands = adControl.WorkCommands
+						}
+					}
 				}
 			}
 			ads = append(ads, sa)
@@ -761,7 +765,7 @@ func (s *Netceptor) AddWorkCommand(command string) error {
 	// and only add work command names to that service ad
 	if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
 		for serviceName, svc := range ad {
-			for key, _ := range svc.Tags {
+			for key := range svc.Tags {
 				if key == "type" {
 					if svc.Tags["type"] == "Control Service" {
 						ad[serviceName].WorkCommands = append(ad[serviceName].WorkCommands, command)

@@ -290,7 +290,9 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	}
 	var li *netceptor.Listener
 	if service != "" {
-		li, err = s.nc.ListenAndAdvertise(service, tlscfg, nil)
+		li, err = s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{
+			"type": "Control Service",
+		})
 		if err != nil {
 			return fmt.Errorf("error opening Unix socket: %s", err)
 		}

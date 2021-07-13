@@ -89,7 +89,6 @@ type Netceptor struct {
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
 	allowedPeers           []string
-	workCommands           []string
 	epoch                  uint64
 	sequence               uint64
 	connLock               *sync.RWMutex
@@ -513,7 +512,6 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 		Time:         time.Now(),
 		ConnType:     connType,
 		Tags:         tags,
-		WorkCommands: s.workCommands,
 	}
 	s.sendServiceAdsChan <- 0
 }
@@ -573,7 +571,13 @@ func (s *Netceptor) sendServiceAds() {
 				Time:         time.Now(),
 				ConnType:     s.listenerRegistry[sn].connType,
 				Tags:         s.listenerRegistry[sn].adTags,
-				WorkCommands: s.workCommands,
+			}
+			if sn == "control" {
+				if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
+					if adControl,ok := ad["control"]; ok {
+							sa.WorkCommands = adControl.WorkCommands
+					}
+				}
 			}
 			ads = append(ads, sa)
 		}
@@ -755,16 +759,18 @@ func (s *Netceptor) AddWorkCommand(command string) error {
 	if command == "" {
 		return fmt.Errorf("must provide a name")
 	}
-	s.serviceAdsLock.Lock()
-	defer s.serviceAdsLock.Unlock()
-	if n, ok := s.serviceAdsReceived[s.NodeID()]; ok {
-		// if it's the local node, just update the local service advertisement
-		// structs directly
-		for _, ad := range n {
-			ad.WorkCommands = append(ad.WorkCommands, command)
+	// check if s.serviceAdsReceived["foo"]["control"].Tags["type"] == "Control Service"
+	// and only add work command names to that service ad
+	if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
+		for serviceName, svc := range ad {
+			for key, _ := range svc.Tags {
+				if key == "type" {
+					if svc.Tags["type"] == "Control Service" {
+						ad[serviceName].WorkCommands = append(ad[serviceName].WorkCommands, command)
+					}
+				}
+			}
 		}
-	} else {
-		s.workCommands = append(s.workCommands, command)
 	}
 
 	return nil

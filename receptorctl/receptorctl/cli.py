@@ -114,7 +114,7 @@ def status(ctx):
             elif ad['ConnType'] == 2:
                 conn_type = 'StreamTLS'
             print(
-                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S} {(ad['Tags'] or '-'):<16}",
+                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}",
                 end=""
             )
             commands = ad['WorkCommands']

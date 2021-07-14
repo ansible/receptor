@@ -7,10 +7,18 @@ GO_FUNCTIONAL_TESTS_DIRS:=$$(find ./functional -type d)
 # Generate artifacts
 artifacts: container-image-base
 	mkdir -p $(PWD)/artifacts
-	podman run -it --rm \
+	podman run --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v $(PWD)/artifacts/:/artifacts/:rw \
 		-v receptor_go_root_cache:/root/go:rw \
+		$(CONTAINER_IMAGE_TAG_BASE) \
+		/build-artifacts.sh
+
+artifacts-no-cache: container-image-base
+	mkdir -p $(PWD)/artifacts
+	podman run --rm \
+		-v $(PWD)/../:/source/:ro \
+		-v $(PWD)/artifacts/:/artifacts/:rw \
 		$(CONTAINER_IMAGE_TAG_BASE) \
 		/build-artifacts.sh
 
@@ -25,7 +33,7 @@ container-shell-base:
 		-v $(PWD)/../:/source/:ro \
 		-v receptor_go_root_cache:/root/go:rw \
 		$(CONTAINER_IMAGE_TAG_BASE) bash -c \
-			'cp -r /source /build && cd /build && bash'
+			'cp -r /source /build; cd /build; bash'
 
 # VM (vagrant)
 vm: vm-create

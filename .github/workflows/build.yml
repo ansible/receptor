@@ -1,0 +1,65 @@
+---
+
+name: Build Artifact
+
+on: 
+  push:
+    branches:
+      - '*'
+    # tags:        
+    #   - v*
+
+jobs:
+  artifact:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        # os: [ubuntu-latest, windows-latest, macOS-latest]
+
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Build <linux>
+      run: |
+        sed -i 's/podman/docker/g' tests/Makefile
+        cd tests/ && make artifacts-no-cache
+      if: matrix.os == 'ubuntu-latest'
+
+    # - name: Build <macOS>
+    #   run: |
+    #     go build -v .
+    #     mkdir dist
+    #     mv receptor ./dist/receptor-darwin-x86_64
+    #   if: matrix.os == 'macOS-latest'
+      
+    # - name: Build <windows>
+    #   run: |
+    #     go build -v .
+    #     mkdir dist
+    #     mv receptor.exe ./dist/receptor-windows-x86_64.exe
+    #   if: matrix.os == 'windows-latest'
+        
+    # Upload as a CI artifact
+    - name: Upload binary <linux>
+      uses: actions/upload-artifact@master
+      with:
+        name: receptor-linux-x86_64
+        path: ./tests/artifacts/receptor
+      if: matrix.os == 'ubuntu-latest'
+
+    # - name: Upload binary <macOS>
+    #   uses: actions/upload-artifact@master
+    #   with:
+    #     name: receptor-darwin-x86_64
+    #     path: ./dist/receptor-darwin-x86_64
+    #   if: matrix.os == 'macOS-latest'
+      
+    # - name: Upload binary <windows>
+    #   uses: actions/upload-artifact@master
+    #   with:
+    #     name: receptor-windows-x86_64.exe
+    #     path: ./dist/receptor-windows-x86_64.exe
+    #   if: matrix.os == 'windows-latest'

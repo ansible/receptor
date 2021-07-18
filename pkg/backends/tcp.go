@@ -235,6 +235,7 @@ func (cfg tcpListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg tcpListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
+	logger.Debug("Running TCP listener %s\n", address)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
@@ -244,7 +245,7 @@ func (cfg tcpListenerCfg) Run() error {
 		logger.Error("Error creating listener %s: %s\n", address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost, "")
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		return err
 	}
@@ -283,7 +284,7 @@ func (cfg tcpDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil, cfg.Address)
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		return err
 	}
@@ -291,14 +292,13 @@ func (cfg tcpDialerCfg) Run() error {
 }
 
 func (cfg tcpDialerCfg) Reload() error {
-	if netceptor.MainInstance.InBackendCancel(cfg.Address) {
-		netceptor.MainInstance.UnmarkforCancel(cfg.Address)
-	} else {
-		cfg.Prepare()
-		cfg.Run()
-	}
-	return nil
+	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
 }
+
+func (cfg tcpListenerCfg) Reload() error {
+	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+}
+
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",

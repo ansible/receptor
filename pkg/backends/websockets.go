@@ -261,7 +261,7 @@ func (cfg websocketListenerCfg) Run() error {
 		return err
 	}
 	b.SetPath(cfg.Path)
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost, "")
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		return err
 	}
@@ -312,11 +312,19 @@ func (cfg websocketDialerCfg) Run() error {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil, cfg.Address)
+	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (cfg websocketDialerCfg) Reload() error {
+	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+}
+
+func (cfg websocketListenerCfg) Reload() error {
+	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func init() {

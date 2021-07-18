@@ -115,7 +115,7 @@ type Netceptor struct {
 	sendServiceAdsChan     chan time.Duration
 	backendWaitGroup       sync.WaitGroup
 	backendCount           int
-	backendCancel          map[string]*backendCancelInfo
+	backendCancel          []context.CancelFunc
 	networkName            string
 	serverTLSConfigs       map[string]*tls.Config
 	clientTLSConfigs       map[string]*tls.Config
@@ -230,35 +230,14 @@ type UnreachableNotification struct {
 	ReceivedFromNode string
 }
 
-
-type backendCancelInfo struct {
-	cancel        context.CancelFunc
-	markForCancel bool
-}
-
-func (s *Netceptor) MarkAllForCancel() {
-	for i,_ := range s.backendCancel {
-		s.backendCancel[i].markForCancel = true
-	}
-}
-
-func (s *Netceptor) CancelMarked() {
+func (s *Netceptor) CancelBackends() {
+	logger.Debug("Canceling backends")
 	for i, _ := range s.backendCancel {
-		if s.backendCancel[i].markForCancel {
-			logger.Debug("Canceling %s", i)
-			s.backendCancel[i].cancel()
-			delete(s.backendCancel, i)
-		}
+		s.backendCancel[i]()
 	}
-}
-
-func (s *Netceptor) UnmarkforCancel(backend string) {
-	s.backendCancel[backend].markForCancel = false
-}
-
-func (s *Netceptor) InBackendCancel(backend string) bool {
-	_, ok := s.backendCancel[backend]
-	return ok
+	s.BackendWait()
+	s.backendCancel = nil
+	s.backendCount = 0
 }
 
 var networkNames = make([]string, 0)
@@ -323,7 +302,7 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 		sendServiceAdsChan:     nil,
 		backendWaitGroup:       sync.WaitGroup{},
 		backendCount:           0,
-		backendCancel:          make(map[string]*backendCancelInfo),
+		backendCancel:          nil,
 		networkName:            makeNetworkName(NodeID),
 		clientTLSConfigs:       make(map[string]*tls.Config),
 		serverTLSConfigs:       make(map[string]*tls.Config),
@@ -382,6 +361,10 @@ func (s *Netceptor) Context() context.Context {
 	return s.context
 }
 
+func (s *Netceptor) AllowedPeers() []string {
+	return s.allowedPeers
+}
+
 // Shutdown shuts down a Netceptor instance
 func (s *Netceptor) Shutdown() {
 	s.cancelFunc()
@@ -423,16 +406,10 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 }
 
 // AddBackend adds a backend to the Netceptor system
-func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64, cancelID string) error {
-	var sessChan chan BackendSession
-	var err error
-	if cancelID != "" {
-		ctxBackend, cancel := context.WithCancel(s.context)
-		s.backendCancel[cancelID] = &backendCancelInfo{cancel: cancel, markForCancel: false}
-		sessChan, err = backend.Start(ctxBackend)
-	} else {
-		sessChan, err = backend.Start(s.context)
-	}
+func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
+	ctxBackend, cancel := context.WithCancel(s.context)
+	s.backendCancel = append(s.backendCancel, cancel)
+	sessChan, err := backend.Start(ctxBackend)
 
 	if err != nil {
 		return err
@@ -440,15 +417,17 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 	s.backendWaitGroup.Add(1)
 	s.backendCount++
 	go func() {
-		defer s.backendWaitGroup.Done()
+		defer func() {
+			s.backendWaitGroup.Done()
+		}()
 		for {
 			select {
 			case sess, ok := <-sessChan:
 				if ok {
 					s.backendWaitGroup.Add(1)
 					go func() {
-						err := s.runProtocol(sess, connectionCost, nodeCost)
-						s.backendWaitGroup.Done()
+						defer s.backendWaitGroup.Done()
+						err := s.runProtocol(ctxBackend, sess, connectionCost, nodeCost)
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
 						}
@@ -456,7 +435,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 				} else {
 					return
 				}
-			case <-s.context.Done():
+			case <-ctxBackend.Done():
 				return
 			}
 		}
@@ -467,6 +446,14 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 // BackendWait waits for the backend wait group
 func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()
+}
+
+func (s *Netceptor) BackendAdd() {
+	s.backendWaitGroup.Add(1)
+}
+
+func (s *Netceptor) BackendDone() {
+	s.backendWaitGroup.Done()
 }
 
 // BackendCount returns the number of backends that ever registered with this Netceptor
@@ -1402,6 +1389,7 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 
 // Goroutine to send data from the backend to the connection's ReadChan
 func (ci *connInfo) protoReader(sess BackendSession) {
+	defer MainInstance.BackendDone()
 	for {
 		buf, err := sess.Recv(1 * time.Second)
 		select {
@@ -1426,6 +1414,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 
 // Goroutine to send data from the connection's WriteChan to the backend
 func (ci *connInfo) protoWriter(sess BackendSession) {
+	defer MainInstance.BackendDone()
 	for {
 		select {
 		case <-ci.Context.Done():
@@ -1449,6 +1438,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 
 // Continuously sends routing updates to let the other end know who we are on initial connection
 func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bool) {
+	defer s.BackendDone()
 	count := 0
 	for {
 		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate(0))
@@ -1489,7 +1479,7 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 }
 
 // Main Netceptor protocol loop
-func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
+func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
 	if connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -1508,7 +1498,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 			s.knownNodeLock.Unlock()
 			done := false
 			select {
-			case <-s.context.Done():
+			case <-ctx.Done():
 				done = true
 			default:
 			}
@@ -1523,7 +1513,8 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 		WriteChan: make(chan []byte),
 		Cost:      connectionCost,
 	}
-	ci.Context, ci.CancelFunc = context.WithCancel(s.context)
+	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
+	s.backendWaitGroup.Add(3)
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
 	initDoneChan := make(chan bool)
@@ -1634,7 +1625,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					// Establish the connection
 					select {
 					case initDoneChan <- true:
-					case <-s.context.Done():
+					case <-ctx.Done():
 						return nil
 					}
 					logger.Info("Connection established with %s\n", remoteNodeID)
@@ -1656,12 +1647,12 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					s.knownNodeLock.Unlock()
 					select {
 					case s.sendRouteFloodChan <- 0:
-					case <-s.context.Done():
+					case <-ctx.Done():
 						return nil
 					}
 					select {
 					case s.updateRoutingTableChan <- 0:
-					case <-s.context.Done():
+					case <-ctx.Done():
 						return nil
 					}
 					established = true

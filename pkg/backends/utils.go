@@ -76,8 +76,10 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)
+	netceptor.MainInstance.BackendAdd()
 	go func() {
 		defer func() {
+			netceptor.MainInstance.BackendDone()
 			lcf()
 			close(sessChan)
 		}()
@@ -100,4 +102,16 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 		}
 	}()
 	return sessChan, nil
+}
+
+func callSliceFunctions(f []func() error) error {
+	// convenience for running an slice of functions and returning any
+	// errors along the way
+	for _, toRun := range f {
+		err := toRun()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

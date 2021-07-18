@@ -73,7 +73,7 @@ func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSess
 
 // Run runs the action, in this case adding a null backend to keep the wait group alive
 func (cfg nullBackendCfg) Run() error {
-	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil, "nullBackendCfg")
+	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil)
 	if err != nil {
 		return err
 	}
@@ -118,15 +118,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	done := make(chan struct{})
-	go func() {
-		netceptor.MainInstance.BackendWait()
-		close(done)
-	}()
+	controlsvc.ReloadChan = make(chan struct{})
+	waitForBackends := func () {
+		for {
+			netceptor.MainInstance.BackendWait()
+			done <- struct{}{}
+		}
+	}
+	go waitForBackends()
 
+// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	select {
-	case <-done:
+	case <- done:
 		if netceptor.MainInstance.BackendCount() > 0 {
 			logger.Error("All backends have failed. Exiting.\n")
 			os.Exit(1)
@@ -138,5 +142,16 @@ func main() {
 	case <-time.After(100 * time.Millisecond):
 	}
 	logger.Info("Initialization complete\n")
-	<-done
+	for {
+		select {
+		case <- controlsvc.ReloadChan:
+			// we are reloading, so we don't want to exit main(). waitForBackends is going to write
+			// to done channel, so we can read it ignore it
+			controlsvc.ReloadChan <- struct{}{}
+			<- done
+		case <- done:
+			// backends stopped, but not during a reload, thus we exit from main()
+			return
+		}
+	}
 }

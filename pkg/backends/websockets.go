@@ -129,7 +129,7 @@ func (b *WebsocketListener) Start(ctx context.Context, nc *netceptor.Netceptor) 
 	if err != nil {
 		return nil, err
 	}
-	nc.BackendAdd()
+	nc.BackendWaitGroupAdd()
 	go func() {
 		defer nc.BackendDone()
 		var err error

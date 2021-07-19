@@ -18,7 +18,7 @@ type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 func dialerSession(ctx context.Context, nc *netceptor.Netceptor, redial bool, redialDelay time.Duration,
 	df dialerFunc) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
-	nc.BackendAdd()
+	nc.BackendWaitGroupAdd()
 	go func() {
 		defer func() {
 			nc.BackendDone()
@@ -80,7 +80,7 @@ func listenerSession(ctx context.Context, nc *netceptor.Netceptor, lf listenFunc
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)
-	nc.BackendAdd()
+	nc.BackendWaitGroupAdd()
 	go func() {
 		defer func() {
 			nc.BackendDone()

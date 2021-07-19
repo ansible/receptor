@@ -298,7 +298,6 @@ func (cfg tcpListenerCfg) Reload() error {
 	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
-
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"tcp-listener", "Run a backend listener on a TCP port", tcpListenerCfg{}, cmdline.Section(backendSection))

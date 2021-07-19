@@ -230,16 +230,6 @@ type UnreachableNotification struct {
 	ReceivedFromNode string
 }
 
-func (s *Netceptor) CancelBackends() {
-	logger.Debug("Canceling backends")
-	for i, _ := range s.backendCancel {
-		s.backendCancel[i]()
-	}
-	s.BackendWait()
-	s.backendCancel = nil
-	s.backendCount = 0
-}
-
 var networkNames = make([]string, 0)
 var networkNamesLock = sync.Mutex{}
 
@@ -361,10 +351,6 @@ func (s *Netceptor) Context() context.Context {
 	return s.context
 }
 
-func (s *Netceptor) AllowedPeers() []string {
-	return s.allowedPeers
-}
-
 // Shutdown shuts down a Netceptor instance
 func (s *Netceptor) Shutdown() {
 	s.cancelFunc()
@@ -448,10 +434,12 @@ func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()
 }
 
+// BackendAdd increments backendWaitGroup counter
 func (s *Netceptor) BackendAdd() {
 	s.backendWaitGroup.Add(1)
 }
 
+// BackendDone calls Done on the backendWaitGroup
 func (s *Netceptor) BackendDone() {
 	s.backendWaitGroup.Done()
 }
@@ -459,6 +447,18 @@ func (s *Netceptor) BackendDone() {
 // BackendCount returns the number of backends that ever registered with this Netceptor
 func (s *Netceptor) BackendCount() int {
 	return s.backendCount
+}
+
+// CancelBackends stops all backends by calling a context cancel
+func (s *Netceptor) CancelBackends() {
+	logger.Debug("Canceling backends")
+	for i := range s.backendCancel {
+		// a context cancel function
+		s.backendCancel[i]()
+	}
+	s.BackendWait()
+	s.backendCancel = nil
+	s.backendCount = 0
 }
 
 // Status returns the current state of the Netceptor object

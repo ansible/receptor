@@ -149,7 +149,7 @@ func (b *UDPListener) LocalAddr() net.Addr {
 // Start runs the given session function over the UDPListener backend
 func (b *UDPListener) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
-	nc.BackendAdd()
+	nc.BackendWaitGroupAdd()
 	go func() {
 		defer nc.BackendDone()
 		buf := make([]byte, utils.NormalBufferSize)

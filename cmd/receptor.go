@@ -120,7 +120,7 @@ func main() {
 
 	done := make(chan struct{})
 	controlsvc.ReloadChan = make(chan struct{})
-	waitForBackends := func () {
+	waitForBackends := func() {
 		for {
 			netceptor.MainInstance.BackendWait()
 			done <- struct{}{}
@@ -128,9 +128,9 @@ func main() {
 	}
 	go waitForBackends()
 
-// Fancy footwork to set an error exitcode if we're immediately exiting at startup
+	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	select {
-	case <- done:
+	case <-done:
 		if netceptor.MainInstance.BackendCount() > 0 {
 			logger.Error("All backends have failed. Exiting.\n")
 			os.Exit(1)
@@ -144,12 +144,12 @@ func main() {
 	logger.Info("Initialization complete\n")
 	for {
 		select {
-		case <- controlsvc.ReloadChan:
+		case <-controlsvc.ReloadChan:
 			// we are reloading, so we don't want to exit main(). waitForBackends is going to write
 			// to done channel, so we can read it and ignore it
 			controlsvc.ReloadChan <- struct{}{}
-			<- done
-		case <- done:
+			<-done
+		case <-done:
 			// backends stopped, but not during a reload, thus we exit from main()
 			return
 		}

@@ -15,11 +15,15 @@ const (
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
 // dialerSession is a convenience function for backends that use dial/retry logic
-func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
+func dialerSession(ctx context.Context, nc *netceptor.Netceptor, redial bool, redialDelay time.Duration,
 	df dialerFunc) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
+	nc.BackendAdd()
 	go func() {
-		defer close(sessChan)
+		defer func() {
+			nc.BackendDone()
+			close(sessChan)
+		}()
 		redialDelayInc := utils.NewIncrementalDuration(redialDelay, maxRedialDelay, 1.5)
 		for {
 			closeChan := make(chan struct{})
@@ -70,16 +74,16 @@ type acceptFunc func() (netceptor.BackendSession, error)
 type listenerCancelFunc func()
 
 // listenerSession is a convenience function for backends that use listen/accept logic
-func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
+func listenerSession(ctx context.Context, nc *netceptor.Netceptor, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
 	err := lf()
 	if err != nil {
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)
-	netceptor.MainInstance.BackendAdd()
+	nc.BackendAdd()
 	go func() {
 		defer func() {
-			netceptor.MainInstance.BackendDone()
+			nc.BackendDone()
 			lcf()
 			close(sessChan)
 		}()

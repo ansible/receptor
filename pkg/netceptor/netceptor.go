@@ -432,8 +432,8 @@ func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()
 }
 
-// BackendAdd increments backendWaitGroup counter
-func (s *Netceptor) BackendAdd() {
+// BackendWaitGroupAdd increments backendWaitGroup counter
+func (s *Netceptor) BackendWaitGroupAdd() {
 	s.backendWaitGroup.Add(1)
 }
 

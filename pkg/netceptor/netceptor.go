@@ -65,7 +65,7 @@ func (e *TimeoutError) Temporary() bool { return true }
 
 // Backend is the interface for back-ends that the Receptor network can run over
 type Backend interface {
-	Start(context.Context) (chan BackendSession, error)
+	Start(context.Context, *Netceptor) (chan BackendSession, error)
 }
 
 // BackendSession is the interface for a single session of a back-end.
@@ -395,7 +395,7 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
-	sessChan, err := backend.Start(ctxBackend)
+	sessChan, err := backend.Start(ctxBackend, s)
 
 	if err != nil {
 		return err
@@ -403,9 +403,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 	s.backendWaitGroup.Add(1)
 	s.backendCount++
 	go func() {
-		defer func() {
-			s.backendWaitGroup.Done()
-		}()
+		defer s.backendWaitGroup.Done()
 		for {
 			select {
 			case sess, ok := <-sessChan:
@@ -1389,7 +1387,6 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 
 // Goroutine to send data from the backend to the connection's ReadChan
 func (ci *connInfo) protoReader(sess BackendSession) {
-	defer MainInstance.BackendDone()
 	for {
 		buf, err := sess.Recv(1 * time.Second)
 		select {
@@ -1414,7 +1411,6 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 
 // Goroutine to send data from the connection's WriteChan to the backend
 func (ci *connInfo) protoWriter(sess BackendSession) {
-	defer MainInstance.BackendDone()
 	for {
 		select {
 		case <-ci.Context.Done():
@@ -1438,7 +1434,6 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 
 // Continuously sends routing updates to let the other end know who we are on initial connection
 func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bool) {
-	defer s.BackendDone()
 	count := 0
 	for {
 		ri, err := s.translateStructToNetwork(MsgTypeRoute, s.makeRoutingUpdate(0))
@@ -1514,7 +1509,6 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connec
 		Cost:      connectionCost,
 	}
 	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
-	s.backendWaitGroup.Add(3)
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
 	initDoneChan := make(chan bool)

@@ -67,7 +67,7 @@ func (cfg nodeCfg) Run() error {
 type nullBackendCfg struct{}
 
 // make the nullBackendCfg object be usable as a do-nothing Backend
-func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+func (cfg nullBackendCfg) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
 
@@ -119,14 +119,10 @@ func main() {
 	}
 
 	done := make(chan struct{})
-	controlsvc.ReloadChan = make(chan struct{})
-	waitForBackends := func() {
-		for {
-			netceptor.MainInstance.BackendWait()
-			done <- struct{}{}
-		}
-	}
-	go waitForBackends()
+	go func() {
+		netceptor.MainInstance.BackendWait()
+		close(done)
+	}()
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
 	select {
@@ -142,16 +138,6 @@ func main() {
 	case <-time.After(100 * time.Millisecond):
 	}
 	logger.Info("Initialization complete\n")
-	for {
-		select {
-		case <-controlsvc.ReloadChan:
-			// we are reloading, so we don't want to exit main(). waitForBackends is going to write
-			// to done channel, so we can read it and ignore it
-			controlsvc.ReloadChan <- struct{}{}
-			<-done
-		case <-done:
-			// backends stopped, but not during a reload, thus we exit from main()
-			return
-		}
-	}
+	doneMain := make(chan struct{})
+	<-doneMain
 }

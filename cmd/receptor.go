@@ -146,7 +146,7 @@ func main() {
 		select {
 		case <- controlsvc.ReloadChan:
 			// we are reloading, so we don't want to exit main(). waitForBackends is going to write
-			// to done channel, so we can read it ignore it
+			// to done channel, so we can read it and ignore it
 			controlsvc.ReloadChan <- struct{}{}
 			<- done
 		case <- done:

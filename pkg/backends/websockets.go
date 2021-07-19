@@ -320,11 +320,11 @@ func (cfg websocketDialerCfg) Run() error {
 }
 
 func (cfg websocketDialerCfg) Reload() error {
-	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func (cfg websocketListenerCfg) Reload() error {
-	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func init() {

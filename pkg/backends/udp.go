@@ -316,11 +316,11 @@ func (cfg udpDialerCfg) Run() error {
 }
 
 func (cfg udpDialerCfg) Reload() error {
-	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func (cfg udpListenerCfg) Reload() error {
-	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func init() {

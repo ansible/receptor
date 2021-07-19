@@ -104,7 +104,7 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 	return sessChan, nil
 }
 
-func callSliceFunctions(f []func() error) error {
+func runFuncs(f []func() error) error {
 	// convenience for running an slice of functions and returning any
 	// errors along the way
 	for _, toRun := range f {

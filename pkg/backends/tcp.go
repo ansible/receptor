@@ -235,7 +235,6 @@ func (cfg tcpListenerCfg) Prepare() error {
 // Run runs the action
 func (cfg tcpListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	logger.Debug("Running TCP listener %s\n", address)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
@@ -292,11 +291,11 @@ func (cfg tcpDialerCfg) Run() error {
 }
 
 func (cfg tcpDialerCfg) Reload() error {
-	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func (cfg tcpListenerCfg) Reload() error {
-	return callSliceFunctions([]func() error{cfg.Prepare, cfg.Run})
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 

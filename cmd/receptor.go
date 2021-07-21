@@ -14,6 +14,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/workceptor"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -67,7 +68,7 @@ func (cfg nodeCfg) Run() error {
 type nullBackendCfg struct{}
 
 // make the nullBackendCfg object be usable as a do-nothing Backend
-func (cfg nullBackendCfg) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
+func (cfg nullBackendCfg) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
 

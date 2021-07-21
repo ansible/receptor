@@ -7,6 +7,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -146,7 +147,7 @@ func NewExternalBackend() (*ExternalBackend, error) {
 }
 
 // Start launches the backend from Receptor's point of view, and waits for connections to happen.
-func (b *ExternalBackend) Start(ctx context.Context, nc *Netceptor) (chan BackendSession, error) {
+func (b *ExternalBackend) Start(ctx context.Context, wg *sync.WaitGroup) (chan BackendSession, error) {
 	b.ctx, b.cancel = context.WithCancel(ctx)
 	b.ctx = ctx
 	b.sessChan = make(chan BackendSession)

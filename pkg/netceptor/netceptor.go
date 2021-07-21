@@ -65,7 +65,7 @@ func (e *TimeoutError) Temporary() bool { return true }
 
 // Backend is the interface for back-ends that the Receptor network can run over
 type Backend interface {
-	Start(context.Context, *Netceptor) (chan BackendSession, error)
+	Start(context.Context, *sync.WaitGroup) (chan BackendSession, error)
 }
 
 // BackendSession is the interface for a single session of a back-end.
@@ -395,7 +395,7 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
-	sessChan, err := backend.Start(ctxBackend, s)
+	sessChan, err := backend.Start(ctxBackend, &s.backendWaitGroup)
 
 	if err != nil {
 		return err

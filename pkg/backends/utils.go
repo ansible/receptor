@@ -5,6 +5,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
+	"sync"
 	"time"
 )
 
@@ -15,13 +16,13 @@ const (
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
 // dialerSession is a convenience function for backends that use dial/retry logic
-func dialerSession(ctx context.Context, nc *netceptor.Netceptor, redial bool, redialDelay time.Duration,
+func dialerSession(ctx context.Context, wg *sync.WaitGroup, redial bool, redialDelay time.Duration,
 	df dialerFunc) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
-	nc.BackendWaitGroupAdd()
+	wg.Add(1)
 	go func() {
 		defer func() {
-			nc.BackendDone()
+			wg.Done()
 			close(sessChan)
 		}()
 		redialDelayInc := utils.NewIncrementalDuration(redialDelay, maxRedialDelay, 1.5)
@@ -74,16 +75,16 @@ type acceptFunc func() (netceptor.BackendSession, error)
 type listenerCancelFunc func()
 
 // listenerSession is a convenience function for backends that use listen/accept logic
-func listenerSession(ctx context.Context, nc *netceptor.Netceptor, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
+func listenerSession(ctx context.Context, wg *sync.WaitGroup, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
 	err := lf()
 	if err != nil {
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)
-	nc.BackendWaitGroupAdd()
+	wg.Add(1)
 	go func() {
 		defer func() {
-			nc.BackendDone()
+			wg.Done()
 			lcf()
 			close(sessChan)
 		}()

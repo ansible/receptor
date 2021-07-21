@@ -38,8 +38,8 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 }
 
 // Start runs the given session function over this backend service
-func (b *UDPDialer) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
-	return dialerSession(ctx, nc, b.redial, 5*time.Second,
+func (b *UDPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+	return dialerSession(ctx, wg, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			dialer := net.Dialer{}
 			conn, err := dialer.DialContext(ctx, "udp", b.address)
@@ -147,11 +147,11 @@ func (b *UDPListener) LocalAddr() net.Addr {
 }
 
 // Start runs the given session function over the UDPListener backend
-func (b *UDPListener) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
+func (b *UDPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
-	nc.BackendWaitGroupAdd()
+	wg.Add(1)
 	go func() {
-		defer nc.BackendDone()
+		defer wg.Done()
 		buf := make([]byte, utils.NormalBufferSize)
 		for {
 			select {

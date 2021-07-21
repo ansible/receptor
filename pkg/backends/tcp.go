@@ -36,8 +36,8 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 }
 
 // Start runs the given session function over this backend service
-func (b *TCPDialer) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
-	return dialerSession(ctx, nc, b.redial, 5*time.Second,
+func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+	return dialerSession(ctx, wg, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			var conn net.Conn
 			var err error
@@ -82,8 +82,8 @@ func (b *TCPListener) Addr() net.Addr {
 }
 
 // Start runs the given session function over the TCPListener backend
-func (b *TCPListener) Start(ctx context.Context, nc *netceptor.Netceptor) (chan netceptor.BackendSession, error) {
-	sessChan, err := listenerSession(ctx, nc,
+func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+	sessChan, err := listenerSession(ctx, wg,
 		func() error {
 			var err error
 			lc := net.ListenConfig{}

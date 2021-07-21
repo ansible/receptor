@@ -25,14 +25,19 @@ func (t *reloadCommandType) InitFromJSON(config map[string]interface{}) (Control
 func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
+	cfr := make(map[string]interface{})
 	logger.Debug("Reloading")
 	logger.Debug("goroutines before cancel: %d", runtime.NumGoroutine())
 	nc.CancelBackends()
 	logger.Debug("goroutines after cancel: %d", runtime.NumGoroutine())
 	// ReloadCL is a ParseAndRun closure, set in receptor.go/main()
-	ReloadCL()
+	err := ReloadCL()
 	logger.Debug("goroutines after reload: %d", runtime.NumGoroutine())
-	cfr := make(map[string]interface{})
+	if err != nil {
+		cfr["Success"] = false
+		cfr["Error"] = err.Error()
+		return cfr, err
+	}
 	cfr["Success"] = true
 	return cfr, nil
 }

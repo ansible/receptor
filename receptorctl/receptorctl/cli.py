@@ -104,7 +104,7 @@ def status(ctx):
     ads = status.pop('Advertisements', None)
     if ads:
         print()
-        print(f"{'Node':<{longest_node}} Service   Type       Last Seen           Tags            Work Types")
+        print(f"{'Node':<{longest_node}} Service   Type       Last Seen           Tags                            Work Types")
         for ad in ads:
             time = dateutil.parser.parse(ad['Time'])
             if ad['ConnType'] == 0:
@@ -114,7 +114,7 @@ def status(ctx):
             elif ad['ConnType'] == 2:
                 conn_type = 'StreamTLS'
             print(
-                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S} {(ad['Tags'] or '-'):<16}",
+                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<32}",
                 end=""
             )
             commands = ad['WorkCommands']

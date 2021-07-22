@@ -1,0 +1,31 @@
+version: "3.9"
+services:
+  arceus:
+    build: ./build/receptor/
+    command: receptor -c /configs/arceus.yaml
+    volumes:
+      - ./configs/:/configs
+    networks:
+      - receptor-network
+
+  celebi:
+    build: ./build/receptor/
+    command: receptor -c /configs/celebi.yaml
+    volumes:
+      - ./configs/:/configs
+      - ./socks/:/socks
+    networks:
+      - receptor-network
+
+  receptorctl:
+    build: ./build/receptorctl/
+    volumes:
+      - ./socks/:/socks
+    environment:
+      RECEPTORCTL_SOCKET: /socks/celebi.sock
+    networks:
+      - random
+
+networks:
+  receptor-network: {}
+  random: {}

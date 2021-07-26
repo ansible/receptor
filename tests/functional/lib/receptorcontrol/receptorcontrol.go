@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/workceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"net"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/workceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 )
 
 // ReceptorControl Connects to a control socket and provides basic commands
@@ -162,6 +163,23 @@ func (r *ReceptorControl) Ping(node string) (string, error) {
 		return "", errors.New(jsonData["Error"].(string))
 	}
 	return fmt.Sprintf("Reply from %s in %s", jsonData["From"].(string), jsonData["TimeStr"].(string)), nil
+}
+
+// Reload reloads the current node
+func (r *ReceptorControl) Reload() error {
+	_, err := r.WriteStr("reload")
+	if err != nil {
+		return err
+	}
+	jsonData, err := r.ReadAndParseJSON()
+	if err != nil {
+		return err
+	}
+	success := jsonData["Success"].(bool)
+	if !success {
+		return errors.New("Error")
+	}
+	return nil
 }
 
 // Status retrieves the status of the current node

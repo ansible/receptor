@@ -605,9 +605,19 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			err = controllers["node3"].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			// Wait for node3 to join the mesh again
 			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = m.WaitForReady(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = controllers["node3"].Reconnect()
 			if err != nil {
 				t.Fatal(err)
 			}

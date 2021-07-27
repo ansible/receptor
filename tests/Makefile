@@ -1,13 +1,15 @@
 CONTAINER_IMAGE_TAG_BASE=ansible/receptor:base
 CONTAINER_IMAGE_TAG_TEST=ansible/receptor:test
 
+CONTAINER_RUN=podman
+
 # Tests
 GO_FUNCTIONAL_TESTS_DIRS:=$$(find ./functional -type d)
 
 # Generate artifacts
 artifacts: container-image-base
 	mkdir -p $(PWD)/artifacts
-	podman run --rm \
+	$(CONTAINER_RUN) run --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v $(PWD)/artifacts/:/artifacts/:rw \
 		-v receptor_go_root_cache:/root/go:rw \
@@ -16,7 +18,7 @@ artifacts: container-image-base
 
 artifacts-no-cache: container-image-base
 	mkdir -p $(PWD)/artifacts
-	podman run --rm \
+	$(CONTAINER_RUN) run --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v $(PWD)/artifacts/:/artifacts/:rw \
 		$(CONTAINER_IMAGE_TAG_BASE) \
@@ -26,10 +28,10 @@ artifacts-no-cache: container-image-base
 container-image: container-image-base
 
 container-image-base:
-	podman build -t $(CONTAINER_IMAGE_TAG_BASE) -f ./environments/container/Containerfile ./../
+	$(CONTAINER_RUN) build -t $(CONTAINER_IMAGE_TAG_BASE) -f ./environments/container/Containerfile ./../
 
 container-shell-base:
-	podman run -it --rm \
+	$(CONTAINER_RUN) run -it --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v receptor_go_root_cache:/root/go:rw \
 		$(CONTAINER_IMAGE_TAG_BASE) bash -c \

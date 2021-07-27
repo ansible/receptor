@@ -606,7 +606,7 @@ func TestWork(t *testing.T) {
 			}
 
 			// Wait for node3 to join the mesh again
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
 				t.Fatal(err)

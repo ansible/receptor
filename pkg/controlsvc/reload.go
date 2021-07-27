@@ -27,12 +27,9 @@ func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 	// initial config file
 	cfr := make(map[string]interface{})
 	logger.Debug("Reloading")
-	logger.Debug("goroutines before cancel: %d", runtime.NumGoroutine())
 	nc.CancelBackends()
-	logger.Debug("goroutines after cancel: %d", runtime.NumGoroutine())
 	// ReloadCL is a ParseAndRun closure, set in receptor.go/main()
 	err := ReloadCL()
-	logger.Debug("goroutines after reload: %d", runtime.NumGoroutine())
 	if err != nil {
 		cfr["Success"] = false
 		cfr["Error"] = err.Error()

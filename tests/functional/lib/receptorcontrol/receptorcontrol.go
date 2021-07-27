@@ -167,7 +167,7 @@ func (r *ReceptorControl) Ping(node string) (string, error) {
 
 // Reload reloads the current node
 func (r *ReceptorControl) Reload() error {
-	_, err := r.WriteStr("reload")
+	_, err := r.WriteStr("reload \n")
 	if err != nil {
 		return err
 	}

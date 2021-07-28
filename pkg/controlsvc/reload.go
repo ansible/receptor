@@ -3,7 +3,6 @@ package controlsvc
 import (
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
-	"runtime"
 )
 
 type reloadCommandType struct{}

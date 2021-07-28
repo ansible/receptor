@@ -79,7 +79,7 @@ func Log(level int, format string, v ...interface{}) {
 		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
 		return
 	}
-	prefix = strings.ToUpper(logLevelName)
+	prefix = strings.ToUpper(logLevelName) + " "
 	if logLevel >= level {
 		log.SetPrefix(prefix)
 		log.Printf(format, v...)

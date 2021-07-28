@@ -591,6 +591,42 @@ func TestWork(t *testing.T) {
 			}
 
 		})
+		t.Run(testGroup+"/reloaded nodes can join the mesh", func(t *testing.T) {
+			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
+			controllers, m, _ := workSetup(t.Name())
+			defer tearDown(controllers, m)
+
+			err := controllers["node3"].Reload()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = controllers["node3"].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Wait for node3 to join the mesh again
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			err = m.WaitForReady(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = controllers["node3"].Reconnect()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = controllers["node1"].Ping("node3")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+		})
 
 	}
 }

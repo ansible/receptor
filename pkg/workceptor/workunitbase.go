@@ -34,8 +34,8 @@ const (
 )
 
 // IsComplete returns true if a given WorkState indicates the job is finished
-func IsComplete(WorkState int) bool {
-	return WorkState == WorkStateSucceeded || WorkState == WorkStateFailed
+func IsComplete(workState int) bool {
+	return workState == WorkStateSucceeded || workState == WorkStateFailed
 }
 
 // WorkStateToString returns a string representation of a WorkState

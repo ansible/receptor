@@ -217,22 +217,20 @@ func (s *Server) RunControlSession(conn net.Conn) {
 					logger.Error("Write error in control service: %s\n", err)
 					return
 				}
-			} else {
-				if cfr != nil {
-					rbytes, err := json.Marshal(cfr)
-					if err != nil {
-						_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
-						if err != nil {
-							logger.Error("Write error in control service: %s\n", err)
-							return
-						}
-					}
-					rbytes = append(rbytes, '\n')
-					_, err = conn.Write(rbytes)
+			} else if cfr != nil {
+				rbytes, err := json.Marshal(cfr)
+				if err != nil {
+					_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
 					if err != nil {
 						logger.Error("Write error in control service: %s\n", err)
 						return
 					}
+				}
+				rbytes = append(rbytes, '\n')
+				_, err = conn.Write(rbytes)
+				if err != nil {
+					logger.Error("Write error in control service: %s\n", err)
+					return
 				}
 			}
 		} else {
@@ -247,7 +245,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 // RunControlSvc runs the main accept loop of the control service
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
-	unixSocket string, unixSocketPermissions os.FileMode, TCPListen string, tcptls *tls.Config) error {
+	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config) error {
 	var uli net.Listener
 	var lock *utils.FLock
 	var err error
@@ -260,12 +258,12 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		uli = nil
 	}
 	var tli net.Listener
-	if TCPListen != "" {
+	if tcpListen != "" {
 		var listenAddr string
-		if strings.Contains(TCPListen, ":") {
-			listenAddr = TCPListen
+		if strings.Contains(tcpListen, ":") {
+			listenAddr = tcpListen
 		} else {
-			listenAddr = fmt.Sprintf("0.0.0.0:%s", TCPListen)
+			listenAddr = fmt.Sprintf("0.0.0.0:%s", tcpListen)
 		}
 		tli, err = net.Listen("tcp", listenAddr)
 		if err != nil {

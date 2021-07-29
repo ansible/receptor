@@ -364,9 +364,9 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 		// Wait for stdout file to exist
 		for {
 			_, err := os.Stat(stdoutFilename)
-			if err == nil {
-				break
-			} else if os.IsNotExist(err) {
+			switch {
+			case err == nil:
+			case os.IsNotExist(err):
 				if IsComplete(unit.Status().State) {
 					close(resultChan)
 					logger.Warning("Unit completed without producing any stdout\n")
@@ -375,10 +375,11 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 				if sleepOrDone(doneChan, 250*time.Millisecond) {
 					return
 				}
-			} else {
+			default:
 				logger.Error("Error accessing stdout file: %s\n", err)
 				return
 			}
+			break
 		}
 		var stdout *os.File
 		var err error

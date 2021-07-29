@@ -260,18 +260,18 @@ func makeNetworkName(nodeID string) string {
 }
 
 // NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants
-func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
+func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
 	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
 	s := Netceptor{
-		nodeID:                 NodeID,
+		nodeID:                 nodeID,
 		mtu:                    mtu,
 		routeUpdateTime:        routeUpdateTime,
 		serviceAdTime:          serviceAdTime,
 		seenUpdateExpireTime:   seenUpdateExpireTime,
 		maxForwardingHops:      maxForwardingHops,
 		maxConnectionIdleTime:  maxConnectionIdleTime,
-		allowedPeers:           AllowedPeers,
+		allowedPeers:           allowedPeers,
 		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:               0,
 		connLock:               &sync.RWMutex{},
@@ -295,7 +295,7 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 		sendServiceAdsChan:     nil,
 		backendWaitGroup:       sync.WaitGroup{},
 		backendCount:           0,
-		networkName:            makeNetworkName(NodeID),
+		networkName:            makeNetworkName(nodeID),
 		clientTLSConfigs:       make(map[string]*tls.Config),
 		serverTLSConfigs:       make(map[string]*tls.Config),
 	}
@@ -307,7 +307,7 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 		ctx = context.Background()
 	}
 	s.clientTLSConfigs["default"] = &tls.Config{}
-	s.addNameHash(NodeID)
+	s.addNameHash(nodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -334,8 +334,8 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 }
 
 // New constructs a new Receptor network protocol instance
-func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
-	return NewWithConsts(ctx, NodeID, AllowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
+func New(ctx context.Context, nodeID string, allowedPeers []string) *Netceptor {
+	return NewWithConsts(ctx, nodeID, allowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
 		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
@@ -358,7 +358,7 @@ func (s *Netceptor) Shutdown() {
 	s.cancelFunc()
 }
 
-// NodeID returns the local Node ID of this Netceptor instance
+// nodeID returns the local Node ID of this Netceptor instance
 func (s *Netceptor) NodeID() string {
 	return s.nodeID
 }
@@ -796,8 +796,8 @@ const (
 )
 
 // receptorVerifyFunc generates a function that verifies a Receptor node ID
-func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
-	VerifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectednodeID string,
+	verifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		certs := make([]*x509.Certificate, len(rawCerts))
 		for i, asn1Data := range rawCerts {
@@ -809,23 +809,25 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 			certs[i] = cert
 		}
 		var opts x509.VerifyOptions
-		if VerifyType == VerifyServer {
+		switch verifyType {
+		case VerifyServer:
 			opts = x509.VerifyOptions{
 				Intermediates: x509.NewCertPool(),
 				Roots:         tlscfg.RootCAs,
 				CurrentTime:   time.Now(),
 				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 			}
-		} else if VerifyType == VerifyClient {
+		case VerifyClient:
 			opts = x509.VerifyOptions{
 				Intermediates: x509.NewCertPool(),
 				Roots:         tlscfg.ClientCAs,
 				CurrentTime:   time.Now(),
 				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			}
-		} else {
+		default:
 			return fmt.Errorf("invalid verification type: must be client or server")
 		}
+
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
 		}
@@ -840,14 +842,14 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 		}
 		found := false
 		for _, receptorName := range receptorNames {
-			if receptorName == expectedNodeID {
+			if receptorName == expectednodeID {
 				found = true
 				break
 			}
 		}
 		if !found {
 			logger.Error("RVF ReceptorNameError: %s", err)
-			return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedNodeID}
+			return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectednodeID}
 		}
 		return nil
 	}
@@ -864,12 +866,13 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 		return nil, fmt.Errorf("unknown TLS config %s", name)
 	}
 	tlscfg = tlscfg.Clone()
-	if tlscfg.InsecureSkipVerify {
-		// noop
-	} else if expectedHostNameType == "receptor" {
+
+	switch {
+	case tlscfg.InsecureSkipVerify:
+	case expectedHostNameType == "receptor":
 		tlscfg.InsecureSkipVerify = true
 		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, VerifyServer)
-	} else {
+	default:
 		tlscfg.ServerName = expectedHostName
 	}
 	return tlscfg, nil
@@ -1250,12 +1253,12 @@ func (s *Netceptor) handleUnreachable(md *messageData) error {
 }
 
 // Sends an unreachable response
-func (s *Netceptor) sendUnreachable(ToNode string, message *UnreachableMessage) error {
+func (s *Netceptor) sendUnreachable(toNode string, message *UnreachableMessage) error {
 	bytes, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
-	err = s.sendMessage("unreach", ToNode, "unreach", bytes)
+	err = s.sendMessage("unreach", toNode, "unreach", bytes)
 	if err != nil {
 		return err
 	}
@@ -1305,14 +1308,14 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 }
 
 // GetServiceInfo returns the advertising info, if any, for a service on a node
-func (s *Netceptor) GetServiceInfo(NodeID string, Service string) (*ServiceAdvertisement, bool) {
+func (s *Netceptor) GetServiceInfo(nodeID string, service string) (*ServiceAdvertisement, bool) {
 	s.serviceAdsLock.RLock()
 	defer s.serviceAdsLock.RUnlock()
-	n, ok := s.serviceAdsReceived[NodeID]
+	n, ok := s.serviceAdsReceived[nodeID]
 	if !ok {
 		return nil, false
 	}
-	svc, ok := n[Service]
+	svc, ok := n[service]
 	if !ok {
 		return nil, false
 	}
@@ -1441,9 +1444,9 @@ func (s *Netceptor) sendRejectMessage(writeChan chan []byte) {
 	}
 }
 
-func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connInfo, reason string) error {
+func (s *Netceptor) sendAndLogConnectionRejection(remotenodeID string, ci *connInfo, reason string) error {
 	s.sendRejectMessage(ci.WriteChan)
-	return fmt.Errorf("rejected connection with node %s because %s", remoteNodeID, reason)
+	return fmt.Errorf("rejected connection with node %s because %s", remotenodeID, reason)
 }
 
 // Main Netceptor protocol loop
@@ -1453,16 +1456,16 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 	}
 	established := false
 	remoteEstablished := false
-	remoteNodeID := ""
+	remotenodeID := ""
 	defer func() {
 		_ = sess.Close()
 		if established {
 			s.connLock.Lock()
-			delete(s.connections, remoteNodeID)
+			delete(s.connections, remotenodeID)
 			s.connLock.Unlock()
 			s.knownNodeLock.Lock()
-			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
-			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
+			delete(s.knownConnectionCosts[remotenodeID], s.nodeID)
+			delete(s.knownConnectionCosts[s.nodeID], remotenodeID)
 			s.knownNodeLock.Unlock()
 			done := false
 			select {
@@ -1491,36 +1494,37 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 		case data := <-ci.ReadChan:
 			msgType := data[0]
 			if established {
-				if msgType == MsgTypeData {
+				switch msgType {
+				case MsgTypeData:
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
 						logger.Error("Error translating data to message struct: %s\n", err)
 						continue
 					}
 					logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
-						message.FromNode, message.FromService, message.ToNode, message.ToService, remoteNodeID)
+						message.FromNode, message.FromService, message.ToNode, message.ToService, remotenodeID)
 					err = s.handleMessageData(message)
 					if err != nil {
 						logger.Error("Error handling message data: %s\n", err)
 					}
-				} else if msgType == MsgTypeRoute {
+				case MsgTypeRoute:
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
 						logger.Error("Error unpacking routing update: %s\n", err)
 						continue
 					}
-					if ri.ForwardingNode != remoteNodeID {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci,
+					if ri.ForwardingNode != remotenodeID {
+						return s.sendAndLogConnectionRejection(remotenodeID, ci,
 							fmt.Sprintf("remote node ID changed unexpectedly from %s to %s",
-								remoteNodeID, ri.NodeID))
+								remotenodeID, ri.NodeID))
 					}
-					if ri.NodeID == remoteNodeID {
+					if ri.NodeID == remotenodeID {
 						// This is an update from our direct connection, so do some extra verification
 						remoteCost, ok := ri.Connections[s.nodeID]
 						if !ok {
 							if remoteEstablished {
-								return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
+								return s.sendAndLogConnectionRejection(remotenodeID, ci, "remote node no longer lists us as a connection")
 							}
 							// This is a late initialization request from the remote node, so don't process it as a routing update.
 							continue
@@ -1528,20 +1532,20 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 							remoteEstablished = true
 						}
 						if ok && remoteCost != connectionCost {
-							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
+							return s.sendAndLogConnectionRejection(remotenodeID, ci, "we disagree about the connection cost")
 						}
 					}
-					s.handleRoutingUpdate(ri, remoteNodeID)
-				} else if msgType == MsgTypeServiceAdvertisement {
-					err := s.handleServiceAdvertisement(data, remoteNodeID)
+					s.handleRoutingUpdate(ri, remotenodeID)
+				case MsgTypeServiceAdvertisement:
+					err := s.handleServiceAdvertisement(data, remotenodeID)
 					if err != nil {
 						logger.Error("Error handling service advertisement: %s\n", err)
 						continue
 					}
-				} else if msgType == MsgTypeReject {
+				case MsgTypeReject:
 					logger.Warning("Received a rejection message from peer.")
 					return fmt.Errorf("remote node rejected the connection")
-				} else {
+				default:
 					logger.Warning("Unknown message type %d\n", msgType)
 				}
 			} else {
@@ -1553,37 +1557,37 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 						logger.Error("Error unpacking routing update: %s\n", err)
 						continue
 					}
-					remoteNodeID = ri.ForwardingNode
+					remotenodeID = ri.ForwardingNode
 					// Decide whether the remote node is acceptable
-					if remoteNodeID == s.nodeID {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
+					if remotenodeID == s.nodeID {
+						return s.sendAndLogConnectionRejection(remotenodeID, ci, "it tried to connect using our own node ID")
 					}
 					remoteNodeAccepted := true
 					s.connLock.RLock()
 					for conn := range s.connections {
-						if remoteNodeID == conn {
+						if remotenodeID == conn {
 							remoteNodeAccepted = false
 							break
 						}
 					}
 					s.connLock.RUnlock()
 					if !remoteNodeAccepted {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
+						return s.sendAndLogConnectionRejection(remotenodeID, ci, "it connected using a node ID we are already connected to")
 					}
 					if s.allowedPeers != nil {
 						remoteNodeAccepted = false
 						for i := range s.allowedPeers {
-							if s.allowedPeers[i] == remoteNodeID {
+							if s.allowedPeers[i] == remotenodeID {
 								remoteNodeAccepted = true
 								break
 							}
 						}
 					}
 					if !remoteNodeAccepted {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the accepted connections list")
+						return s.sendAndLogConnectionRejection(remotenodeID, ci, "it is not in the accepted connections list")
 					}
 
-					remoteNodeCost, ok := nodeCost[remoteNodeID]
+					remoteNodeCost, ok := nodeCost[remotenodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost
@@ -1595,22 +1599,22 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					case <-s.context.Done():
 						return nil
 					}
-					logger.Info("Connection established with %s\n", remoteNodeID)
-					s.addNameHash(remoteNodeID)
+					logger.Info("Connection established with %s\n", remotenodeID)
+					s.addNameHash(remotenodeID)
 					s.connLock.Lock()
-					s.connections[remoteNodeID] = ci
+					s.connections[remotenodeID] = ci
 					s.connLock.Unlock()
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]
 					if !ok {
 						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
 					}
-					s.knownConnectionCosts[s.nodeID][remoteNodeID] = connectionCost
-					_, ok = s.knownConnectionCosts[remoteNodeID]
+					s.knownConnectionCosts[s.nodeID][remotenodeID] = connectionCost
+					_, ok = s.knownConnectionCosts[remotenodeID]
 					if !ok {
-						s.knownConnectionCosts[remoteNodeID] = make(map[string]float64)
+						s.knownConnectionCosts[remotenodeID] = make(map[string]float64)
 					}
-					s.knownConnectionCosts[remoteNodeID][s.nodeID] = connectionCost
+					s.knownConnectionCosts[remotenodeID][s.nodeID] = connectionCost
 					s.knownNodeLock.Unlock()
 					select {
 					case s.sendRouteFloodChan <- 0:

@@ -45,28 +45,29 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 	var block *pem.Block
 	for len(content) > 0 {
 		block, content = pem.Decode(content)
-		if block.Type == "CERTIFICATE" {
+		switch block.Type {
+		case "CERTIFICATE":
 			var cert *x509.Certificate
 			cert, err = x509.ParseCertificate(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, cert)
-		} else if block.Type == "CERTIFICATE REQUEST" {
+		case "CERTIFICATE REQUEST":
 			var req *x509.CertificateRequest
 			req, err = x509.ParseCertificateRequest(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, req)
-		} else if block.Type == "RSA PRIVATE KEY" {
+		case "RSA PRIVATE KEY":
 			var key *rsa.PrivateKey
 			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, key)
-		} else {
+		default:
 			return nil, fmt.Errorf("unknown block type %s", block.Type)
 		}
 	}

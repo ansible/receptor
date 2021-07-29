@@ -413,8 +413,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 			connections := make(map[string]mesh.YamlConnection)
 			nodeID := "Node" + strconv.Itoa(i)
 			if i > 0 {
-				prevNodeID := "Node" + strconv.Itoa(i-1)
-				connections[prevNodeID] = mesh.YamlConnection{
+				connections["Node"+strconv.Itoa(i-1)] = mesh.YamlConnection{
 					Index: 0,
 				}
 			}

@@ -78,19 +78,19 @@ type GeneralNameEncode struct {
 }
 
 // MakeReceptorSAN generates a subjectAltName extension, optionally containing Receptor names
-func MakeReceptorSAN(DNSNames []string, IPAddresses []net.IP, NodeIDs []string) (*pkix.Extension, error) {
+func MakeReceptorSAN(dnsNames []string, ipAddresses []net.IP, nodeIDs []string) (*pkix.Extension, error) {
 	var rawValues []asn1.RawValue
-	for _, name := range DNSNames {
+	for _, name := range dnsNames {
 		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
 	}
-	for _, rawIP := range IPAddresses {
+	for _, rawIP := range ipAddresses {
 		ip := rawIP.To4()
 		if ip == nil {
 			ip = rawIP
 		}
 		rawValues = append(rawValues, asn1.RawValue{Tag: 7, Class: 2, Bytes: ip})
 	}
-	for _, nodeID := range NodeIDs {
+	for _, nodeID := range nodeIDs {
 		var err error
 		var asnOtherName []byte
 		asnOtherName, err = asn1.Marshal(OtherNameEncode{

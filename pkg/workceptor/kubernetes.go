@@ -72,12 +72,10 @@ var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
 // podRunningAndReady is a completion criterion for pod ready to be attached to
 func podRunningAndReady(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
+	if event.Type == watch.Deleted {
 		return false, k8serrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
-	switch t := event.Object.(type) {
-	case *corev1.Pod:
+	if t, ok := event.Object.(*corev1.Pod); ok {
 		switch t.Status.Phase {
 		case corev1.PodFailed, corev1.PodSucceeded:
 			return false, ErrPodCompleted
@@ -390,11 +388,12 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	close(finishedChan)
 	if errStdin != nil || errStdout != nil {
 		var errDetail string
-		if errStdin == nil {
+		switch {
+		case errStdin == nil:
 			errDetail = fmt.Sprintf("%s", errStdout)
-		} else if errStdout == nil {
+		case errStdout == nil:
 			errDetail = fmt.Sprintf("%s", errStdin)
-		} else {
+		default:
 			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", errStdin, errStdout)
 		}
 		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
@@ -631,11 +630,14 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 
 func (kw *kubeUnit) connectToKube() error {
 	var err error
-	if kw.authMethod == "kubeconfig" || kw.authMethod == "runtime" {
+	switch kw.authMethod {
+	case "kubeconfig":
 		err = kw.connectUsingKubeconfig()
-	} else if kw.authMethod == "incluster" {
+	case "runtime":
+		err = kw.connectUsingKubeconfig()
+	case "incluster":
 		err = kw.connectUsingIncluster()
-	} else {
+	default:
 		return fmt.Errorf("unknown auth method %s", kw.authMethod)
 	}
 	if err != nil {

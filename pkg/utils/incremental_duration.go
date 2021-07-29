@@ -24,17 +24,17 @@ func NewIncrementalDuration(duration, maxDuration time.Duration, multiplier floa
 }
 
 // Reset sets current duration to initial duration
-func (ID *IncrementalDuration) Reset() {
-	ID.duration = ID.initialDuration
+func (id *IncrementalDuration) Reset() {
+	id.duration = id.initialDuration
 }
 
-func (ID *IncrementalDuration) increaseDuration() {
-	ID.duration = time.Duration(math.Min(ID.multiplier*float64(ID.duration), float64(ID.maxDuration)))
+func (id *IncrementalDuration) increaseDuration() {
+	id.duration = time.Duration(math.Min(id.multiplier*float64(id.duration), float64(id.maxDuration)))
 }
 
 // NextTimeout returns a timeout channel based on current duration
-func (ID *IncrementalDuration) NextTimeout() <-chan time.Time {
-	ch := time.After(ID.duration)
-	ID.increaseDuration()
+func (id *IncrementalDuration) NextTimeout() <-chan time.Time {
+	ch := time.After(id.duration)
+	id.increaseDuration()
 	return ch
 }

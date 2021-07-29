@@ -31,7 +31,7 @@ func TestStatusFileLock(t *testing.T) {
 	wg.Add(numWriterThreads)
 	for i := 0; i < numWriterThreads; i++ {
 		waitTime := time.Duration(i) * baseWaitTime
-		totalWaitTime = totalWaitTime + waitTime
+		totalWaitTime += waitTime
 		go func(iter int, waitTime time.Duration) {
 			sfd := StatusFileData{}
 			err = sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {

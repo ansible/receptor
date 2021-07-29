@@ -261,7 +261,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	}
 	var tli net.Listener
 	if TCPListen != "" {
-		listenAddr := ""
+		var listenAddr string
 		if strings.Contains(TCPListen, ":") {
 			listenAddr = TCPListen
 		} else {

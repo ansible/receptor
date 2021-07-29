@@ -829,14 +829,11 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
 		}
-		var err error
-		verifiedChains, err = certs[0].Verify(opts)
-		if err != nil {
+		if _, err := certs[0].Verify(opts); err != nil {
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 			return err
 		}
-		var receptorNames []string
-		receptorNames, err = utils.ReceptorNames(certs[0].Extensions)
+		receptorNames, err := utils.ReceptorNames(certs[0].Extensions)
 		if err != nil {
 			logger.Error("RVF failed to get ReceptorNames: %s", err)
 			return err

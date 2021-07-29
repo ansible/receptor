@@ -430,6 +430,9 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			index := connYaml.Index
 			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
 			attrMap, ok := attr.(map[interface{}]interface{})
+			if !ok {
+				panic("value has not the correct type")
+			}
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
 				listenerMap, ok := listener.(map[interface{}]interface{})
@@ -546,6 +549,9 @@ func (m *LibMesh) CheckConnections() bool {
 		for k, connYaml := range m.MeshDefinition.Nodes[status.NodeID].Connections {
 			index := connYaml.Index
 			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
+			if !ok {
+				panic("value has not the correct type")
+			}
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)

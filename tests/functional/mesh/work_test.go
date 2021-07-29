@@ -535,7 +535,6 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
 				t.Fatal(err)
@@ -634,6 +633,9 @@ func TestRuntimeParams(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
 	unitID, err := controller.WorkSubmitJSON(command)
 	if err != nil {
@@ -655,6 +657,9 @@ func TestKubeRuntimeParams(t *testing.T) {
 	home := os.Getenv("HOME")
 	configfilename := filepath.Join(home, ".kube/config")
 	reader, err := os.Open(configfilename)
+	if err != nil {
+		t.Fatal(err)
+	}
 	buf, err := ioutil.ReadAll(reader)
 	if err != nil {
 		t.Fatal(err)
@@ -692,6 +697,9 @@ func TestKubeRuntimeParams(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_pod": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
 	unitID, err := controller.WorkSubmitJSON(command)
 	if err != nil {
@@ -742,6 +750,9 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
 	_, err = controller.WorkSubmitJSON(command)
 	if err == nil {
@@ -787,6 +798,9 @@ func TestKubeContainerFailure(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	job := `{"command":"work","subcommand":"submit","worktype":"kubejob","node":"node0"}`
 	unitID, err := controller.WorkSubmitJSON(job)
 	if err != nil {

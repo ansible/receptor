@@ -28,6 +28,9 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = n1.AddBackend(b1, 1.0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a server TLS certificate for "localhost"
 	key, err := rsa.GenerateKey(rand.Reader, 2048)

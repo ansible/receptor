@@ -152,6 +152,9 @@ func TestTraceroute(t *testing.T) {
 			controlNode := m.Nodes()["controller"]
 			controller := receptorcontrol.New()
 			err = controller.Connect(controlNode.ControlSocket())
+			if err != nil {
+				t.Fatal(err)
+			}
 			_, err = controller.WriteStr("traceroute node7\n")
 			if err != nil {
 				t.Fatal(err)

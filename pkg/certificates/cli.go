@@ -193,7 +193,10 @@ func (sr signReq) Run() error {
 		fmt.Printf("  Subject: %s\n", req.Subject)
 		algo := req.PublicKeyAlgorithm.String()
 		if algo == "RSA" {
-			rpk := req.PublicKey.(*rsa.PublicKey)
+			rpk, ok := req.PublicKey.(*rsa.PublicKey)
+			if !ok {
+				panic("public key is not RSA")
+			}
 			algo = fmt.Sprintf("%s (%d bits)", algo, rpk.Size()*8)
 		}
 		fmt.Printf("  Encryption Algorithm: %s\n", algo)

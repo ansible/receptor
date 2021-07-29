@@ -363,7 +363,10 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+			remoteUnitID, ok := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+			if !ok {
+				panic("value is not the correct type")
+			}
 			if remoteUnitID == "" {
 				t.Errorf("remoteUnitID should not be empty")
 			}

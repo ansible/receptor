@@ -150,7 +150,10 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 			panic(err)
 		}
 	}()
-	red := rw.UnredactedStatus().ExtraData.(*remoteExtraData)
+	red, ok := rw.UnredactedStatus().ExtraData.(*remoteExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	workSubmitCmd := make(map[string]interface{})
 	for k, v := range red.RemoteParams {
 		workSubmitCmd[k] = v
@@ -183,7 +186,10 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	red.RemoteUnitID = string(match[1])
 	rw.UpdateFullStatus(func(status *StatusFileData) {
-		ed := status.ExtraData.(*remoteExtraData)
+		ed, ok := status.ExtraData.(*remoteExtraData)
+		if !ok {
+			panic("extra data is not the correct type")
+		}
 		ed.RemoteUnitID = red.RemoteUnitID
 	})
 	stdin, err := os.Open(path.Join(rw.UnitDir(), "stdin"))
@@ -209,7 +215,10 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 		return fmt.Errorf("error from remote: %s", match[1])
 	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
-		ed := status.ExtraData.(*remoteExtraData)
+		ed, ok := status.ExtraData.(*remoteExtraData)
+		if !ok {
+			panic("extra data is not the correct type")
+		}
 		ed.RemoteStarted = true
 	})
 	return nil
@@ -219,7 +228,10 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader,
 	release bool, force bool) error {
 	defer conn.Close()
-	red := rw.Status().ExtraData.(*remoteExtraData)
+	red, ok := rw.Status().ExtraData.(*remoteExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	var workCmd string
 	if release {
 		workCmd = "release"
@@ -485,12 +497,18 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 }
 
 func (rw *remoteUnit) setExpiration(mw *utils.JobContext) {
-	red := rw.Status().ExtraData.(*remoteExtraData)
+	red, ok := rw.Status().ExtraData.(*remoteExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	dur := red.Expiration.Sub(time.Now())
 	select {
 	case <-mw.Done():
 	case <-time.After(dur):
-		red := rw.Status().ExtraData.(*remoteExtraData)
+		red, ok := rw.Status().ExtraData.(*remoteExtraData)
+		if !ok {
+			panic("extra data is not the correct type")
+		}
 		if !red.RemoteStarted {
 			rw.UpdateFullStatus(func(status *StatusFileData) {
 				status.Detail = fmt.Sprintf("Work unit expired on %s", red.Expiration.Format("Mon Jan 2 15:04:05"))
@@ -503,7 +521,10 @@ func (rw *remoteUnit) setExpiration(mw *utils.JobContext) {
 
 // startOrRestart is a shared implementation of Start() and Restart()
 func (rw *remoteUnit) startOrRestart(start bool) error {
-	red := rw.Status().ExtraData.(*remoteExtraData)
+	red, ok := rw.Status().ExtraData.(*remoteExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
@@ -536,7 +557,10 @@ func (rw *remoteUnit) Start() error {
 
 // Restart resumes monitoring a job after a Receptor restart
 func (rw *remoteUnit) Restart() error {
-	red := rw.Status().ExtraData.(*remoteExtraData)
+	red, ok := rw.Status().ExtraData.(*remoteExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	if red.RemoteStarted {
 		return rw.startOrRestart(false)
 	}

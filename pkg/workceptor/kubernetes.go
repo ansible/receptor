@@ -98,7 +98,10 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 }
 
 func (kw *kubeUnit) createPod(env map[string]string) error {
-	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
+	ked, ok := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	command, err := shlex.Split(ked.Command)
 	if err != nil {
 		return err
@@ -211,7 +214,6 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		ctxPodReady, _ = context.WithTimeout(kw.ctx, kw.podPendingTimeout)
 	}
 	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady)
-	var ok bool
 	kw.pod, ok = ev.Object.(*corev1.Pod)
 	if !ok {
 		return fmt.Errorf("watch did not return a pod")
@@ -245,7 +247,10 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 func (kw *kubeUnit) runWorkUsingLogger() {
 	skipStdin := false
 	status := kw.Status()
-	ked := status.ExtraData.(*kubeExtraData)
+	ked, ok := status.ExtraData.(*kubeExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	var err error
 	var errMsg string
 	if ked.PodName == "" {
@@ -569,7 +574,10 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 
 func (kw *kubeUnit) connectUsingKubeconfig() error {
 	var err error
-	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
+	ked, ok := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	if ked.KubeConfig == "" {
 		clr := clientcmd.NewDefaultClientConfigLoadingRules()
 		kw.config, err = clientcmd.BuildConfigFromFlags("", clr.GetDefaultFilename())
@@ -654,7 +662,10 @@ func readFileToString(filename string) (string, error) {
 
 // SetFromParams sets the in-memory state from parameters
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
-	ked := kw.status.ExtraData.(*kubeExtraData)
+	ked, ok := kw.status.ExtraData.(*kubeExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	type value struct {
 		name       string
 		permission bool
@@ -795,7 +806,10 @@ func (kw *kubeUnit) startOrRestart() error {
 // Restart resumes monitoring a job after a Receptor restart
 func (kw *kubeUnit) Restart() error {
 	status := kw.Status()
-	ked := status.ExtraData.(*kubeExtraData)
+	ked, ok := status.ExtraData.(*kubeExtraData)
+	if !ok {
+		panic("extra data is not the correct type")
+	}
 	if IsComplete(status.State) {
 		return nil
 	}

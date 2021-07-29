@@ -223,11 +223,20 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			panic(err)
 		}
 		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
+			attrMap, ok := attr.(map[interface{}]interface{})
+			if !ok {
+				panic("attrMap is not the correct type")
+			}
 			for k, v := range attrMap {
-				k = k.(string)
+				k, ok = k.(string)
+				if !ok {
+					panic("key is not the correct type")
+				}
 				if k == "tls-client" {
-					vMap := v.(map[interface{}]interface{})
+					vMap, ok := v.(map[interface{}]interface{})
+					if !ok {
+						panic("value is not the correct type")
+					}
 					// Taken from pkg/netceptor/tlsconfig.go
 					tlscfg := &tls.Config{}
 
@@ -261,11 +270,17 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						tlscfg.RootCAs = rootCAs
 					}
 
-					tlscfg.InsecureSkipVerify = vMap["insecureskipverify"].(bool)
+					tlscfg.InsecureSkipVerify, ok = vMap["insecureskipverify"].(bool)
+					if !ok {
+						panic("value is not the correct type")
+					}
 
 					node.clientTLSConfigs[vMap["name"].(string)] = tlscfg
 				} else if k == "tls-server" {
-					vMap := v.(map[interface{}]interface{})
+					vMap, ok := v.(map[interface{}]interface{})
+					if !ok {
+						panic("value is not the correct type")
+					}
 					// Taken from pkg/netceptor/tlsconfig.go
 					tlscfg := &tls.Config{}
 
@@ -308,11 +323,20 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		}
 
 		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
+			attrMap, ok := attr.(map[interface{}]interface{})
+			if !ok {
+				panic("attrMap is not the correct type")
+			}
 			for k, v := range attrMap {
-				k = k.(string)
+				k, ok := k.(string)
+				if !ok {
+					panic("key is not the correct type")
+				}
 				if k == "tcp-listener" || k == "udp-listener" || k == "ws-listener" {
-					vMap := v.(map[interface{}]interface{})
+					vMap, ok := v.(map[interface{}]interface{})
+					if !ok {
+						panic("value is not the correct type")
+					}
 					port, ok := vMap["port"].(string)
 					if !ok {
 						port = "0"
@@ -327,22 +351,25 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					nodeCost := make(map[string]float64)
 
 					// Use nodeCost map if possible
-					interfaceNodeCost, ok := vMap["nodecost"].(map[interface{}]interface{})
-					for k, v := range interfaceNodeCost {
-						kStr, ok := k.(string)
+					if vMap["nodecost"] != nil {
+						interfaceNodeCost, ok := vMap["nodecost"].(map[interface{}]interface{})
 						if !ok {
-							return nil, errors.New("nodecost map key was not a string")
+							panic("value has not the correct type")
 						}
-						// vStr, ok := v.(string)
-						vFloat, ok := v.(float64)
-						if !ok {
-							return nil, errors.New("nodecost map value was not a float")
+						for k, v := range interfaceNodeCost {
+							k, ok := k.(string)
+							if !ok {
+								return nil, errors.New("nodecost map key was not a string")
+							}
+							v, ok := v.(float64)
+							if !ok {
+								return nil, errors.New("nodecost map value was not a float")
+							}
+							if err != nil {
+								return nil, err
+							}
+							nodeCost[k] = v
 						}
-						// vFloat, err := strconv.ParseFloat(vStr, 64)
-						if err != nil {
-							return nil, err
-						}
-						nodeCost[kStr] = vFloat
 					}
 
 					bindaddr, ok := vMap["bindaddr"].(string)

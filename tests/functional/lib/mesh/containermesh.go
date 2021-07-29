@@ -333,9 +333,15 @@ done`
 		// it already exists
 		needsIDAttr := true
 		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
+			attrMap, ok := attr.(map[interface{}]interface{})
+			if !ok {
+				panic("attrMap is not the correct type")
+			}
 			for k, v := range attrMap {
-				k = k.(string)
+				k, ok = k.(string)
+				if !ok {
+					panic("key is not the correct type")
+				}
 				if k == "tcp-listener" || k == "udp-listener" || k == "ws-listener" {
 					vMap, ok := v.(map[interface{}]interface{})
 					if !ok {

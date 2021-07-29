@@ -158,7 +158,10 @@ func (r *ReceptorControl) Ping(node string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	success := jsonData["Success"].(bool)
+	success, ok := jsonData["Success"].(bool)
+	if !ok {
+		panic("value is not the correct type")
+	}
 	if !success {
 		return "", errors.New(jsonData["Error"].(string))
 	}

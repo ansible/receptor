@@ -64,7 +64,8 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 				header.Add(http.CanonicalHeaderKey(extraHeaderParts[0]), extraHeaderParts[1])
 			}
 			header.Add(http.CanonicalHeaderKey("origin"), b.origin)
-			conn, _, err := dialer.DialContext(ctx, b.address, header)
+			conn, resp, err := dialer.DialContext(ctx, b.address, header)
+			resp.Body.Close()
 			if err != nil {
 				return nil, err
 			}

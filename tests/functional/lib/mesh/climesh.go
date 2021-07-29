@@ -207,9 +207,15 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 		// it already exists
 		needsIDAttr := true
 		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
+			attrMap, ok := attr.(map[interface{}]interface{})
+			if !ok {
+				panic("attrMap is not the correct type")
+			}
 			for k, v := range attrMap {
-				k = k.(string)
+				k, ok = k.(string)
+				if !ok {
+					panic("key is not the correct type")
+				}
 				if k == "tcp-listener" || k == "udp-listener" || k == "ws-listener" {
 					vMap, ok := v.(map[interface{}]interface{})
 					if !ok {
@@ -344,9 +350,15 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 		needsControlService := true
 		controlServiceIndex := 0
 		for index, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
+			attrMap, ok := attr.(map[interface{}]interface{})
+			if !ok {
+				panic("attrMap is not the correct type")
+			}
 			for k, v := range attrMap {
-				k = k.(string)
+				k, ok = k.(string)
+				if !ok {
+					panic("key is not the correct type")
+				}
 				if k == "control-service" {
 					vMap, _ := v.(map[interface{}]interface{})
 					csvName, ok := vMap["service"]
@@ -493,7 +505,10 @@ func (m *CLIMesh) CheckAdvertisements() bool {
 		expected := map[string][]string{}
 		for node := range m.MeshDefinition.Nodes {
 			for _, attr := range m.MeshDefinition.Nodes[node].Nodedef {
-				attrMap := attr.(map[interface{}]interface{})
+				attrMap, ok := attr.(map[interface{}]interface{})
+				if !ok {
+					panic("attrMap is not the correct type")
+				}
 				for _, cmd := range []string{"work-command", "work-kubernetes", "work-python"} {
 					if v, ok := attrMap[cmd]; ok {
 						v, _ := v.(map[interface{}]interface{})

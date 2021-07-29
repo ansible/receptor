@@ -44,13 +44,11 @@ func init() {
 // ContainerNode holds a Netceptor, this layer of abstraction might be unnecessary and
 // go away later
 type ContainerNode struct {
-	dir                    string
-	yamlConfigPath         string
-	yamlConfig             []interface{}
-	containerControlSocket string
-	externalControlSocket  string
-	containerName          string
-	TCRules                *TCRuleYaml
+	dir                   string
+	yamlConfig            []interface{}
+	externalControlSocket string
+	containerName         string
+	TCRules               *TCRuleYaml
 }
 
 // ContainerMesh contains a list of Nodes and the yaml definition that created them

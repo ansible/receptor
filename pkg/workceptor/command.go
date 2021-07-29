@@ -24,7 +24,6 @@ type commandUnit struct {
 	command            string
 	baseParams         string
 	allowRuntimeParams bool
-	cmdParams          string
 	done               bool
 }
 

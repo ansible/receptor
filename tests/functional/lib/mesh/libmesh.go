@@ -41,14 +41,6 @@ type LibMesh struct {
 	dir            string
 }
 
-// Error handler that gets called for backend errors
-func handleError(err error, fatal bool) {
-	fmt.Printf("Error: %s\n", err)
-	if fatal {
-		os.Exit(1)
-	}
-}
-
 // NewLibNode builds a node with the name passed as the argument
 func NewLibNode(name string) *LibNode {
 	n1 := netceptor.New(context.Background(), name, nil)

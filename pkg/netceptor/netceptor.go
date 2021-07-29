@@ -963,7 +963,7 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 }
 
 // Translates an outgoing message from a messageData object to wire protocol.
-func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
+func (s *Netceptor) translateDataFromMessage(msg *messageData) []byte {
 	data := make([]byte, 36+len(msg.Data))
 	data[0] = MsgTypeData
 	data[1] = msg.HopsToLive
@@ -972,7 +972,7 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 	copy(data[20:28], fixedLenBytesFromString(msg.FromService, 8))
 	copy(data[28:36], fixedLenBytesFromString(msg.ToService, 8))
 	copy(data[36:], msg.Data)
-	return data, nil
+	return data
 }
 
 // Forwards a message to its next hop
@@ -1001,10 +1001,7 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	if !ok || c.WriteChan == nil {
 		return fmt.Errorf("no connection to next hop")
 	}
-	message, err := s.translateDataFromMessage(md)
-	if err != nil {
-		return err
-	}
+	message := s.translateDataFromMessage(md)
 	// decrement HopsToLive
 	message[1]--
 	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)

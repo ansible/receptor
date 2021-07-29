@@ -60,9 +60,8 @@ func (cfg nodeCfg) Init() error {
 	return nil
 }
 
-func (cfg nodeCfg) Run() error {
+func (cfg nodeCfg) Run() {
 	workceptor.MainInstance.ListKnownUnitIDs() // Triggers a scan of unit dirs and restarts any that need it
-	return nil
 }
 
 type nullBackendCfg struct{}
@@ -74,11 +73,7 @@ func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSess
 
 // Run runs the action, in this case adding a null backend to keep the wait group alive
 func (cfg nullBackendCfg) Run() error {
-	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+	return netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil)
 }
 
 func main() {

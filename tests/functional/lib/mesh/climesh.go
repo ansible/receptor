@@ -21,11 +21,10 @@ import (
 // CLINode holds a Netceptor, this layer of abstraction might be unnecessary and
 // go away later
 type CLINode struct {
-	receptorCmd    *exec.Cmd
-	dir            string
-	yamlConfigPath string
-	yamlConfig     []interface{}
-	controlSocket  string
+	receptorCmd   *exec.Cmd
+	dir           string
+	yamlConfig    []interface{}
+	controlSocket string
 }
 
 // CLIMesh contains a list of Nodes and the yaml definition that created them

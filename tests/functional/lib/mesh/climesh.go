@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,6 +11,11 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // CLINode holds a Netceptor, this layer of abstraction might be unnecessary and
@@ -96,6 +97,21 @@ func (n *CLINode) Start() error {
 	return err
 }
 
+// overwrites the node confiration ( nodefed.yaml )  on disk
+func (n *CLINode) OverwriteNodedef() error {
+	strData, err := yaml.Marshal(n.yamlConfig)
+	if err != nil {
+		return err
+	}
+	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
+	err = ioutil.WriteFile(nodedefPath, strData, 0644)
+	if err != nil {
+		// there was an error overwriting the nodedef.yaml file
+		return err
+	}
+	return nil
+}
+
 // Destroy kills the receptor process and puts its ports back into the pool to
 // be reallocated once it's shutdown
 func (n *CLINode) Destroy() {
@@ -163,6 +179,52 @@ func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	}
 
 	return NewCLIMeshFromYaml(MeshDefinition, dirSuffix)
+}
+
+func ChangeNodeCLIYamlConfig(m *CLIMesh, nodeid string, changetype string) error {
+	if changetype == "portChange" {
+
+		// check if the node exists
+		for node_id := range m.nodes {
+			if node_id == nodeid {
+				// we change the port of the node here
+				fmt.Println("Need to change the port in thid node")
+
+				for outer_key, outer_value := range m.nodes[node_id].yamlConfig {
+					fmt.Println(outer_key)
+					fmt.Println(outer_value)
+					outer_attribute_map := outer_value.(map[interface{}]interface{})
+					for inner_key, inner_value := range outer_attribute_map {
+						if inner_key.(string) == "tcp-listener" {
+							inner_attribute_map := inner_value.(map[interface{}]interface{})
+							port, ok := inner_attribute_map["port"]
+							if !ok {
+								fmt.Println("no port information is available")
+							}
+							fmt.Println(port)
+							// now i need to change this port.
+							// I know how to get a free available port. but not sure how to make that change persistent in the YamlConfig
+							// I can make changes in the `inner_attribute_map` but i will have to propgate it to YamlConfig.
+							// the data structures are in `map[interface{}]interface{}`, which is not indexable and hence need a way to delete the existing port information from YamlConfig
+
+						}
+					}
+
+				}
+			}
+		}
+
+	} else if changetype == "workChange" {
+		// check if the node id exists
+		// more changes to work that the node is dealing with will come here.
+		return nil
+	} else {
+		// we can put different type of changes that we can make in the YamlConfig
+		fmt.Print("No change were made")
+		return nil
+	}
+	//
+	return nil
 }
 
 // NewCLIMeshFromYaml takes a yaml mesh description and returns a mesh of nodes

@@ -628,6 +628,22 @@ func TestWork(t *testing.T) {
 
 		})
 
+		t.Run(testGroup+"/Change config, reload, make sure we can reconnect to old nodes", func(t *testing.T) {
+			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
+			controllers, m, _ := workSetup(t.Name())
+			defer tearDown(controllers, m)
+
+			// change configuration for node2
+			err := mesh.ChangeNodeCLIYamlConfig(m, "node2", "portChange")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+		})
+
 	}
 }
 

@@ -51,7 +51,7 @@ func (cfg tlsServerCfg) Prepare() error {
 	if cfg.ClientCAs != "" {
 		bytes, err := ioutil.ReadFile(cfg.ClientCAs)
 		if err != nil {
-			return fmt.Errorf("error reading client CAs file: %s", err)
+			return fmt.Errorf("error reading client CAs file: %w", err)
 		}
 		clientCAs := x509.NewCertPool()
 		clientCAs.AppendCertsFromPEM(bytes)
@@ -104,7 +104,7 @@ func (cfg tlsClientConfig) Prepare() error {
 	if cfg.RootCAs != "" {
 		bytes, err := ioutil.ReadFile(cfg.RootCAs)
 		if err != nil {
-			return fmt.Errorf("error reading root CAs file: %s", err)
+			return fmt.Errorf("error reading root CAs file: %w", err)
 		}
 
 		rootCAs := x509.NewCertPool()

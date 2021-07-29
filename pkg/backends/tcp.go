@@ -6,6 +6,7 @@ package backends
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -119,7 +120,8 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 					return nil, io.EOF
 				default:
 				}
-				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+				var nerr net.Error
+				if ok := errors.As(err, &nerr); ok && nerr.Timeout() {
 					continue
 				}
 				if err != nil {
@@ -181,7 +183,8 @@ func (ns *TCPSession) Recv(timeout time.Duration) ([]byte, error) {
 			return nil, err
 		}
 		n, err := ns.conn.Read(buf)
-		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+		var nerr net.Error
+		if ok := errors.As(err, &nerr); ok && nerr.Timeout() {
 			return nil, netceptor.ErrTimeout
 		}
 		if err != nil {

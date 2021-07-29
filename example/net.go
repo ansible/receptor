@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -69,7 +70,7 @@ func main() {
 			done := false
 			for !done {
 				n, err := conn.Read(buf)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					done = true
 				} else if err != nil {
 					fmt.Printf("Read error in Receptor listener: %s\n", err)
@@ -113,7 +114,7 @@ func main() {
 			if n > 0 {
 				fmt.Printf("Received data: %s\n", rbuf[:n])
 			}
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// Shut down the whole Netceptor when any connection closes, because this is just a demo
 				n2.Shutdown()
 				return
@@ -128,7 +129,7 @@ func main() {
 	// Send some data, which should be processed through the echo server back to our
 	// receive function and printed to the screen.
 	_, err = c2.Write([]byte("Hello, world!"))
-	if err != nil && err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		fmt.Printf("Write error in Receptor dialer: %s\n", err)
 	}
 

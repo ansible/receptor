@@ -5,6 +5,7 @@ package workceptor
 import (
 	"context"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,7 +20,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/project-receptor/receptor/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,7 +74,7 @@ var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 func podRunningAndReady(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+		return false, k8serrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *corev1.Pod:
@@ -215,7 +216,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if !ok {
 		return fmt.Errorf("watch did not return a pod")
 	}
-	if err == ErrPodCompleted {
+	if errors.Is(err, ErrPodCompleted) {
 		if len(kw.pod.Status.ContainerStatuses) != 1 {
 			return fmt.Errorf("expected 1 container in pod but there were %d", len(kw.pod.Status.ContainerStatuses))
 		}
@@ -230,7 +231,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		}
 		if len(kw.pod.Status.ContainerStatuses) == 1 {
 			if kw.pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				return fmt.Errorf("%s, %s", err.Error(), kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)
+				return fmt.Errorf("%w, %s", err, kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)
 			}
 		}
 		return err
@@ -250,7 +251,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	if ked.PodName == "" {
 		// Create the pod
 		err := kw.createPod(nil)
-		if err == ErrPodCompleted {
+		if errors.Is(err, ErrPodCompleted) {
 			skipStdin = true
 		} else if err != nil {
 			errMsg = fmt.Sprintf("Error creating pod: %s", err)
@@ -348,7 +349,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				return
 			case <-stdin.Done():
 				err := stdin.Error()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 				} else {
 					kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", err), stdout.Size())
@@ -539,7 +540,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 			return
 		case <-stdin.Done():
 			err := stdin.Error()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 			} else {
 				kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", err), stdout.Size())
@@ -681,11 +682,11 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	var err error
 	ked.KubePod, err = readFileToString(ked.KubePod)
 	if err != nil {
-		return fmt.Errorf("could not read pod: %s", err)
+		return fmt.Errorf("could not read pod: %w", err)
 	}
 	ked.KubeConfig, err = readFileToString(ked.KubeConfig)
 	if err != nil {
-		return fmt.Errorf("could not read kubeconfig: %s", err)
+		return fmt.Errorf("could not read kubeconfig: %w", err)
 	}
 	userParams := ""
 	userCommand := ""
@@ -712,7 +713,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 			}
 			err := v.setter(value)
 			if err != nil {
-				return fmt.Errorf("error setting value for %s: %s", v.name, err)
+				return fmt.Errorf("error setting value for %s: %w", v.name, err)
 			}
 		}
 	}
@@ -921,7 +922,7 @@ func (cfg workKubeCfg) Prepare() error {
 		}
 		_, err := os.Stat(cfg.KubeConfig)
 		if err != nil {
-			return fmt.Errorf("error accessing kubeconfig file: %s", err)
+			return fmt.Errorf("error accessing kubeconfig file: %w", err)
 		}
 	}
 	if cfg.Pod != "" && (cfg.Image != "" || cfg.Command != "" || cfg.Params != "") {

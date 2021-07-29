@@ -23,7 +23,7 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 		tli = tls.NewListener(tli, tlsServer)
 	}
 	if err != nil {
-		return fmt.Errorf("error listening on TCP: %s", err)
+		return fmt.Errorf("error listening on TCP: %w", err)
 	}
 	go func() {
 		for {
@@ -51,7 +51,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 		"address": address,
 	})
 	if err != nil {
-		return fmt.Errorf("error listening on Receptor network: %s", err)
+		return fmt.Errorf("error listening on Receptor network: %w", err)
 	}
 	go func() {
 		for {

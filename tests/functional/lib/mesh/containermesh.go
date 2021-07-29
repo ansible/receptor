@@ -109,7 +109,7 @@ func (n *ContainerNode) Start() error {
 	Cmd := exec.Command(containerRunner, "start", n.containerName)
 	output, err := Cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s failed: %s\nCombined Output: %s", Cmd.String(), err.Error(), output)
+		return fmt.Errorf("%s failed: %w\nCombined Output: %s", Cmd.String(), err, output)
 	}
 	if n.TCRules != nil {
 		args := []string{"exec", "-u", "0", n.containerName, "tc", "qdisc", "add", "dev", "eth0", "root", "netem"}
@@ -144,7 +144,7 @@ func (n *ContainerNode) Start() error {
 		tcCmd := exec.Command(containerRunner, args...)
 		output, err = tcCmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("%s failed: %s\nCombined Output: %s", tcCmd.String(), err.Error(), output)
+			return fmt.Errorf("%s failed: %w\nCombined Output: %s", tcCmd.String(), err, output)
 		}
 		// Write the script so we can apply these tc rules when launching the
 		// mesh manually
@@ -501,7 +501,7 @@ done`
 	containerCompose.Dir = mesh.dir
 	output, err := containerCompose.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("%s failed: %s\nCombined Output: %s", containerCompose.String(), err.Error(), output)
+		return nil, fmt.Errorf("%s failed: %w\nCombined Output: %s", containerCompose.String(), err, output)
 	}
 
 	for k, node := range nodes {

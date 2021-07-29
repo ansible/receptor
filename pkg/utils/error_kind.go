@@ -1,6 +1,9 @@
 package utils
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // ErrorWithKind represents an error wrapped with a designation of what kind of error it is
 type ErrorWithKind struct {
@@ -23,9 +26,10 @@ func WrapErrorWithKind(err error, kind string) ErrorWithKind {
 
 // ErrorIsKind returns true if err is an ErrorWithKind of the specified kind, or false otherwise (including if nil)
 func ErrorIsKind(err error, kind string) bool {
-	ek, ok := err.(ErrorWithKind)
-	if !ok {
+	var kerr ErrorWithKind
+
+	if ok := errors.As(err, &kerr); !ok {
 		return false
 	}
-	return ek.kind == kind
+	return kerr.kind == kind
 }

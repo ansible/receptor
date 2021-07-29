@@ -4,6 +4,7 @@ package workceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -54,7 +55,7 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 	}
 	err := w.RegisterWorker("remote", newRemoteWorker)
 	if err != nil {
-		return nil, fmt.Errorf("could not register remote worker function: %s", err)
+		return nil, fmt.Errorf("could not register remote worker function: %w", err)
 	}
 	return w, nil
 }
@@ -77,7 +78,7 @@ func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
 		w: w,
 	})
 	if err != nil {
-		return fmt.Errorf("could not add work control function: %s", err)
+		return fmt.Errorf("could not add work control function: %w", err)
 	}
 	return nil
 }
@@ -408,7 +409,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 					resultChan <- buf[:n]
 				}
 			}
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				err = stdout.Close()
 				if err != nil {
 					logger.Error("Error closing stdout\n")

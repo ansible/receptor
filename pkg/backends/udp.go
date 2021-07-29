@@ -5,6 +5,7 @@ package backends
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -90,7 +91,8 @@ func (ns *UDPDialerSession) Recv(timeout time.Duration) ([]byte, error) {
 	}
 	buf := make([]byte, utils.NormalBufferSize)
 	n, err := ns.conn.Read(buf)
-	if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+	var nerr net.Error
+	if ok := errors.As(err, &nerr); ok && nerr.Timeout() {
 		return nil, netceptor.ErrTimeout
 	}
 	if err != nil {
@@ -165,7 +167,8 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 				return
 			}
 			n, addr, err := b.conn.ReadFromUDP(buf)
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			var nerr net.Error
+			if ok := errors.As(err, &nerr); ok && nerr.Timeout() {
 				continue
 			}
 			if err != nil {

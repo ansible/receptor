@@ -26,7 +26,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 
 	uc, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		return fmt.Errorf("error listening on UDP: %s", err)
+		return fmt.Errorf("error listening on UDP: %w", err)
 	}
 
 	ncAddr := s.NewAddr(node, service)
@@ -101,7 +101,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 		"address": address,
 	})
 	if err != nil {
-		return fmt.Errorf("error listening on service %s: %s", service, err)
+		return fmt.Errorf("error listening on service %s: %w", service, err)
 	}
 	go func() {
 		for {

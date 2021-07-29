@@ -6,6 +6,7 @@ package backends
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -142,7 +143,7 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 			b.server.TLSConfig = b.tlscfg
 			err = b.server.ServeTLS(b.li, "", "")
 		}
-		if err != nil && err != http.ErrServerClosed {
+		if !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("HTTP server error: %s\n", err)
 		}
 	}()
@@ -285,7 +286,7 @@ func (cfg websocketDialerCfg) Prepare() error {
 	}
 	_, err := url.Parse(cfg.Address)
 	if err != nil {
-		return fmt.Errorf("address %s is not a valid URL: %s", cfg.Address, err)
+		return fmt.Errorf("address %s is not a valid URL: %w", cfg.Address, err)
 	}
 	if cfg.ExtraHeader != "" && !strings.Contains(cfg.ExtraHeader, ":") {
 		return fmt.Errorf("extra header must be in the form key:value")

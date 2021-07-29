@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
 )
@@ -22,7 +23,7 @@ func TryFLock(filename string) (*FLock, error) {
 		return nil, err
 	}
 	err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
-	if err == syscall.EWOULDBLOCK {
+	if errors.Is(err, syscall.EWOULDBLOCK) {
 		err = ErrLocked
 	}
 	if err != nil {

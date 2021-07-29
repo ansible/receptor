@@ -21,7 +21,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 	node string, rservice string, tlscfg *tls.Config) error {
 	uli, lock, err := utils.UnixSocketListen(filename, permissions)
 	if err != nil {
-		return fmt.Errorf("error opening Unix socket: %s", err)
+		return fmt.Errorf("error opening Unix socket: %w", err)
 	}
 	go func() {
 		defer func() {
@@ -55,7 +55,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 		"filename": filename,
 	})
 	if err != nil {
-		return fmt.Errorf("error listening on Receptor network: %s", err)
+		return fmt.Errorf("error listening on Receptor network: %w", err)
 	}
 	go func() {
 		for {

@@ -289,7 +289,7 @@ func (ipr *IPRouterService) addRoute(route *net.IPNet) error {
 		Gw:        ipr.destIP,
 	})
 	if err != nil {
-		return fmt.Errorf("error adding route to interface: %s", err)
+		return fmt.Errorf("error adding route to interface: %w", err)
 	}
 	return nil
 }
@@ -303,11 +303,11 @@ func (ipr *IPRouterService) run() error {
 	var err error
 	ipr.tunIf, err = water.New(water.Config{DeviceType: water.TUN})
 	if err != nil {
-		return fmt.Errorf("error opening tun device: %s", err)
+		return fmt.Errorf("error opening tun device: %w", err)
 	}
 	ipr.link, err = netlink.LinkByName(ipr.tunIf.Name())
 	if err != nil {
-		return fmt.Errorf("error accessing link for tun device: %s", err)
+		return fmt.Errorf("error accessing link for tun device: %w", err)
 	}
 	baseIP := ipr.localNet.IP.To4()
 	ipr.linkIP = make([]byte, 4)
@@ -325,11 +325,11 @@ func (ipr *IPRouterService) run() error {
 	}
 	err = netlink.AddrAdd(ipr.link, addr)
 	if err != nil {
-		return fmt.Errorf("error adding IP address to link: %s", err)
+		return fmt.Errorf("error adding IP address to link: %w", err)
 	}
 	err = netlink.LinkSetUp(ipr.link)
 	if err != nil {
-		return fmt.Errorf("error setting link up: %s", err)
+		return fmt.Errorf("error setting link up: %w", err)
 	}
 	advertisement := map[string]string{
 		"type":        adTypeIPRouter,
@@ -341,7 +341,7 @@ func (ipr *IPRouterService) run() error {
 	}
 	ipr.nConn, err = ipr.nc.ListenPacketAndAdvertise(ipr.networkName, advertisement)
 	if err != nil {
-		return fmt.Errorf("error listening for service %s: %s", ipr.networkName, err)
+		return fmt.Errorf("error listening for service %s: %w", ipr.networkName, err)
 	}
 	go ipr.runAdvertisingWatcher()
 	go ipr.runTunToNetceptor()

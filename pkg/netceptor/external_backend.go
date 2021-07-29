@@ -2,6 +2,7 @@ package netceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -44,7 +45,7 @@ func MessageConnFromNetConn(conn net.Conn) MessageConn {
 // WriteMessage writes a message to the connection
 func (mc *netMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if ctx.Err() != nil {
-		return fmt.Errorf("session closed: %s", ctx.Err())
+		return fmt.Errorf("session closed: %w", ctx.Err())
 	}
 	buf := mc.framer.SendData(data)
 	n, err := mc.conn.Write(buf)
@@ -66,7 +67,7 @@ func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration
 	}
 	for {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("session closed: %s", ctx.Err())
+			return nil, fmt.Errorf("session closed: %w", ctx.Err())
 		}
 		if mc.framer.MessageReady() {
 			break
@@ -75,7 +76,8 @@ func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration
 		if n > 0 {
 			mc.framer.RecvData(buf[:n])
 		}
-		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+		var nerr net.Error
+		if ok := errors.As(err, &nerr); ok && nerr.Timeout() {
 			return nil, ErrTimeout
 		}
 		if err != nil {
@@ -114,7 +116,7 @@ func MessageConnFromWebsocketConn(conn *websocket.Conn) MessageConn {
 // WriteMessage writes a message to the connection
 func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if ctx.Err() != nil {
-		return fmt.Errorf("session closed: %s", ctx.Err())
+		return fmt.Errorf("session closed: %w", ctx.Err())
 	}
 	return mc.conn.WriteMessage(websocket.BinaryMessage, data)
 }
@@ -122,7 +124,7 @@ func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) e
 // ReadMessage reads a message from the connection
 func (mc *websocketMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("session closed: %s", ctx.Err())
+		return nil, fmt.Errorf("session closed: %w", ctx.Err())
 	}
 	messageType, data, err := mc.conn.ReadMessage()
 	if messageType != websocket.BinaryMessage {

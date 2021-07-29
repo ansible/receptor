@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -1370,11 +1371,11 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 			return
 		default:
 		}
-		if err == ErrTimeout {
+		if errors.Is(err, ErrTimeout) {
 			continue
 		}
 		if err != nil {
-			if err != io.EOF && ci.Context.Err() == nil {
+			if !errors.Is(err, io.EOF) && ci.Context.Err() == nil {
 				logger.Error("Backend receiving error %s\n", err)
 			}
 			ci.CancelFunc()

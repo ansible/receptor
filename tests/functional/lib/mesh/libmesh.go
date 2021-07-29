@@ -253,7 +253,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					if vMap["rootcas"] != "" {
 						bytes, err := ioutil.ReadFile(vMap["rootcas"].(string))
 						if err != nil {
-							return nil, fmt.Errorf("error reading root CAs file: %s", err)
+							return nil, fmt.Errorf("error reading root CAs file: %w", err)
 						}
 
 						rootCAs := x509.NewCertPool()
@@ -287,7 +287,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					if vMap["clientcas"] != nil {
 						bytes, err := ioutil.ReadFile(vMap["clientcas"].(string))
 						if err != nil {
-							return nil, fmt.Errorf("error reading client CAs file: %s", err)
+							return nil, fmt.Errorf("error reading client CAs file: %w", err)
 						}
 						clientCAs := x509.NewCertPool()
 						clientCAs.AppendCertsFromPEM(bytes)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -135,7 +136,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		buf := make([]byte, 1)
 		for {
 			n, err := conn.Read(buf)
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				logger.Info("Control service closed\n")
 				done = true
 				break
@@ -253,7 +254,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	if unixSocket != "" {
 		uli, lock, err = utils.UnixSocketListen(unixSocket, unixSocketPermissions)
 		if err != nil {
-			return fmt.Errorf("error opening Unix socket: %s", err)
+			return fmt.Errorf("error opening Unix socket: %w", err)
 		}
 	} else {
 		uli = nil
@@ -268,7 +269,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		}
 		tli, err = net.Listen("tcp", listenAddr)
 		if err != nil {
-			return fmt.Errorf("error listening on TCP socket: %s", err)
+			return fmt.Errorf("error listening on TCP socket: %w", err)
 		}
 		if tcptls != nil {
 			tli = tls.NewListener(tli, tcptls)
@@ -280,7 +281,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	if service != "" {
 		li, err = s.nc.ListenAndAdvertise(service, tlscfg, nil)
 		if err != nil {
-			return fmt.Errorf("error opening Unix socket: %s", err)
+			return fmt.Errorf("error opening Unix socket: %w", err)
 		}
 	} else {
 		li = nil

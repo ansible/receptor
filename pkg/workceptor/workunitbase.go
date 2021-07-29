@@ -5,6 +5,7 @@ package workceptor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -58,7 +59,7 @@ var ErrPending = fmt.Errorf("operation pending")
 
 // IsPending returns true if the error is an ErrPending
 func IsPending(err error) bool {
-	return err == ErrPending
+	return errors.Is(err, ErrPending)
 }
 
 // BaseWorkUnit includes data common to all work units, and partially implements the WorkUnit interface

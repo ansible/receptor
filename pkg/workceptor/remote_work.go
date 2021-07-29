@@ -162,19 +162,19 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	workSubmitCmd["tlsclient"] = red.TLSClient
 	wscBytes, err := json.Marshal(workSubmitCmd)
 	if err != nil {
-		return fmt.Errorf("error constructing work submit command: %s", err)
+		return fmt.Errorf("error constructing work submit command: %w", err)
 	}
 	_, err = conn.Write(wscBytes)
 	if err == nil {
 		_, err = conn.Write([]byte("\n"))
 	}
 	if err != nil {
-		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
+		return fmt.Errorf("write error sending to %s: %w", red.RemoteNode, err)
 	}
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
-		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
+		return fmt.Errorf("read error reading from %s: %w", red.RemoteNode, err)
 	}
 	submitIDRegex := regexp.MustCompile("with ID ([a-zA-Z0-9]+)\\.")
 	match := submitIDRegex.FindSubmatch([]byte(response))
@@ -188,20 +188,20 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	})
 	stdin, err := os.Open(path.Join(rw.UnitDir(), "stdin"))
 	if err != nil {
-		return fmt.Errorf("error opening stdin file: %s", err)
+		return fmt.Errorf("error opening stdin file: %w", err)
 	}
 	_, err = io.Copy(conn, stdin)
 	if err != nil {
-		return fmt.Errorf("error sending stdin file: %s", err)
+		return fmt.Errorf("error sending stdin file: %w", err)
 	}
 	err = doClose()
 	if err != nil {
-		return fmt.Errorf("error closing stdin file: %s", err)
+		return fmt.Errorf("error closing stdin file: %w", err)
 	}
 	response, err = utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
-		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
+		return fmt.Errorf("read error reading from %s: %w", red.RemoteNode, err)
 	}
 	resultErrorRegex := regexp.MustCompile("ERROR: (.*)")
 	match = resultErrorRegex.FindSubmatch([]byte(response))
@@ -228,12 +228,12 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	}
 	_, err := conn.Write([]byte(fmt.Sprintf("work %s %s\n", workCmd, red.RemoteUnitID)))
 	if err != nil {
-		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
+		return fmt.Errorf("write error sending to %s: %w", red.RemoteNode, err)
 	}
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
-		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
+		return fmt.Errorf("read error reading from %s: %w", red.RemoteNode, err)
 	}
 	if response[:5] == "ERROR" {
 		return fmt.Errorf("error cancelling remote unit: %s", response[6:])

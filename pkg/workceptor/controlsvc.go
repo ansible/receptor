@@ -67,7 +67,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 			var err error
 			c.params["startpos"], err = strconv.ParseInt(tokens[2], 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("error converting start position to integer: %s", err)
+				return nil, fmt.Errorf("error converting start position to integer: %w", err)
 			}
 		} else {
 			c.params["startpos"] = int64(0)

@@ -642,6 +642,45 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			//reload entire mesh , because all 3 nodes configuration changed
+			err = controllers["node2"].Reload()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = controllers["node2"].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			//reload node2
+			err = controllers["node1"].Reload()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = controllers["node1"].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			//reload node2
+			err = controllers["node3"].Reload()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = controllers["node3"].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// make sure , we can ping to the reloaded nodes
+			_, err = controllers["node1"].Ping("node2")
+			if err != nil {
+				t.Fatal(err)
+			}
+
 		})
 
 	}

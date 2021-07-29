@@ -246,7 +246,7 @@ func (cw *commandUnit) Cancel() error {
 	}
 	proc, err := os.FindProcess(ced.Pid)
 	if err != nil {
-		return nil
+		return err
 	}
 	defer func() {
 		if err := proc.Release(); err != nil {

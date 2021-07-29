@@ -106,7 +106,7 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	valueStr, ok := value.(string)
 	if ok {
 		valueInt, err := strconv.ParseInt(valueStr, 10, 64)
-		if err != nil {
+		if err == nil {
 			return valueInt, nil
 		}
 	}

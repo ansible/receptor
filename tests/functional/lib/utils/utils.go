@@ -268,10 +268,11 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames,
 // which case it returns false
 func CheckUntilTimeout(ctx context.Context, interval time.Duration, check func() bool) bool {
 	for ready := check(); !ready; ready = check() {
-		if ctx.Err() != nil {
+		select {
+		case <-ctx.Done():
 			return false
+		case <-time.After(interval):
 		}
-		time.Sleep(interval)
 	}
 	return true
 }
@@ -284,10 +285,12 @@ func CheckUntilTimeoutWithErr(ctx context.Context, interval time.Duration, check
 		if err != nil {
 			return false, err
 		}
-		if ctx.Err() != nil {
+
+		select {
+		case <-ctx.Done():
 			return false, nil
+		case <-time.After(interval):
 		}
-		time.Sleep(interval)
 	}
 	return true, nil
 }

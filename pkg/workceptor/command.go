@@ -3,7 +3,6 @@
 package workceptor
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -252,7 +251,7 @@ func (cw *commandUnit) Cancel() error {
 	}()
 	err = proc.Signal(os.Interrupt)
 	switch {
-	case errors.Is(err, os.ErrProcessDone):
+	case strings.Contains(err.Error(), "already finished"):
 		return nil
 	case err != nil:
 		return err

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"context"
 	"errors"
 	"io/ioutil"
 	"net"
@@ -9,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/project-receptor/receptor/pkg/certificates"
 )
@@ -263,35 +261,4 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 		return "", "", err
 	}
 	return keyPath, crtPath, nil
-}
-
-// CheckUntilTimeout Polls the check function until the context expires, in
-// which case it returns false.
-func CheckUntilTimeout(ctx context.Context, interval time.Duration, check func() bool) bool {
-	for ready := check(); !ready; ready = check() {
-		select {
-		case <-ctx.Done():
-			return false
-		case <-time.After(interval):
-		}
-	}
-	return true
-}
-
-// CheckUntilTimeoutWithErr does the same as CheckUntilTimeout but requires the
-// check function returns (bool, error), and will return an error immediately
-// if the check function returns an error.
-func CheckUntilTimeoutWithErr(ctx context.Context, interval time.Duration, check func() (bool, error)) (bool, error) {
-	for ready, err := check(); !ready; ready, err = check() {
-		if err != nil {
-			return false, err
-		}
-
-		select {
-		case <-ctx.Done():
-			return false, nil
-		case <-time.After(interval):
-		}
-	}
-	return true, nil
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func ConfirmListening(pid int) (bool, error) {
+func confirmListening(pid int) (bool, error) {
 	pidString := "pid=" + strconv.Itoa(pid)
 	out := bytes.Buffer{}
 	ssCmd := exec.Command("ss", "-tulnp")
@@ -64,15 +65,14 @@ func TestListeners(t *testing.T) {
 				}
 			}()
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-			success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
-				return ConfirmListening(cmd.Process.Pid)
+			err = wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+				return confirmListening(cmd.Process.Pid)
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !success {
+			switch {
+			case errors.Is(err, wait.ErrWaitTimeout):
 				t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+			case err != nil:
+				t.Fatal(err)
 			}
 		})
 	}
@@ -114,20 +114,22 @@ func TestSSLListeners(t *testing.T) {
 				}
 			}()
 
-			checkFunc := func() bool {
+			checkFunc := func() (bool, error) {
 				opensslStdOut := bytes.Buffer{}
 				opensslStdIn := bytes.Buffer{}
 				opensslCmd := exec.Command("openssl", "s_client", "-connect", "localhost:"+strconv.Itoa(port))
 				opensslCmd.Stdin = &opensslStdIn
 				opensslCmd.Stdout = &opensslStdOut
 				err = opensslCmd.Run()
-				return err == nil
+				return err == nil, nil
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-			success := utils.CheckUntilTimeout(ctx, 10*time.Millisecond, checkFunc)
-			if !success {
+			err = wait.PollImmediate(10*time.Millisecond, 2*time.Second, checkFunc)
+			switch {
+			case errors.Is(err, wait.ErrWaitTimeout):
 				t.Fatalf("Timed out while waiting for tls backend to start:\n%s", receptorStdOut.String())
+			case err != nil:
+				t.Fatal(err)
 			}
 		})
 	}
@@ -206,15 +208,14 @@ func TestCostMap(t *testing.T) {
 						}
 					}()
 
-					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
-						return ConfirmListening(cmd.Process.Pid)
+					err = wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+						return confirmListening(cmd.Process.Pid)
 					})
-					if err != nil {
-						t.Fatal(err)
-					}
-					if !success {
+					switch {
+					case errors.Is(err, wait.ErrWaitTimeout):
 						t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+					case err != nil:
+						t.Fatal(err)
 					}
 				})
 			}
@@ -258,15 +259,14 @@ func TestCosts(t *testing.T) {
 						}
 					}()
 
-					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
-						return ConfirmListening(cmd.Process.Pid)
+					err = wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+						return confirmListening(cmd.Process.Pid)
 					})
-					if err != nil {
-						t.Fatal(err)
-					}
-					if !success {
+					switch {
+					case errors.Is(err, wait.ErrWaitTimeout):
 						t.Fatalf("Timed out while waiting for backend to start:\n%s", receptorStdOut.String())
+					case err != nil:
+						t.Fatal(err)
 					}
 				})
 			}

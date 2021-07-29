@@ -18,6 +18,7 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var containerImage string
@@ -661,18 +662,39 @@ func (m *ContainerMesh) CheckControlSockets() bool {
 // WaitForReady Waits for connections and routes to converge.
 func (m *ContainerMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
+
+	err := wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckControlSockets(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for control sockets")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckConnections) {
+
+	err = wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckConnections(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for Connections")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
+
+	err = wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckKnownConnectionCosts(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while checking Connection Costs")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
+
+	err = wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckRoutes(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for routes to converge")
+	case err != nil:
+		return err
 	}
+
 	return nil
 }
 

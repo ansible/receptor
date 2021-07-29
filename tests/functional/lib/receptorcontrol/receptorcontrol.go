@@ -12,7 +12,7 @@ import (
 
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/workceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // ReceptorControl Connects to a control socket and provides basic commands.
@@ -294,7 +294,7 @@ func (r *ReceptorControl) getWorkList() (map[string]interface{}, error) {
 }
 
 func assertWithTimeout(ctx context.Context, check func() bool) bool {
-	return utils.CheckUntilTimeout(ctx, 500*time.Millisecond, check)
+	return wait.PollImmediateUntil(500*time.Millisecond, func() (bool, error) { return check(), nil }, ctx.Done()) != nil
 }
 
 func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, state int) bool {

@@ -16,6 +16,7 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // CLINode holds a Netceptor, this layer of abstraction might be unnecessary and
@@ -492,10 +493,10 @@ func (m *CLIMesh) CheckConnections() bool {
 
 // CheckAdvertisements returns true if the advertisements are recorded in
 // a manner consistent with the work-commands defined for the mesh.
-func (m *CLIMesh) CheckAdvertisements() bool {
+func (m *CLIMesh) CheckAdvertisements() (bool, error) {
 	statusList, err := m.Status()
 	if err != nil {
-		return false
+		return false, err
 	}
 	for _, status := range statusList {
 		actual := map[string][]string{}
@@ -520,10 +521,10 @@ func (m *CLIMesh) CheckAdvertisements() bool {
 			}
 		}
 		if reflect.DeepEqual(actual, expected) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh.
@@ -569,35 +570,61 @@ func (m *CLIMesh) CheckRoutes() bool {
 
 // CheckControlSockets Checks if the Control sockets in the mesh are all running and accepting
 // connections.
-func (m *CLIMesh) CheckControlSockets() bool {
+func (m *CLIMesh) CheckControlSockets() (bool, error) {
 	for _, node := range m.nodes {
 		controller := receptorcontrol.New()
-		if controller.Connect(node.ControlSocket()) != nil {
-			return false
+		if err := controller.Connect(node.ControlSocket()); err != nil {
+			return false, err
 		}
 		controller.Close()
 	}
-	return true
+	return true, nil
 }
 
 // WaitForReady Waits for connections and routes to converge.
 func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
+
+	err := wait.PollImmediateUntil(sleepInterval, m.CheckControlSockets, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for control sockets")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckConnections) {
+
+	err = wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckConnections(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for Connections")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
+
+	err = wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckKnownConnectionCosts(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while checking Connection Costs")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
+
+	err = wait.PollImmediateUntil(sleepInterval, func() (bool, error) { return m.CheckRoutes(), nil }, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for routes to converge")
+	case err != nil:
+		return err
 	}
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckAdvertisements) {
+
+	err = wait.PollImmediateUntil(sleepInterval, m.CheckAdvertisements, ctx.Done())
+	switch {
+	case errors.Is(err, wait.ErrWaitTimeout):
 		return errors.New("timed out while waiting for Advertisements")
+	case err != nil:
+		return err
 	}
+
 	return nil
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func checkSkipKube(t *testing.T) {
@@ -199,11 +200,11 @@ func TestWork(t *testing.T) {
 
 		assertFilesReleased := func(ctx context.Context, nodeDir, nodeID, unitID string) error {
 			workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
-			check := func() bool {
+			check := func() (bool, error) {
 				_, err := os.Stat(workPath)
-				return os.IsNotExist(err)
+				return os.IsNotExist(err), nil
 			}
-			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
+			if wait.PollImmediateUntil(3000*time.Millisecond, check, ctx.Done()) != nil {
 				return fmt.Errorf("unitID %s on %s did not release", unitID, nodeID)
 			}
 			return nil
@@ -211,15 +212,16 @@ func TestWork(t *testing.T) {
 
 		assertStdoutFizeSize := func(ctx context.Context, nodeDir, nodeID, unitID string, waitUntilSize int) error {
 			stdoutFilename := filepath.Join(nodeDir, "datadir", nodeID, unitID, "stdout")
-			check := func() bool {
+			check := func() (bool, error) {
 				_, err := os.Stat(stdoutFilename)
 				if os.IsNotExist(err) {
-					return false
+					return false, nil
 				}
 				fstat, _ := os.Stat(stdoutFilename)
-				return int(fstat.Size()) >= waitUntilSize
+				return int(fstat.Size()) >= waitUntilSize, nil
 			}
-			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
+
+			if wait.PollImmediateUntil(3000*time.Millisecond, check, ctx.Done()) != nil {
 				return fmt.Errorf("file size not correct for %s", stdoutFilename)
 			}
 			return nil

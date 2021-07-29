@@ -60,9 +60,6 @@ func (b *Broker) start() {
 
 // Subscribe registers to receive messages from the broker
 func (b *Broker) Subscribe() chan interface{} {
-	if b == nil || b.ctx == nil {
-		fmt.Printf("foo\n")
-	}
 	if b.ctx.Err() == nil {
 		msgCh := make(chan interface{}, 1)
 		b.subCh <- msgCh

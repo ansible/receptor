@@ -25,7 +25,7 @@ type acceptResult struct {
 	err  error
 }
 
-// Listener implements the net.Listener interface via the Receptor network
+// Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
 	s          *Netceptor
 	pc         *PacketConn
@@ -35,7 +35,7 @@ type Listener struct {
 	doneOnce   *sync.Once
 }
 
-// Internal implementation of Listen and ListenAndAdvertise
+// Internal implementation of Listen and ListenAndAdvertise.
 func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
@@ -217,7 +217,7 @@ func (li *Listener) acceptLoop() {
 	}
 }
 
-// Accept accepts a connection via the listener
+// Accept accepts a connection via the listener.
 func (li *Listener) Accept() (net.Conn, error) {
 	select {
 	case ar := <-li.acceptChan:
@@ -227,25 +227,24 @@ func (li *Listener) Accept() (net.Conn, error) {
 	}
 }
 
-// Close closes the listener
+// Close closes the listener.
 func (li *Listener) Close() error {
 	li.doneOnce.Do(func() {
 		close(li.doneChan)
 	})
-	qerr := li.ql.Close()
-	perr := li.pc.Close()
-	if qerr != nil {
-		return qerr
+
+	if err := li.ql.Close(); err != nil {
+		return err
 	}
-	return perr
+	return li.pc.Close()
 }
 
-// Addr returns the local address of this listener
+// Addr returns the local address of this listener.
 func (li *Listener) Addr() net.Addr {
 	return li.pc.LocalAddr()
 }
 
-// Conn implements the net.Conn interface via the Receptor network
+// Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
@@ -373,22 +372,22 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	}
 }
 
-// Read reads data from the connection
+// Read reads data from the connection.
 func (c *Conn) Read(b []byte) (n int, err error) {
 	return c.qs.Read(b)
 }
 
-// CancelRead cancels a pending read operation
+// CancelRead cancels a pending read operation.
 func (c *Conn) CancelRead() {
 	c.qs.CancelRead(499)
 }
 
-// Write writes data to the connection
+// Write writes data to the connection.
 func (c *Conn) Write(b []byte) (n int, err error) {
 	return c.qs.Write(b)
 }
 
-// Close closes the writer side of the connection
+// Close closes the writer side of the connection.
 func (c *Conn) Close() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
@@ -396,27 +395,27 @@ func (c *Conn) Close() error {
 	return c.qs.Close()
 }
 
-// LocalAddr returns the local address of this connection
+// LocalAddr returns the local address of this connection.
 func (c *Conn) LocalAddr() net.Addr {
 	return c.qc.LocalAddr()
 }
 
-// RemoteAddr returns the remote address of this connection
+// RemoteAddr returns the remote address of this connection.
 func (c *Conn) RemoteAddr() net.Addr {
 	return c.qc.RemoteAddr()
 }
 
-// SetDeadline sets both read and write deadlines
+// SetDeadline sets both read and write deadlines.
 func (c *Conn) SetDeadline(t time.Time) error {
 	return c.qs.SetDeadline(t)
 }
 
-// SetReadDeadline sets the read deadline
+// SetReadDeadline sets the read deadline.
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	return c.qs.SetReadDeadline(t)
 }
 
-// SetWriteDeadline sets the write deadline
+// SetWriteDeadline sets the write deadline.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.qs.SetWriteDeadline(t)
 }

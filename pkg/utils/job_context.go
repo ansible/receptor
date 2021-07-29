@@ -70,22 +70,22 @@ func (mw *JobContext) Wait() {
 	}
 }
 
-// Done implements Context.Done()
+// Done implements Context.Done().
 func (mw *JobContext) Done() <-chan struct{} {
 	return mw.ctx.Done()
 }
 
-// Err implements Context.Err()
+// Err implements Context.Err().
 func (mw *JobContext) Err() error {
 	return mw.ctx.Err()
 }
 
-// Deadline implements Context.Deadline()
+// Deadline implements Context.Deadline().
 func (mw *JobContext) Deadline() (time time.Time, ok bool) {
 	return mw.ctx.Deadline()
 }
 
-// Value implements Context.Value()
+// Value implements Context.Value().
 func (mw *JobContext) Value(key interface{}) interface{} {
 	return mw.ctx.Value(key)
 }
@@ -97,7 +97,7 @@ func (mw *JobContext) Cancel() {
 	}
 }
 
-// Running returns true if a job is currently running
+// Running returns true if a job is currently running.
 func (mw *JobContext) Running() bool {
 	mw.runningLock.Lock()
 	defer mw.runningLock.Unlock()

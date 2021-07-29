@@ -19,7 +19,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// CertNames lists the subjectAltNames that can be assigned to a certificate or request
+// CertNames lists the subjectAltNames that can be assigned to a certificate or request.
 type CertNames struct {
 	DNSNames    []string
 	NodeIDs     []string
@@ -126,7 +126,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
-// LoadCertificate loads a single certificate from a file
+// LoadCertificate loads a single certificate from a file.
 func LoadCertificate(filename string) (*x509.Certificate, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
@@ -142,7 +142,7 @@ func LoadCertificate(filename string) (*x509.Certificate, error) {
 	return cert, nil
 }
 
-// LoadRequest loads a single certificate request from a file
+// LoadRequest loads a single certificate request from a file.
 func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
@@ -158,7 +158,7 @@ func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 	return req, nil
 }
 
-// LoadPrivateKey loads a single RSA private key from a file
+// LoadPrivateKey loads a single RSA private key from a file.
 func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {

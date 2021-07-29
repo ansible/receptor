@@ -46,7 +46,7 @@ func (c *tracerouteCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFunc
 		pingTime, pingRemote, err := ping(nc, c.target, byte(i))
 		thisResult["From"] = pingRemote
 		thisResult["Time"] = pingTime
-		thisResult["TimeStr"] = fmt.Sprintf("%s", pingTime)
+		thisResult["TimeStr"] = fmt.Sprint(pingTime)
 		if err != nil && err.Error() != netceptor.ProblemExpiredInTransit {
 			thisResult["Error"] = err.Error()
 		}

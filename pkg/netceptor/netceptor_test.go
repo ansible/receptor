@@ -24,7 +24,7 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 	s := strings.Trim(string(p), "\n")
 	if strings.HasPrefix(s, "ERROR") {
 		if !strings.Contains(s, "maximum number of forwarding hops") {
-			fmt.Printf(s)
+			fmt.Println(s)
 			lw.t.Fatal(s)
 			return
 		}
@@ -306,9 +306,7 @@ func TestLotsOfPings(t *testing.T) {
 	}()
 
 	t.Log("waiting for done")
-	select {
-	case <-ctx.Done():
-	}
+	<-ctx.Done()
 	t.Log("waiting for waitgroup")
 	wg.Wait()
 
@@ -432,7 +430,6 @@ func TestDuplicateNodeDetection(t *testing.T) {
 
 		// Force close the connection to the connected node
 		_ = c2.Close()
-
 	}
 
 	// Shut down the rest of the network

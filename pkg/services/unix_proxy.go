@@ -16,7 +16,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network
+// UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network.
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
 	node string, rservice string, tlscfg *tls.Config) error {
 	uli, lock, err := utils.UnixSocketListen(filename, permissions)
@@ -48,7 +48,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 	return nil
 }
 
-// UnixProxyServiceOutbound listens on the Receptor network and forwards the connection via a Unix socket
+// UnixProxyServiceOutbound listens on the Receptor network and forwards the connection via a Unix socket.
 func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tls.Config, filename string) error {
 	qli, err := s.ListenAndAdvertise(service, tlscfg, map[string]string{
 		"type":     "Unix Proxy",
@@ -63,7 +63,6 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 			if err != nil {
 				logger.Error("Error accepting connection on Receptor network: %s\n", err)
 				return
-
 			}
 			uc, err := net.Dial("unix", filename)
 			if err != nil {
@@ -76,7 +75,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 	return nil
 }
 
-// unixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy
+// unixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy.
 type unixProxyInboundCfg struct {
 	Filename      string `required:"true" description:"Socket filename, which will be overwritten"`
 	Permissions   int    `description:"Socket file permissions" default:"0600"`
@@ -85,7 +84,7 @@ type unixProxyInboundCfg struct {
 	TLS           string `description:"Name of TLS client config for the Receptor connection"`
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg unixProxyInboundCfg) Run() error {
 	logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, "receptor")
@@ -96,14 +95,14 @@ func (cfg unixProxyInboundCfg) Run() error {
 		cfg.RemoteNode, cfg.RemoteService, tlscfg)
 }
 
-// unixProxyOutboundCfg is the cmdline configuration object for a Unix socket outbound proxy
+// unixProxyOutboundCfg is the cmdline configuration object for a Unix socket outbound proxy.
 type unixProxyOutboundCfg struct {
 	Service  string `required:"true" description:"Receptor service name to bind to"`
 	Filename string `required:"true" description:"Socket filename, which must already exist"`
 	TLS      string `description:"Name of TLS server config for the Receptor connection"`
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg unixProxyOutboundCfg) Run() error {
 	logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)

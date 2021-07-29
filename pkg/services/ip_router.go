@@ -29,7 +29,7 @@ type ipRoute struct {
 	via  string
 }
 
-// IPRouterService is an IP router service
+// IPRouterService is an IP router service.
 type IPRouterService struct {
 	nc              *netceptor.Netceptor
 	networkName     string
@@ -144,7 +144,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 		found := false
 		for j := range routes {
 			route := routes[j]
-			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+			if kr.dest.IP.Equal(route.Dst.IP) && bytes.Equal(kr.dest.Mask, route.Dst.Mask) {
 				found = true
 				break
 			}
@@ -169,7 +169,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 		found := false
 		for j := range ipr.knownRoutes {
 			kr := ipr.knownRoutes[j]
-			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+			if kr.dest.IP.Equal(route.Dst.IP) && bytes.Equal(kr.dest.Mask, route.Dst.Mask) {
 				found = true
 				break
 			}
@@ -350,7 +350,7 @@ func (ipr *IPRouterService) run() error {
 	return nil
 }
 
-// ipRouterCfg is the cmdline configuration object for an IP router
+// ipRouterCfg is the cmdline configuration object for an IP router.
 type ipRouterCfg struct {
 	NetworkName string `required:"true" description:"Name of this network and service."`
 	Interface   string `description:"Name of the local tun interface"`
@@ -358,7 +358,7 @@ type ipRouterCfg struct {
 	Routes      string `description:"Comma separated list of CIDR subnets to advertise"`
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg ipRouterCfg) Run() error {
 	logger.Debug("Running tun router service %s\n", cfg)
 	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)

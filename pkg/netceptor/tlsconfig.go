@@ -20,7 +20,7 @@ var configSection = &cmdline.ConfigSection{
 	Order:       5,
 }
 
-// tlsServerCfg stores the configuration options for a TLS server
+// tlsServerCfg stores the configuration options for a TLS server.
 type tlsServerCfg struct {
 	Name              string `required:"true" description:"Name of this TLS server configuration"`
 	Cert              string `required:"true" description:"Server certificate filename"`
@@ -29,7 +29,7 @@ type tlsServerCfg struct {
 	ClientCAs         string `description:"Filename of CA bundle to verify client certs with"`
 }
 
-// Prepare creates the tls.config and stores it in the global map
+// Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsServerCfg) Prepare() error {
 	tlscfg := &tls.Config{}
 
@@ -70,7 +70,7 @@ func (cfg tlsServerCfg) Prepare() error {
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
 
-// tlsClientConfig stores the configuration options for a TLS client
+// tlsClientConfig stores the configuration options for a TLS client.
 type tlsClientConfig struct {
 	Name               string `required:"true" description:"Name of this TLS client configuration"`
 	Cert               string `required:"false" description:"Client certificate filename"`
@@ -79,7 +79,7 @@ type tlsClientConfig struct {
 	InsecureSkipVerify bool   `required:"false" description:"Accept any server cert" default:"false"`
 }
 
-// Prepare creates the tls.config and stores it in the global map
+// Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsClientConfig) Prepare() error {
 	tlscfg := &tls.Config{}
 

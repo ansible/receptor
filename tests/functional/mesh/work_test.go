@@ -17,8 +17,7 @@ import (
 )
 
 func checkSkipKube(t *testing.T) {
-	skip := os.Getenv("SKIP_KUBE")
-	if skip == "1" {
+	if skip := os.Getenv("SKIP_KUBE"); skip == "1" {
 		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
 	}
 }
@@ -202,10 +201,7 @@ func TestWork(t *testing.T) {
 			workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
 			check := func() bool {
 				_, err := os.Stat(workPath)
-				if os.IsNotExist(err) {
-					return true
-				}
-				return false
+				return os.IsNotExist(err)
 			}
 			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 				return fmt.Errorf("unitID %s on %s did not release", unitID, nodeID)
@@ -221,10 +217,7 @@ func TestWork(t *testing.T) {
 					return false
 				}
 				fstat, _ := os.Stat(stdoutFilename)
-				if int(fstat.Size()) >= waitUntilSize {
-					return true
-				}
-				return false
+				return int(fstat.Size()) >= waitUntilSize
 			}
 			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 				return fmt.Errorf("file size not correct for %s", stdoutFilename)
@@ -594,7 +587,6 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-
 	}
 }
 

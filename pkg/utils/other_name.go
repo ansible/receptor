@@ -7,19 +7,19 @@ import (
 )
 
 var (
-	// OIDSubjectAltName is the OID for subjectAltName
+	// OIDSubjectAltName is the OID for subjectAltName.
 	OIDSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
-	// OIDReceptorName is the OID for a Receptor node ID
+	// OIDReceptorName is the OID for a Receptor node ID.
 	OIDReceptorName = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 2312, 19, 1}
 )
 
-// OtherNameDecode is used for decoding the OtherName field type of an x.509 subjectAltName
+// OtherNameDecode is used for decoding the OtherName field type of an x.509 subjectAltName.
 type OtherNameDecode struct {
 	ID    asn1.ObjectIdentifier
 	Value asn1.RawValue
 }
 
-// ReceptorNames returns a list of Receptor node IDs found in the subjectAltName field of an x.509 certificate
+// ReceptorNames returns a list of Receptor node IDs found in the subjectAltName field of an x.509 certificate.
 func ReceptorNames(extensions []pkix.Extension) ([]string, error) {
 	names := make([]string, 0)
 	for _, extension := range extensions {
@@ -51,35 +51,35 @@ func ReceptorNames(extensions []pkix.Extension) ([]string, error) {
 	return names, nil
 }
 
-// UTFString is used for encoding a UTF-8 string
+// UTFString is used for encoding a UTF-8 string.
 type UTFString struct {
 	A string `asn1:"utf8"`
 }
 
-// DNSNameEncode is used for encoding the OtherName field of an x.509 subjectAltName
+// DNSNameEncode is used for encoding the OtherName field of an x.509 subjectAltName.
 type DNSNameEncode struct {
 	Value string `asn1:"tag:2"`
 }
 
-// IPAddressEncode is used for encoding the OtherName field of an x.509 subjectAltName
+// IPAddressEncode is used for encoding the OtherName field of an x.509 subjectAltName.
 type IPAddressEncode struct {
 	Value []byte `asn1:"tag:7"`
 }
 
-// OtherNameEncode is used for encoding the OtherName field of an x.509 subjectAltName
+// OtherNameEncode is used for encoding the OtherName field of an x.509 subjectAltName.
 type OtherNameEncode struct {
 	OID   asn1.ObjectIdentifier
 	Value UTFString `asn1:"tag:0"`
 }
 
-// GeneralNameEncode is used for encoding a GeneralName in an x.509 certificate
+// GeneralNameEncode is used for encoding a GeneralName in an x.509 certificate.
 type GeneralNameEncode struct {
 	Names []interface{} `asn1:"tag:0"`
 }
 
-// MakeReceptorSAN generates a subjectAltName extension, optionally containing Receptor names
+// MakeReceptorSAN generates a subjectAltName extension, optionally containing Receptor names.
 func MakeReceptorSAN(dnsNames []string, ipAddresses []net.IP, nodeIDs []string) (*pkix.Extension, error) {
-	var rawValues []asn1.RawValue
+	rawValues := []asn1.RawValue{}
 	for _, name := range dnsNames {
 		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
 	}

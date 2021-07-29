@@ -69,7 +69,7 @@ func TestStatusFileLock(t *testing.T) {
 				}
 				if detailIter >= 0 {
 					if int64(sfd.State) != sfd.StdoutSize || sfd.State != detailIter {
-						t.Fatal(fmt.Sprintf("Mismatched data in struct"))
+						t.Fatal("Mismatched data in struct")
 					}
 				}
 			}
@@ -77,7 +77,7 @@ func TestStatusFileLock(t *testing.T) {
 	}
 	wg.Wait()
 	cancel()
-	totalTime := time.Now().Sub(startTime)
+	totalTime := time.Since(startTime)
 	if totalTime < totalWaitTime {
 		t.Fatal("File locks apparently not locking")
 	}

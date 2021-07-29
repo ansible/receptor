@@ -1,71 +1,75 @@
-# TODO: Linters that should immediately added after golangci-lint has been accepted:
-# - thelper
-# - staticcheck
-# - nilerr
-# - ineffassign
-# - govet
-# - gosimple
-# - wastedassign
-# - exhaustive
-# - stylecheck
-# - errorlint
-# - structcheck
-# - unparam
-# - bodyclose
-# - unused
-# - prealloc
-# - errcheck
-# - prealloc
-# - gosec
-# - gofumpt
-# - goimports
-# - gofmt
-# - gocritic
-# - gci
-# - deadcode
-# - makezero
-# - revive
-# - forbidigo
-# - errcheck
-# - forcetypeassert
-# - paralleltest
-
-# TODO: Linters that should be included to improve code quality. Not already added because bigger code changes are required. (Ordered)
-# - wrapcheck: Wrap errors with more context before passing them up to. Helps understanding what happens.
-# - goerr113: No dynamic errors please.
-# - goprintffuncname: Encourage consistent func naming.
-# - nlreturn, whitespace, wsl: Improve readability by forcing new lines at certain places.
-# - godot: Comments are sentences and end with periods.
-# - dupl: Duplicate code bad!
-# - ifshort: Improve readability by encouraging the short if syntax.
-# - goconst: encourage constants.
-# - gochecknoinits: Don't use init().
-# - testpackage: Encourages black box testing.
-# - gochecknoglobals: Dislikes that you create globals.
-# - cyclop, funlen, gocognit, gocyclo, nestif: Low complexity ftw.
-# - exhaustivestruct: Be way too verbose with structs.
-
 linters:
   disable-all: true
   enable:
-    - typecheck
-    - varcheck
     - asciicheck
+    - bodyclose
+    # - cyclop # TODO: Reduce code complexity.
+    - deadcode
     - depguard
     - dogsled
+    #- dupl # TODO: Remove duplicates.
     - durationcheck
+    - errcheck
+    - errorlint
     - exportloopref
+    - forcetypeassert
+    #- funlen # TODO: Reduce code complexity.
+    - gci
+    #- gochecknoglobals # TODO: Reduce number of globals.
+    #- gochecknoinits # TODO: Maybe not use init().
+    #- gocognit # TODO: Reduce code complexity.
+    - gocritic
+    #- gocyclo # TODO: Reduce code complexity.
+    - godot
+    #- goerr113 # TODO: Please do not use dynamic errors.
+    - gofmt
+    - gofumpt
     - goheader
+    - goimports
     - golint
     - gomoddirectives
     - gomodguard
+    # - goprintffuncname # TODO: logging methods are not named like the ones in `fmt` which could lead to problems.
+    - gosec
+    - gosimple
+    - govet
+    - ifshort
     - importas
+    - ineffassign
+    - makezero
     - misspell
     - nakedret
+    # - nestif # TODO: Reduce code complexity.
+    - nilerr
+    # - nlreturn # TODO: Improves code readability.
     - noctx
     - nolintlint
+    #- paralleltest # TODO: Is this even possible for us?
+    - prealloc
     - predeclared
+    - revive
     - rowserrcheck
     - sqlclosecheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    #- testpackage # TODO: Put tests in their dedicated test packages.
+    #- thelper # TODO: Requires test refactoring.
     - tparallel
+    - typecheck
     - unconvert
+    # - unparam # TODO: This breaks something, look at it!
+    - unused
+    - varcheck
+    - wastedassign
+    - whitespace
+    # - wrapcheck # TODO: Errors passed upwards should be wrapped.
+    # - wsl # TODO: Add more whitespace to make the code readable ... maybe.
+
+issues:
+  exclude:
+    - "lostcancel" # TODO: Context is not canceled on multiple occasions. Needs more detailed work to be fixed.
+    - "SA2002|thelper|testinggoroutine" # TODO: Test interface used outside of its routine, tests need to be rewritten.
+    - "G306" # TODO: Restrict perms of touched files.
+    - "G402|G404" # TODO: Make TLS mroe secure.
+    - "G204" # gosec is throwing a fit, ignore.

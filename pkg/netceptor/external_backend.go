@@ -20,7 +20,7 @@ type ExternalBackend struct {
 	sessChan chan BackendSession
 }
 
-// MessageConn is an abstract connection that sends and receives whole messages (datagrams)
+// MessageConn is an abstract connection that sends and receives whole messages (datagrams).
 type MessageConn interface {
 	WriteMessage(ctx context.Context, data []byte) error
 	ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error)
@@ -28,13 +28,13 @@ type MessageConn interface {
 	Close() error
 }
 
-// netMessageConn implements MessageConn for Go net.Conn
+// netMessageConn implements MessageConn for Go net.Conn.
 type netMessageConn struct {
 	conn   net.Conn
 	framer framer.Framer
 }
 
-// MessageConnFromNetConn returns a MessageConnection that wraps a net.Conn
+// MessageConnFromNetConn returns a MessageConnection that wraps a net.Conn.
 func MessageConnFromNetConn(conn net.Conn) MessageConn {
 	return &netMessageConn{
 		conn:   conn,
@@ -42,7 +42,7 @@ func MessageConnFromNetConn(conn net.Conn) MessageConn {
 	}
 }
 
-// WriteMessage writes a message to the connection
+// WriteMessage writes a message to the connection.
 func (mc *netMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if ctx.Err() != nil {
 		return fmt.Errorf("session closed: %w", ctx.Err())
@@ -58,7 +58,7 @@ func (mc *netMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	return nil
 }
 
-// ReadMessage reads a message from the connection
+// ReadMessage reads a message from the connection.
 func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
 	buf := make([]byte, utils.NormalBufferSize)
 	err := mc.conn.SetReadDeadline(time.Now().Add(timeout))
@@ -91,29 +91,29 @@ func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration
 	return buf, nil
 }
 
-// SetReadDeadline sets the deadline by which a message must be read from the connection
+// SetReadDeadline sets the deadline by which a message must be read from the connection.
 func (mc *netMessageConn) SetReadDeadline(t time.Time) error {
 	panic("implement me")
 }
 
-// Close closes the connection
+// Close closes the connection.
 func (mc *netMessageConn) Close() error {
 	return mc.conn.Close()
 }
 
-// websocketMessageConn implements MessageConn for Gorilla websocket.Conn
+// websocketMessageConn implements MessageConn for Gorilla websocket.Conn.
 type websocketMessageConn struct {
 	conn *websocket.Conn
 }
 
-// MessageConnFromWebsocketConn returns a MessageConnection that wraps a Gorilla websocket.Conn
+// MessageConnFromWebsocketConn returns a MessageConnection that wraps a Gorilla websocket.Conn.
 func MessageConnFromWebsocketConn(conn *websocket.Conn) MessageConn {
 	return &websocketMessageConn{
 		conn: conn,
 	}
 }
 
-// WriteMessage writes a message to the connection
+// WriteMessage writes a message to the connection.
 func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if ctx.Err() != nil {
 		return fmt.Errorf("session closed: %w", ctx.Err())
@@ -121,7 +121,7 @@ func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) e
 	return mc.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-// ReadMessage reads a message from the connection
+// ReadMessage reads a message from the connection.
 func (mc *websocketMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("session closed: %w", ctx.Err())
@@ -133,17 +133,17 @@ func (mc *websocketMessageConn) ReadMessage(ctx context.Context, timeout time.Du
 	return data, err
 }
 
-// SetReadDeadline sets the deadline by which a message must be read from the connection
+// SetReadDeadline sets the deadline by which a message must be read from the connection.
 func (mc *websocketMessageConn) SetReadDeadline(t time.Time) error {
 	return mc.conn.SetReadDeadline(t)
 }
 
-// Close closes the connection
+// Close closes the connection.
 func (mc *websocketMessageConn) Close() error {
 	return mc.conn.Close()
 }
 
-// NewExternalBackend initializes a new ExternalBackend object
+// NewExternalBackend initializes a new ExternalBackend object.
 func NewExternalBackend() (*ExternalBackend, error) {
 	return &ExternalBackend{}, nil
 }
@@ -174,17 +174,17 @@ func (b *ExternalBackend) NewConnection(conn MessageConn, closeConnWithSession b
 	b.sessChan <- ebs
 }
 
-// Send sends data over the session
+// Send sends data over the session.
 func (es *ExternalSession) Send(data []byte) error {
 	return es.conn.WriteMessage(es.eb.ctx, data)
 }
 
-// Recv receives data via the session
+// Recv receives data via the session.
 func (es *ExternalSession) Recv(timeout time.Duration) ([]byte, error) {
 	return es.conn.ReadMessage(es.eb.ctx, timeout)
 }
 
-// Close closes the session
+// Close closes the session.
 func (es *ExternalSession) Close() error {
 	es.eb.cancel()
 	var err error

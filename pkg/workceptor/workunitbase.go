@@ -19,13 +19,13 @@ import (
 	"github.com/rogpeppe/go-internal/lockedfile"
 )
 
-// Work sleep constants
+// Work sleep constants.
 const (
 	SuccessWorkSleep = 1 * time.Second // Normal time to wait between checks
 	MaxWorkSleep     = 1 * time.Minute // Max time to ever wait between checks
 )
 
-// Work state constants
+// Work state constants.
 const (
 	WorkStatePending   = 0
 	WorkStateRunning   = 1
@@ -33,12 +33,12 @@ const (
 	WorkStateFailed    = 3
 )
 
-// IsComplete returns true if a given WorkState indicates the job is finished
+// IsComplete returns true if a given WorkState indicates the job is finished.
 func IsComplete(workState int) bool {
 	return workState == WorkStateSucceeded || workState == WorkStateFailed
 }
 
-// WorkStateToString returns a string representation of a WorkState
+// WorkStateToString returns a string representation of a WorkState.
 func WorkStateToString(workState int) string {
 	switch workState {
 	case WorkStatePending:
@@ -54,15 +54,15 @@ func WorkStateToString(workState int) string {
 	}
 }
 
-// ErrPending is returned when an operation hasn't succeeded or failed yet
+// ErrPending is returned when an operation hasn't succeeded or failed yet.
 var ErrPending = fmt.Errorf("operation pending")
 
-// IsPending returns true if the error is an ErrPending
+// IsPending returns true if the error is an ErrPending.
 func IsPending(err error) bool {
 	return errors.Is(err, ErrPending)
 }
 
-// BaseWorkUnit includes data common to all work units, and partially implements the WorkUnit interface
+// BaseWorkUnit includes data common to all work units, and partially implements the WorkUnit interface.
 type BaseWorkUnit struct {
 	w               *Workceptor
 	status          StatusFileData
@@ -91,32 +91,32 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 }
 
-// SetFromParams sets the in-memory state from parameters
+// SetFromParams sets the in-memory state from parameters.
 func (bwu *BaseWorkUnit) SetFromParams(params map[string]string) error {
 	return nil
 }
 
-// UnitDir returns the unit directory of this work unit
+// UnitDir returns the unit directory of this work unit.
 func (bwu *BaseWorkUnit) UnitDir() string {
 	return bwu.unitDir
 }
 
-// ID returns the unique identifier of this work unit
+// ID returns the unique identifier of this work unit.
 func (bwu *BaseWorkUnit) ID() string {
 	return bwu.unitID
 }
 
-// StatusFileName returns the full path to the status file in the unit dir
+// StatusFileName returns the full path to the status file in the unit dir.
 func (bwu *BaseWorkUnit) StatusFileName() string {
 	return bwu.statusFileName
 }
 
-// StdoutFileName returns the full path to the stdout file in the unit dir
+// StdoutFileName returns the full path to the stdout file in the unit dir.
 func (bwu *BaseWorkUnit) StdoutFileName() string {
 	return bwu.stdoutFileName
 }
 
-// lockStatusFile gains a lock on the status file
+// lockStatusFile gains a lock on the status file.
 func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, error) {
 	lockFileName := filename + ".lock"
 	lockFile, err := lockedfile.OpenFile(lockFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
@@ -126,15 +126,14 @@ func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, er
 	return lockFile, nil
 }
 
-// unlockStatusFile releases the lock on the status file
+// unlockStatusFile releases the lock on the status file.
 func (sfd *StatusFileData) unlockStatusFile(filename string, lockFile *lockedfile.File) {
-	err := lockFile.Close()
-	if err != nil {
+	if err := lockFile.Close(); err != nil {
 		logger.Error("Error closing %s.lock: %s", filename, err)
 	}
 }
 
-// saveToFile saves status to an already-open file
+// saveToFile saves status to an already-open file.
 func (sfd *StatusFileData) saveToFile(file io.Writer) error {
 	jsonBytes, err := json.Marshal(sfd)
 	if err != nil {
@@ -145,7 +144,7 @@ func (sfd *StatusFileData) saveToFile(file io.Writer) error {
 	return err
 }
 
-// Save saves status to a file
+// Save saves status to a file.
 func (sfd *StatusFileData) Save(filename string) error {
 	lockFile, err := sfd.lockStatusFile(filename)
 	if err != nil {
@@ -164,14 +163,14 @@ func (sfd *StatusFileData) Save(filename string) error {
 	return file.Close()
 }
 
-// Save saves status to a file
+// Save saves status to a file.
 func (bwu *BaseWorkUnit) Save() error {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()
 	return bwu.status.Save(bwu.statusFileName)
 }
 
-// loadFromFile loads status from an already open file
+// loadFromFile loads status from an already open file.
 func (sfd *StatusFileData) loadFromFile(file io.Reader) error {
 	jsonBytes, err := ioutil.ReadAll(file)
 	if err != nil {
@@ -180,7 +179,7 @@ func (sfd *StatusFileData) loadFromFile(file io.Reader) error {
 	return json.Unmarshal(jsonBytes, sfd)
 }
 
-// Load loads status from a file
+// Load loads status from a file.
 func (sfd *StatusFileData) Load(filename string) error {
 	lockFile, err := sfd.lockStatusFile(filename)
 	if err != nil {
@@ -199,7 +198,7 @@ func (sfd *StatusFileData) Load(filename string) error {
 	return file.Close()
 }
 
-// Load loads status from a file
+// Load loads status from a file.
 func (bwu *BaseWorkUnit) Load() error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
@@ -290,12 +289,12 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 	}
 }
 
-// LastUpdateError returns the last error (including nil) resulting from an UpdateBasicStatus or UpdateFullStatus
+// LastUpdateError returns the last error (including nil) resulting from an UpdateBasicStatus or UpdateFullStatus.
 func (bwu *BaseWorkUnit) LastUpdateError() error {
 	return bwu.lastUpdateError
 }
 
-// monitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes
+// monitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes.
 func (bwu *BaseWorkUnit) monitorLocalStatus() {
 	statusFile := path.Join(bwu.UnitDir(), "status")
 	watcher, err := fsnotify.NewWatcher()
@@ -355,25 +354,24 @@ loop:
 
 // getStatus returns a copy of the base status (no ExtraData).  The caller must already hold the statusLock.
 func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
-	var status StatusFileData
-	status = bwu.status
+	status := bwu.status
 	status.ExtraData = nil
 	return &status
 }
 
-// Status returns a copy of the status currently loaded in memory (use Load to get it from disk)
+// Status returns a copy of the status currently loaded in memory (use Load to get it from disk).
 func (bwu *BaseWorkUnit) Status() *StatusFileData {
 	return bwu.UnredactedStatus()
 }
 
-// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets
+// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()
 	return bwu.getStatus()
 }
 
-// Release releases this unit of work, deleting its files
+// Release releases this unit of work, deleting its files.
 func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
@@ -411,7 +409,7 @@ func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	return uu
 }
 
-// unknownUnit is used to represent units we find on disk, but don't recognize their WorkType
+// unknownUnit is used to represent units we find on disk, but don't recognize their WorkType.
 type unknownUnit struct {
 	BaseWorkUnit
 }

@@ -35,7 +35,7 @@ import (
 	watch2 "k8s.io/client-go/tools/watch"
 )
 
-// kubeUnit implements the WorkUnit interface
+// kubeUnit implements the WorkUnit interface.
 type kubeUnit struct {
 	BaseWorkUnit
 	authMethod          string
@@ -54,7 +54,7 @@ type kubeUnit struct {
 	podPendingTimeout   time.Duration
 }
 
-// kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker
+// kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker.
 type kubeExtraData struct {
 	Image         string
 	Command       string
@@ -67,10 +67,10 @@ type kubeExtraData struct {
 	PodName       string
 }
 
-// ErrPodCompleted is returned when pod has already completed before we could attach
+// ErrPodCompleted is returned when pod has already completed before we could attach.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
-// podRunningAndReady is a completion criterion for pod ready to be attached to
+// podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(event watch.Event) (bool, error) {
 	if event.Type == watch.Deleted {
 		return false, k8serrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
@@ -129,7 +129,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 			}
 		}
 		if !foundWorker {
-			return fmt.Errorf("At least one container must be named worker")
+			return fmt.Errorf("at least one container must be named worker")
 		}
 		spec.RestartPolicy = corev1.RestartPolicyNever
 		userNamespace := pod.ObjectMeta.Namespace
@@ -206,12 +206,15 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).Watch(kw.ctx, options)
 		},
 	}
-
-	ctxPodReady := kw.ctx
+	var ev *watch.Event
 	if kw.podPendingTimeout != time.Duration(0) {
-		ctxPodReady, _ = context.WithTimeout(kw.ctx, kw.podPendingTimeout)
+		ctxPodReady, cancel := context.WithTimeout(kw.ctx, kw.podPendingTimeout)
+		ev, err = watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady)
+		cancel()
+	} else {
+		ev, err = watch2.UntilWithSync(kw.ctx, lw, &corev1.Pod{}, nil, podRunningAndReady)
 	}
-	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady)
+
 	kw.pod, ok = ev.Object.(*corev1.Pod)
 	if !ok {
 		return fmt.Errorf("watch did not return a pod")
@@ -662,7 +665,8 @@ func readFileToString(filename string) (string, error) {
 	return string(content), nil
 }
 
-// SetFromParams sets the in-memory state from parameters
+// SetFromParams sets the in-memory state from parameters.
+//nolint: ifshort // This function is too magical for the linter to understand.
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	ked, ok := kw.status.ExtraData.(*kubeExtraData)
 	if !ok {
@@ -763,7 +767,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	return nil
 }
 
-// Status returns a copy of the status currently loaded in memory
+// Status returns a copy of the status currently loaded in memory.
 func (kw *kubeUnit) Status() *StatusFileData {
 	status := kw.UnredactedStatus()
 	ed, ok := status.ExtraData.(*kubeExtraData)
@@ -774,7 +778,7 @@ func (kw *kubeUnit) Status() *StatusFileData {
 	return status
 }
 
-// Status returns a copy of the status currently loaded in memory
+// Status returns a copy of the status currently loaded in memory.
 func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	kw.statusLock.RLock()
 	defer kw.statusLock.RUnlock()
@@ -787,11 +791,10 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	return status
 }
 
-// startOrRestart is a shared implementation of Start() and Restart()
+// startOrRestart is a shared implementation of Start() and Restart().
 func (kw *kubeUnit) startOrRestart() error {
 	// Connect to the Kubernetes API
-	err := kw.connectToKube()
-	if err != nil {
+	if err := kw.connectToKube(); err != nil {
 		return err
 	}
 	// Launch runner process
@@ -805,7 +808,7 @@ func (kw *kubeUnit) startOrRestart() error {
 	return nil
 }
 
-// Restart resumes monitoring a job after a Receptor restart
+// Restart resumes monitoring a job after a Receptor restart.
 func (kw *kubeUnit) Restart() error {
 	status := kw.Status()
 	ked, ok := status.ExtraData.(*kubeExtraData)
@@ -871,7 +874,7 @@ func (kw *kubeUnit) Release(force bool) error {
 // Command line
 // **************************************************************************
 
-// workKubeCfg is the cmdline configuration object for a Kubernetes worker plugin
+// workKubeCfg is the cmdline configuration object for a Kubernetes worker plugin.
 type workKubeCfg struct {
 	WorkType            string `required:"true" description:"Name for this worker type"`
 	Namespace           string `description:"Kubernetes namespace to create pods in"`
@@ -887,12 +890,12 @@ type workKubeCfg struct {
 	AllowRuntimeTLS     bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
 	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
 	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
-	AllowRuntimePod     bool   `description:"Allow passing Pod at runtime" default: "false"`
+	AllowRuntimePod     bool   `description:"Allow passing Pod at runtime" default:"false"`
 	DeletePodOnRestart  bool   `description:"On restart, delete the pod if in pending state" default:"true"`
 	StreamMethod        string `description:"Method for connecting to worker pods: logger or tcp" default:"logger"`
 }
 
-// newWorker is a factory to produce worker instances
+// newWorker is a factory to produce worker instances.
 func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
@@ -923,7 +926,7 @@ func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 	return ku
 }
 
-// Prepare inspects the configuration for validity
+// Prepare inspects the configuration for validity.
 func (cfg workKubeCfg) Prepare() error {
 	lcAuth := strings.ToLower(cfg.AuthMethod)
 	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "runtime" {
@@ -960,7 +963,7 @@ func (cfg workKubeCfg) Prepare() error {
 	return nil
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg workKubeCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
 	return err

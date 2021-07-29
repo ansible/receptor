@@ -19,7 +19,7 @@ import (
 )
 
 // CLINode holds a Netceptor, this layer of abstraction might be unnecessary and
-// go away later
+// go away later.
 type CLINode struct {
 	receptorCmd   *exec.Cmd
 	dir           string
@@ -27,14 +27,14 @@ type CLINode struct {
 	controlSocket string
 }
 
-// CLIMesh contains a list of Nodes and the yaml definition that created them
+// CLIMesh contains a list of Nodes and the yaml definition that created them.
 type CLIMesh struct {
 	nodes          map[string]*CLINode
 	MeshDefinition *YamlData
 	dir            string
 }
 
-// NewCLINode builds a node with the name passed as the argument
+// NewCLINode builds a node with the name passed as the argument.
 func NewCLINode(name string) *CLINode {
 	return &CLINode{
 		receptorCmd:   nil,
@@ -42,13 +42,13 @@ func NewCLINode(name string) *CLINode {
 	}
 }
 
-// Dir returns the basedir which contains all of the node data
+// Dir returns the basedir which contains all of the node data.
 func (n *CLINode) Dir() string {
 	return n.dir
 }
 
 // Status returns the status of the node using the control socket to query the
-// node
+// node.
 func (n *CLINode) Status() (*netceptor.Status, error) {
 	controller := receptorcontrol.New()
 	err := controller.Connect(n.controlSocket)
@@ -63,19 +63,19 @@ func (n *CLINode) Status() (*netceptor.Status, error) {
 	return status, nil
 }
 
-// ControlSocket Returns the path to the controlsocket
+// ControlSocket Returns the path to the controlsocket.
 func (n *CLINode) ControlSocket() string {
 	return n.controlSocket
 }
 
-// Shutdown kills the receptor process
+// Shutdown kills the receptor process.
 func (n *CLINode) Shutdown() {
 	if err := n.receptorCmd.Process.Kill(); err != nil {
 		panic(err)
 	}
 }
 
-// Start writes the the node config to disk and starts the receptor process
+// Start writes the the node config to disk and starts the receptor process.
 func (n *CLINode) Start() error {
 	strData, err := yaml.Marshal(n.yamlConfig)
 	if err != nil {
@@ -101,7 +101,7 @@ func (n *CLINode) Start() error {
 }
 
 // Destroy kills the receptor process and puts its ports back into the pool to
-// be reallocated once it's shutdown
+// be reallocated once it's shutdown.
 func (n *CLINode) Destroy() {
 	n.Shutdown()
 	go func() {
@@ -134,19 +134,19 @@ func (n *CLINode) Destroy() {
 	}()
 }
 
-// WaitForShutdown Waits for the receptor process to finish
+// WaitForShutdown Waits for the receptor process to finish.
 func (n *CLINode) WaitForShutdown() {
 	if err := n.receptorCmd.Wait(); err != nil {
 		panic(err)
 	}
 }
 
-// Dir returns the basedir which contains all of the mesh data
+// Dir returns the basedir which contains all of the mesh data.
 func (m *CLIMesh) Dir() string {
 	return m.dir
 }
 
-// Nodes Returns a list of nodes
+// Nodes Returns a list of nodes.
 func (m *CLIMesh) Nodes() map[string]Node {
 	nodes := make(map[string]Node)
 	for k, v := range m.nodes {
@@ -156,7 +156,7 @@ func (m *CLIMesh) Nodes() map[string]Node {
 }
 
 // NewCLIMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
-// calls NewMeshFromYaml on it
+// calls NewMeshFromYaml on it.
 func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -174,7 +174,7 @@ func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 }
 
 // NewCLIMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
-// listening and dialing as defined in the yaml
+// listening and dialing as defined in the yaml.
 func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, error) {
 	mesh := &CLIMesh{}
 	// Setup the mesh directory
@@ -276,7 +276,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 				dialerYaml := make(map[interface{}]interface{})
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
 				bindaddr, ok := listenerMap["bindaddr"].(string)
@@ -300,7 +300,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 				dialerYaml := make(map[interface{}]interface{})
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
 				bindaddr, ok := listenerMap["bindaddr"].(string)
@@ -320,7 +320,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 				dialerYaml := make(map[interface{}]interface{})
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
 
@@ -421,7 +421,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	case node := <-failedMesh:
 		mesh.Destroy()
 		mesh.WaitForShutdown()
-		return nil, fmt.Errorf("Failed to create mesh: node %s exited early", node.dir)
+		return nil, fmt.Errorf("failed to create mesh: node %s exited early", node.dir)
 	case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
 	}
 
@@ -429,14 +429,14 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 }
 
 // Destroy stops all running Netceptors and their backends and frees all
-// relevant resources
+// relevant resources.
 func (m *CLIMesh) Destroy() {
 	for _, node := range m.nodes {
 		node.Destroy()
 	}
 }
 
-// WaitForShutdown Waits for all running Netceptors and their backends to stop
+// WaitForShutdown Waits for all running Netceptors and their backends to stop.
 func (m *CLIMesh) WaitForShutdown() {
 	for _, node := range m.nodes {
 		node.WaitForShutdown()
@@ -444,7 +444,7 @@ func (m *CLIMesh) WaitForShutdown() {
 }
 
 // CheckConnections returns true if the connections defined in our mesh definition are
-// consistent with the connections made by the nodes
+// consistent with the connections made by the nodes.
 func (m *CLIMesh) CheckConnections() bool {
 	statusList, err := m.Status()
 	if err != nil {
@@ -478,13 +478,9 @@ func (m *CLIMesh) CheckConnections() bool {
 				continue
 			}
 		}
-		for nodeID, node := range m.MeshDefinition.Nodes {
+		for nodeID := range m.MeshDefinition.Nodes {
 			if nodeID == status.NodeID {
 				continue
-			}
-			for k := range node.Connections {
-				if k == status.NodeID {
-				}
 			}
 		}
 		if reflect.DeepEqual(actualConnections, expectedConnections) {
@@ -495,7 +491,7 @@ func (m *CLIMesh) CheckConnections() bool {
 }
 
 // CheckAdvertisements returns true if the advertisements are recorded in
-// a manner consistent with the work-commands defined for the mesh
+// a manner consistent with the work-commands defined for the mesh.
 func (m *CLIMesh) CheckAdvertisements() bool {
 	statusList, err := m.Status()
 	if err != nil {
@@ -530,7 +526,7 @@ func (m *CLIMesh) CheckAdvertisements() bool {
 	return false
 }
 
-// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh
+// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh.
 func (m *CLIMesh) CheckKnownConnectionCosts() bool {
 	meshStatus, err := m.Status()
 	if err != nil {
@@ -550,7 +546,7 @@ func (m *CLIMesh) CheckKnownConnectionCosts() bool {
 	return true
 }
 
-// CheckRoutes returns true if every node has a route to every other node
+// CheckRoutes returns true if every node has a route to every other node.
 func (m *CLIMesh) CheckRoutes() bool {
 	meshStatus, err := m.Status()
 	if err != nil {
@@ -572,7 +568,7 @@ func (m *CLIMesh) CheckRoutes() bool {
 }
 
 // CheckControlSockets Checks if the Control sockets in the mesh are all running and accepting
-// connections
+// connections.
 func (m *CLIMesh) CheckControlSockets() bool {
 	for _, node := range m.nodes {
 		controller := receptorcontrol.New()
@@ -584,30 +580,30 @@ func (m *CLIMesh) CheckControlSockets() bool {
 	return true
 }
 
-// WaitForReady Waits for connections and routes to converge
+// WaitForReady Waits for connections and routes to converge.
 func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
-		return errors.New("Timed out while waiting for control sockets")
+		return errors.New("timed out while waiting for control sockets")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckConnections) {
-		return errors.New("Timed out while waiting for Connections")
+		return errors.New("timed out while waiting for Connections")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
-		return errors.New("Timed out while checking Connection Costs")
+		return errors.New("timed out while checking Connection Costs")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
-		return errors.New("Timed out while waiting for routes to converge")
+		return errors.New("timed out while waiting for routes to converge")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckAdvertisements) {
-		return errors.New("Timed out while waiting for Advertisements")
+		return errors.New("timed out while waiting for Advertisements")
 	}
 	return nil
 }
 
-// Status returns a list of statuses from the contained netceptors
+// Status returns a list of statuses from the contained netceptors.
 func (m *CLIMesh) Status() ([]*netceptor.Status, error) {
-	var out []*netceptor.Status
+	out := []*netceptor.Status{}
 	for _, node := range m.nodes {
 		status, err := node.Status()
 		if err != nil {

@@ -25,25 +25,25 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// defaultMTU is the largest message sendable over the Netceptor network
+// defaultMTU is the largest message sendable over the Netceptor network.
 const defaultMTU = 16384
 
-// defaultRouteUpdateTime is the interval at which regular route updates will be sent
+// defaultRouteUpdateTime is the interval at which regular route updates will be sent.
 const defaultRouteUpdateTime = 10 * time.Second
 
-// defaultServiceAdTime is the interval at which regular service advertisements will be sent
+// defaultServiceAdTime is the interval at which regular service advertisements will be sent.
 const defaultServiceAdTime = 60 * time.Second
 
-// defaultSeenUpdateExpireTime is the age after which routing update IDs can be discarded
+// defaultSeenUpdateExpireTime is the age after which routing update IDs can be discarded.
 const defaultSeenUpdateExpireTime = 1 * time.Hour
 
-// defaultMaxForwardingHops is the maximum number of times that Netceptor will forward a data packet
+// defaultMaxForwardingHops is the maximum number of times that Netceptor will forward a data packet.
 const defaultMaxForwardingHops = 30
 
-// defaultMaxConnectionIdleTime is the maximum time a connection can go without data before we consider it failed
+// defaultMaxConnectionIdleTime is the maximum time a connection can go without data before we consider it failed.
 const defaultMaxConnectionIdleTime = 2*defaultRouteUpdateTime + 1*time.Second
 
-// MainInstance is the global instance of Netceptor instantiated by the command-line main() function
+// MainInstance is the global instance of Netceptor instantiated by the command-line main() function.
 var MainInstance *Netceptor
 
 // ErrorFunc is a function parameter used to process errors. The boolean parameter
@@ -65,7 +65,7 @@ func (e *TimeoutError) Timeout() bool { return true }
 // Temporary returns true if a retry is likely a good idea.
 func (e *TimeoutError) Temporary() bool { return true }
 
-// Backend is the interface for back-ends that the Receptor network can run over
+// Backend is the interface for back-ends that the Receptor network can run over.
 type Backend interface {
 	Start(context.Context) (chan BackendSession, error)
 }
@@ -80,7 +80,7 @@ type BackendSession interface {
 	Close() error
 }
 
-// Netceptor is the main object of the Receptor mesh network protocol
+// Netceptor is the main object of the Receptor mesh network protocol.
 type Netceptor struct {
 	nodeID                 string
 	mtu                    int
@@ -141,20 +141,20 @@ type Status struct {
 }
 
 const (
-	// MsgTypeData is a normal data-containing message
+	// MsgTypeData is a normal data-containing message.
 	MsgTypeData = 0
-	// MsgTypeRoute is a routing update
+	// MsgTypeRoute is a routing update.
 	MsgTypeRoute = 1
-	// MsgTypeServiceAdvertisement is an advertisement for a service
+	// MsgTypeServiceAdvertisement is an advertisement for a service.
 	MsgTypeServiceAdvertisement = 2
-	// MsgTypeReject indicates a rejection (closure) of a backend connection
+	// MsgTypeReject indicates a rejection (closure) of a backend connection.
 	MsgTypeReject = 3
 )
 
 const (
-	// ProblemServiceUnknown occurs when a message arrives for a non-listening service
+	// ProblemServiceUnknown occurs when a message arrives for a non-listening service.
 	ProblemServiceUnknown = "service unknown"
-	// ProblemExpiredInTransit occurs when a message's HopsToLive expires in transit
+	// ProblemExpiredInTransit occurs when a message's HopsToLive expires in transit.
 	ProblemExpiredInTransit = "message expired"
 )
 
@@ -192,15 +192,15 @@ type routingUpdate struct {
 }
 
 const (
-	// ConnTypeDatagram indicates a packetconn (datagram) service listener
+	// ConnTypeDatagram indicates a packetconn (datagram) service listener.
 	ConnTypeDatagram = 0
-	// ConnTypeStream indicates a conn (stream) service listener, without a user-defined TLS
+	// ConnTypeStream indicates a conn (stream) service listener, without a user-defined TLS.
 	ConnTypeStream = 1
-	// ConnTypeStreamTLS indicates the service listens on a packetconn connection, with a user-defined TLS
+	// ConnTypeStreamTLS indicates the service listens on a packetconn connection, with a user-defined TLS.
 	ConnTypeStreamTLS = 2
 )
 
-// ServiceAdvertisement is the data associated with a service advertisement
+// ServiceAdvertisement is the data associated with a service advertisement.
 type ServiceAdvertisement struct {
 	NodeID       string
 	Service      string
@@ -210,13 +210,13 @@ type ServiceAdvertisement struct {
 	WorkCommands []string
 }
 
-// serviceAdvertisementFull is the whole message from the network
+// serviceAdvertisementFull is the whole message from the network.
 type serviceAdvertisementFull struct {
 	*ServiceAdvertisement
 	Cancel bool
 }
 
-// UnreachableMessage is the on-the-wire data associated with an unreachable message
+// UnreachableMessage is the on-the-wire data associated with an unreachable message.
 type UnreachableMessage struct {
 	FromNode    string
 	ToNode      string
@@ -225,7 +225,7 @@ type UnreachableMessage struct {
 	Problem     string
 }
 
-// UnreachableNotification includes additional information returned from SubscribeUnreachable
+// UnreachableNotification includes additional information returned from SubscribeUnreachable.
 type UnreachableNotification struct {
 	UnreachableMessage
 	ReceivedFromNode string
@@ -236,7 +236,7 @@ var (
 	networkNamesLock = sync.Mutex{}
 )
 
-// makeNetworkName returns a network name that is unique within global scope
+// makeNetworkName returns a network name that is unique within global scope.
 func makeNetworkName(nodeID string) string {
 	networkNamesLock.Lock()
 	defer networkNamesLock.Unlock()
@@ -259,7 +259,7 @@ func makeNetworkName(nodeID string) string {
 	}
 }
 
-// NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants
+// NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants.
 func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
 	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
@@ -303,9 +303,6 @@ func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 		"ping":    s.handlePing,
 		"unreach": s.handleUnreachable,
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	s.clientTLSConfigs["default"] = &tls.Config{}
 	s.addNameHash(nodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
@@ -333,13 +330,13 @@ func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 	return &s
 }
 
-// New constructs a new Receptor network protocol instance
+// New constructs a new Receptor network protocol instance.
 func New(ctx context.Context, nodeID string, allowedPeers []string) *Netceptor {
 	return NewWithConsts(ctx, nodeID, allowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
 		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
-// NewAddr generates a Receptor network address from a node ID and service name
+// NewAddr generates a Receptor network address from a node ID and service name.
 func (s *Netceptor) NewAddr(node string, service string) Addr {
 	return Addr{
 		network: s.networkName,
@@ -348,52 +345,52 @@ func (s *Netceptor) NewAddr(node string, service string) Addr {
 	}
 }
 
-// Context returns the context for this Netceptor instance
+// Context returns the context for this Netceptor instance.
 func (s *Netceptor) Context() context.Context {
 	return s.context
 }
 
-// Shutdown shuts down a Netceptor instance
+// Shutdown shuts down a Netceptor instance.
 func (s *Netceptor) Shutdown() {
 	s.cancelFunc()
 }
 
-// nodeID returns the local Node ID of this Netceptor instance
+// nodeID returns the local Node ID of this Netceptor instance.
 func (s *Netceptor) NodeID() string {
 	return s.nodeID
 }
 
-// MTU returns the configured MTU of this Netceptor instance
+// MTU returns the configured MTU of this Netceptor instance.
 func (s *Netceptor) MTU() int {
 	return s.mtu
 }
 
-// RouteUpdateTime returns the configured RouteUpdateTime of this Netceptor instance
+// RouteUpdateTime returns the configured RouteUpdateTime of this Netceptor instance.
 func (s *Netceptor) RouteUpdateTime() time.Duration {
 	return s.routeUpdateTime
 }
 
-// ServiceAdTime returns the configured ServiceAdTime of this Netceptor instance
+// ServiceAdTime returns the configured ServiceAdTime of this Netceptor instance.
 func (s *Netceptor) ServiceAdTime() time.Duration {
 	return s.serviceAdTime
 }
 
-// SeenUpdateExpireTime returns the configured SeenUpdateExpireTime of this Netceptor instance
+// SeenUpdateExpireTime returns the configured SeenUpdateExpireTime of this Netceptor instance.
 func (s *Netceptor) SeenUpdateExpireTime() time.Duration {
 	return s.seenUpdateExpireTime
 }
 
-// MaxForwardingHops returns the configured MaxForwardingHops of this Netceptor instance
+// MaxForwardingHops returns the configured MaxForwardingHops of this Netceptor instance.
 func (s *Netceptor) MaxForwardingHops() byte {
 	return s.maxForwardingHops
 }
 
-// MaxConnectionIdleTime returns the configured MaxConnectionIdleTime of this Netceptor instance
+// MaxConnectionIdleTime returns the configured MaxConnectionIdleTime of this Netceptor instance.
 func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
 }
 
-// AddBackend adds a backend to the Netceptor system
+// AddBackend adds a backend to the Netceptor system.
 func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
 	sessChan, err := backend.Start(s.context)
 	if err != nil {
@@ -426,17 +423,17 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 	return nil
 }
 
-// BackendWait waits for the backend wait group
+// BackendWait waits for the backend wait group.
 func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()
 }
 
-// BackendCount returns the number of backends that ever registered with this Netceptor
+// BackendCount returns the number of backends that ever registered with this Netceptor.
 func (s *Netceptor) BackendCount() int {
 	return s.backendCount
 }
 
-// Status returns the current state of the Netceptor object
+// Status returns the current state of the Netceptor object.
 func (s *Netceptor) Status() Status {
 	s.connLock.RLock()
 	conns := make([]*ConnStatus, 0)
@@ -539,7 +536,7 @@ func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
 	return nil
 }
 
-// Send a single service broadcast
+// Send a single service broadcast.
 func (s *Netceptor) sendServiceAd(si *ServiceAdvertisement) error {
 	logger.Debug("Sending service advertisement: %v\n", si)
 	sf := serviceAdvertisementFull{
@@ -554,7 +551,7 @@ func (s *Netceptor) sendServiceAd(si *ServiceAdvertisement) error {
 	return nil
 }
 
-// Send advertisements for all advertised services
+// Send advertisements for all advertised services.
 func (s *Netceptor) sendServiceAds() {
 	ads := make([]ServiceAdvertisement, 0)
 	s.listenerLock.RLock()
@@ -580,7 +577,7 @@ func (s *Netceptor) sendServiceAds() {
 	}
 }
 
-// Watches connections and expires any that haven't seen traffic in too long
+// Watches connections and expires any that haven't seen traffic in too long.
 func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
@@ -603,7 +600,7 @@ func (s *Netceptor) monitorConnectionAging() {
 	}
 }
 
-// Expires old updates from the seenUpdates table
+// Expires old updates from the seenUpdates table.
 func (s *Netceptor) expireSeenUpdates() {
 	for {
 		select {
@@ -622,7 +619,7 @@ func (s *Netceptor) expireSeenUpdates() {
 	}
 }
 
-// Recalculates the next-hop table based on current knowledge of the network
+// Recalculates the next-hop table based on current knowledge of the network.
 func (s *Netceptor) updateRoutingTable() {
 	s.knownNodeLock.RLock()
 	defer s.knownNodeLock.RUnlock()
@@ -682,7 +679,7 @@ func (s *Netceptor) updateRoutingTable() {
 	s.printRoutingTable()
 }
 
-// SubscribeRoutingUpdates subscribes for messages when the routing table is changed
+// SubscribeRoutingUpdates subscribes for messages when the routing table is changed.
 func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
 	iChan := s.routingUpdateBroker.Subscribe()
 	uChan := make(chan map[string]string)
@@ -713,7 +710,7 @@ func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
 	return uChan
 }
 
-// Forwards a message to all neighbors, possibly excluding one
+// Forwards a message to all neighbors, possibly excluding one.
 func (s *Netceptor) flood(message []byte, excludeConn string) {
 	s.connLock.RLock()
 	writeChans := make([]chan []byte, 0)
@@ -741,7 +738,7 @@ func (s *Netceptor) GetServerTLSConfig(name string) (*tls.Config, error) {
 	return sc.Clone(), nil
 }
 
-// AddWorkCommand records a work command so it can be included in service announcements
+// AddWorkCommand records a work command so it can be included in service announcements.
 func (s *Netceptor) AddWorkCommand(command string) error {
 	if command == "" {
 		return fmt.Errorf("must provide a name")
@@ -760,7 +757,7 @@ func (s *Netceptor) AddWorkCommand(command string) error {
 	return nil
 }
 
-// SetServerTLSConfig stores a server TLS config by name
+// SetServerTLSConfig stores a server TLS config by name.
 func (s *Netceptor) SetServerTLSConfig(name string, config *tls.Config) error {
 	if name == "" {
 		return fmt.Errorf("must provide a name")
@@ -769,7 +766,7 @@ func (s *Netceptor) SetServerTLSConfig(name string, config *tls.Config) error {
 	return nil
 }
 
-// ReceptorCertNameError is the error produced when Receptor certificate name verification fails
+// ReceptorCertNameError is the error produced when Receptor certificate name verification fails.
 type ReceptorCertNameError struct {
 	ValidNodes   []string
 	ExpectedNode string
@@ -789,13 +786,13 @@ func (rce ReceptorCertNameError) Error() string {
 }
 
 const (
-	// VerifyServer indicates we are the client, verifying a server
+	// VerifyServer indicates we are the client, verifying a server.
 	VerifyServer = 1
-	// VerifyClient indicates we are the server, verifying a client
+	// VerifyClient indicates we are the server, verifying a client.
 	VerifyClient = 2
 )
 
-// receptorVerifyFunc generates a function that verifies a Receptor node ID
+// receptorVerifyFunc generates a function that verifies a Receptor node ID.
 func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectednodeID string,
 	verifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
@@ -878,7 +875,7 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 	return tlscfg, nil
 }
 
-// SetClientTLSConfig stores a client TLS config by name
+// SetClientTLSConfig stores a client TLS config by name.
 func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config) error {
 	if name == "" {
 		return fmt.Errorf("must provide a name")
@@ -887,10 +884,10 @@ func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config) error {
 	return nil
 }
 
-// All-zero seed for deterministic highwayhash
+// All-zero seed for deterministic highwayhash.
 var zerokey = make([]byte, 32)
 
-// Hash a name and add it to the lookup table
+// Hash a name and add it to the lookup table.
 func (s *Netceptor) addNameHash(name string) uint64 {
 	if strings.EqualFold(name, "localhost") {
 		name = s.nodeID
@@ -907,7 +904,7 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 	return hv
 }
 
-// Looks up a name given a hash received from the network
+// Looks up a name given a hash received from the network.
 func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	s.hashLock.RLock()
 	defer s.hashLock.RUnlock()
@@ -918,7 +915,7 @@ func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	return name, nil
 }
 
-// Given a string, returns a fixed-length buffer right-padded with null (0) bytes
+// Given a string, returns a fixed-length buffer right-padded with null (0) bytes.
 func stringFromFixedLenBytes(bytes []byte) string {
 	p := len(bytes) - 1
 	for p >= 0 && bytes[p] == 0 {
@@ -930,7 +927,7 @@ func stringFromFixedLenBytes(bytes []byte) string {
 	return string(bytes[:p+1])
 }
 
-// Given a fixed-length buffer, returns a string excluding any null (0) bytes on the right
+// Given a fixed-length buffer, returns a string excluding any null (0) bytes on the right.
 func fixedLenBytesFromString(s string, l int) []byte {
 	bytes := make([]byte, l)
 	copy(bytes, s)
@@ -976,7 +973,7 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) []byte {
 	return data
 }
 
-// Forwards a message to its next hop
+// Forwards a message to its next hop.
 func (s *Netceptor) forwardMessage(md *messageData) error {
 	if md.HopsToLive <= 0 {
 		if md.FromService != "unreach" {
@@ -1010,7 +1007,7 @@ func (s *Netceptor) forwardMessage(md *messageData) error {
 	return nil
 }
 
-// Generates and sends a message over the Receptor network, specifying HopsToLive
+// Generates and sends a message over the Receptor network, specifying HopsToLive.
 func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
 	if len(fromService) > 8 || len(toService) > 8 {
 		return fmt.Errorf("service name too long")
@@ -1031,7 +1028,7 @@ func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string,
 	return s.handleMessageData(md)
 }
 
-// Generates and sends a message over the Receptor network
+// Generates and sends a message over the Receptor network.
 func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
 	return s.sendMessageWithHopsToLive(fromService, toNode, toService, data, s.maxForwardingHops)
 }
@@ -1077,7 +1074,7 @@ func (s *Netceptor) printRoutingTable() {
 	}
 }
 
-// Constructs a routing update message
+// Constructs a routing update message.
 func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate {
 	s.sequence++
 	s.connLock.RLock()
@@ -1098,7 +1095,7 @@ func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate 
 	return update
 }
 
-// Translates an arbitrary struct to a network message
+// Translates an arbitrary struct to a network message.
 func (s *Netceptor) translateStructToNetwork(messageType byte, content interface{}) ([]byte, error) {
 	contentBytes, err := json.Marshal(content)
 	if err != nil {
@@ -1232,12 +1229,12 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	s.flood(message, recvConn)
 }
 
-// Handles a ping request
+// Handles a ping request.
 func (s *Netceptor) handlePing(md *messageData) error {
 	return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
 }
 
-// Handles an unreachable response
+// Handles an unreachable response.
 func (s *Netceptor) handleUnreachable(md *messageData) error {
 	unrMsg := UnreachableMessage{}
 	err := json.Unmarshal(md.Data, &unrMsg)
@@ -1252,7 +1249,7 @@ func (s *Netceptor) handleUnreachable(md *messageData) error {
 	return s.unreachableBroker.Publish(unrData)
 }
 
-// Sends an unreachable response
+// Sends an unreachable response.
 func (s *Netceptor) sendUnreachable(toNode string, message *UnreachableMessage) error {
 	bytes, err := json.Marshal(message)
 	if err != nil {
@@ -1307,7 +1304,7 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 	return s.forwardMessage(md)
 }
 
-// GetServiceInfo returns the advertising info, if any, for a service on a node
+// GetServiceInfo returns the advertising info, if any, for a service on a node.
 func (s *Netceptor) GetServiceInfo(nodeID string, service string) (*ServiceAdvertisement, bool) {
 	s.serviceAdsLock.RLock()
 	defer s.serviceAdsLock.RUnlock()
@@ -1323,7 +1320,7 @@ func (s *Netceptor) GetServiceInfo(nodeID string, service string) (*ServiceAdver
 	return &svcCopy, true
 }
 
-// Handles an incoming service advertisement
+// Handles an incoming service advertisement.
 func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string) error {
 	if data[0] != MsgTypeServiceAdvertisement {
 		return fmt.Errorf("message is the wrong type")
@@ -1362,7 +1359,7 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 	return nil
 }
 
-// Goroutine to send data from the backend to the connection's ReadChan
+// Goroutine to send data from the backend to the connection's ReadChan.
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv(1 * time.Second)
@@ -1386,7 +1383,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 	}
 }
 
-// Goroutine to send data from the connection's WriteChan to the backend
+// Goroutine to send data from the connection's WriteChan to the backend.
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
 		select {
@@ -1408,7 +1405,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 	}
 }
 
-// Continuously sends routing updates to let the other end know who we are on initial connection
+// Continuously sends routing updates to let the other end know who we are on initial connection.
 func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bool) {
 	count := 0
 	for {
@@ -1449,7 +1446,7 @@ func (s *Netceptor) sendAndLogConnectionRejection(remotenodeID string, ci *connI
 	return fmt.Errorf("rejected connection with node %s because %s", remotenodeID, reason)
 }
 
-// Main Netceptor protocol loop
+// Main Netceptor protocol loop.
 func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
 	if connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")

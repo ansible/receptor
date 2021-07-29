@@ -10,7 +10,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// PacketConn implements the net.PacketConn interface via the Receptor network
+// PacketConn implements the net.PacketConn interface via the Receptor network.
 type PacketConn struct {
 	s                  *Netceptor
 	localService       string
@@ -70,7 +70,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	return pc, nil
 }
 
-// startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages
+// startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages.
 func (pc *PacketConn) startUnreachable() {
 	pc.context, pc.cancel = context.WithCancel(pc.s.context)
 	pc.unreachableSubs = utils.NewBroker(pc.context, reflect.TypeOf(UnreachableNotification{}))
@@ -95,7 +95,7 @@ func (pc *PacketConn) startUnreachable() {
 	}()
 }
 
-// SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn
+// SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn.
 func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 	iChan := pc.unreachableSubs.Subscribe()
 	uChan := make(chan UnreachableNotification)

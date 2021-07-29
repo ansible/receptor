@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// UnixSocketListen listens on a Unix socket, handling file locking and permissions
+// UnixSocketListen listens on a Unix socket, handling file locking and permissions.
 func UnixSocketListen(filename string, permissions os.FileMode) (net.Listener, *FLock, error) {
 	lock, err := TryFLock(filename + ".lock")
 	if err != nil {

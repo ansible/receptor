@@ -76,7 +76,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 	return c, nil
 }
 
-// strFromMap extracts a string from a map[string]interface{}, handling errors
+// strFromMap extracts a string from a map[string]interface{}, handling errors.
 func strFromMap(config map[string]interface{}, name string) (string, error) {
 	value, ok := config[name]
 	if !ok {
@@ -89,7 +89,7 @@ func strFromMap(config map[string]interface{}, name string) (string, error) {
 	return valueStr, nil
 }
 
-// intFromMap extracts an int64 from a map[string]interface{}, handling errors
+// intFromMap extracts an int64 from a map[string]interface{}, handling errors.
 func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	value, ok := config[name]
 	if !ok {
@@ -163,7 +163,7 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 	return c, nil
 }
 
-// Worker function called by the control service to process a "work" command
+// Worker function called by the control service to process a "work" command.
 func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	switch c.subcommand {
 	case "submit":

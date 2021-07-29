@@ -14,7 +14,7 @@ var (
 	showTrace bool
 )
 
-// Log level constants
+// Log level constants.
 const (
 	ErrorLevel = iota + 1
 	WarningLevel
@@ -22,23 +22,23 @@ const (
 	DebugLevel
 )
 
-// QuietMode turns off all log output
+// QuietMode turns off all log output.
 func QuietMode() {
 	logLevel = 0
 }
 
-// SetLogLevel is a helper function for setting logLevel int
+// SetLogLevel is a helper function for setting logLevel int.
 func SetLogLevel(level int) {
 	logLevel = level
 }
 
-// SetShowTrace is a helper function for setting showTrace bool
+// SetShowTrace is a helper function for setting showTrace bool.
 func SetShowTrace(trace bool) {
 	showTrace = trace
 }
 
 // GetLogLevelByName is a helper function for returning level associated with log
-// level string
+// level string.
 func GetLogLevelByName(logName string) (int, error) {
 	var err error
 	if val, hasKey := logLevelMap[strings.ToLower(logName)]; hasKey {
@@ -48,12 +48,12 @@ func GetLogLevelByName(logName string) (int, error) {
 	return 0, err
 }
 
-// GetLogLevel returns current log level
+// GetLogLevel returns current log level.
 func GetLogLevel() int {
 	return logLevel
 }
 
-// LogLevelToName takes an int and returns the corresponding log level name
+// LogLevelToName takes an int and returns the corresponding log level name.
 func LogLevelToName(logLevel int) (string, error) {
 	var err error
 	for k, v := range logLevelMap {
@@ -66,7 +66,7 @@ func LogLevelToName(logLevel int) (string, error) {
 }
 
 // logLevelMap maps strings to log level int
-// allows for --LogLevel Debug at command line
+// allows for --LogLevel Debug at command line.
 var logLevelMap = map[string]int{
 	"error":   ErrorLevel,
 	"warning": WarningLevel,
@@ -74,7 +74,7 @@ var logLevelMap = map[string]int{
 	"debug":   DebugLevel,
 }
 
-// Log sends a log message at a given level
+// Log sends a log message at a given level.
 func Log(level int, format string, v ...interface{}) {
 	var prefix string
 	logLevelName, err := LogLevelToName(level)
@@ -89,27 +89,27 @@ func Log(level int, format string, v ...interface{}) {
 	}
 }
 
-// Error reports unexpected behavior, likely to result in termination
+// Error reports unexpected behavior, likely to result in termination.
 func Error(format string, v ...interface{}) {
 	Log(ErrorLevel, format, v...)
 }
 
-// Warning reports unexpected behavior, not necessarily resulting in termination
+// Warning reports unexpected behavior, not necessarily resulting in termination.
 func Warning(format string, v ...interface{}) {
 	Log(WarningLevel, format, v...)
 }
 
-// Info provides general purpose statements useful to end user
+// Info provides general purpose statements useful to end user.
 func Info(format string, v ...interface{}) {
 	Log(InfoLevel, format, v...)
 }
 
-// Debug contains extra information helpful to developers
+// Debug contains extra information helpful to developers.
 func Debug(format string, v ...interface{}) {
 	Log(DebugLevel, format, v...)
 }
 
-// Trace outputs detailed packet traversal
+// Trace outputs detailed packet traversal.
 func Trace(format string, v ...interface{}) {
 	if showTrace {
 		log.SetPrefix("TRACE ")

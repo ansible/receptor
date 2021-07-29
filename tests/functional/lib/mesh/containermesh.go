@@ -93,8 +93,9 @@ func (n *ContainerNode) ControlSocket() string {
 
 // Shutdown kills the receptor process
 func (n *ContainerNode) Shutdown() {
-	receptorCmd := exec.Command(containerRunner, "stop", n.containerName)
-	receptorCmd.Start()
+	if err := exec.Command(containerRunner, "stop", n.containerName).Start(); err != nil {
+		panic(err)
+	}
 }
 
 // Start writes the the node config to disk and starts the receptor process
@@ -104,7 +105,9 @@ func (n *ContainerNode) Start() error {
 		return err
 	}
 	nodedefPath := filepath.Join(n.dir, "receptor.conf")
-	ioutil.WriteFile(nodedefPath, strData, 0o644)
+	if err := ioutil.WriteFile(nodedefPath, strData, 0o644); err != nil {
+		panic(err)
+	}
 	Cmd := exec.Command(containerRunner, "start", n.containerName)
 	output, err := Cmd.CombinedOutput()
 	if err != nil {
@@ -175,8 +178,9 @@ func (n *ContainerNode) Destroy() {
 	n.Shutdown()
 	go func() {
 		n.WaitForShutdown()
-		Cmd := exec.Command(containerRunner, "rm", n.containerName)
-		Cmd.Start()
+		if err := exec.Command(containerRunner, "rm", n.containerName).Start(); err != nil {
+			panic(err)
+		}
 		for _, i := range n.yamlConfig {
 			m, ok := i.(map[interface{}]interface{})
 			if !ok {
@@ -205,8 +209,9 @@ func (n *ContainerNode) Destroy() {
 
 // WaitForShutdown Waits for the receptor process to finish
 func (n *ContainerNode) WaitForShutdown() {
-	Cmd := exec.Command(containerRunner, "wait", n.containerName)
-	Cmd.Run()
+	if err := exec.Command(containerRunner, "wait", n.containerName).Run(); err != nil {
+		panic(err)
+	}
 }
 
 // Dir returns the basedir which contains all of the mesh data
@@ -253,8 +258,8 @@ func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*Conta
 	if dirSuffix != "" {
 		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
-	err := os.MkdirAll(baseDir, 0o755)
-	if err != nil {
+
+	if err := os.MkdirAll(baseDir, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, err
 	}
 	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
@@ -367,7 +372,9 @@ done`
 			nodeYaml["id"] = k
 			externalDataDir := filepath.Join(node.dir, "datadir")
 			nodeYaml["datadir"] = "/etc/receptor/datadir"
-			os.Mkdir(externalDataDir, 0o755)
+			if err := os.Mkdir(externalDataDir, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+				panic(err)
+			}
 			idYaml["node"] = nodeYaml
 			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
 		}
@@ -479,10 +486,13 @@ done`
 
 	containerComposeDataStr, err := yaml.Marshal(containerComposeData)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	nodedefPath := filepath.Join(mesh.dir, "docker-compose.yaml")
-	ioutil.WriteFile(nodedefPath, containerComposeDataStr, 0o644)
+
+	if err := ioutil.WriteFile(nodedefPath, containerComposeDataStr, 0o644); err != nil {
+		panic(err)
+	}
 
 	containerCompose := exec.Command(containerComposeRunner, "up", "--no-start")
 	// Add COMPOSE_PARALLEL_LIMIT=500 to our environment because of

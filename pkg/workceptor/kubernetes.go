@@ -225,7 +225,9 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		}
 		return err
 	} else if err != nil {
-		kw.Cancel()
+		if err := kw.Cancel(); err != nil {
+			panic(err)
+		}
 		if len(kw.pod.Status.ContainerStatuses) == 1 {
 			if kw.pod.Status.ContainerStatuses[0].State.Waiting != nil {
 				return fmt.Errorf("%s, %s", err.Error(), kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)

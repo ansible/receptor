@@ -473,7 +473,9 @@ func TestWork(t *testing.T) {
 			}
 			nodes["node2"].Shutdown()
 			nodes["node2"].WaitForShutdown()
-			nodes["node2"].Start()
+			if err := nodes["node2"].Start(); err != nil {
+				t.Fatal(err)
+			}
 			// Wait for node2 to join the mesh again
 			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
 			err = m.WaitForReady(ctx)

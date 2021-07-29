@@ -43,11 +43,17 @@ func init() {
 	defer tcpPortMutex.Unlock()
 	tcpPortPool, _ = makeRange(10000, 65000, 1)
 	TestBaseDir = filepath.Join(os.TempDir(), "receptor-testing")
-	os.Mkdir(TestBaseDir, 0o700)
+	if err := os.Mkdir(TestBaseDir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		panic(err)
+	}
 	ControlSocketBaseDir = filepath.Join(TestBaseDir, "controlsockets")
-	os.Mkdir(ControlSocketBaseDir, 0o700)
+	if err := os.Mkdir(ControlSocketBaseDir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		panic(err)
+	}
 	CertBaseDir = filepath.Join(TestBaseDir, "receptor-testing-certs")
-	os.Mkdir(CertBaseDir, 0o700)
+	if err := os.Mkdir(CertBaseDir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		panic(err)
+	}
 }
 
 func makeRange(start, stop, step int) ([]int, error) {

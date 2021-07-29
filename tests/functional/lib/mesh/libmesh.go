@@ -209,8 +209,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
 	// Ignore the error, if the dir already exists thats fine
-	err := os.MkdirAll(baseDir, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(baseDir, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, err
 	}
 	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
@@ -228,7 +227,9 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		if err != nil {
 			return nil, err
 		}
-		os.Mkdir(node.dir, 0o755)
+		if err := os.Mkdir(node.dir, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+			panic(err)
+		}
 		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {

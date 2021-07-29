@@ -71,7 +71,9 @@ func (n *CLINode) ControlSocket() string {
 
 // Shutdown kills the receptor process
 func (n *CLINode) Shutdown() {
-	n.receptorCmd.Process.Kill()
+	if err := n.receptorCmd.Process.Kill(); err != nil {
+		panic(err)
+	}
 }
 
 // Start writes the the node config to disk and starts the receptor process
@@ -81,7 +83,9 @@ func (n *CLINode) Start() error {
 		return err
 	}
 	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
-	ioutil.WriteFile(nodedefPath, strData, 0o644)
+	if err := ioutil.WriteFile(nodedefPath, strData, 0o644); err != nil {
+		panic(err)
+	}
 	n.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
 	stdout, err := os.Create(filepath.Join(n.dir, "stdout"))
 	if err != nil {
@@ -102,7 +106,9 @@ func (n *CLINode) Start() error {
 func (n *CLINode) Destroy() {
 	n.Shutdown()
 	go func() {
-		n.receptorCmd.Wait()
+		if err := n.receptorCmd.Wait(); err != nil {
+			panic(err)
+		}
 		for _, i := range n.yamlConfig {
 			m, ok := i.(map[interface{}]interface{})
 			if !ok {
@@ -131,7 +137,9 @@ func (n *CLINode) Destroy() {
 
 // WaitForShutdown Waits for the receptor process to finish
 func (n *CLINode) WaitForShutdown() {
-	n.receptorCmd.Wait()
+	if err := n.receptorCmd.Wait(); err != nil {
+		panic(err)
+	}
 }
 
 // Dir returns the basedir which contains all of the mesh data
@@ -175,8 +183,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	if dirSuffix != "" {
 		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
-	err := os.MkdirAll(baseDir, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(baseDir, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, err
 	}
 	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
@@ -237,7 +244,9 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			nodeYaml := make(map[interface{}]interface{})
 			nodeYaml["id"] = k
 			nodeYaml["datadir"] = filepath.Join(node.dir, "datadir")
-			os.Mkdir(nodeYaml["datadir"].(string), 0o755)
+			if err := os.Mkdir(nodeYaml["datadir"].(string), 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+				panic(err)
+			}
 			idYaml["node"] = nodeYaml
 			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
 		}

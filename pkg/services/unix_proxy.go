@@ -24,7 +24,11 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 		return fmt.Errorf("error opening Unix socket: %s", err)
 	}
 	go func() {
-		defer lock.Unlock()
+		defer func() {
+			if err := lock.Unlock(); err != nil {
+				panic(err)
+			}
+		}()
 		for {
 			uc, err := uli.Accept()
 			if err != nil {

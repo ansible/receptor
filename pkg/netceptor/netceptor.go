@@ -673,7 +673,11 @@ func (s *Netceptor) updateRoutingTable() {
 	for k, v := range s.routingTable {
 		routingTableCopy[k] = v
 	}
-	go s.routingUpdateBroker.Publish(routingTableCopy)
+	go func() {
+		if err := s.routingUpdateBroker.Publish(routingTableCopy); err != nil {
+			panic(err)
+		}
+	}()
 	s.printRoutingTable()
 }
 

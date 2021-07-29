@@ -145,7 +145,11 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 		})
 		return err
 	}
-	defer doClose()
+	defer func() {
+		if err := doClose(); err != nil {
+			panic(err)
+		}
+	}()
 	red := rw.UnredactedStatus().ExtraData.(*remoteExtraData)
 	workSubmitCmd := make(map[string]interface{})
 	for k, v := range red.RemoteParams {

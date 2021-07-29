@@ -58,8 +58,14 @@ func TestListeners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer cmd.Process.Wait()
-			defer cmd.Process.Kill()
+			defer func() {
+				if err := cmd.Process.Kill(); err != nil {
+					panic(err)
+				}
+				if _, err := cmd.Process.Wait(); err != nil {
+					panic(err)
+				}
+			}()
 
 			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 			success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
@@ -99,8 +105,14 @@ func TestSSLListeners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer cmd.Process.Wait()
-			defer cmd.Process.Kill()
+			defer func() {
+				if err := cmd.Process.Kill(); err != nil {
+					panic(err)
+				}
+				if _, err := cmd.Process.Wait(); err != nil {
+					panic(err)
+				}
+			}()
 
 			checkFunc := func() bool {
 				opensslStdOut := bytes.Buffer{}
@@ -148,8 +160,12 @@ func TestNegativeCost(t *testing.T) {
 			// Wait for our process to hopefully run and quit
 			time.Sleep(100 * time.Millisecond)
 
-			cmd.Process.Kill()
-			cmd.Process.Wait()
+			if err := cmd.Process.Kill(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := cmd.Process.Wait(); err != nil {
+				t.Fatal(err)
+			}
 			if receptorStdOut.String() != "Error: connection cost must be positive\n" {
 				t.Fatalf("Expected stdout: Error: connection cost must be positive, actual stdout: %s", receptorStdOut.String())
 			}
@@ -184,8 +200,14 @@ func TestCostMap(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					defer cmd.Process.Wait()
-					defer cmd.Process.Kill()
+					defer func() {
+						if err := cmd.Process.Kill(); err != nil {
+							panic(err)
+						}
+						if _, err := cmd.Process.Wait(); err != nil {
+							panic(err)
+						}
+					}()
 
 					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
@@ -230,8 +252,14 @@ func TestCosts(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					defer cmd.Process.Wait()
-					defer cmd.Process.Kill()
+					defer func() {
+						if err := cmd.Process.Kill(); err != nil {
+							panic(err)
+						}
+						if _, err := cmd.Process.Wait(); err != nil {
+							panic(err)
+						}
+					}()
 
 					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {

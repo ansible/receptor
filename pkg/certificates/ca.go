@@ -10,12 +10,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // CertNames lists the subjectAltNames that can be assigned to a certificate or request
@@ -121,7 +122,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 			continue
 		}
 	}
-	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0600)
+	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
 // LoadCertificate loads a single certificate from a file

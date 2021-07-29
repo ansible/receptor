@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/workceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"net"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/workceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 )
 
 // ReceptorControl Connects to a control socket and provides basic commands
@@ -301,7 +302,7 @@ func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, st
 	return assertWithTimeout(ctx, check)
 }
 
-//AssertWorkRunning waits until work status is running
+// AssertWorkRunning waits until work status is running
 func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateRunning) {
 		return fmt.Errorf("Failed to assert %s is running or ctx timed out", unitID)
@@ -333,7 +334,7 @@ func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) e
 	return nil
 }
 
-//AssertWorkCancelled waits until work status is cancelled
+// AssertWorkCancelled waits until work status is cancelled
 func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string) error {
 	check := func() bool {
 		workStatus, err := r.GetWorkStatus(unitID)

@@ -7,16 +7,17 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/ghjm/cmdline"
-	"github.com/gorilla/websocket"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ghjm/cmdline"
+	"github.com/gorilla/websocket"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 // WebsocketDialer implements Backend for outbound Websocket
@@ -116,7 +117,7 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 	sessChan := make(chan netceptor.BackendSession)
 	mux := http.NewServeMux()
 	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
-		var upgrader = websocket.Upgrader{}
+		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			logger.Error("Error upgrading websocket connection: %s\n", err)

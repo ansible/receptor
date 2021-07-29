@@ -2,16 +2,19 @@ package controlsvc
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"strings"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-type connectCommandType struct{}
-type connectCommand struct {
-	targetNode    string
-	targetService string
-	tlsConfigName string
-}
+type (
+	connectCommandType struct{}
+	connectCommand     struct {
+		targetNode    string
+		targetService string
+		tlsConfigName string
+	}
+)
 
 func (t *connectCommandType) InitFromString(params string) (ControlCommand, error) {
 	tokens := strings.Split(params, " ")

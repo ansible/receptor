@@ -10,8 +10,7 @@ import (
 var ErrLocked = fmt.Errorf("fslock is already locked")
 
 // FLock represents a Unix file lock, but is not usable on Windows
-type FLock struct {
-}
+type FLock struct{}
 
 // TryFLock is not implemented on Windows
 func TryFLock(filename string) (*FLock, error) {

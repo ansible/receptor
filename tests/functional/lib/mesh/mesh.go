@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"context"
+
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 

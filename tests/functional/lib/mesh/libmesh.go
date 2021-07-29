@@ -6,18 +6,19 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/backends"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/backends"
+	"github.com/project-receptor/receptor/pkg/controlsvc"
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // LibNode holds a Netceptor, this layer of abstraction might be unnecessary and
@@ -208,7 +209,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
 	// Ignore the error, if the dir already exists thats fine
-	err := os.MkdirAll(baseDir, 0755)
+	err := os.MkdirAll(baseDir, 0o755)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +228,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		if err != nil {
 			return nil, err
 		}
-		os.Mkdir(node.dir, 0755)
+		os.Mkdir(node.dir, 0o755)
 		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
@@ -339,12 +340,12 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						if !ok {
 							return nil, errors.New("nodecost map key was not a string")
 						}
-						//vStr, ok := v.(string)
+						// vStr, ok := v.(string)
 						vFloat, ok := v.(float64)
 						if !ok {
 							return nil, errors.New("nodecost map value was not a float")
 						}
-						//vFloat, err := strconv.ParseFloat(vStr, 64)
+						// vFloat, err := strconv.ParseFloat(vStr, 64)
 						if err != nil {
 							return nil, err
 						}
@@ -485,7 +486,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		node.controlSocket = filepath.Join(tempdir, "controlsock")
 
 		node.controlServer = controlsvc.New(true, node.NetceptorInstance)
-		err = node.controlServer.RunControlSvc(ctx, "control", nil, node.controlSocket, os.FileMode(0600), "", nil)
+		err = node.controlServer.RunControlSvc(ctx, "control", nil, node.controlSocket, os.FileMode(0o600), "", nil)
 		if err != nil {
 			return nil, err
 		}

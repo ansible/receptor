@@ -2,14 +2,17 @@ package logger
 
 import (
 	"fmt"
-	"github.com/ghjm/cmdline"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/ghjm/cmdline"
 )
 
-var logLevel int
-var showTrace bool
+var (
+	logLevel  int
+	showTrace bool
+)
 
 // Log level constants
 const (

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 )
 
 func ConfirmListening(pid int) (bool, error) {

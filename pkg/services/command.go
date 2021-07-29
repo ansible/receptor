@@ -5,14 +5,15 @@ package services
 
 import (
 	"crypto/tls"
+	"net"
+	"os/exec"
+	"strings"
+
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
-	"os/exec"
-	"strings"
 )
 
 func runCommand(qc net.Conn, command string) error {

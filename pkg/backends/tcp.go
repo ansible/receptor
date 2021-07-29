@@ -7,15 +7,16 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"io"
-	"net"
-	"sync"
-	"time"
 )
 
 // TCPDialer implements Backend for outbound TCP

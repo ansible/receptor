@@ -5,11 +5,12 @@ package services
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
 )
 
 // UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service

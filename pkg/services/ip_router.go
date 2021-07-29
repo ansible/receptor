@@ -6,6 +6,12 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
@@ -14,11 +20,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"math"
-	"net"
-	"strings"
-	"sync"
-	"time"
 )
 
 const adTypeIPRouter = "IP Router"

@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/pbnjay/memory"
 	"runtime"
+
+	"github.com/pbnjay/memory"
 )
 
 // GetSysCPUCount returns number of logical CPU cores on the system

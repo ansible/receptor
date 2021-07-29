@@ -3,10 +3,11 @@ package netceptor
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"reflect"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // PacketConn implements the net.PacketConn interface via the Receptor network

@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,6 +11,11 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // CLINode holds a Netceptor, this layer of abstraction might be unnecessary and
@@ -80,7 +81,7 @@ func (n *CLINode) Start() error {
 		return err
 	}
 	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
-	ioutil.WriteFile(nodedefPath, strData, 0644)
+	ioutil.WriteFile(nodedefPath, strData, 0o644)
 	n.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
 	stdout, err := os.Create(filepath.Join(n.dir, "stdout"))
 	if err != nil {
@@ -174,7 +175,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	if dirSuffix != "" {
 		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
-	err := os.MkdirAll(baseDir, 0755)
+	err := os.MkdirAll(baseDir, 0o755)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +237,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			nodeYaml := make(map[interface{}]interface{})
 			nodeYaml["id"] = k
 			nodeYaml["datadir"] = filepath.Join(node.dir, "datadir")
-			os.Mkdir(nodeYaml["datadir"].(string), 0755)
+			os.Mkdir(nodeYaml["datadir"].(string), 0o755)
 			idYaml["node"] = nodeYaml
 			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
 		}

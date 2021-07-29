@@ -5,11 +5,6 @@ package workceptor
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/randstr"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,6 +13,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/controlsvc"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/randstr"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // Workceptor is the main object that handles unit-of-work management
@@ -125,7 +126,7 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 			if err == nil {
 				continue
 			}
-			return ident, os.MkdirAll(unitdir, 0700)
+			return ident, os.MkdirAll(unitdir, 0o700)
 		}
 	}
 }

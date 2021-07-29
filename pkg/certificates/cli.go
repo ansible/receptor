@@ -6,10 +6,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"github.com/ghjm/cmdline"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/ghjm/cmdline"
 )
 
 type initCA struct {

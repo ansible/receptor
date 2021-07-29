@@ -4,12 +4,13 @@ package workceptor
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/project-receptor/receptor/pkg/controlsvc"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {
@@ -205,7 +206,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
-		stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O_WRONLY, 0600)
+		stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O_WRONLY, 0o600)
 		if err != nil {
 			return nil, err
 		}

@@ -6,12 +6,13 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"strconv"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
-	"strconv"
 )
 
 // TCPProxyServiceInbound listens on a TCP port and forwards the connection over the Receptor network

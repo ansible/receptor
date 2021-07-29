@@ -4,10 +4,11 @@ package workceptor
 
 import (
 	"context"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {

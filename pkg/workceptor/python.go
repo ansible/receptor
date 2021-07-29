@@ -5,8 +5,9 @@ package workceptor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ghjm/cmdline"
 	"os/exec"
+
+	"github.com/ghjm/cmdline"
 )
 
 // pythonUnit implements the WorkUnit interface

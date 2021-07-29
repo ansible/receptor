@@ -3,15 +3,18 @@ package controlsvc
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-type pingCommandType struct{}
-type pingCommand struct {
-	target string
-}
+type (
+	pingCommandType struct{}
+	pingCommand     struct {
+		target string
+	}
+)
 
 func (t *pingCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params == "" {

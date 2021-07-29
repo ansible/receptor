@@ -3,11 +3,12 @@ package netceptor
 import (
 	"context"
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/gorilla/websocket"
 	"github.com/project-receptor/receptor/pkg/framer"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
-	"time"
 )
 
 // ExternalBackend is a backend implementation for the situation when non-Receptor code

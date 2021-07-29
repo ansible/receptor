@@ -127,7 +127,7 @@ func TestWork(t *testing.T) {
 			}
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{
-					"node2": mesh.YamlConnection{
+					"node2": {
 						Index: 0,
 					},
 				},
@@ -154,7 +154,7 @@ func TestWork(t *testing.T) {
 			}
 			data.Nodes["node3"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{
-					"node2": mesh.YamlConnection{
+					"node2": {
 						Index: 0,
 					},
 				},
@@ -589,7 +589,6 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 		})
 
 	}

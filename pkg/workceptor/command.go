@@ -4,9 +4,6 @@ package workceptor
 
 import (
 	"fmt"
-	"github.com/ghjm/cmdline"
-	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/logger"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,6 +11,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/ghjm/cmdline"
+	"github.com/google/shlex"
+	"github.com/project-receptor/receptor/pkg/logger"
 )
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin
@@ -76,7 +77,7 @@ func commandRunner(command string, params string, unitdir string) error {
 		return err
 	}
 	cmd.Stdin = stdin
-	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0600)
+	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
 	if err != nil {
 		return err
 	}

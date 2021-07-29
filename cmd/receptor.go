@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/ghjm/cmdline"
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	_ "github.com/project-receptor/receptor/pkg/certificates"
@@ -12,9 +16,6 @@ import (
 	_ "github.com/project-receptor/receptor/pkg/services"
 	_ "github.com/project-receptor/receptor/pkg/version"
 	"github.com/project-receptor/receptor/pkg/workceptor"
-	"os"
-	"strings"
-	"time"
 )
 
 type nodeCfg struct {

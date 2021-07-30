@@ -2,15 +2,18 @@ package controlsvc
 
 import (
 	"fmt"
+
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
 	"github.com/project-receptor/receptor/pkg/version"
 )
 
-type statusCommandType struct{}
-type statusCommand struct {
-	requestedFields []string
-}
+type (
+	statusCommandType struct{}
+	statusCommand     struct {
+		requestedFields []string
+	}
+)
 
 func (t *statusCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params != "" {

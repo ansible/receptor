@@ -1,8 +1,9 @@
 package controlsvc
 
 import (
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 // ControlCommandType is a type of command that can be run from the control service

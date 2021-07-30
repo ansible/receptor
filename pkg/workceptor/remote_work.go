@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"net"
 	"os"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin
@@ -82,7 +83,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {
-			var shouldExit = false
+			shouldExit := false
 			rw.UpdateFullStatus(func(status *StatusFileData) {
 				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
 				if !status.ExtraData.(*remoteExtraData).RemoteStarted {
@@ -321,7 +322,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	}
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
-	stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)
+	stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 	if err == nil {
 		err = stdout.Close()
 	}
@@ -369,7 +370,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				logger.Warning("Remote node %s did not stream results\n", remoteNode)
 				continue
 			}
-			stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0600)
+			stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 			if err != nil {
 				logger.Error("Could not open stdout file %s: %s\n", rw.stdoutFileName, err)
 				return

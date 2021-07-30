@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"errors"
-	"github.com/project-receptor/receptor/pkg/certificates"
 	"io/ioutil"
 	"net"
 	"os"
@@ -11,13 +10,19 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/certificates"
 )
 
-var udpPortMutex sync.Mutex
-var udpPortPool []int
+var (
+	udpPortMutex sync.Mutex
+	udpPortPool  []int
+)
 
-var tcpPortMutex sync.Mutex
-var tcpPortPool []int
+var (
+	tcpPortMutex sync.Mutex
+	tcpPortPool  []int
+)
 
 // TestBaseDir holds the base directory that all permanent test logs should go in
 var TestBaseDir string
@@ -38,11 +43,11 @@ func init() {
 	defer tcpPortMutex.Unlock()
 	tcpPortPool, _ = makeRange(10000, 65000, 1)
 	TestBaseDir = filepath.Join(os.TempDir(), "receptor-testing")
-	os.Mkdir(TestBaseDir, 0700)
+	os.Mkdir(TestBaseDir, 0o700)
 	ControlSocketBaseDir = filepath.Join(TestBaseDir, "controlsockets")
-	os.Mkdir(ControlSocketBaseDir, 0700)
+	os.Mkdir(ControlSocketBaseDir, 0o700)
 	CertBaseDir = filepath.Join(TestBaseDir, "receptor-testing-certs")
-	os.Mkdir(CertBaseDir, 0700)
+	os.Mkdir(CertBaseDir, 0o700)
 }
 
 func makeRange(start, stop, step int) ([]int, error) {
@@ -110,7 +115,7 @@ func ReserveUDPPort() int {
 		portNum := udpPortPool[len(udpPortPool)-1]
 		udpPortPool = udpPortPool[:len(udpPortPool)-1]
 		portStr := strconv.Itoa(portNum)
-		//udpPort, err := net.Listen("udp", ":"+portStr)
+		// udpPort, err := net.Listen("udp", ":"+portStr)
 		udpAddr, err := net.ResolveUDPAddr("udp", ":"+portStr)
 		if err != nil {
 			panic("err")

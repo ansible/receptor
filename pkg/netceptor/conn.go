@@ -9,14 +9,15 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/lucas-clemente/quic-go"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"math/big"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/lucas-clemente/quic-go"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 type acceptResult struct {

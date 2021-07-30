@@ -17,7 +17,7 @@ type FLock struct {
 
 // TryFLock non-blockingly attempts to acquire a lock on the file
 func TryFLock(filename string) (*FLock, error) {
-	fd, err := syscall.Open(filename, syscall.O_CREAT|syscall.O_RDONLY|syscall.O_CLOEXEC, 0600)
+	fd, err := syscall.Open(filename, syscall.O_CREAT|syscall.O_RDONLY|syscall.O_CLOEXEC, 0o600)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,6 @@ import (
 )
 
 func TestStatusFileLock(t *testing.T) {
-
 	numWriterThreads := 8
 	numReaderThreads := 8
 	baseWaitTime := 200 * time.Millisecond

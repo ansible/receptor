@@ -3,14 +3,15 @@ package netceptor
 import (
 	"context"
 	"fmt"
-	"github.com/prep/socketpair"
-	"github.com/project-receptor/receptor/pkg/logger"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/prep/socketpair"
+	"github.com/project-receptor/receptor/pkg/logger"
 )
 
 type logWriter struct {
@@ -321,7 +322,6 @@ func TestLotsOfPings(t *testing.T) {
 }
 
 func TestDuplicateNodeDetection(t *testing.T) {
-
 	// Create Netceptor nodes
 	netsize := 4
 	nodes := make([]*Netceptor, netsize)

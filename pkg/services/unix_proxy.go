@@ -6,13 +6,14 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"os"
+	"runtime"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
-	"os"
-	"runtime"
 )
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network

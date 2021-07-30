@@ -6,15 +6,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/fsnotify/fsnotify"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/rogpeppe/go-internal/lockedfile"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/rogpeppe/go-internal/lockedfile"
 )
 
 // Work sleep constants
@@ -117,7 +118,7 @@ func (bwu *BaseWorkUnit) StdoutFileName() string {
 // lockStatusFile gains a lock on the status file
 func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, error) {
 	lockFileName := filename + ".lock"
-	lockFile, err := lockedfile.OpenFile(lockFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	lockFile, err := lockedfile.OpenFile(lockFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +151,7 @@ func (sfd *StatusFileData) Save(filename string) error {
 		return err
 	}
 	defer sfd.unlockStatusFile(filename, lockFile)
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -212,7 +213,7 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 		return err
 	}
 	defer sfd.unlockStatusFile(filename, lockFile)
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0600)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
 	}

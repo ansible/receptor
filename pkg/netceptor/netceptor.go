@@ -8,12 +8,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	priorityQueue "github.com/jupp0r/go-priority-queue"
-	"github.com/minio/highwayhash"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/randstr"
-	"github.com/project-receptor/receptor/pkg/tickrunner"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"math"
 	"math/rand"
@@ -21,6 +15,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	priorityQueue "github.com/jupp0r/go-priority-queue"
+	"github.com/minio/highwayhash"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/randstr"
+	"github.com/project-receptor/receptor/pkg/tickrunner"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // defaultMTU is the largest message sendable over the Netceptor network
@@ -229,10 +230,12 @@ type UnreachableNotification struct {
 	ReceivedFromNode string
 }
 
-var networkNames = make([]string, 0)
-var networkNamesLock = sync.Mutex{}
+var (
+	networkNames     = make([]string, 0)
+	networkNamesLock = sync.Mutex{}
+)
 
-//makeNetworkName returns a network name that is unique within global scope
+// makeNetworkName returns a network name that is unique within global scope
 func makeNetworkName(nodeID string) string {
 	networkNamesLock.Lock()
 	defer networkNamesLock.Unlock()
@@ -537,7 +540,6 @@ func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
 
 // Send a single service broadcast
 func (s *Netceptor) sendServiceAd(si *ServiceAdvertisement) error {
-
 	logger.Debug("Sending service advertisement: %v\n", si)
 	sf := serviceAdvertisementFull{
 		ServiceAdvertisement: si,
@@ -1401,7 +1403,6 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 				return
 			}
 		}
-
 	}
 }
 

@@ -2,14 +2,17 @@ package controlsvc
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"strconv"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-type tracerouteCommandType struct{}
-type tracerouteCommand struct {
-	target string
-}
+type (
+	tracerouteCommandType struct{}
+	tracerouteCommand     struct {
+		target string
+	}
+)
 
 func (t *tracerouteCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params == "" {

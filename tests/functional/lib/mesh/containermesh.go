@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,12 +13,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"gopkg.in/yaml.v2"
 )
 
 var containerImage string
 
-var containerRunner string
-var containerComposeRunner string
+var (
+	containerRunner        string
+	containerComposeRunner string
+)
 
 func init() {
 	containerImage = os.Getenv("CONTAINER_IMAGE")
@@ -101,7 +104,7 @@ func (n *ContainerNode) Start() error {
 		return err
 	}
 	nodedefPath := filepath.Join(n.dir, "receptor.conf")
-	ioutil.WriteFile(nodedefPath, strData, 0644)
+	ioutil.WriteFile(nodedefPath, strData, 0o644)
 	Cmd := exec.Command(containerRunner, "start", n.containerName)
 	output, err := Cmd.CombinedOutput()
 	if err != nil {
@@ -150,7 +153,7 @@ func (n *ContainerNode) Start() error {
 		if err != nil {
 			return err
 		}
-		err = f.Chmod(0755)
+		err = f.Chmod(0o755)
 		if err != nil {
 			return err
 		}
@@ -250,7 +253,7 @@ func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*Conta
 	if dirSuffix != "" {
 		baseDir = filepath.Join(utils.TestBaseDir, dirSuffix)
 	}
-	err := os.MkdirAll(baseDir, 0755)
+	err := os.MkdirAll(baseDir, 0o755)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +276,7 @@ done`
 	if err != nil {
 		return nil, err
 	}
-	err = f.Chmod(0755)
+	err = f.Chmod(0o755)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +367,7 @@ done`
 			nodeYaml["id"] = k
 			externalDataDir := filepath.Join(node.dir, "datadir")
 			nodeYaml["datadir"] = "/etc/receptor/datadir"
-			os.Mkdir(externalDataDir, 0755)
+			os.Mkdir(externalDataDir, 0o755)
 			idYaml["node"] = nodeYaml
 			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
 		}
@@ -479,7 +482,7 @@ done`
 		return nil, err
 	}
 	nodedefPath := filepath.Join(mesh.dir, "docker-compose.yaml")
-	ioutil.WriteFile(nodedefPath, containerComposeDataStr, 0644)
+	ioutil.WriteFile(nodedefPath, containerComposeDataStr, 0o644)
 
 	containerCompose := exec.Command(containerComposeRunner, "up", "--no-start")
 	// Add COMPOSE_PARALLEL_LIMIT=500 to our environment because of

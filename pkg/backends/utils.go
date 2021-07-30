@@ -2,10 +2,11 @@ package backends
 
 import (
 	"context"
+	"time"
+
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"time"
 )
 
 const (
@@ -65,9 +66,11 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 	return sessChan, nil
 }
 
-type listenFunc func() error
-type acceptFunc func() (netceptor.BackendSession, error)
-type listenerCancelFunc func()
+type (
+	listenFunc         func() error
+	acceptFunc         func() (netceptor.BackendSession, error)
+	listenerCancelFunc func()
+)
 
 // listenerSession is a convenience function for backends that use listen/accept logic
 func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {

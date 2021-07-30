@@ -6,8 +6,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/ghjm/cmdline"
 	"io/ioutil"
+
+	"github.com/ghjm/cmdline"
 )
 
 // **************************************************************************

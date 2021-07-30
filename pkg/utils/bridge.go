@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/project-receptor/receptor/pkg/logger"
 	"io"
 	"strings"
+
+	"github.com/project-receptor/receptor/pkg/logger"
 )
 
 // NormalBufferSize is the size of buffers used by various processes when copying data between sockets

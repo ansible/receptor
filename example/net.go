@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/backends"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"net"
 	"os"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/backends"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 /*
@@ -140,5 +141,4 @@ func main() {
 	// Gracefully shut down n1
 	n1.Shutdown()
 	n1.BackendWait()
-
 }

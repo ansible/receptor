@@ -6,13 +6,14 @@ package backends
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
-	"sync"
-	"time"
 )
 
 // UDPMaxPacketLen is the maximum size of a message that can be sent over UDP

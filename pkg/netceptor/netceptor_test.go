@@ -160,9 +160,9 @@ func TestLotsOfPings(t *testing.T) {
 	numBackboneNodes := 3
 	numLeafNodesPerBackbone := 3
 
-	nodes := make([]*Netceptor, numBackboneNodes)
+	nodes := []*Netceptor{}
 	for i := 0; i < numBackboneNodes; i++ {
-		nodes[i] = New(context.Background(), fmt.Sprintf("backbone_%d", i), nil)
+		nodes = append(nodes, New(context.Background(), fmt.Sprintf("backbone_%d", i), nil))
 	}
 	for i := 0; i < numBackboneNodes; i++ {
 		for j := 0; j < i; j++ {

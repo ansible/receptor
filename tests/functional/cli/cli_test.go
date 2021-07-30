@@ -87,6 +87,9 @@ func TestSSLListeners(t *testing.T) {
 			t.Parallel()
 
 			key, crt, err := utils.GenerateCert("test", "localhost", []string{"localhost"}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			receptorStdOut := bytes.Buffer{}
 			port := utils.ReserveTCPPort()

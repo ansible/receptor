@@ -20,13 +20,13 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin
+// remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnit
 	topJC *utils.JobContext
 }
 
-// remoteExtraData is the content of the ExtraData JSON field for a remote work unit
+// remoteExtraData is the content of the ExtraData JSON field for a remote work unit.
 type remoteExtraData struct {
 	RemoteNode     string
 	RemoteWorkType string
@@ -41,7 +41,7 @@ type remoteExtraData struct {
 
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
 
-// connectToRemote establishes a control socket connection to a remote node
+// connectToRemote establishes a control socket connection to a remote node.
 func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Reader, error) {
 	status := rw.Status()
 	red, ok := status.ExtraData.(*remoteExtraData)
@@ -71,7 +71,7 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	return conn, reader, nil
 }
 
-// getConnection retries connectToRemote until connected or the context expires
+// getConnection retries connectToRemote until connected or the context expires.
 func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
 	for {
@@ -103,7 +103,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 	}
 }
 
-// connectAndRun makes a single attempt to connect to a remote node and runs an action function
+// connectAndRun makes a single attempt to connect to a remote node and runs an action function.
 func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) error {
 	conn, reader, err := rw.connectToRemote(ctx)
 	if err != nil {
@@ -237,7 +237,7 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	return nil
 }
 
-// monitorRemoteStatus monitors the remote status file and copies results to the local one
+// monitorRemoteStatus monitors the remote status file and copies results to the local one.
 func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool) {
 	defer func() {
 		mw.Cancel()
@@ -307,7 +307,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	}
 }
 
-// monitorRemoteStdout copies the remote stdout stream to the local buffer
+// monitorRemoteStdout copies the remote stdout stream to the local buffer.
 func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	defer func() {
 		mw.Cancel()
@@ -399,7 +399,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	}
 }
 
-// monitorRemoteUnit watches a remote unit on another node and maintains local status
+// monitorRemoteUnit watches a remote unit on another node and maintains local status.
 func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 	subJC := &utils.JobContext{}
 	if forRelease {
@@ -413,7 +413,7 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 	subJC.Wait()
 }
 
-// SetFromParams sets the in-memory state from parameters
+// SetFromParams sets the in-memory state from parameters.
 func (rw *remoteUnit) SetFromParams(params map[string]string) error {
 	for k, v := range params {
 		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
@@ -421,7 +421,7 @@ func (rw *remoteUnit) SetFromParams(params map[string]string) error {
 	return nil
 }
 
-// Status returns a copy of the status currently loaded in memory
+// Status returns a copy of the status currently loaded in memory.
 func (rw *remoteUnit) Status() *StatusFileData {
 	status := rw.UnredactedStatus()
 	ed, ok := status.ExtraData.(*remoteExtraData)
@@ -439,7 +439,7 @@ func (rw *remoteUnit) Status() *StatusFileData {
 	return status
 }
 
-// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets
+// UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 	rw.statusLock.RLock()
 	defer rw.statusLock.RUnlock()
@@ -456,7 +456,7 @@ func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 	return status
 }
 
-// runAndMonitor waits for a connection to be available, then starts the remote unit and monitors it
+// runAndMonitor waits for a connection to be available, then starts the remote unit and monitors it.
 func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, action actionFunc) error {
 	return rw.getConnectionAndRun(mw, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		err := action(ctx, conn, reader)
@@ -497,7 +497,7 @@ func (rw *remoteUnit) setExpiration(mw *utils.JobContext) {
 	}
 }
 
-// startOrRestart is a shared implementation of Start() and Restart()
+// startOrRestart is a shared implementation of Start() and Restart().
 func (rw *remoteUnit) startOrRestart(start bool) error {
 	red := rw.Status().ExtraData.(*remoteExtraData)
 	if start && red.RemoteStarted {
@@ -530,7 +530,7 @@ func (rw *remoteUnit) Start() error {
 	return rw.startOrRestart(true)
 }
 
-// Restart resumes monitoring a job after a Receptor restart
+// Restart resumes monitoring a job after a Receptor restart.
 func (rw *remoteUnit) Restart() error {
 	red := rw.Status().ExtraData.(*remoteExtraData)
 	if red.RemoteStarted {
@@ -539,7 +539,7 @@ func (rw *remoteUnit) Restart() error {
 	return fmt.Errorf("remote work had not previously started")
 }
 
-// cancelOrRelease is a shared implementation of Cancel() and Release()
+// cancelOrRelease is a shared implementation of Cancel() and Release().
 func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	// Update the status file that the unit is locally cancelled/released
 	var remoteStarted bool

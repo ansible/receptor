@@ -15,13 +15,13 @@ import (
 	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 )
 
-// ReceptorControl Connects to a control socket and provides basic commands
+// ReceptorControl Connects to a control socket and provides basic commands.
 type ReceptorControl struct {
 	socketConn     *net.UnixConn
 	socketFilename string
 }
 
-// New Returns an empty ReceptorControl
+// New Returns an empty ReceptorControl.
 func New() *ReceptorControl {
 	return &ReceptorControl{
 		socketConn:     nil,
@@ -30,7 +30,7 @@ func New() *ReceptorControl {
 }
 
 // Connect connects to the socket at the specified filename and checks the
-// handshake with the control service
+// handshake with the control service.
 func (r *ReceptorControl) Connect(filename string) error {
 	if r.socketConn != nil {
 		return errors.New("Tried to connect to a socket after already being connected to a socket")
@@ -51,7 +51,7 @@ func (r *ReceptorControl) Connect(filename string) error {
 	return nil
 }
 
-// Reconnect to unix socket
+// Reconnect to unix socket.
 func (r *ReceptorControl) Reconnect() error {
 	if r.socketFilename != "" {
 		err := r.Connect(r.socketFilename)
@@ -64,7 +64,7 @@ func (r *ReceptorControl) Reconnect() error {
 	return nil
 }
 
-// Read reads a line from the socket
+// Read reads a line from the socket.
 func (r *ReceptorControl) Read() ([]byte, error) {
 	dataBytes := make([]byte, 0)
 	buf := make([]byte, 1)
@@ -83,12 +83,12 @@ func (r *ReceptorControl) Read() ([]byte, error) {
 	return dataBytes, nil
 }
 
-// Write writes some data to the socket
+// Write writes some data to the socket.
 func (r *ReceptorControl) Write(data []byte) (int, error) {
 	return r.socketConn.Write(data)
 }
 
-// ReadStr reads some data from the socket and converts it to a string
+// ReadStr reads some data from the socket and converts it to a string.
 func (r *ReceptorControl) ReadStr() (string, error) {
 	data, err := r.Read()
 	if err != nil {
@@ -97,7 +97,7 @@ func (r *ReceptorControl) ReadStr() (string, error) {
 	return string(data), nil
 }
 
-// WriteStr writes string data to the socket
+// WriteStr writes string data to the socket.
 func (r *ReceptorControl) WriteStr(data string) (int, error) {
 	return r.Write([]byte(data))
 }
@@ -117,20 +117,20 @@ func (r *ReceptorControl) handshake() error {
 	return nil
 }
 
-// Close closes the connection to the socket
+// Close closes the connection to the socket.
 func (r *ReceptorControl) Close() error {
 	err := r.socketConn.Close()
 	r.socketConn = nil
 	return err
 }
 
-// CloseWrite closes the write side of the socket
+// CloseWrite closes the write side of the socket.
 func (r *ReceptorControl) CloseWrite() error {
 	err := r.socketConn.CloseWrite()
 	return err
 }
 
-// ReadAndParseJSON reads data from the socket and parses it as json
+// ReadAndParseJSON reads data from the socket and parses it as json.
 func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	data, err := r.Read()
 	if err != nil {
@@ -148,7 +148,7 @@ func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	return jsonData, nil
 }
 
-// Ping pings the specified node
+// Ping pings the specified node.
 func (r *ReceptorControl) Ping(node string) (string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("ping %s\n", node))
 	if err != nil {
@@ -165,7 +165,7 @@ func (r *ReceptorControl) Ping(node string) (string, error) {
 	return fmt.Sprintf("Reply from %s in %s", jsonData["From"].(string), jsonData["TimeStr"].(string)), nil
 }
 
-// Status retrieves the status of the current node
+// Status retrieves the status of the current node.
 func (r *ReceptorControl) Status() (*netceptor.Status, error) {
 	_, err := r.WriteStr("status\n")
 	if err != nil {
@@ -210,7 +210,7 @@ func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
 	return unitID, nil
 }
 
-// WorkSubmitJSON begins work on remote node via JSON command
+// WorkSubmitJSON begins work on remote node via JSON command.
 func (r *ReceptorControl) WorkSubmitJSON(command string) (string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("%s\n", command))
 	if err != nil {
@@ -223,7 +223,7 @@ func (r *ReceptorControl) WorkSubmitJSON(command string) (string, error) {
 	return unitID, nil
 }
 
-// WorkSubmit begins work on remote node
+// WorkSubmit begins work on remote node.
 func (r *ReceptorControl) WorkSubmit(node, workType string) (string, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work submit %s %s\n", node, workType))
 	if err != nil {
@@ -236,12 +236,12 @@ func (r *ReceptorControl) WorkSubmit(node, workType string) (string, error) {
 	return unitID, nil
 }
 
-// WorkStart begins work on local node
+// WorkStart begins work on local node.
 func (r *ReceptorControl) WorkStart(workType string) (string, error) {
 	return r.WorkSubmit("localhost", workType)
 }
 
-// WorkCancel cancels work
+// WorkCancel cancels work.
 func (r *ReceptorControl) WorkCancel(unitID string) (map[string]interface{}, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work cancel %s\n", unitID))
 	if err != nil {
@@ -250,7 +250,7 @@ func (r *ReceptorControl) WorkCancel(unitID string) (map[string]interface{}, err
 	return r.ReadAndParseJSON()
 }
 
-// WorkRelease cancels and deletes work
+// WorkRelease cancels and deletes work.
 func (r *ReceptorControl) WorkRelease(unitID string) (map[string]interface{}, error) {
 	_, err := r.WriteStr(fmt.Sprintf("work release %s\n", unitID))
 	if err != nil {
@@ -259,7 +259,7 @@ func (r *ReceptorControl) WorkRelease(unitID string) (map[string]interface{}, er
 	return r.ReadAndParseJSON()
 }
 
-// GetWorkStatus returns JSON of status file for a given unitID
+// GetWorkStatus returns JSON of status file for a given unitID.
 func (r *ReceptorControl) GetWorkStatus(unitID string) (*workceptor.StatusFileData, error) {
 	status := &workceptor.StatusFileData{}
 	_, err := r.WriteStr(fmt.Sprintf("work status %s\n", unitID))
@@ -302,7 +302,7 @@ func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, st
 	return assertWithTimeout(ctx, check)
 }
 
-// AssertWorkRunning waits until work status is running
+// AssertWorkRunning waits until work status is running.
 func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateRunning) {
 		return fmt.Errorf("Failed to assert %s is running or ctx timed out", unitID)
@@ -310,7 +310,7 @@ func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) 
 	return nil
 }
 
-// AssertWorkPending waits until status is pending
+// AssertWorkPending waits until status is pending.
 func (r *ReceptorControl) AssertWorkPending(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStatePending) {
 		return fmt.Errorf("Failed to assert %s is pending or ctx timed out", unitID)
@@ -318,7 +318,7 @@ func (r *ReceptorControl) AssertWorkPending(ctx context.Context, unitID string) 
 	return nil
 }
 
-// AssertWorkSucceeded waits until status is successful
+// AssertWorkSucceeded waits until status is successful.
 func (r *ReceptorControl) AssertWorkSucceeded(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateSucceeded) {
 		return fmt.Errorf("Failed to assert %s succeeded or ctx timed out", unitID)
@@ -326,7 +326,7 @@ func (r *ReceptorControl) AssertWorkSucceeded(ctx context.Context, unitID string
 	return nil
 }
 
-// AssertWorkFailed waits until status is failed
+// AssertWorkFailed waits until status is failed.
 func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateFailed) {
 		return fmt.Errorf("Failed to assert %s failed or ctx timed out", unitID)
@@ -334,7 +334,7 @@ func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) e
 	return nil
 }
 
-// AssertWorkCancelled waits until work status is cancelled
+// AssertWorkCancelled waits until work status is cancelled.
 func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string) error {
 	check := func() bool {
 		workStatus, err := r.GetWorkStatus(unitID)
@@ -365,7 +365,7 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string
 	return nil
 }
 
-// AssertWorkTimedOut asserts that work failed
+// AssertWorkTimedOut asserts that work failed.
 func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string) error {
 	check := func() bool {
 		workStatus, err := r.GetWorkStatus(unitID)
@@ -387,7 +387,7 @@ func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string)
 	return nil
 }
 
-// AssertWorkReleased asserts that work is not in work list
+// AssertWorkReleased asserts that work is not in work list.
 func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, unitID string) error {
 	check := func() bool {
 		workList, err := r.getWorkList()
@@ -438,7 +438,7 @@ func (r *ReceptorControl) getWorkResults(unitID string, readSize int) ([]byte, e
 	return buf, nil
 }
 
-// AssertWorkResults makes sure results match expected byte array
+// AssertWorkResults makes sure results match expected byte array.
 func (r *ReceptorControl) AssertWorkResults(unitID string, expectedResults []byte) error {
 	workResults, err := r.getWorkResults(unitID, len(expectedResults))
 	if err != nil {

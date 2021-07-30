@@ -22,7 +22,7 @@ import (
 )
 
 // LibNode holds a Netceptor, this layer of abstraction might be unnecessary and
-// go away later
+// go away later.
 type LibNode struct {
 	dir                    string
 	NetceptorInstance      *netceptor.Netceptor
@@ -34,14 +34,14 @@ type LibNode struct {
 	clientTLSConfigs       map[string]*tls.Config
 }
 
-// LibMesh contains a list of Nodes and the yaml definition that created them
+// LibMesh contains a list of Nodes and the yaml definition that created them.
 type LibMesh struct {
 	nodes          map[string]*LibNode
 	MeshDefinition *YamlData
 	dir            string
 }
 
-// Error handler that gets called for backend errors
+// Error handler that gets called for backend errors.
 func handleError(err error, fatal bool) {
 	fmt.Printf("Error: %s\n", err)
 	if fatal {
@@ -49,7 +49,7 @@ func handleError(err error, fatal bool) {
 	}
 }
 
-// NewLibNode builds a node with the name passed as the argument
+// NewLibNode builds a node with the name passed as the argument.
 func NewLibNode(name string) *LibNode {
 	n1 := netceptor.New(context.Background(), name, nil)
 	return &LibNode{
@@ -59,44 +59,44 @@ func NewLibNode(name string) *LibNode {
 	}
 }
 
-// Dir returns the basedir which contains all of the node data
+// Dir returns the basedir which contains all of the node data.
 func (n *LibNode) Dir() string {
 	return n.dir
 }
 
-// Status returns the status of the node
+// Status returns the status of the node.
 func (n *LibNode) Status() (*netceptor.Status, error) {
 	status := n.NetceptorInstance.Status()
 	return &status, nil
 }
 
-// ControlSocket Returns the path to the controlsocket
+// ControlSocket Returns the path to the controlsocket.
 func (n *LibNode) ControlSocket() string {
 	return n.controlSocket
 }
 
-// Start is not implemented yet
+// Start is not implemented yet.
 func (n *LibNode) Start() error {
 	panic("Start is not yet implemented for LibNode")
 }
 
-// Shutdown is not implemented yet
+// Shutdown is not implemented yet.
 func (n *LibNode) Shutdown() {
 	panic("Shutdown is not yet implemented for LibNode")
 }
 
-// Destroy shuts the node down
+// Destroy shuts the node down.
 func (n *LibNode) Destroy() {
 	n.controlServerCanceller()
 	n.NetceptorInstance.Shutdown()
 }
 
-// WaitForShutdown Waits for the node to shutdown completely
+// WaitForShutdown Waits for the node to shutdown completely.
 func (n *LibNode) WaitForShutdown() {
 	n.NetceptorInstance.BackendWait()
 }
 
-// Nodes Returns a list of nodes
+// Nodes Returns a list of nodes.
 func (m *LibMesh) Nodes() map[string]Node {
 	nodes := make(map[string]Node)
 	for k, v := range m.nodes {
@@ -106,7 +106,7 @@ func (m *LibMesh) Nodes() map[string]Node {
 }
 
 // TCPListen helper function to create and start a TCPListener
-// This might be an unnecessary abstraction and maybe should be deleted
+// This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
 	b1, err := backends.NewTCPListener(address, tlsCfg)
 	if err != nil {
@@ -118,7 +118,7 @@ func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]fl
 }
 
 // TCPDial helper function to create and start a TCPDialer
-// This might be an unnecessary abstraction and maybe should be deleted
+// This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) error {
 	b1, err := backends.NewTCPDialer(address, true, tlsCfg)
 	if err != nil {
@@ -129,7 +129,7 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 }
 
 // UDPListen helper function to create and start a UDPListener
-// This might be an unnecessary abstraction and maybe should be deleted
+// This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]float64) error {
 	b1, err := backends.NewUDPListener(address)
 	if err != nil {
@@ -141,7 +141,7 @@ func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]fl
 }
 
 // UDPDial helper function to create and start a UDPDialer
-// This might be an unnecessary abstraction and maybe should be deleted
+// This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) UDPDial(address string, cost float64) error {
 	b1, err := backends.NewUDPDialer(address, true)
 	if err != nil {
@@ -152,7 +152,7 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 }
 
 // WebsocketListen helper function to create and start a WebsocketListener
-// This might be an unnecessary abstraction and maybe should be deleted
+// This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS
 	b1, err := backends.NewWebsocketListener(address, tlsCfg)
@@ -165,7 +165,7 @@ func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[str
 }
 
 // WebsocketDial helper function to create and start a WebsocketDialer
-// This might be an unnecessary abstraction and maybe should be deleted
+// This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS and extra headers
 	b1, err := backends.NewWebsocketDialer(address, nil, "", true)
@@ -176,13 +176,13 @@ func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config
 	return err
 }
 
-// Dir returns the basedir which contains all of the mesh data
+// Dir returns the basedir which contains all of the mesh data.
 func (m *LibMesh) Dir() string {
 	return m.dir
 }
 
 // NewLibMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
-// calls NewMeshFromYaml on it
+// calls NewMeshFromYaml on it.
 func NewLibMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -200,7 +200,7 @@ func NewLibMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 }
 
 // NewLibMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
-// listening and dialing as defined in the yaml
+// listening and dialing as defined in the yaml.
 func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, error) {
 	mesh := &LibMesh{}
 	// Setup the mesh directory
@@ -496,14 +496,14 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	return mesh, nil
 }
 
-// Destroy stops all running Netceptors and their backends
+// Destroy stops all running Netceptors and their backends.
 func (m *LibMesh) Destroy() {
 	for _, node := range m.nodes {
 		node.Destroy()
 	}
 }
 
-// WaitForShutdown Waits for all running Netceptors and their backends to stop
+// WaitForShutdown Waits for all running Netceptors and their backends to stop.
 func (m *LibMesh) WaitForShutdown() {
 	for _, node := range m.nodes {
 		node.WaitForShutdown()
@@ -511,7 +511,7 @@ func (m *LibMesh) WaitForShutdown() {
 }
 
 // CheckConnections returns true if the connections defined in our mesh definition are
-// consistent with the connections made by the nodes
+// consistent with the connections made by the nodes.
 func (m *LibMesh) CheckConnections() bool {
 	statusList, err := m.Status()
 	if err != nil {
@@ -558,7 +558,7 @@ func (m *LibMesh) CheckConnections() bool {
 	return false
 }
 
-// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh
+// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh.
 func (m *LibMesh) CheckKnownConnectionCosts() bool {
 	meshStatus, err := m.Status()
 	if err != nil {
@@ -578,7 +578,7 @@ func (m *LibMesh) CheckKnownConnectionCosts() bool {
 	return true
 }
 
-// CheckRoutes returns true if every node has a route to every other node
+// CheckRoutes returns true if every node has a route to every other node.
 func (m *LibMesh) CheckRoutes() bool {
 	meshStatus, err := m.Status()
 	if err != nil {
@@ -600,7 +600,7 @@ func (m *LibMesh) CheckRoutes() bool {
 }
 
 // CheckControlSockets Checks if the Control sockets in the mesh are all running and accepting
-// connections
+// connections.
 func (m *LibMesh) CheckControlSockets() bool {
 	for _, node := range m.nodes {
 		controller := receptorcontrol.New()
@@ -612,7 +612,7 @@ func (m *LibMesh) CheckControlSockets() bool {
 	return true
 }
 
-// WaitForReady Waits for connections and routes to converge
+// WaitForReady Waits for connections and routes to converge.
 func (m *LibMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
@@ -630,7 +630,7 @@ func (m *LibMesh) WaitForReady(ctx context.Context) error {
 	return nil
 }
 
-// Status returns a list of statuses from the contained netceptors
+// Status returns a list of statuses from the contained netceptors.
 func (m *LibMesh) Status() ([]*netceptor.Status, error) {
 	var out []*netceptor.Status
 	for _, node := range m.nodes {

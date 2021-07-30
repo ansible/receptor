@@ -21,12 +21,12 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// sockControl implements the ControlFuncOperations interface that is passed back to control functions
+// sockControl implements the ControlFuncOperations interface that is passed back to control functions.
 type sockControl struct {
 	conn net.Conn
 }
 
-// BridgeConn bridges the socket to another socket
+// BridgeConn bridges the socket to another socket.
 func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
@@ -38,7 +38,7 @@ func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName s
 	return nil
 }
 
-// ReadFromConn copies from the socket to an io.Writer, until EOF
+// ReadFromConn copies from the socket to an io.Writer, until EOF.
 func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
@@ -53,7 +53,7 @@ func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 	return nil
 }
 
-// WriteToConn writes an initial string, and then messages to a channel, to the connection
+// WriteToConn writes an initial string, and then messages to a channel, to the connection.
 func (s *sockControl) WriteToConn(message string, in chan []byte) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
@@ -74,7 +74,7 @@ func (s *sockControl) Close() error {
 	return s.conn.Close()
 }
 
-// Server is an instance of a control service
+// Server is an instance of a control service.
 type Server struct {
 	nc              *netceptor.Netceptor
 	controlFuncLock sync.RWMutex
@@ -97,7 +97,7 @@ func New(stdServices bool, nc *netceptor.Netceptor) *Server {
 	return s
 }
 
-// MainInstance is the global instance of the control service instantiated by the command-line main() function
+// MainInstance is the global instance of the control service instantiated by the command-line main() function.
 var MainInstance *Server
 
 // AddControlFunc registers a function that can be used from a control socket.
@@ -112,7 +112,7 @@ func (s *Server) AddControlFunc(name string, cType ControlCommandType) error {
 	return nil
 }
 
-// RunControlSession runs the server protocol on the given connection
+// RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
 	logger.Info("Client connected to control service\n")
 	defer func() {
@@ -244,7 +244,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 	}
 }
 
-// RunControlSvc runs the main accept loop of the control service
+// RunControlSvc runs the main accept loop of the control service.
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
 	unixSocket string, unixSocketPermissions os.FileMode, TCPListen string, tcptls *tls.Config) error {
 	var uli net.Listener
@@ -354,7 +354,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 // Command line
 // **************************************************************************
 
-// cmdlineConfigWindows is the cmdline configuration object for a control service on Windows
+// cmdlineConfigWindows is the cmdline configuration object for a control service on Windows.
 type cmdlineConfigWindows struct {
 	Service   string `description:"Receptor service name to listen on" default:"control"`
 	TLS       string `description:"Name of TLS server config for the Receptor listener"`
@@ -362,7 +362,7 @@ type cmdlineConfigWindows struct {
 	TCPTLS    string `description:"Name of TLS server config for the TCP listener"`
 }
 
-// cmdlineConfigUnix is the cmdline configuration object for a control service on Unix
+// cmdlineConfigUnix is the cmdline configuration object for a control service on Unix.
 type cmdlineConfigUnix struct {
 	Service     string `description:"Receptor service name to listen on" default:"control"`
 	Filename    string `description:"Filename of local Unix socket to bind to the service"`
@@ -372,7 +372,7 @@ type cmdlineConfigUnix struct {
 	TCPTLS      string `description:"Name of TLS server config for the TCP listener"`
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg cmdlineConfigUnix) Run() error {
 	if cfg.TLS != "" && cfg.TCPListen != "" && cfg.TCPTLS == "" {
 		logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
@@ -396,7 +396,7 @@ func (cfg cmdlineConfigUnix) Run() error {
 	return nil
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg cmdlineConfigWindows) Run() error {
 	return cmdlineConfigUnix{
 		Service:   cfg.Service,

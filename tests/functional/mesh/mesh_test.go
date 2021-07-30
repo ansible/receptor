@@ -19,7 +19,7 @@ import (
 )
 
 // Test that a mesh starts and that connections are what we expect and that
-// each node's view of the mesh converges
+// each node's view of the mesh converges.
 func TestMeshStartup(t *testing.T) {
 	testTable := []struct {
 		filename string
@@ -74,7 +74,7 @@ func TestMeshStartup(t *testing.T) {
 	}
 }
 
-// Test that a mesh starts and that connections are what we expect
+// Test that a mesh starts and that connections are what we expect.
 func TestMeshConnections(t *testing.T) {
 	testTable := []struct {
 		filename string
@@ -122,7 +122,7 @@ func TestMeshConnections(t *testing.T) {
 	}
 }
 
-// Test that traceroute works
+// Test that traceroute works.
 func TestTraceroute(t *testing.T) {
 	testTable := []struct {
 		filename string
@@ -212,7 +212,7 @@ func TestTraceroute(t *testing.T) {
 	}
 }
 
-// Test that a mesh starts and that connections are what we expect
+// Test that a mesh starts and that connections are what we expect.
 func TestMeshShutdown(t *testing.T) {
 	// defer leaktest.Check(t)()
 	testTable := []struct {

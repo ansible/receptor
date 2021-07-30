@@ -41,7 +41,7 @@ func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCo
 	return c, nil
 }
 
-// ping is the internal implementation of sending a single ping packet and waiting for a reply or error
+// ping is the internal implementation of sending a single ping packet and waiting for a reply or error.
 func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duration, string, error) {
 	pc, err := nc.ListenPacket("")
 	if err != nil {

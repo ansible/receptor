@@ -16,16 +16,16 @@ import (
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// UDPMaxPacketLen is the maximum size of a message that can be sent over UDP
+// UDPMaxPacketLen is the maximum size of a message that can be sent over UDP.
 const UDPMaxPacketLen = 65507
 
-// UDPDialer implements Backend for outbound UDP
+// UDPDialer implements Backend for outbound UDP.
 type UDPDialer struct {
 	address string
 	redial  bool
 }
 
-// NewUDPDialer instantiates a new UDPDialer backend
+// NewUDPDialer instantiates a new UDPDialer backend.
 func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 	_, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
@@ -38,7 +38,7 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 	return &nd, nil
 }
 
-// Start runs the given session function over this backend service
+// Start runs the given session function over this backend service.
 func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
@@ -60,14 +60,14 @@ func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 		})
 }
 
-// UDPDialerSession implements BackendSession for UDPDialer
+// UDPDialerSession implements BackendSession for UDPDialer.
 type UDPDialerSession struct {
 	conn            *net.UDPConn
 	closeChan       chan struct{}
 	closeChanCloser sync.Once
 }
 
-// Send sends data over the session
+// Send sends data over the session.
 func (ns *UDPDialerSession) Send(data []byte) error {
 	if len(data) > UDPMaxPacketLen {
 		return fmt.Errorf("data too large")
@@ -82,7 +82,7 @@ func (ns *UDPDialerSession) Send(data []byte) error {
 	return nil
 }
 
-// Recv receives data via the session
+// Recv receives data via the session.
 func (ns *UDPDialerSession) Recv(timeout time.Duration) ([]byte, error) {
 	err := ns.conn.SetReadDeadline(time.Now().Add(timeout))
 	if err != nil {
@@ -99,7 +99,7 @@ func (ns *UDPDialerSession) Recv(timeout time.Duration) ([]byte, error) {
 	return buf[:n], nil
 }
 
-// Close closes the session
+// Close closes the session.
 func (ns *UDPDialerSession) Close() error {
 	if ns.closeChan != nil {
 		ns.closeChanCloser.Do(func() {
@@ -110,7 +110,7 @@ func (ns *UDPDialerSession) Close() error {
 	return ns.conn.Close()
 }
 
-// UDPListener implements Backend for inbound UDP
+// UDPListener implements Backend for inbound UDP.
 type UDPListener struct {
 	laddr           *net.UDPAddr
 	conn            *net.UDPConn
@@ -119,7 +119,7 @@ type UDPListener struct {
 	sessionRegistry map[string]*UDPListenerSession
 }
 
-// NewUDPListener instantiates a new UDPListener backend
+// NewUDPListener instantiates a new UDPListener backend.
 func NewUDPListener(address string) (*UDPListener, error) {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
@@ -139,7 +139,7 @@ func NewUDPListener(address string) (*UDPListener, error) {
 	return &ul, nil
 }
 
-// LocalAddr returns the local address the listener is listening on
+// LocalAddr returns the local address the listener is listening on.
 func (b *UDPListener) LocalAddr() net.Addr {
 	if b.conn == nil {
 		return nil
@@ -147,7 +147,7 @@ func (b *UDPListener) LocalAddr() net.Addr {
 	return b.conn.LocalAddr()
 }
 
-// Start runs the given session function over the UDPListener backend
+// Start runs the given session function over the UDPListener backend.
 func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
 	go func() {
@@ -208,14 +208,14 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 	return sessChan, nil
 }
 
-// UDPListenerSession implements BackendSession for UDPListener
+// UDPListenerSession implements BackendSession for UDPListener.
 type UDPListenerSession struct {
 	li       *UDPListener
 	raddr    *net.UDPAddr
 	recvChan chan []byte
 }
 
-// Send sends data over the session
+// Send sends data over the session.
 func (ns *UDPListenerSession) Send(data []byte) error {
 	n, err := ns.li.conn.WriteToUDP(data, ns.raddr)
 	if err != nil {
@@ -226,7 +226,7 @@ func (ns *UDPListenerSession) Send(data []byte) error {
 	return nil
 }
 
-// Recv receives data from the session
+// Recv receives data from the session.
 func (ns *UDPListenerSession) Recv(timeout time.Duration) ([]byte, error) {
 	select {
 	case data := <-ns.recvChan:
@@ -236,7 +236,7 @@ func (ns *UDPListenerSession) Recv(timeout time.Duration) ([]byte, error) {
 	}
 }
 
-// Close closes the session
+// Close closes the session.
 func (ns *UDPListenerSession) Close() error {
 	ns.li.sessRegLock.Lock()
 	defer ns.li.sessRegLock.Unlock()
@@ -248,7 +248,7 @@ func (ns *UDPListenerSession) Close() error {
 // Command line
 // **************************************************************************
 
-// udpListenerCfg is the cmdline configuration object for a UDP listener
+// udpListenerCfg is the cmdline configuration object for a UDP listener.
 type udpListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
@@ -256,7 +256,7 @@ type udpListenerCfg struct {
 	NodeCost map[string]float64 `description:"Per-node costs"`
 }
 
-// Prepare verifies the parameters are correct
+// Prepare verifies the parameters are correct.
 func (cfg udpListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
@@ -269,7 +269,7 @@ func (cfg udpListenerCfg) Prepare() error {
 	return nil
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg udpListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	b, err := NewUDPListener(address)
@@ -285,14 +285,14 @@ func (cfg udpListenerCfg) Run() error {
 	return nil
 }
 
-// udpDialerCfg is the cmdline configuration object for a UDP listener
+// udpDialerCfg is the cmdline configuration object for a UDP listener.
 type udpDialerCfg struct {
 	Address string  `description:"Host:Port to connect to" barevalue:"yes" required:"yes"`
 	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
 	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
-// Prepare verifies the parameters are correct
+// Prepare verifies the parameters are correct.
 func (cfg udpDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
@@ -300,7 +300,7 @@ func (cfg udpDialerCfg) Prepare() error {
 	return nil
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg udpDialerCfg) Run() error {
 	logger.Debug("Running UDP peer connection %s\n", cfg.Address)
 	b, err := NewUDPDialer(cfg.Address, cfg.Redial)

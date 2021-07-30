@@ -7,7 +7,7 @@ import (
 	"github.com/project-receptor/receptor/pkg/logger"
 )
 
-// NormalBufferSize is the size of buffers used by various processes when copying data between sockets
+// NormalBufferSize is the size of buffers used by various processes when copying data between sockets.
 const NormalBufferSize = 65536
 
 // BridgeConns bridges two connections, like netcat.

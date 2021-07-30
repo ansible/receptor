@@ -24,15 +24,15 @@ var (
 	tcpPortPool  []int
 )
 
-// TestBaseDir holds the base directory that all permanent test logs should go in
+// TestBaseDir holds the base directory that all permanent test logs should go in.
 var TestBaseDir string
 
 // ControlSocketBaseDir holds the base directory for controlsockets, control sockets
 // have a limited path length, therefore we cant always put them along side the
-// node they are attached to
+// node they are attached to.
 var ControlSocketBaseDir string
 
-// CertBaseDir specifies the directory that generated certs get put in
+// CertBaseDir specifies the directory that generated certs get put in.
 var CertBaseDir string
 
 func init() {
@@ -71,7 +71,7 @@ func makeRange(start, stop, step int) ([]int, error) {
 // There's a race condition here where the port we grab *could* later be
 // grabbed by another process/thread before we use it, if you rely on this you
 // should handle a case where the port given is in use before you are able to
-// open it
+// open it.
 func ReserveTCPPort() int {
 	tcpPortMutex.Lock()
 	defer tcpPortMutex.Unlock()
@@ -94,7 +94,7 @@ func ReserveTCPPort() int {
 }
 
 // FreeTCPPort puts a port back into the pool such that it can be allocated
-// later
+// later.
 func FreeTCPPort(portNum int) {
 	tcpPortMutex.Lock()
 	defer tcpPortMutex.Unlock()
@@ -106,7 +106,7 @@ func FreeTCPPort(portNum int) {
 // There's a race condition here where the port we grab *could* later be
 // grabbed by another process/thread before we use it, if you rely on this you
 // should handle a case where the port given is in use before you are able to
-// open it
+// open it.
 func ReserveUDPPort() int {
 	udpPortMutex.Lock()
 	defer udpPortMutex.Unlock()
@@ -135,7 +135,7 @@ func ReserveUDPPort() int {
 }
 
 // FreeUDPPort puts a port back into the pool such that it can be allocated
-// later
+// later.
 func FreeUDPPort(portNum int) {
 	udpPortMutex.Lock()
 	defer udpPortMutex.Unlock()
@@ -143,7 +143,7 @@ func FreeUDPPort(portNum int) {
 	udpPortPool = append(udpPortPool, portNum)
 }
 
-// GenerateCA generates a CA certificate and key
+// GenerateCA generates a CA certificate and key.
 func GenerateCA(name, commonName string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
@@ -168,7 +168,7 @@ func GenerateCA(name, commonName string) (string, string, error) {
 	return keyPath, crtPath, nil
 }
 
-// GenerateCert generates a private and public key for testing in the directory specified
+// GenerateCert generates a private and public key for testing in the directory specified.
 func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
@@ -212,7 +212,7 @@ func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, 
 }
 
 // GenerateCertWithCA generates a private and public key for testing in the directory
-// specified using the ca specified
+// specified using the ca specified.
 func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames, NodeIDs []string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
@@ -259,7 +259,7 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames,
 }
 
 // CheckUntilTimeout Polls the check function until the context expires, in
-// which case it returns false
+// which case it returns false.
 func CheckUntilTimeout(ctx context.Context, interval time.Duration, check func() bool) bool {
 	for ready := check(); !ready; ready = check() {
 		if ctx.Err() != nil {
@@ -272,7 +272,7 @@ func CheckUntilTimeout(ctx context.Context, interval time.Duration, check func()
 
 // CheckUntilTimeoutWithErr does the same as CheckUntilTimeout but requires the
 // check function returns (bool, error), and will return an error immediately
-// if the check function returns an error
+// if the check function returns an error.
 func CheckUntilTimeoutWithErr(ctx context.Context, interval time.Duration, check func() (bool, error)) (bool, error) {
 	for ready, err := check(); !ready; ready, err = check() {
 		if err != nil {

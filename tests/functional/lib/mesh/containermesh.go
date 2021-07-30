@@ -42,7 +42,7 @@ func init() {
 }
 
 // ContainerNode holds a Netceptor, this layer of abstraction might be unnecessary and
-// go away later
+// go away later.
 type ContainerNode struct {
 	dir                    string
 	yamlConfigPath         string
@@ -53,25 +53,25 @@ type ContainerNode struct {
 	TCRules                *TCRuleYaml
 }
 
-// ContainerMesh contains a list of Nodes and the yaml definition that created them
+// ContainerMesh contains a list of Nodes and the yaml definition that created them.
 type ContainerMesh struct {
 	nodes          map[string]*ContainerNode
 	MeshDefinition *YamlData
 	dir            string
 }
 
-// NewContainerNode builds a node with the name passed as the argument
+// NewContainerNode builds a node with the name passed as the argument.
 func NewContainerNode(name string) *ContainerNode {
 	return &ContainerNode{}
 }
 
-// Dir returns the basedir which contains all of the node data
+// Dir returns the basedir which contains all of the node data.
 func (n *ContainerNode) Dir() string {
 	return n.dir
 }
 
 // Status returns the status of the node using the control socket to query the
-// node
+// node.
 func (n *ContainerNode) Status() (*netceptor.Status, error) {
 	controller := receptorcontrol.New()
 	err := controller.Connect(n.externalControlSocket)
@@ -86,18 +86,18 @@ func (n *ContainerNode) Status() (*netceptor.Status, error) {
 	return status, nil
 }
 
-// ControlSocket Returns the path to the controlsocket
+// ControlSocket Returns the path to the controlsocket.
 func (n *ContainerNode) ControlSocket() string {
 	return n.externalControlSocket
 }
 
-// Shutdown kills the receptor process
+// Shutdown kills the receptor process.
 func (n *ContainerNode) Shutdown() {
 	receptorCmd := exec.Command(containerRunner, "stop", n.containerName)
 	receptorCmd.Start()
 }
 
-// Start writes the the node config to disk and starts the receptor process
+// Start writes the the node config to disk and starts the receptor process.
 func (n *ContainerNode) Start() error {
 	strData, err := yaml.Marshal(n.yamlConfig)
 	if err != nil {
@@ -170,7 +170,7 @@ func (n *ContainerNode) Start() error {
 }
 
 // Destroy kills the receptor process and puts its ports back into the pool to
-// be reallocated once it's shutdown
+// be reallocated once it's shutdown.
 func (n *ContainerNode) Destroy() {
 	n.Shutdown()
 	go func() {
@@ -203,18 +203,18 @@ func (n *ContainerNode) Destroy() {
 	}()
 }
 
-// WaitForShutdown Waits for the receptor process to finish
+// WaitForShutdown Waits for the receptor process to finish.
 func (n *ContainerNode) WaitForShutdown() {
 	Cmd := exec.Command(containerRunner, "wait", n.containerName)
 	Cmd.Run()
 }
 
-// Dir returns the basedir which contains all of the mesh data
+// Dir returns the basedir which contains all of the mesh data.
 func (m *ContainerMesh) Dir() string {
 	return m.dir
 }
 
-// Nodes Returns a list of nodes
+// Nodes Returns a list of nodes.
 func (m *ContainerMesh) Nodes() map[string]Node {
 	nodes := make(map[string]Node)
 	for k, v := range m.nodes {
@@ -224,7 +224,7 @@ func (m *ContainerMesh) Nodes() map[string]Node {
 }
 
 // NewContainerMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
-// calls NewMeshFromYaml on it
+// calls NewMeshFromYaml on it.
 func NewContainerMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 	yamlDat, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -242,7 +242,7 @@ func NewContainerMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 }
 
 // NewContainerMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
-// listening and dialing as defined in the yaml
+// listening and dialing as defined in the yaml.
 func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*ContainerMesh, error) {
 	containerComposeData := make(map[string]interface{})
 	containerComposeData["version"] = "2.4"
@@ -526,14 +526,14 @@ done`
 }
 
 // Destroy stops all running Netceptors and their backends and frees all
-// relevant resources
+// relevant resources.
 func (m *ContainerMesh) Destroy() {
 	for _, node := range m.nodes {
 		node.Destroy()
 	}
 }
 
-// WaitForShutdown Waits for all running Netceptors and their backends to stop
+// WaitForShutdown Waits for all running Netceptors and their backends to stop.
 func (m *ContainerMesh) WaitForShutdown() {
 	for _, node := range m.nodes {
 		node.WaitForShutdown()
@@ -541,7 +541,7 @@ func (m *ContainerMesh) WaitForShutdown() {
 }
 
 // CheckConnections returns true if the connections defined in our mesh definition are
-// consistent with the connections made by the nodes
+// consistent with the connections made by the nodes.
 func (m *ContainerMesh) CheckConnections() bool {
 	statusList, err := m.Status()
 	if err != nil {
@@ -588,7 +588,7 @@ func (m *ContainerMesh) CheckConnections() bool {
 	return false
 }
 
-// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh
+// CheckKnownConnectionCosts returns true if every node has the same view of the connections in the mesh.
 func (m *ContainerMesh) CheckKnownConnectionCosts() bool {
 	meshStatus, err := m.Status()
 	if err != nil {
@@ -608,7 +608,7 @@ func (m *ContainerMesh) CheckKnownConnectionCosts() bool {
 	return true
 }
 
-// CheckRoutes returns true if every node has a route to every other node
+// CheckRoutes returns true if every node has a route to every other node.
 func (m *ContainerMesh) CheckRoutes() bool {
 	meshStatus, err := m.Status()
 	if err != nil {
@@ -630,7 +630,7 @@ func (m *ContainerMesh) CheckRoutes() bool {
 }
 
 // CheckControlSockets Checks if the Control sockets in the mesh are all running and accepting
-// connections
+// connections.
 func (m *ContainerMesh) CheckControlSockets() bool {
 	for _, node := range m.nodes {
 		controller := receptorcontrol.New()
@@ -642,7 +642,7 @@ func (m *ContainerMesh) CheckControlSockets() bool {
 	return true
 }
 
-// WaitForReady Waits for connections and routes to converge
+// WaitForReady Waits for connections and routes to converge.
 func (m *ContainerMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
@@ -660,7 +660,7 @@ func (m *ContainerMesh) WaitForReady(ctx context.Context) error {
 	return nil
 }
 
-// Status returns a list of statuses from the contained netceptors
+// Status returns a list of statuses from the contained netceptors.
 func (m *ContainerMesh) Status() ([]*netceptor.Status, error) {
 	var out []*netceptor.Status
 	for _, node := range m.nodes {

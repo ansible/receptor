@@ -54,12 +54,12 @@ func (cwe *CancelWithErrContext) closeDoneChan() {
 	})
 }
 
-// Done implements Context.Done()
+// Done implements Context.Done().
 func (cwe *CancelWithErrContext) Done() <-chan struct{} {
 	return cwe.doneChan
 }
 
-// Err implements Context.Err()
+// Err implements Context.Err().
 func (cwe *CancelWithErrContext) Err() error {
 	if cwe.err != nil {
 		return cwe.err
@@ -67,12 +67,12 @@ func (cwe *CancelWithErrContext) Err() error {
 	return cwe.parentCtx.Err()
 }
 
-// Deadline implements Context.Deadline()
+// Deadline implements Context.Deadline().
 func (cwe *CancelWithErrContext) Deadline() (time time.Time, ok bool) {
 	return cwe.parentCtx.Deadline()
 }
 
-// Value implements Context.Value()
+// Value implements Context.Value().
 func (cwe *CancelWithErrContext) Value(key interface{}) interface{} {
 	return cwe.parentCtx.Value(key)
 }

@@ -1,7 +1,7 @@
 CONTAINER_IMAGE_TAG_BASE=ansible/receptor:base
 CONTAINER_IMAGE_TAG_TEST=ansible/receptor:test
 
-CONTAINER_RUN=podman
+CONTAINER_RUN:=$$(./receptor-tester.sh container-runtime)
 
 # Tests
 GO_FUNCTIONAL_TESTS_DIRS:=$$(find ./functional -type d)

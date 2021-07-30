@@ -2,9 +2,24 @@
 
 set -e
 
+# Go to current script dir
+current_dir=$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )
+cd ${current_dir}
+
 # Global vars
-tests_dirs=$(find . -name *_test.go -exec dirname {} + | uniq)
+tests_dirs=""
+for f in $(find . -name *_test.go); do
+    tests_dirs="${tests_dirs} $(dirname $f)"
+done
+tests_dirs=$(echo $tests_dirs | sed 's/ /\n/g' | uniq)
 tests_files=$(find . -name *_test.go)
+
+# Switch between podman or docker
+if command -v podman &> /dev/null ; then
+    export CONTAINER_RUN=podman
+elif command -v docker &> /dev/null ; then
+    export CONTAINER_RUN=docker
+fi
 
 # Logs. Based on:
 # https://github.com/containers/Demos/blob/master/building/buildah_intro/buildah_intro.sh
@@ -56,9 +71,9 @@ log_error() {
 # Helpers
 function check_requirements(){
     # Check if podman is installed
-    if ! command -v podman &> /dev/null
+    if [ -z "${CONTAINER_RUN}" ]
     then
-        log_error "ERROR: podman is not installed!"
+        log_error "ERROR: podman OR docker must be installed!"
         exit 1
     fi
 
@@ -70,7 +85,12 @@ function check_requirements(){
     fi
 
     # Check if Makefile exists
-    # TODO
+    if [ ! -f "${current_dir}/Makefile" ]
+    then
+        echo ${current_dir}/Makefile
+        log_error "ERROR: Makefile not found in current dir!"
+        exit 1
+    fi
 }
 function build_artifacts(){
     make artifacts
@@ -107,7 +127,7 @@ function f_run() {
         cd /source/tests && set -x &&
         go test -v '$@'
     '
-	podman run -it --rm \
+	${CONTAINER_RUN} run -it --rm \
 		-v $(pwd)/../:/source/:ro \
 		-v $(pwd)/artifacts:/artifacts/:rw \
 		-v receptor_go_root_cache:/root/go:rw \
@@ -125,11 +145,13 @@ function f_help() {
     echo
     cat <<- HELP_INFO
 Command list:
-  list-dirs    - list all available tests directories
-  list-files   - list all available tests files
-  run          - WIP run a specific test
-  run-all      - WIP run all tests. Returns 0 if pass
-  help         - show this help section
+  list-dirs         list all available tests directories
+  list-files        list all available tests files
+  run               run a specific test
+  run-all           run all tests. Returns 0 if pass
+  container-runtime show container runtime available
+  requirements      check all system requirements
+  help              show this help section
 HELP_INFO
 }
 
@@ -149,6 +171,13 @@ elif [[ $1 == "run" ]]; then
 elif [[ $1 == "run-all" ]]; then
     shift
     f_run_all $@
+    exit
+elif [[ $1 == "container-runtime" ]]; then
+    echo ${CONTAINER_RUN}
+    exit
+elif [[ $1 == "requirements" ]]; then
+    check_requirements
+    log_info "All system requirements are satisfied!"
     exit
 elif [[ $1 == "help" ]]; then
     shift

@@ -43,7 +43,7 @@ func newStdoutWriter(unitdir string) (*stdoutWriter, error) {
 // Write writes data to the stdout file and status file, implementing io.Writer.
 func (sw *stdoutWriter) Write(p []byte) (n int, err error) {
 	wn, werr := sw.writer.Write(p)
-	var serr error = nil
+	var serr error
 	if wn > 0 {
 		sw.bytesWritten += int64(wn)
 		serr = saveStdoutSize(sw.unitdir, sw.bytesWritten)

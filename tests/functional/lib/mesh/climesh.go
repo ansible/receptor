@@ -591,7 +591,7 @@ func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 
 // Status returns a list of statuses from the contained netceptors.
 func (m *CLIMesh) Status() ([]*netceptor.Status, error) {
-	var out []*netceptor.Status
+	out := []*netceptor.Status{}
 	for _, node := range m.nodes {
 		status, err := node.Status()
 		if err != nil {

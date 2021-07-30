@@ -674,7 +674,7 @@ func (m *ContainerMesh) WaitForReady(ctx context.Context) error {
 
 // Status returns a list of statuses from the contained netceptors.
 func (m *ContainerMesh) Status() ([]*netceptor.Status, error) {
-	var out []*netceptor.Status
+	out := []*netceptor.Status{}
 	for _, node := range m.nodes {
 		status, err := node.Status()
 		if err != nil {

@@ -80,7 +80,7 @@ type GeneralNameEncode struct {
 
 // MakeReceptorSAN generates a subjectAltName extension, optionally containing Receptor names.
 func MakeReceptorSAN(DNSNames []string, IPAddresses []net.IP, NodeIDs []string) (*pkix.Extension, error) {
-	var rawValues []asn1.RawValue
+	rawValues := []asn1.RawValue{}
 	for _, name := range DNSNames {
 		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
 	}

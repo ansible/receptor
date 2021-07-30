@@ -334,7 +334,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					}
 					nodeCost := make(map[string]float64)
 
-					// Use nodeCost map if possible
+					// Use nodeCost map if possible.
 					if vMap["nodecost"] != nil {
 						interfaceNodeCost := vMap["nodecost"].(map[interface{}]interface{})
 						for k, v := range interfaceNodeCost {
@@ -643,7 +643,7 @@ func (m *LibMesh) WaitForReady(ctx context.Context) error {
 
 // Status returns a list of statuses from the contained netceptors.
 func (m *LibMesh) Status() ([]*netceptor.Status, error) {
-	var out []*netceptor.Status
+	out := []*netceptor.Status{}
 	for _, node := range m.nodes {
 		status, err := node.Status()
 		if err != nil {

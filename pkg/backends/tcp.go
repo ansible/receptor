@@ -99,7 +99,7 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			var ok bool
 			tli, ok := li.(*net.TCPListener)
 			if !ok {
-				return fmt.Errorf("Listen returned a non-TCP listener")
+				return fmt.Errorf("listen returned a non-TCP listener")
 			}
 			if b.tls == nil {
 				b.li = li

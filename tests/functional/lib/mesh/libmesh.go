@@ -331,7 +331,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						cost = 1.0
 					}
 					if err != nil {
-						return nil, fmt.Errorf("Unable to determine cost for %s", k)
+						return nil, fmt.Errorf("unable to determine cost for %s", k)
 					}
 					nodeCost := make(map[string]float64)
 
@@ -420,13 +420,13 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			if ok {
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 
 				cost := getListenerCost(listenerMap, k)
 
 				if err != nil {
-					return nil, fmt.Errorf("Unable to determine cost for %s", k)
+					return nil, fmt.Errorf("unable to determine cost for %s", k)
 				}
 
 				addr := listenerMap["bindaddr"].(string) + ":" + listenerMap["port"].(string)
@@ -439,12 +439,12 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			if ok {
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				cost := getListenerCost(listenerMap, k)
 
 				if err != nil {
-					return nil, fmt.Errorf("Unable to determine cost for %s", k)
+					return nil, fmt.Errorf("unable to determine cost for %s", k)
 				}
 
 				addr := listenerMap["bindaddr"].(string) + ":" + listenerMap["port"].(string)
@@ -457,13 +457,13 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			if ok {
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 
 				cost := getListenerCost(listenerMap, k)
 
 				if err != nil {
-					return nil, fmt.Errorf("Unable to determine cost for %s", k)
+					return nil, fmt.Errorf("unable to determine cost for %s", k)
 				}
 
 				proto := "ws://"
@@ -621,16 +621,16 @@ func (m *LibMesh) CheckControlSockets() bool {
 func (m *LibMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
-		return errors.New("Timed out while waiting for control sockets")
+		return errors.New("timed out while waiting for control sockets")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckConnections) {
-		return errors.New("Timed out while waiting for Connections")
+		return errors.New("timed out while waiting for Connections")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
-		return errors.New("Timed out while checking Connection Costs")
+		return errors.New("timed out while checking Connection Costs")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
-		return errors.New("Timed out while waiting for routes to converge")
+		return errors.New("timed out while waiting for routes to converge")
 	}
 
 	return nil

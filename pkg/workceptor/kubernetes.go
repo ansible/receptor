@@ -128,7 +128,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 			}
 		}
 		if !foundWorker {
-			return fmt.Errorf("At least one container must be named worker")
+			return fmt.Errorf("at least one container must be named worker")
 		}
 		spec.RestartPolicy = corev1.RestartPolicyNever
 		userNamespace := pod.ObjectMeta.Namespace

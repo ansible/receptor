@@ -60,7 +60,7 @@ func (r *ReceptorControl) Reconnect() error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("Could not reconnect, no socketFilename")
+		return fmt.Errorf("could not reconnect, no socketFilename")
 	}
 
 	return nil
@@ -322,7 +322,7 @@ func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, st
 // AssertWorkRunning waits until work status is running.
 func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateRunning) {
-		return fmt.Errorf("Failed to assert %s is running or ctx timed out", unitID)
+		return fmt.Errorf("failed to assert %s is running or ctx timed out", unitID)
 	}
 
 	return nil
@@ -331,7 +331,7 @@ func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) 
 // AssertWorkPending waits until status is pending.
 func (r *ReceptorControl) AssertWorkPending(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStatePending) {
-		return fmt.Errorf("Failed to assert %s is pending or ctx timed out", unitID)
+		return fmt.Errorf("failed to assert %s is pending or ctx timed out", unitID)
 	}
 
 	return nil
@@ -340,7 +340,7 @@ func (r *ReceptorControl) AssertWorkPending(ctx context.Context, unitID string) 
 // AssertWorkSucceeded waits until status is successful.
 func (r *ReceptorControl) AssertWorkSucceeded(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateSucceeded) {
-		return fmt.Errorf("Failed to assert %s succeeded or ctx timed out", unitID)
+		return fmt.Errorf("failed to assert %s succeeded or ctx timed out", unitID)
 	}
 
 	return nil
@@ -349,7 +349,7 @@ func (r *ReceptorControl) AssertWorkSucceeded(ctx context.Context, unitID string
 // AssertWorkFailed waits until status is failed.
 func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) error {
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateFailed) {
-		return fmt.Errorf("Failed to assert %s failed or ctx timed out", unitID)
+		return fmt.Errorf("failed to assert %s failed or ctx timed out", unitID)
 	}
 
 	return nil
@@ -382,7 +382,7 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string
 		return false
 	}
 	if !assertWithTimeout(ctx, check) {
-		return fmt.Errorf("Failed to assert %s is cancelled or ctx timed out", unitID)
+		return fmt.Errorf("failed to assert %s is cancelled or ctx timed out", unitID)
 	}
 
 	return nil
@@ -403,7 +403,7 @@ func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string)
 		return strings.HasPrefix(detail, "Work unit expired on")
 	}
 	if !assertWithTimeout(ctx, check) {
-		return fmt.Errorf("Failed to assert work timed out or ctx timed out")
+		return fmt.Errorf("failed to assert work timed out or ctx timed out")
 	}
 
 	return nil
@@ -421,7 +421,7 @@ func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, unitID string)
 		return !ok
 	}
 	if !assertWithTimeout(ctx, check) {
-		return fmt.Errorf("Failed to assert %s is released or ctx timed out", unitID)
+		return fmt.Errorf("failed to assert %s is released or ctx timed out", unitID)
 	}
 
 	return nil

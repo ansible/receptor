@@ -62,7 +62,7 @@ func makeRange(start, stop, step int) ([]int, error) {
 			out = append(out, start)
 		}
 	default:
-		return nil, errors.New("Unable to make range")
+		return nil, errors.New("unable to make range")
 	}
 
 	return out, nil

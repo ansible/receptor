@@ -390,7 +390,7 @@ done`
 				dialerYaml := make(map[interface{}]interface{})
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
 				bindaddr, ok := listenerMap["bindaddr"].(string)
@@ -414,7 +414,7 @@ done`
 				dialerYaml := make(map[interface{}]interface{})
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
 				bindaddr, ok := listenerMap["bindaddr"].(string)
@@ -434,7 +434,7 @@ done`
 				dialerYaml := make(map[interface{}]interface{})
 				listenerMap, ok := listener.(map[interface{}]interface{})
 				if !ok {
-					return nil, errors.New("Listener object is not a map")
+					return nil, errors.New("listener object is not a map")
 				}
 				peerYaml := make(map[interface{}]interface{})
 
@@ -519,7 +519,7 @@ done`
 			mesh.Destroy()
 			mesh.WaitForShutdown()
 
-			return nil, errors.New("Failed to create mesh")
+			return nil, errors.New("failed to create mesh")
 		case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
 		}
 	}
@@ -646,16 +646,16 @@ func (m *ContainerMesh) CheckControlSockets() bool {
 func (m *ContainerMesh) WaitForReady(ctx context.Context) error {
 	sleepInterval := 100 * time.Millisecond
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
-		return errors.New("Timed out while waiting for control sockets")
+		return errors.New("timed out while waiting for control sockets")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckConnections) {
-		return errors.New("Timed out while waiting for Connections")
+		return errors.New("timed out while waiting for Connections")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
-		return errors.New("Timed out while checking Connection Costs")
+		return errors.New("timed out while checking Connection Costs")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
-		return errors.New("Timed out while waiting for routes to converge")
+		return errors.New("timed out while waiting for routes to converge")
 	}
 
 	return nil

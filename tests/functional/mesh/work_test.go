@@ -17,8 +17,7 @@ import (
 )
 
 func checkSkipKube(t *testing.T) {
-	skip := os.Getenv("SKIP_KUBE")
-	if skip == "1" {
+	if skip := os.Getenv("SKIP_KUBE"); skip == "1" {
 		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
 	}
 }

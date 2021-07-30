@@ -128,8 +128,7 @@ func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, er
 
 // unlockStatusFile releases the lock on the status file.
 func (sfd *StatusFileData) unlockStatusFile(filename string, lockFile *lockedfile.File) {
-	err := lockFile.Close()
-	if err != nil {
+	if err := lockFile.Close(); err != nil {
 		logger.Error("Error closing %s.lock: %s", filename, err)
 	}
 }

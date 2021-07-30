@@ -298,8 +298,7 @@ func (cfg websocketDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
-	_, err := url.Parse(cfg.Address)
-	if err != nil {
+	if _, err := url.Parse(cfg.Address); err != nil {
 		return fmt.Errorf("address %s is not a valid URL: %s", cfg.Address, err)
 	}
 	if cfg.ExtraHeader != "" && !strings.Contains(cfg.ExtraHeader, ":") {

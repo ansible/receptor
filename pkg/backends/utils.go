@@ -77,8 +77,7 @@ type (
 
 // listenerSession is a convenience function for backends that use listen/accept logic.
 func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
-	err := lf()
-	if err != nil {
+	if err := lf(); err != nil {
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)

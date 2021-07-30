@@ -18,8 +18,7 @@ func ConfirmListening(pid int) (bool, error) {
 	out := bytes.Buffer{}
 	ssCmd := exec.Command("ss", "-tulnp")
 	ssCmd.Stdout = &out
-	err := ssCmd.Run()
-	if err != nil {
+	if err := ssCmd.Run(); err != nil {
 		return false, err
 	}
 	if strings.Contains(out.String(), pidString) {
@@ -32,8 +31,7 @@ func ConfirmListening(pid int) (bool, error) {
 func TestHelp(t *testing.T) {
 	t.Parallel()
 	cmd := exec.Command("receptor", "--help")
-	err := cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}
 }

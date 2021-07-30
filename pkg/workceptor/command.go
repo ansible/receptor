@@ -185,8 +185,7 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	cw.done = false
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Start()
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)
 
 		return err
@@ -226,8 +225,7 @@ func (cw *commandUnit) Start() error {
 
 // Restart resumes monitoring a job after a Receptor restart.
 func (cw *commandUnit) Restart() error {
-	err := cw.Load()
-	if err != nil {
+	if err := cw.Load(); err != nil {
 		return err
 	}
 	state := cw.Status().State

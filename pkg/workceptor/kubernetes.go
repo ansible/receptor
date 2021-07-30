@@ -677,6 +677,7 @@ func readFileToString(filename string) (string, error) {
 }
 
 // SetFromParams sets the in-memory state from parameters.
+//nolint:ifshort // Method to magical for linter
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	ked := kw.status.ExtraData.(*kubeExtraData)
 	type value struct {
@@ -809,8 +810,7 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 // startOrRestart is a shared implementation of Start() and Restart().
 func (kw *kubeUnit) startOrRestart() error {
 	// Connect to the Kubernetes API
-	err := kw.connectToKube()
-	if err != nil {
+	if err := kw.connectToKube(); err != nil {
 		return err
 	}
 	// Launch runner process

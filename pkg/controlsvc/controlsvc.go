@@ -47,8 +47,8 @@ func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 			return err
 		}
 	}
-	_, err := io.Copy(out, s.conn)
-	if err != nil {
+
+	if _, err := io.Copy(out, s.conn); err != nil {
 		return err
 	}
 
@@ -108,8 +108,8 @@ var MainInstance *Server
 func (s *Server) AddControlFunc(name string, cType ControlCommandType) error {
 	s.controlFuncLock.Lock()
 	defer s.controlFuncLock.Unlock()
-	_, ok := s.controlTypes[name]
-	if ok {
+
+	if _, ok := s.controlTypes[name]; ok {
 		return fmt.Errorf("control function named %s already exists", name)
 	}
 	s.controlTypes[name] = cType

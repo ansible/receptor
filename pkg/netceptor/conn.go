@@ -241,9 +241,8 @@ func (li *Listener) Close() error {
 	li.doneOnce.Do(func() {
 		close(li.doneChan)
 	})
-	qerr := li.ql.Close()
 	perr := li.pc.Close()
-	if qerr != nil {
+	if qerr := li.ql.Close(); qerr != nil {
 		return qerr
 	}
 

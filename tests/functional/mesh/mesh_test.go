@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	_ "github.com/fortytw2/leaktest"
-	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/fortytw2/leaktest"
+	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"gopkg.in/yaml.v2"
 )
 
 // Test that a mesh starts and that connections are what we expect and that

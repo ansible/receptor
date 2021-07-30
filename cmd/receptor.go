@@ -3,19 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"sync"
+
 	"github.com/ghjm/cmdline"
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	_ "github.com/project-receptor/receptor/pkg/certificates"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	_ "github.com/project-receptor/receptor/pkg/services"
 	_ "github.com/project-receptor/receptor/pkg/version"
 	"github.com/project-receptor/receptor/pkg/workceptor"
-	"os"
-	"strings"
-	"sync"
-	"time"
 )
 
 type nodeCfg struct {
@@ -128,19 +127,20 @@ func main() {
 	}()
 
 	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
-	select {
-	case <-done:
-		if netceptor.MainInstance.BackendCount() > 0 {
-			logger.Error("All backends have failed. Exiting.\n")
-			os.Exit(1)
-		} else {
-			logger.Warning("Nothing to do - no backends were specified.\n")
-			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
-			os.Exit(1)
-		}
-	case <-time.After(100 * time.Millisecond):
-	}
-	logger.Info("Initialization complete\n")
-	doneMain := make(chan struct{})
-	<-doneMain
+	// Commenting it out so that nodes can start without a backend
+	//select {
+	//case <-done:
+	//	if netceptor.MainInstance.BackendCount() > 0 {
+	//		logger.Error("All backends have failed. Exiting.\n")
+	//		os.Exit(1)
+	//	} else {
+	//		logger.Warning("Nothing to do - no backends were specified.\n")
+	//		fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
+	//		os.Exit(1)
+	//	}
+	//case <-time.After(100 * time.Millisecond):
+	//}
+	//logger.Info("Initialization complete\n")
+	//doneMain := make(chan struct{})
+	//<-doneMain
 }

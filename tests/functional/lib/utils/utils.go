@@ -52,15 +52,16 @@ func init() {
 
 func makeRange(start, stop, step int) ([]int, error) {
 	out := []int{}
-	if step > 0 && start < stop {
+	switch {
+	case step > 0 && start < stop:
 		for ; start < stop; start += step {
 			out = append(out, start)
 		}
-	} else if step < 0 && start > stop {
+	case step < 0 && start > stop:
 		for ; start > stop; start += step {
 			out = append(out, start)
 		}
-	} else {
+	default:
 		return nil, errors.New("Unable to make range")
 	}
 
@@ -173,7 +174,7 @@ func GenerateCA(name, commonName string) (string, string, error) {
 }
 
 // GenerateCert generates a private and public key for testing in the directory specified.
-func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, string, error) {
+func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
@@ -191,8 +192,8 @@ func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, 
 		CommonName: commonName,
 		Bits:       2048,
 		CertNames: certificates.CertNames{
-			DNSNames: DNSNames,
-			NodeIDs:  NodeIDs,
+			DNSNames: dnsNames,
+			NodeIDs:  nodeIDs,
 		},
 	})
 	if err != nil {
@@ -218,7 +219,7 @@ func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, 
 
 // GenerateCertWithCA generates a private and public key for testing in the directory
 // specified using the ca specified.
-func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames, NodeIDs []string) (string, string, error) {
+func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames, nodeIDs []string) (string, string, error) {
 	dir, err := ioutil.TempDir(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
@@ -239,8 +240,8 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames,
 		CommonName: commonName,
 		Bits:       2048,
 		CertNames: certificates.CertNames{
-			DNSNames: DNSNames,
-			NodeIDs:  NodeIDs,
+			DNSNames: dnsNames,
+			NodeIDs:  nodeIDs,
 		},
 	})
 	if err != nil {

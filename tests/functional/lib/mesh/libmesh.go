@@ -202,7 +202,7 @@ func NewLibMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 
 // NewLibMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml.
-func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, error) {
+func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, error) {
 	mesh := &LibMesh{}
 	// Setup the mesh directory
 	baseDir := utils.TestBaseDir
@@ -223,14 +223,14 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	nodes := make(map[string]*LibNode)
 	// We must start listening on all our nodes before we start dialing so
 	// there's something to dial into
-	for k := range MeshDefinition.Nodes {
+	for k := range meshDefinition.Nodes {
 		node := NewLibNode(k)
 		node.dir, err = ioutil.TempDir(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}
 		os.Mkdir(node.dir, 0o755)
-		for _, attr := range MeshDefinition.Nodes[k].Nodedef {
+		for _, attr := range meshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -302,11 +302,12 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						tlscfg.ClientCAs = clientCAs
 					}
 
-					if vMap["requireclientcert"] != nil {
+					switch {
+					case vMap["requireclientcert"] != nil:
 						tlscfg.ClientAuth = tls.RequireAndVerifyClientCert
-					} else if vMap["clientcas"] != nil {
+					case vMap["clientcas"] != nil:
 						tlscfg.ClientAuth = tls.VerifyClientCertIfGiven
-					} else {
+					default:
 						tlscfg.ClientAuth = tls.NoClientCert
 					}
 
@@ -315,7 +316,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			}
 		}
 
-		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
+		for attrkey, attr := range meshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -367,12 +368,15 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					} else {
 						tls = node.serverTLSConfigs[tlsName]
 					}
-					if k == "tcp-listener" {
+					switch k {
+					case "tcp-listener":
 						err = node.TCPListen(address, cost, nodeCost, tls)
-					} else if k == "udp-listener" {
+					case "udp-listener":
 						err = node.UDPListen(address, cost, nodeCost)
-					} else if k == "ws-listener" {
+					case "ws-listener":
 						err = node.WebsocketListen(address, cost, nodeCost, tls)
+					default:
+						panic("unknown listener")
 					}
 					if err != nil {
 						return nil, err
@@ -402,15 +406,15 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					}
 				}
 			}
-			MeshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
+			meshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
 		}
 		nodes[k] = node
 	}
-	for k := range MeshDefinition.Nodes {
+	for k := range meshDefinition.Nodes {
 		node := nodes[k]
-		for connNode, connYaml := range MeshDefinition.Nodes[k].Connections {
+		for connNode, connYaml := range meshDefinition.Nodes[k].Connections {
 			index := connYaml.Index
-			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
+			attr := meshDefinition.Nodes[connNode].Nodedef[index]
 			attrMap := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
@@ -494,7 +498,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		}
 	}
 	mesh.nodes = nodes
-	mesh.MeshDefinition = &MeshDefinition
+	mesh.MeshDefinition = &meshDefinition
 
 	return mesh, nil
 }

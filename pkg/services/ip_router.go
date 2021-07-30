@@ -218,19 +218,20 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		// Get the destination address from the received packet
 		ipVersion := int(packet[0] >> 4)
 		var destIP net.IP
-		if ipVersion == 4 {
+		switch ipVersion {
+		case 4:
 			header, err := ipv4.ParseHeader(packet)
 			if err != nil {
 				logger.Debug("Malformed ipv4 packet received: %s", err)
 			}
 			destIP = header.Dst
-		} else if ipVersion == 6 {
+		case 6:
 			header, err := ipv6.ParseHeader(packet)
 			if err != nil {
 				logger.Debug("Malformed ipv6 packet received: %s", err)
 			}
 			destIP = header.Dst
-		} else {
+		default:
 			logger.Debug("Packet received with unknown version %d", ipVersion)
 
 			continue

@@ -246,7 +246,7 @@ func NewContainerMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 
 // NewContainerMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml.
-func NewContainerMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*ContainerMesh, error) {
+func NewContainerMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*ContainerMesh, error) {
 	containerComposeData := make(map[string]interface{})
 	containerComposeData["version"] = "2.4"
 	// Contains the description of each node for docker/podman-compose
@@ -297,9 +297,9 @@ done`
 
 	// We must start listening on all our nodes before we start dialing so
 	// there's something to dial into
-	for k := range MeshDefinition.Nodes {
+	for k := range meshDefinition.Nodes {
 		node := NewContainerNode(k)
-		node.TCRules = MeshDefinition.Nodes[k].TCRules
+		node.TCRules = meshDefinition.Nodes[k].TCRules
 		tempdir, err = ioutil.TempDir(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
@@ -332,7 +332,7 @@ done`
 		// Keep track of if we need to add an attribute for the node id or if
 		// it already exists
 		needsIDAttr := true
-		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
+		for attrkey, attr := range meshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -362,7 +362,7 @@ done`
 					}
 				}
 			}
-			MeshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
+			meshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
 		}
 		if needsIDAttr {
 			idYaml := make(map[interface{}]interface{})
@@ -372,20 +372,20 @@ done`
 			nodeYaml["datadir"] = "/etc/receptor/datadir"
 			os.Mkdir(externalDataDir, 0o755)
 			idYaml["node"] = nodeYaml
-			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
+			meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, idYaml)
 		}
 		logYaml := make(map[interface{}]interface{})
 		levelYaml := make(map[interface{}]interface{})
 		levelYaml["level"] = "debug"
 		logYaml["log-level"] = levelYaml
-		MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, logYaml)
+		meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, logYaml)
 		nodes[k] = node
 	}
-	for k := range MeshDefinition.Nodes {
-		for connNode, connYaml := range MeshDefinition.Nodes[k].Connections {
+	for k := range meshDefinition.Nodes {
+		for connNode, connYaml := range meshDefinition.Nodes[k].Connections {
 			index := connYaml.Index
 			TLS := connYaml.TLS
-			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
+			attr := meshDefinition.Nodes[connNode].Nodedef[index]
 			attrMap := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
@@ -409,7 +409,7 @@ done`
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["tcp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
 			listener, ok = attrMap["udp-listener"]
 			if ok {
@@ -429,7 +429,7 @@ done`
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["udp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
 			listener, ok = attrMap["ws-listener"]
 			if ok {
@@ -459,7 +459,7 @@ done`
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["ws-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
 		}
 	}
@@ -476,7 +476,7 @@ done`
 		tmp["filename"] = node.externalControlSocket
 		controlServiceYaml["control-service"] = tmp
 		containerComposeServices[k]["volumes"] = append(containerComposeServices[k]["volumes"].([]string), fmt.Sprintf("%s:%s", filepath.Dir(node.externalControlSocket), filepath.Dir(node.externalControlSocket)))
-		MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, controlServiceYaml)
+		meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, controlServiceYaml)
 	}
 	containerComposeData["services"] = containerComposeServices
 
@@ -500,14 +500,14 @@ done`
 	}
 
 	for k, node := range nodes {
-		node.yamlConfig = MeshDefinition.Nodes[k].Nodedef
+		node.yamlConfig = meshDefinition.Nodes[k].Nodedef
 		err = node.Start()
 		if err != nil {
 			return nil, err
 		}
 	}
 	mesh.nodes = nodes
-	mesh.MeshDefinition = &MeshDefinition
+	mesh.MeshDefinition = &meshDefinition
 
 	failedMesh := make(chan bool, 1)
 	time.Sleep(100 * time.Millisecond)

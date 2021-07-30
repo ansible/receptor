@@ -58,11 +58,12 @@ func (cfg tlsServerCfg) Prepare() error {
 		tlscfg.ClientCAs = clientCAs
 	}
 
-	if cfg.RequireClientCert {
+	switch {
+	case cfg.RequireClientCert:
 		tlscfg.ClientAuth = tls.RequireAndVerifyClientCert
-	} else if cfg.ClientCAs != "" {
+	case cfg.ClientCAs != "":
 		tlscfg.ClientAuth = tls.VerifyClientCertIfGiven
-	} else {
+	default:
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
 

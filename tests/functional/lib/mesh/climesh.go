@@ -171,7 +171,7 @@ func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
 
 // NewCLIMeshFromYaml takes a yaml mesh description and returns a mesh of nodes
 // listening and dialing as defined in the yaml.
-func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, error) {
+func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, error) {
 	mesh := &CLIMesh{}
 	// Setup the mesh directory
 	baseDir := utils.TestBaseDir
@@ -193,7 +193,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 
 	// We must start listening on all our nodes before we start dialing so
 	// there's something to dial into
-	for k := range MeshDefinition.Nodes {
+	for k := range meshDefinition.Nodes {
 		node := NewCLINode(k)
 		tempdir, err = ioutil.TempDir(mesh.dir, k+"-")
 		if err != nil {
@@ -203,7 +203,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 		// Keep track of if we need to add an attribute for the node id or if
 		// it already exists
 		needsIDAttr := true
-		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
+		for attrkey, attr := range meshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -233,7 +233,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 					}
 				}
 			}
-			MeshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
+			meshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
 		}
 		if needsIDAttr {
 			idYaml := make(map[interface{}]interface{})
@@ -242,20 +242,20 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			nodeYaml["datadir"] = filepath.Join(node.dir, "datadir")
 			os.Mkdir(nodeYaml["datadir"].(string), 0o755)
 			idYaml["node"] = nodeYaml
-			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
+			meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, idYaml)
 		}
 		logYaml := make(map[interface{}]interface{})
 		levelYaml := make(map[interface{}]interface{})
 		levelYaml["level"] = "debug"
 		logYaml["log-level"] = levelYaml
-		MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, logYaml)
+		meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, logYaml)
 		nodes[k] = node
 	}
-	for k := range MeshDefinition.Nodes {
-		for connNode, connYaml := range MeshDefinition.Nodes[k].Connections {
+	for k := range meshDefinition.Nodes {
+		for connNode, connYaml := range meshDefinition.Nodes[k].Connections {
 			index := connYaml.Index
 			TLS := connYaml.TLS
-			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
+			attr := meshDefinition.Nodes[connNode].Nodedef[index]
 			attrMap := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
@@ -279,7 +279,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["tcp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
 			listener, ok = attrMap["udp-listener"]
 			if ok {
@@ -299,7 +299,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["udp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
 			listener, ok = attrMap["ws-listener"]
 			if ok {
@@ -329,7 +329,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["ws-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
 			}
 		}
 	}
@@ -338,7 +338,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	for k, node := range nodes {
 		needsControlService := true
 		controlServiceIndex := 0
-		for index, attr := range MeshDefinition.Nodes[k].Nodedef {
+		for index, attr := range meshDefinition.Nodes[k].Nodedef {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -369,21 +369,21 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			tmp["filename"] = controlSocket
 			controlServiceYaml := make(map[interface{}]interface{})
 			controlServiceYaml["control-service"] = tmp
-			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, controlServiceYaml)
+			meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, controlServiceYaml)
 		} else {
-			MeshDefinition.Nodes[k].Nodedef[controlServiceIndex].(map[interface{}]interface{})["control-service"].(map[interface{}]interface{})["filename"] = controlSocket
+			meshDefinition.Nodes[k].Nodedef[controlServiceIndex].(map[interface{}]interface{})["control-service"].(map[interface{}]interface{})["filename"] = controlSocket
 		}
 	}
 
 	for k, node := range nodes {
-		node.yamlConfig = MeshDefinition.Nodes[k].Nodedef
+		node.yamlConfig = meshDefinition.Nodes[k].Nodedef
 		err = node.Start()
 		if err != nil {
 			return nil, err
 		}
 	}
 	mesh.nodes = nodes
-	mesh.MeshDefinition = &MeshDefinition
+	mesh.MeshDefinition = &meshDefinition
 
 	failedMesh := make(chan *CLINode)
 	time.Sleep(100 * time.Millisecond)

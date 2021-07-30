@@ -356,10 +356,8 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			if mw.Err() != nil {
 				return
 			}
-		} else {
-			if sleepOrDone(mw.Done(), 1*time.Second) {
-				return
-			}
+		} else if sleepOrDone(mw.Done(), 1*time.Second) {
+			return
 		}
 		err := rw.Load()
 		if err != nil {

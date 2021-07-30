@@ -261,18 +261,18 @@ func makeNetworkName(nodeID string) string {
 }
 
 // NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants.
-func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
+func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
 	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
 	s := Netceptor{
-		nodeID:                 NodeID,
+		nodeID:                 nodeID,
 		mtu:                    mtu,
 		routeUpdateTime:        routeUpdateTime,
 		serviceAdTime:          serviceAdTime,
 		seenUpdateExpireTime:   seenUpdateExpireTime,
 		maxForwardingHops:      maxForwardingHops,
 		maxConnectionIdleTime:  maxConnectionIdleTime,
-		allowedPeers:           AllowedPeers,
+		allowedPeers:           allowedPeers,
 		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:               0,
 		connLock:               &sync.RWMutex{},
@@ -296,7 +296,7 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 		sendServiceAdsChan:     nil,
 		backendWaitGroup:       sync.WaitGroup{},
 		backendCount:           0,
-		networkName:            makeNetworkName(NodeID),
+		networkName:            makeNetworkName(nodeID),
 		clientTLSConfigs:       make(map[string]*tls.Config),
 		serverTLSConfigs:       make(map[string]*tls.Config),
 	}
@@ -308,7 +308,7 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 		ctx = context.Background()
 	}
 	s.clientTLSConfigs["default"] = &tls.Config{}
-	s.addNameHash(NodeID)
+	s.addNameHash(nodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -336,8 +336,8 @@ func NewWithConsts(ctx context.Context, NodeID string, AllowedPeers []string,
 }
 
 // New constructs a new Receptor network protocol instance.
-func New(ctx context.Context, NodeID string, AllowedPeers []string) *Netceptor {
-	return NewWithConsts(ctx, NodeID, AllowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
+func New(ctx context.Context, nodeID string, allowedPeers []string) *Netceptor {
+	return NewWithConsts(ctx, nodeID, allowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
 		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
@@ -809,7 +809,7 @@ const (
 
 // receptorVerifyFunc generates a function that verifies a Receptor node ID.
 func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
-	VerifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	verifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		certs := make([]*x509.Certificate, len(rawCerts))
 		for i, asn1Data := range rawCerts {
@@ -822,23 +822,25 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 			certs[i] = cert
 		}
 		var opts x509.VerifyOptions
-		if VerifyType == VerifyServer {
+		switch verifyType {
+		case VerifyServer:
 			opts = x509.VerifyOptions{
 				Intermediates: x509.NewCertPool(),
 				Roots:         tlscfg.RootCAs,
 				CurrentTime:   time.Now(),
 				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 			}
-		} else if VerifyType == VerifyClient {
+		case VerifyClient:
 			opts = x509.VerifyOptions{
 				Intermediates: x509.NewCertPool(),
 				Roots:         tlscfg.ClientCAs,
 				CurrentTime:   time.Now(),
 				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			}
-		} else {
+		default:
 			return fmt.Errorf("invalid verification type: must be client or server")
 		}
+
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
 		}
@@ -885,12 +887,13 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 		return nil, fmt.Errorf("unknown TLS config %s", name)
 	}
 	tlscfg = tlscfg.Clone()
-	if tlscfg.InsecureSkipVerify {
+	switch {
+	case tlscfg.InsecureSkipVerify:
 		// noop
-	} else if expectedHostNameType == "receptor" {
+	case expectedHostNameType == "receptor":
 		tlscfg.InsecureSkipVerify = true
 		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, VerifyServer)
-	} else {
+	default:
 		tlscfg.ServerName = expectedHostName
 	}
 
@@ -1295,12 +1298,12 @@ func (s *Netceptor) handleUnreachable(md *messageData) error {
 }
 
 // Sends an unreachable response.
-func (s *Netceptor) sendUnreachable(ToNode string, message *UnreachableMessage) error {
+func (s *Netceptor) sendUnreachable(toNode string, message *UnreachableMessage) error {
 	bytes, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
-	err = s.sendMessage("unreach", ToNode, "unreach", bytes)
+	err = s.sendMessage("unreach", toNode, "unreach", bytes)
 	if err != nil {
 		return err
 	}
@@ -1355,14 +1358,14 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 }
 
 // GetServiceInfo returns the advertising info, if any, for a service on a node.
-func (s *Netceptor) GetServiceInfo(NodeID string, Service string) (*ServiceAdvertisement, bool) {
+func (s *Netceptor) GetServiceInfo(nodeID string, service string) (*ServiceAdvertisement, bool) {
 	s.serviceAdsLock.RLock()
 	defer s.serviceAdsLock.RUnlock()
-	n, ok := s.serviceAdsReceived[NodeID]
+	n, ok := s.serviceAdsReceived[nodeID]
 	if !ok {
 		return nil, false
 	}
-	svc, ok := n[Service]
+	svc, ok := n[service]
 	if !ok {
 		return nil, false
 	}
@@ -1549,7 +1552,8 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 		case data := <-ci.ReadChan:
 			msgType := data[0]
 			if established {
-				if msgType == MsgTypeData {
+				switch msgType {
+				case MsgTypeData:
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
 						logger.Error("Error translating data to message struct: %s\n", err)
@@ -1562,7 +1566,7 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 					if err != nil {
 						logger.Error("Error handling message data: %s\n", err)
 					}
-				} else if msgType == MsgTypeRoute {
+				case MsgTypeRoute:
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
@@ -1592,18 +1596,18 @@ func (s *Netceptor) runProtocol(sess BackendSession, connectionCost float64, nod
 						}
 					}
 					s.handleRoutingUpdate(ri, remoteNodeID)
-				} else if msgType == MsgTypeServiceAdvertisement {
+				case MsgTypeServiceAdvertisement:
 					err := s.handleServiceAdvertisement(data, remoteNodeID)
 					if err != nil {
 						logger.Error("Error handling service advertisement: %s\n", err)
 
 						continue
 					}
-				} else if msgType == MsgTypeReject {
+				case MsgTypeReject:
 					logger.Warning("Received a rejection message from peer.")
 
 					return fmt.Errorf("remote node rejected the connection")
-				} else {
+				default:
 					logger.Warning("Unknown message type %d\n", msgType)
 				}
 			} else {

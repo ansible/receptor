@@ -134,11 +134,12 @@ loop:
 
 func combineParams(baseParams string, userParams string) string {
 	var allParams string
-	if userParams == "" {
+	switch {
+	case userParams == "":
 		allParams = baseParams
-	} else if baseParams == "" {
+	case baseParams == "":
 		allParams = userParams
-	} else {
+	default:
 		allParams = strings.Join([]string{baseParams, userParams}, " ")
 	}
 

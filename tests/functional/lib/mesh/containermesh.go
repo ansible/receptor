@@ -579,15 +579,6 @@ func (m *ContainerMesh) CheckConnections() bool {
 				continue
 			}
 		}
-		for nodeID, node := range m.MeshDefinition.Nodes {
-			if nodeID == status.NodeID {
-				continue
-			}
-			for k := range node.Connections {
-				if k == status.NodeID {
-				}
-			}
-		}
 		if reflect.DeepEqual(actualConnections, expectedConnections) {
 			return true
 		}

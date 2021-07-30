@@ -70,7 +70,7 @@ func commandRunner(command string, params string, unitdir string) error {
 		}
 		cmd = exec.Command(command, paramList...)
 	}
-	termChan := make(chan os.Signal)
+	termChan := make(chan os.Signal, 1)
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	stdin, err := os.Open(path.Join(unitdir, "stdin"))
 	if err != nil {

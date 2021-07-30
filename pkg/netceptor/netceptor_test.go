@@ -24,7 +24,7 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 	s := strings.Trim(string(p), "\n")
 	if strings.HasPrefix(s, "ERROR") {
 		if !strings.Contains(s, "maximum number of forwarding hops") {
-			fmt.Printf(s)
+			fmt.Print(s)
 			lw.t.Fatal(s)
 
 			return

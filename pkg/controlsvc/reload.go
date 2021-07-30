@@ -1,6 +1,7 @@
 package controlsvc
 
 import (
+	"fmt"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
@@ -9,7 +10,7 @@ type reloadCommandType struct{}
 type reloadCommand struct{}
 
 // ReloadCL is ParseAndRun closure set with the initial receptor arguments
-var ReloadCL func() error
+var ReloadCL func(bool) error
 
 func (t *reloadCommandType) InitFromString(params string) (ControlCommand, error) {
 	c := &reloadCommand{}
@@ -26,9 +27,18 @@ func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 	// initial config file
 	cfr := make(map[string]interface{})
 	logger.Debug("Reloading")
+
+	// Do a quick check to catch any yaml errors before canceling backends
+	err := ReloadCL(true)
+	if err != nil {
+		cfr["Success"] = false
+		cfr["Error"] = err.Error()
+		return cfr, err
+	}
+
 	nc.CancelBackends()
 	// ReloadCL is a ParseAndRun closure, set in receptor.go/main()
-	err := ReloadCL()
+	err = ReloadCL(false)
 	if err != nil {
 		cfr["Success"] = false
 		cfr["Error"] = err.Error()
@@ -36,4 +46,10 @@ func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 	}
 	cfr["Success"] = true
 	return cfr, nil
+}
+
+func init() {
+	ReloadCL = func(dryRun bool) error {
+		return fmt.Errorf("Reload function not set")
+	}
 }

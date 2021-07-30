@@ -8,10 +8,10 @@
 
 # To create and launch a new systemd-managed Receptor node:
 #
-# 1. Copy this file to /etc/receptor/<some-name>.conf
+# 1. Copy this file to /etc/receptor/receptor.conf
 # 2. chmod 0600 if the new file will contain any passwords or sensitive data
 # 3. Edit the new config file as needed
-# 4. systemctl enable receptor@<some-name> --now
+# 4. systemctl enable receptor --now
 
 
 # Basic properties of the node.  The node ID must be unique.

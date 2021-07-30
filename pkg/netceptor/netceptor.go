@@ -619,7 +619,7 @@ func (s *Netceptor) expireSeenUpdates() {
 	}
 }
 
-// Recalculates the next-hop table based on current knowledge of the network
+// Re-calculates the next-hop table based on current knowledge of the network
 func (s *Netceptor) updateRoutingTable() {
 	s.knownNodeLock.RLock()
 	defer s.knownNodeLock.RUnlock()

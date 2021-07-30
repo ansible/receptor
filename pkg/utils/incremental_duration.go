@@ -36,5 +36,6 @@ func (ID *IncrementalDuration) increaseDuration() {
 func (ID *IncrementalDuration) NextTimeout() <-chan time.Time {
 	ch := time.After(ID.duration)
 	ID.increaseDuration()
+
 	return ch
 }

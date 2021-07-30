@@ -46,6 +46,7 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 		tlscfg:      tlscfg,
 		extraHeader: extraHeader,
 	}
+
 	return &wd, nil
 }
 
@@ -68,6 +69,7 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 				return nil, err
 			}
 			ns := newWebsocketSession(conn, closeChan)
+
 			return ns, nil
 		})
 }
@@ -89,6 +91,7 @@ func NewWebsocketListener(address string, tlscfg *tls.Config) (*WebsocketListene
 		tlscfg:  tlscfg,
 		li:      nil,
 	}
+
 	return &ul, nil
 }
 
@@ -103,6 +106,7 @@ func (b *WebsocketListener) Addr() net.Addr {
 	if b.li == nil {
 		return nil
 	}
+
 	return b.li.Addr()
 }
 
@@ -121,6 +125,7 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			logger.Error("Error upgrading websocket connection: %s\n", err)
+
 			return
 		}
 		ws := newWebsocketSession(conn, nil)
@@ -151,6 +156,7 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 		_ = b.server.Close()
 	}()
 	logger.Debug("Listening on Websocket %s path %s\n", b.Addr().String(), b.Path())
+
 	return sessChan, nil
 }
 
@@ -175,6 +181,7 @@ func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *Websock
 		closeChanCloser: sync.Once{},
 	}
 	go ws.recvChannelizer()
+
 	return ws
 }
 
@@ -198,6 +205,7 @@ func (ns *WebsocketSession) Send(data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -219,6 +227,7 @@ func (ns *WebsocketSession) Close() error {
 			ns.closeChan = nil
 		})
 	}
+
 	return ns.conn.Close()
 }
 
@@ -246,6 +255,7 @@ func (cfg websocketListenerCfg) Prepare() error {
 			return fmt.Errorf("connection cost must be positive for %s", node)
 		}
 	}
+
 	return nil
 }
 
@@ -259,6 +269,7 @@ func (cfg websocketListenerCfg) Run() error {
 	b, err := NewWebsocketListener(address, tlscfg)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)
+
 		return err
 	}
 	b.SetPath(cfg.Path)
@@ -266,6 +277,7 @@ func (cfg websocketListenerCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -290,6 +302,7 @@ func (cfg websocketDialerCfg) Prepare() error {
 	if cfg.ExtraHeader != "" && !strings.Contains(cfg.ExtraHeader, ":") {
 		return fmt.Errorf("extra header must be in the form key:value")
 	}
+
 	return nil
 }
 
@@ -311,12 +324,14 @@ func (cfg websocketDialerCfg) Run() error {
 	b, err := NewWebsocketDialer(cfg.Address, tlscfg, cfg.ExtraHeader, cfg.Redial)
 	if err != nil {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+
 		return err
 	}
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

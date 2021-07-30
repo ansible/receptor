@@ -35,6 +35,7 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 		address: address,
 		redial:  redial,
 	}
+
 	return &nd, nil
 }
 
@@ -56,6 +57,7 @@ func (b *UDPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 				closeChan:       closeChan,
 				closeChanCloser: sync.Once{},
 			}
+
 			return ns, nil
 		})
 }
@@ -79,6 +81,7 @@ func (ns *UDPDialerSession) Send(data []byte) error {
 	if n != len(data) {
 		return fmt.Errorf("partial data sent")
 	}
+
 	return nil
 }
 
@@ -96,6 +99,7 @@ func (ns *UDPDialerSession) Recv(timeout time.Duration) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return buf[:n], nil
 }
 
@@ -107,6 +111,7 @@ func (ns *UDPDialerSession) Close() error {
 			ns.closeChan = nil
 		})
 	}
+
 	return ns.conn.Close()
 }
 
@@ -136,6 +141,7 @@ func NewUDPListener(address string) (*UDPListener, error) {
 		sessRegLock:     sync.RWMutex{},
 		sessionRegistry: make(map[string]*UDPListenerSession),
 	}
+
 	return &ul, nil
 }
 
@@ -144,6 +150,7 @@ func (b *UDPListener) LocalAddr() net.Addr {
 	if b.conn == nil {
 		return nil
 	}
+
 	return b.conn.LocalAddr()
 }
 
@@ -156,12 +163,14 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			select {
 			case <-ctx.Done():
 				_ = b.conn.Close()
+
 				return
 			default:
 			}
 			err := b.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 			if err != nil {
 				logger.Error("Error setting UDP timeout: %s\n", err)
+
 				return
 			}
 			n, addr, err := b.conn.ReadFromUDP(buf)
@@ -170,6 +179,7 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			}
 			if err != nil {
 				logger.Error("UDP read error: %s\n", err)
+
 				return
 			}
 			data := make([]byte, n)
@@ -190,6 +200,7 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 				select {
 				case <-ctx.Done():
 					_ = b.conn.Close()
+
 					return
 				case sessChan <- sess:
 				}
@@ -197,6 +208,7 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 			select {
 			case <-ctx.Done():
 				_ = b.conn.Close()
+
 				return
 			case sess.recvChan <- data:
 			}
@@ -205,6 +217,7 @@ func (b *UDPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 	if b.conn != nil {
 		logger.Debug("Listening on UDP %s\n", b.LocalAddr().String())
 	}
+
 	return sessChan, nil
 }
 
@@ -223,6 +236,7 @@ func (ns *UDPListenerSession) Send(data []byte) error {
 	} else if n != len(data) {
 		return fmt.Errorf("partial data sent")
 	}
+
 	return nil
 }
 
@@ -241,6 +255,7 @@ func (ns *UDPListenerSession) Close() error {
 	ns.li.sessRegLock.Lock()
 	defer ns.li.sessRegLock.Unlock()
 	delete(ns.li.sessionRegistry, ns.raddr.String())
+
 	return nil
 }
 
@@ -266,6 +281,7 @@ func (cfg udpListenerCfg) Prepare() error {
 			return fmt.Errorf("connection cost must be positive for %s", node)
 		}
 	}
+
 	return nil
 }
 
@@ -275,13 +291,16 @@ func (cfg udpListenerCfg) Run() error {
 	b, err := NewUDPListener(address)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)
+
 		return err
 	}
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		logger.Error("Error creating backend for %s: %s\n", address, err)
+
 		return err
 	}
+
 	return nil
 }
 
@@ -297,6 +316,7 @@ func (cfg udpDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
+
 	return nil
 }
 
@@ -306,13 +326,16 @@ func (cfg udpDialerCfg) Run() error {
 	b, err := NewUDPDialer(cfg.Address, cfg.Redial)
 	if err != nil {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+
 		return err
 	}
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		logger.Error("Error creating backend for %s: %s\n", cfg.Address, err)
+
 		return err
 	}
+
 	return nil
 }
 

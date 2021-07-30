@@ -185,6 +185,7 @@ func TestWork(t *testing.T) {
 				}
 				controllers[k] = controller
 			}
+
 			return controllers, m, expectedResults
 		}
 
@@ -205,11 +206,13 @@ func TestWork(t *testing.T) {
 				if os.IsNotExist(err) {
 					return true
 				}
+
 				return false
 			}
 			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 				return fmt.Errorf("unitID %s on %s did not release", unitID, nodeID)
 			}
+
 			return nil
 		}
 
@@ -224,11 +227,13 @@ func TestWork(t *testing.T) {
 				if int(fstat.Size()) >= waitUntilSize {
 					return true
 				}
+
 				return false
 			}
 			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 				return fmt.Errorf("file size not correct for %s", stdoutFilename)
 			}
+
 			return nil
 		}
 
@@ -590,7 +595,6 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
-
 	}
 }
 

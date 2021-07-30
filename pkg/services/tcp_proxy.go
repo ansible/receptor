@@ -30,16 +30,19 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 			tc, err := tli.Accept()
 			if err != nil {
 				logger.Error("Error accepting TCP connection: %s\n", err)
+
 				return
 			}
 			qc, err := s.Dial(node, rservice, tlsClient)
 			if err != nil {
 				logger.Error("Error connecting on Receptor network: %s\n", err)
+
 				continue
 			}
 			go utils.BridgeConns(tc, "tcp service", qc, "receptor connection")
 		}
 	}()
+
 	return nil
 }
 
@@ -58,6 +61,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 			qc, err := qli.Accept()
 			if err != nil {
 				logger.Error("Error accepting connection on Receptor network: %s\n", err)
+
 				return
 			}
 			var tc net.Conn
@@ -68,11 +72,13 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 			}
 			if err != nil {
 				logger.Error("Error connecting via TCP: %s\n", err)
+
 				continue
 			}
 			go utils.BridgeConns(qc, "receptor service", tc, "tcp connection")
 		}
 	}()
+
 	return nil
 }
 
@@ -97,6 +103,7 @@ func (cfg tcpProxyInboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return TCPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, tlsServerCfg,
 		cfg.RemoteNode, cfg.RemoteService, tlsClientCfg)
 }
@@ -124,6 +131,7 @@ func (cfg tcpProxyOutboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, tlsServerCfg, cfg.Address, tlsClientCfg)
 }
 

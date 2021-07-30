@@ -20,6 +20,7 @@ func (t *statusCommandType) InitFromString(params string) (ControlCommand, error
 		return nil, fmt.Errorf("status command does not take parameters")
 	}
 	c := &statusCommand{}
+
 	return c, nil
 }
 
@@ -41,6 +42,7 @@ func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (Control
 	c := &statusCommand{
 		requestedFields: requestedFieldsStr,
 	}
+
 	return c, nil
 }
 
@@ -67,5 +69,6 @@ func (c *statusCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 			cfr[field] = getter()
 		}
 	}
+
 	return cfr, nil
 }

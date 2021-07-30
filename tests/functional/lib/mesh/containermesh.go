@@ -83,6 +83,7 @@ func (n *ContainerNode) Status() (*netceptor.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return status, nil
 }
 
@@ -166,6 +167,7 @@ func (n *ContainerNode) Start() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -220,6 +222,7 @@ func (m *ContainerMesh) Nodes() map[string]Node {
 	for k, v := range m.nodes {
 		nodes[k] = v
 	}
+
 	return nodes
 }
 
@@ -517,6 +520,7 @@ done`
 		case <-failedMesh:
 			mesh.Destroy()
 			mesh.WaitForShutdown()
+
 			return nil, errors.New("Failed to create mesh")
 		case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
 		}
@@ -559,16 +563,19 @@ func (m *ContainerMesh) CheckConnections() bool {
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 			listenerYaml, ok = configItemYaml["udp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 			listenerYaml, ok = configItemYaml["ws-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 		}
@@ -585,6 +592,7 @@ func (m *ContainerMesh) CheckConnections() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -605,6 +613,7 @@ func (m *ContainerMesh) CheckKnownConnectionCosts() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -626,6 +635,7 @@ func (m *ContainerMesh) CheckRoutes() bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -639,6 +649,7 @@ func (m *ContainerMesh) CheckControlSockets() bool {
 		}
 		controller.Close()
 	}
+
 	return true
 }
 
@@ -657,6 +668,7 @@ func (m *ContainerMesh) WaitForReady(ctx context.Context) error {
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
 		return errors.New("Timed out while waiting for routes to converge")
 	}
+
 	return nil
 }
 
@@ -670,5 +682,6 @@ func (m *ContainerMesh) Status() ([]*netceptor.Status, error) {
 		}
 		out = append(out, status)
 	}
+
 	return out, nil
 }

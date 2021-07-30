@@ -82,6 +82,7 @@ func NewIPRouter(nc *netceptor.Netceptor, networkName string, tunInterface strin
 	if err != nil {
 		return nil, err
 	}
+
 	return ipr, nil
 }
 
@@ -126,6 +127,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 	routes, err := netlink.RouteList(ipr.link, netlink.FAMILY_ALL)
 	if err != nil {
 		logger.Error("error retrieving kernel routes list: %s", err)
+
 		return
 	}
 
@@ -146,6 +148,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 			route := routes[j]
 			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
 				found = true
+
 				break
 			}
 		}
@@ -171,6 +174,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 			kr := ipr.knownRoutes[j]
 			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
 				found = true
+
 				break
 			}
 		}
@@ -206,6 +210,7 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		n, err := ipr.tunIf.Read(buf)
 		if err != nil {
 			logger.Error("Error reading from tun device: %s\n", err)
+
 			continue
 		}
 		packet := buf[:n]
@@ -227,6 +232,7 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 			destIP = header.Dst
 		} else {
 			logger.Debug("Packet received with unknown version %d", ipVersion)
+
 			continue
 		}
 
@@ -270,6 +276,7 @@ func (ipr *IPRouterService) runNetceptorToTun() {
 		n, addr, err := ipr.nConn.ReadFrom(buf)
 		if err != nil {
 			logger.Error("Error reading from Receptor: %s\n", err)
+
 			continue
 		}
 		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
@@ -291,6 +298,7 @@ func (ipr *IPRouterService) addRoute(route *net.IPNet) error {
 	if err != nil {
 		return fmt.Errorf("error adding route to interface: %s", err)
 	}
+
 	return nil
 }
 
@@ -346,6 +354,7 @@ func (ipr *IPRouterService) run() error {
 	go ipr.runAdvertisingWatcher()
 	go ipr.runTunToNetceptor()
 	go ipr.runNetceptorToTun()
+
 	return nil
 }
 
@@ -364,6 +373,7 @@ func (cfg ipRouterCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

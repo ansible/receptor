@@ -45,6 +45,7 @@ func GetLogLevelByName(logName string) (int, error) {
 		return val, nil
 	}
 	err = fmt.Errorf("%s is not a valid log level name", logName)
+
 	return 0, err
 }
 
@@ -62,6 +63,7 @@ func LogLevelToName(logLevel int) (string, error) {
 		}
 	}
 	err = fmt.Errorf("%d is not a valid log level", logLevel)
+
 	return "", err
 }
 
@@ -80,6 +82,7 @@ func Log(level int, format string, v ...interface{}) {
 	logLevelName, err := LogLevelToName(level)
 	if err != nil {
 		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
+
 		return
 	}
 	prefix = strings.ToUpper(logLevelName) + " "
@@ -128,6 +131,7 @@ func (cfg loglevelCfg) Init() error {
 		return err
 	}
 	SetLogLevel(val)
+
 	return nil
 }
 
@@ -135,6 +139,7 @@ type traceCfg struct{}
 
 func (cfg traceCfg) Prepare() error {
 	SetShowTrace(true)
+
 	return nil
 }
 

@@ -24,6 +24,7 @@ func runCommand(qc net.Conn, command string) error {
 		return err
 	}
 	utils.BridgeConns(tty, "external command", qc, "command service")
+
 	return nil
 }
 
@@ -34,12 +35,14 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 	})
 	if err != nil {
 		logger.Error("Error listening on Receptor network: %s\n", err)
+
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
 			logger.Error("Error accepting connection on Receptor network: %s\n", err)
+
 			return
 		}
 		go func() {
@@ -67,6 +70,7 @@ func (cfg commandSvcCfg) Run() error {
 		return err
 	}
 	go CommandService(netceptor.MainInstance, cfg.Service, tlscfg, cfg.Command)
+
 	return nil
 }
 

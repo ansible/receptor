@@ -33,7 +33,7 @@ func New() *ReceptorControl {
 // handshake with the control service.
 func (r *ReceptorControl) Connect(filename string) error {
 	if r.socketConn != nil {
-		return errors.New("Tried to connect to a socket after already being connected to a socket")
+		return errors.New("tried to connect to a socket after already being connected to a socket")
 	}
 	addr, err := net.ResolveUnixAddr("unix", filename)
 	if err != nil {
@@ -48,6 +48,7 @@ func (r *ReceptorControl) Connect(filename string) error {
 		return err
 	}
 	r.socketFilename = filename
+
 	return nil
 }
 
@@ -61,6 +62,7 @@ func (r *ReceptorControl) Reconnect() error {
 	} else {
 		return fmt.Errorf("Could not reconnect, no socketFilename")
 	}
+
 	return nil
 }
 
@@ -80,6 +82,7 @@ func (r *ReceptorControl) Read() ([]byte, error) {
 			dataBytes = append(dataBytes, buf[0])
 		}
 	}
+
 	return dataBytes, nil
 }
 
@@ -94,6 +97,7 @@ func (r *ReceptorControl) ReadStr() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return string(data), nil
 }
 
@@ -112,8 +116,9 @@ func (r *ReceptorControl) handshake() error {
 		return err
 	}
 	if matched != true {
-		return fmt.Errorf("Failed control socket handshake, got: %s", data)
+		return fmt.Errorf("failed control socket handshake, got: %s", data)
 	}
+
 	return nil
 }
 
@@ -121,12 +126,14 @@ func (r *ReceptorControl) handshake() error {
 func (r *ReceptorControl) Close() error {
 	err := r.socketConn.Close()
 	r.socketConn = nil
+
 	return err
 }
 
 // CloseWrite closes the write side of the socket.
 func (r *ReceptorControl) CloseWrite() error {
 	err := r.socketConn.CloseWrite()
+
 	return err
 }
 
@@ -145,6 +152,7 @@ func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return jsonData, nil
 }
 
@@ -162,6 +170,7 @@ func (r *ReceptorControl) Ping(node string) (string, error) {
 	if !success {
 		return "", errors.New(jsonData["Error"].(string))
 	}
+
 	return fmt.Sprintf("Reply from %s in %s", jsonData["From"].(string), jsonData["TimeStr"].(string)), nil
 }
 
@@ -207,6 +216,7 @@ func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
 		return "", err
 	}
 	unitID := fmt.Sprintf("%v", response["unitid"])
+
 	return unitID, nil
 }
 
@@ -220,6 +230,7 @@ func (r *ReceptorControl) WorkSubmitJSON(command string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return unitID, nil
 }
 
@@ -233,6 +244,7 @@ func (r *ReceptorControl) WorkSubmit(node, workType string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return unitID, nil
 }
 
@@ -247,6 +259,7 @@ func (r *ReceptorControl) WorkCancel(unitID string) (map[string]interface{}, err
 	if err != nil {
 		return nil, err
 	}
+
 	return r.ReadAndParseJSON()
 }
 
@@ -256,6 +269,7 @@ func (r *ReceptorControl) WorkRelease(unitID string) (map[string]interface{}, er
 	if err != nil {
 		return nil, err
 	}
+
 	return r.ReadAndParseJSON()
 }
 
@@ -274,6 +288,7 @@ func (r *ReceptorControl) GetWorkStatus(unitID string) (*workceptor.StatusFileDa
 	if err != nil {
 		return status, err
 	}
+
 	return status, nil
 }
 
@@ -297,8 +312,10 @@ func assertWithTimeout(ctx context.Context, check func() bool) bool {
 func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, state int) bool {
 	check := func() bool {
 		workStatus, _ := r.GetWorkStatus(unitID)
+
 		return workStatus.State == state
 	}
+
 	return assertWithTimeout(ctx, check)
 }
 
@@ -307,6 +324,7 @@ func (r *ReceptorControl) AssertWorkRunning(ctx context.Context, unitID string) 
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateRunning) {
 		return fmt.Errorf("Failed to assert %s is running or ctx timed out", unitID)
 	}
+
 	return nil
 }
 
@@ -315,6 +333,7 @@ func (r *ReceptorControl) AssertWorkPending(ctx context.Context, unitID string) 
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStatePending) {
 		return fmt.Errorf("Failed to assert %s is pending or ctx timed out", unitID)
 	}
+
 	return nil
 }
 
@@ -323,6 +342,7 @@ func (r *ReceptorControl) AssertWorkSucceeded(ctx context.Context, unitID string
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateSucceeded) {
 		return fmt.Errorf("Failed to assert %s succeeded or ctx timed out", unitID)
 	}
+
 	return nil
 }
 
@@ -331,6 +351,7 @@ func (r *ReceptorControl) AssertWorkFailed(ctx context.Context, unitID string) e
 	if !r.assertWorkState(ctx, unitID, workceptor.WorkStateFailed) {
 		return fmt.Errorf("Failed to assert %s failed or ctx timed out", unitID)
 	}
+
 	return nil
 }
 
@@ -357,11 +378,13 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string
 				return true
 			}
 		}
+
 		return false
 	}
 	if !assertWithTimeout(ctx, check) {
 		return fmt.Errorf("Failed to assert %s is cancelled or ctx timed out", unitID)
 	}
+
 	return nil
 }
 
@@ -379,11 +402,13 @@ func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string)
 		if strings.HasPrefix(detail, "Work unit expired on") {
 			return true
 		}
+
 		return false
 	}
 	if !assertWithTimeout(ctx, check) {
 		fmt.Errorf("Failed to assert work timed out or ctx timed out")
 	}
+
 	return nil
 }
 
@@ -398,6 +423,7 @@ func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, unitID string)
 		if ok {
 			return false
 		}
+
 		return true
 	}
 	if !assertWithTimeout(ctx, check) {
@@ -435,6 +461,7 @@ func (r *ReceptorControl) getWorkResults(unitID string, readSize int) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
+
 	return buf, nil
 }
 
@@ -447,5 +474,6 @@ func (r *ReceptorControl) AssertWorkResults(unitID string, expectedResults []byt
 	if string(expectedResults) != string(workResults) {
 		return fmt.Errorf("work results did not match expected results")
 	}
+
 	return nil
 }

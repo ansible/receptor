@@ -61,13 +61,16 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	hello, err := utils.ReadStringContext(ctxChild, reader, '\n')
 	if err != nil {
 		conn.Close()
+
 		return nil, nil, err
 	}
 	if !strings.Contains(hello, red.RemoteNode) {
 		conn.Close()
+
 		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", red.RemoteNode,
 			strings.TrimRight(hello, "\n"))
 	}
+
 	return conn, reader, nil
 }
 
@@ -109,6 +112,7 @@ func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) erro
 	if err != nil {
 		return utils.WrapErrorWithKind(err, "connection")
 	}
+
 	return action(ctx, conn, reader)
 }
 
@@ -132,6 +136,7 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 			failure()
 		}
 	}()
+
 	return ErrPending
 }
 
@@ -143,6 +148,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 		closeOnce.Do(func() {
 			err = conn.Close()
 		})
+
 		return err
 	}
 	defer doClose()
@@ -170,6 +176,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
+
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	submitIDRegex := regexp.MustCompile("with ID ([a-zA-Z0-9]+)\\.")
@@ -197,6 +204,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	response, err = utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
+
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	resultErrorRegex := regexp.MustCompile("ERROR: (.*)")
@@ -208,6 +216,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 		ed := status.ExtraData.(*remoteExtraData)
 		ed.RemoteStarted = true
 	})
+
 	return nil
 }
 
@@ -229,11 +238,13 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
 		conn.Close()
+
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	if response[:5] == "ERROR" {
 		return fmt.Errorf("error cancelling remote unit: %s", response[6:])
 	}
+
 	return nil
 }
 
@@ -247,6 +258,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	red, ok := status.ExtraData.(*remoteExtraData)
 	if !ok {
 		logger.Error("remote ExtraData missing")
+
 		return
 	}
 	remoteNode := red.RemoteNode
@@ -267,6 +279,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			logger.Debug("Write error sending to %s: %s\n", remoteUnitID, err)
 			_ = conn.Close()
 			conn = nil
+
 			continue
 		}
 		status, err := utils.ReadStringContext(mw, reader, '\n')
@@ -274,6 +287,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			logger.Debug("Read error reading from %s: %s\n", remoteNode, err)
 			_ = conn.Close()
 			conn = nil
+
 			continue
 		}
 		if status[:5] == "ERROR" {
@@ -285,20 +299,24 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 						status.Detail = "Remote work unit is gone"
 					})
 				}
+
 				return
 			}
 			logger.Error("Remote error: %s\n", strings.TrimRight(status[6:], "\n"))
+
 			return
 		}
 		si := StatusFileData{}
 		err = json.Unmarshal([]byte(status), &si)
 		if err != nil {
 			logger.Error("Error unmarshalling JSON: %s\n", status)
+
 			return
 		}
 		rw.UpdateBasicStatus(si.State, si.Detail, si.StdoutSize)
 		if err != nil {
 			logger.Error("Error saving local status file: %s\n", err)
+
 			return
 		}
 		if sleepOrDone(mw.Done(), 1*time.Second) {
@@ -318,6 +336,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	red, ok := status.ExtraData.(*remoteExtraData)
 	if !ok {
 		logger.Error("remote ExtraData missing")
+
 		return
 	}
 	remoteNode := red.RemoteNode
@@ -328,6 +347,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	}
 	if err != nil {
 		logger.Error("Could not open stdout file %s: %s\n", rw.stdoutFileName, err)
+
 		return
 	}
 	for {
@@ -344,6 +364,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		err := rw.Load()
 		if err != nil {
 			logger.Error("Could not read status file %s: %s\n", rw.statusFileName, err)
+
 			return
 		}
 		status := rw.Status()
@@ -359,20 +380,24 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			_, err := conn.Write([]byte(fmt.Sprintf("work results %s %d\n", remoteUnitID, diskStdoutSize)))
 			if err != nil {
 				logger.Warning("Write error sending to %s: %s\n", remoteNode, err)
+
 				continue
 			}
 			status, err := utils.ReadStringContext(mw, reader, '\n')
 			if err != nil {
 				logger.Warning("Read error reading from %s: %s\n", remoteNode, err)
+
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
 				logger.Warning("Remote node %s did not stream results\n", remoteNode)
+
 				continue
 			}
 			stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 			if err != nil {
 				logger.Error("Could not open stdout file %s: %s\n", rw.stdoutFileName, err)
+
 				return
 			}
 			doneChan := make(chan struct{})
@@ -386,6 +411,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 						cr.CancelRead()
 					}
 					_ = conn.Close()
+
 					return
 				}
 			}()
@@ -393,6 +419,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			close(doneChan)
 			if err != nil {
 				logger.Warning("Error copying to stdout file %s: %s\n", rw.stdoutFileName, err)
+
 				continue
 			}
 		}
@@ -418,6 +445,7 @@ func (rw *remoteUnit) SetFromParams(params map[string]string) error {
 	for k, v := range params {
 		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
 	}
+
 	return nil
 }
 
@@ -436,6 +464,7 @@ func (rw *remoteUnit) Status() *StatusFileData {
 			delete(ed.RemoteParams, keysToDelete[i])
 		}
 	}
+
 	return status
 }
 
@@ -453,6 +482,7 @@ func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 		}
 		status.ExtraData = &edCopy
 	}
+
 	return status
 }
 
@@ -462,6 +492,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		err := action(ctx, conn, reader)
 		if err != nil {
 			mw.WorkerDone()
+
 			return err
 		}
 		go func() {
@@ -474,6 +505,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 			}
 			mw.WorkerDone()
 		}()
+
 		return nil
 	}, func() {
 		mw.WorkerDone()
@@ -511,6 +543,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 		if !red.Expiration.IsZero() {
 			go rw.setExpiration(rw.topJC)
 		}
+
 		return rw.runAndMonitor(rw.topJC, false, rw.startRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
 		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
@@ -521,6 +554,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 		rw.monitorRemoteUnit(rw.topJC, false)
 		rw.topJC.WorkerDone()
 	}()
+
 	return nil
 }
 
@@ -536,6 +570,7 @@ func (rw *remoteUnit) Restart() error {
 	if red.RemoteStarted {
 		return rw.startOrRestart(false)
 	}
+
 	return fmt.Errorf("remote work had not previously started")
 }
 
@@ -558,15 +593,18 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 			return rw.BaseWorkUnit.Release(true)
 		}
 		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
+
 		return nil
 	}
 	if release && force {
 		_ = rw.connectAndRun(rw.w.ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true, true)
 		})
+
 		return rw.BaseWorkUnit.Release(true)
 	}
 	rw.topJC.NewJob(rw.w.ctx, 1, false)
+
 	return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release, false)
 	})
@@ -589,5 +627,6 @@ func newRemoteWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	red.RemoteParams = make(map[string]string)
 	rw.status.ExtraData = red
 	rw.topJC = &utils.JobContext{}
+
 	return rw
 }

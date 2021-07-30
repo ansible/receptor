@@ -53,6 +53,7 @@ func TestStatusFileLock(t *testing.T) {
 			for {
 				if ctx.Err() != nil {
 					wg2.Done()
+
 					return
 				}
 				err := sfd.Load(statusFilename)

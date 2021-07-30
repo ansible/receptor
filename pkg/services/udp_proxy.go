@@ -36,6 +36,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			n, addr, err := uc.ReadFrom(buffer)
 			if err != nil {
 				logger.Error("Error reading from UDP: %s\n", err)
+
 				return
 			}
 			raddrStr := addr.String()
@@ -44,6 +45,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 				pc, err = s.ListenPacket("")
 				if err != nil {
 					logger.Error("Error listening on Receptor network: %s\n", err)
+
 					return
 				}
 				logger.Debug("Received new UDP connection from %s\n", raddrStr)
@@ -53,14 +55,17 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			wn, err := pc.WriteTo(buffer[:n], ncAddr)
 			if err != nil {
 				logger.Error("Error sending packet on Receptor network: %s\n", err)
+
 				continue
 			}
 			if wn != n {
 				logger.Debug("Not all bytes written on Receptor network\n")
+
 				continue
 			}
 		}
 	}()
+
 	return nil
 }
 
@@ -70,19 +75,23 @@ func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr
 		n, addr, err := pc.ReadFrom(buf)
 		if err != nil {
 			logger.Error("Error reading from Receptor network: %s\n", err)
+
 			continue
 		}
 		if addr != expectedAddr {
 			logger.Debug("Received packet from unexpected source %s\n", addr)
+
 			continue
 		}
 		wn, err := uc.WriteTo(buf[:n], udpAddr)
 		if err != nil {
 			logger.Error("Error sending packet via UDP: %s\n", err)
+
 			continue
 		}
 		if wn != n {
 			logger.Debug("Not all bytes written via UDP\n")
+
 			continue
 		}
 	}
@@ -108,6 +117,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 			n, addr, err := pc.ReadFrom(buffer)
 			if err != nil {
 				logger.Error("Error reading from Receptor network: %s\n", err)
+
 				return
 			}
 			raddrStr := addr.String()
@@ -116,6 +126,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 				uc, err = net.DialUDP("udp", nil, udpAddr)
 				if err != nil {
 					logger.Error("Error connecting via UDP: %s\n", err)
+
 					return
 				}
 				logger.Debug("Opened new UDP connection to %s\n", raddrStr)
@@ -125,14 +136,17 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 			wn, err := uc.Write(buffer[:n])
 			if err != nil {
 				logger.Error("Error writing to UDP: %s\n", err)
+
 				continue
 			}
 			if wn != n {
 				logger.Debug("Not all bytes written to UDP\n")
+
 				continue
 			}
 		}
 	}()
+
 	return nil
 }
 
@@ -142,15 +156,18 @@ func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr n
 		n, err := uc.Read(buf)
 		if err != nil {
 			logger.Error("Error reading from UDP: %s\n", err)
+
 			return
 		}
 		wn, err := pc.WriteTo(buf[:n], addr)
 		if err != nil {
 			logger.Error("Error writing to the Receptor network: %s\n", err)
+
 			continue
 		}
 		if wn != n {
 			logger.Debug("Not all bytes written to the Netceptor network\n")
+
 			continue
 		}
 	}
@@ -167,6 +184,7 @@ type udpProxyInboundCfg struct {
 // Run runs the action.
 func (cfg udpProxyInboundCfg) Run() error {
 	logger.Debug("Running UDP inbound proxy service %v\n", cfg)
+
 	return UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService)
 }
 
@@ -179,6 +197,7 @@ type udpProxyOutboundCfg struct {
 // Run runs the action.
 func (cfg udpProxyOutboundCfg) Run() error {
 	logger.Debug("Running UDP outbound proxy service %s\n", cfg)
+
 	return UDPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, cfg.Address)
 }
 

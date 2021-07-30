@@ -54,6 +54,7 @@ func (mc *netMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if n != len(buf) {
 		return fmt.Errorf("partial data sent")
 	}
+
 	return nil
 }
 
@@ -86,6 +87,7 @@ func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration
 	if err != nil {
 		return nil, err
 	}
+
 	return buf, nil
 }
 
@@ -116,6 +118,7 @@ func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) e
 	if ctx.Err() != nil {
 		return fmt.Errorf("session closed: %s", ctx.Err())
 	}
+
 	return mc.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
@@ -128,6 +131,7 @@ func (mc *websocketMessageConn) ReadMessage(ctx context.Context, timeout time.Du
 	if messageType != websocket.BinaryMessage {
 		return nil, fmt.Errorf("received message of wrong type")
 	}
+
 	return data, err
 }
 
@@ -151,6 +155,7 @@ func (b *ExternalBackend) Start(ctx context.Context) (chan BackendSession, error
 	b.ctx, b.cancel = context.WithCancel(ctx)
 	b.ctx = ctx
 	b.sessChan = make(chan BackendSession)
+
 	return b.sessChan, nil
 }
 
@@ -189,5 +194,6 @@ func (es *ExternalSession) Close() error {
 	if es.shouldClose {
 		err = es.conn.Close()
 	}
+
 	return err
 }

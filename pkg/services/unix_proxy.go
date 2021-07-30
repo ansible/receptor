@@ -29,18 +29,21 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 			uc, err := uli.Accept()
 			if err != nil {
 				logger.Error("Error accepting Unix socket connection: %s", err)
+
 				return
 			}
 			go func() {
 				qc, err := s.Dial(node, rservice, tlscfg)
 				if err != nil {
 					logger.Error("Error connecting on Receptor network: %s", err)
+
 					return
 				}
 				utils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
 			}()
 		}
 	}()
+
 	return nil
 }
 
@@ -58,17 +61,19 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 			qc, err := qli.Accept()
 			if err != nil {
 				logger.Error("Error accepting connection on Receptor network: %s\n", err)
-				return
 
+				return
 			}
 			uc, err := net.Dial("unix", filename)
 			if err != nil {
 				logger.Error("Error connecting via Unix socket: %s\n", err)
+
 				continue
 			}
 			go utils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
 		}
 	}()
+
 	return nil
 }
 
@@ -88,6 +93,7 @@ func (cfg unixProxyInboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, os.FileMode(cfg.Permissions),
 		cfg.RemoteNode, cfg.RemoteService, tlscfg)
 }
@@ -106,6 +112,7 @@ func (cfg unixProxyOutboundCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return UnixProxyServiceOutbound(netceptor.MainInstance, cfg.Service, tlscfg, cfg.Filename)
 }
 

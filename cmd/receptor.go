@@ -57,11 +57,13 @@ func (cfg nodeCfg) Init() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (cfg nodeCfg) Run() error {
 	workceptor.MainInstance.ListKnownUnitIDs() // Triggers a scan of unit dirs and restarts any that need it
+
 	return nil
 }
 
@@ -78,6 +80,7 @@ func (cfg nullBackendCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

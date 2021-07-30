@@ -113,6 +113,7 @@ func (cfg tlsClientConfig) Prepare() error {
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
+
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
 }
 

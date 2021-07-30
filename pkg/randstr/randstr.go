@@ -13,5 +13,6 @@ func RandomString(length int) string {
 		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		randbytes = append(randbytes, charset[idx.Int64()])
 	}
+
 	return string(randbytes)
 }

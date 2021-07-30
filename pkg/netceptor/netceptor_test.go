@@ -26,6 +26,7 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 		if !strings.Contains(s, "maximum number of forwarding hops") {
 			fmt.Printf(s)
 			lw.t.Fatal(s)
+
 			return
 		}
 	} else if strings.HasPrefix(s, "TRACE") {
@@ -36,6 +37,7 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 		}
 	}
 	lw.t.Log(s)
+
 	return len(p), nil
 }
 
@@ -284,6 +286,7 @@ func TestLotsOfPings(t *testing.T) {
 				for j := range nodes {
 					if !responses[i][j] {
 						good = false
+
 						break
 					}
 				}
@@ -294,6 +297,7 @@ func TestLotsOfPings(t *testing.T) {
 			if good {
 				t.Log("all pings received")
 				cancel()
+
 				return
 			}
 			select {
@@ -383,15 +387,18 @@ func TestDuplicateNodeDetection(t *testing.T) {
 			_, ok := knownRoutes[i][fmt.Sprintf("node%d", peer)]
 			if !ok {
 				knownRoutesLock.RUnlock()
+
 				continue
 			}
 			_, ok = knownRoutes[peer][fmt.Sprintf("node%d", i)]
 			if !ok {
 				knownRoutesLock.RUnlock()
+
 				continue
 			}
 			knownRoutesLock.RUnlock()
 		}
+
 		break
 	}
 
@@ -431,7 +438,6 @@ func TestDuplicateNodeDetection(t *testing.T) {
 
 		// Force close the connection to the connected node
 		_ = c2.Close()
-
 	}
 
 	// Shut down the rest of the network

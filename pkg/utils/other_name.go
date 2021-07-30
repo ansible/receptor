@@ -48,6 +48,7 @@ func ReceptorNames(extensions []pkix.Extension) ([]string, error) {
 			}
 		}
 	}
+
 	return names, nil
 }
 
@@ -111,5 +112,6 @@ func MakeReceptorSAN(DNSNames []string, IPAddresses []net.IP, NodeIDs []string) 
 		Critical: false,
 		Value:    sanBytes,
 	}
+
 	return &sanExt, nil
 }

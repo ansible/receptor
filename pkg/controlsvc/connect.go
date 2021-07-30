@@ -33,6 +33,7 @@ func (t *connectCommandType) InitFromString(params string) (ControlCommand, erro
 		targetService: tokens[1],
 		tlsConfigName: tlsConfigName,
 	}
+
 	return c, nil
 }
 
@@ -68,6 +69,7 @@ func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (Contro
 		targetService: targetServiceStr,
 		tlsConfigName: tlsConfigStr,
 	}
+
 	return c, nil
 }
 
@@ -84,5 +86,6 @@ func (c *connectCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOpe
 	if err != nil {
 		return nil, err
 	}
+
 	return nil, nil
 }

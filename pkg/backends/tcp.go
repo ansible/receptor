@@ -33,6 +33,7 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 		redial:  redial,
 		tls:     tls,
 	}
+
 	return &td, nil
 }
 
@@ -52,6 +53,7 @@ func (b *TCPDialer) Start(ctx context.Context) (chan netceptor.BackendSession, e
 			if err != nil {
 				return nil, err
 			}
+
 			return newTCPSession(conn, closeChan), nil
 		})
 }
@@ -71,6 +73,7 @@ func NewTCPListener(address string, tls *tls.Config) (*TCPListener, error) {
 		tls:     tls,
 		li:      nil,
 	}
+
 	return &tl, nil
 }
 
@@ -79,6 +82,7 @@ func (b *TCPListener) Addr() net.Addr {
 	if b.li == nil {
 		return nil
 	}
+
 	return b.li.Addr()
 }
 
@@ -105,6 +109,7 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 				b.li = tlsLi
 				b.innerLi = tli
 			}
+
 			return nil
 		}, func() (netceptor.BackendSession, error) {
 			var c net.Conn
@@ -125,8 +130,10 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 				if err != nil {
 					return nil, err
 				}
+
 				break
 			}
+
 			return newTCPSession(c, nil), nil
 		}, func() {
 			_ = b.li.Close()
@@ -134,6 +141,7 @@ func (b *TCPListener) Start(ctx context.Context) (chan netceptor.BackendSession,
 	if err == nil {
 		logger.Debug("Listening on TCP %s\n", b.Addr().String())
 	}
+
 	return sessChan, err
 }
 
@@ -153,6 +161,7 @@ func newTCPSession(conn net.Conn, closeChan chan struct{}) *TCPSession {
 		closeChan:       closeChan,
 		closeChanCloser: sync.Once{},
 	}
+
 	return ts
 }
 
@@ -166,6 +175,7 @@ func (ns *TCPSession) Send(data []byte) error {
 	if n != len(buf) {
 		return fmt.Errorf("partial data sent")
 	}
+
 	return nil
 }
 
@@ -193,6 +203,7 @@ func (ns *TCPSession) Recv(timeout time.Duration) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return buf, nil
 }
 
@@ -204,6 +215,7 @@ func (ns *TCPSession) Close() error {
 			ns.closeChan = nil
 		})
 	}
+
 	return ns.conn.Close()
 }
 
@@ -230,6 +242,7 @@ func (cfg tcpListenerCfg) Prepare() error {
 			return fmt.Errorf("connection cost must be positive for %s", node)
 		}
 	}
+
 	return nil
 }
 
@@ -243,12 +256,14 @@ func (cfg tcpListenerCfg) Run() error {
 	b, err := NewTCPListener(address, tlscfg)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)
+
 		return err
 	}
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -265,6 +280,7 @@ func (cfg tcpDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
+
 	return nil
 }
 
@@ -282,12 +298,14 @@ func (cfg tcpDialerCfg) Run() error {
 	b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
 	if err != nil {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+
 		return err
 	}
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

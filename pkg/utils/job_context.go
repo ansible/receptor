@@ -34,6 +34,7 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 	for mw.running {
 		if returnIfRunning {
 			mw.runningLock.Unlock()
+
 			return false
 		}
 		mw.cancel()
@@ -54,6 +55,7 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 		mw.cancel()
 		mw.runningLock.Unlock()
 	}()
+
 	return true
 }
 
@@ -101,5 +103,6 @@ func (mw *JobContext) Cancel() {
 func (mw *JobContext) Running() bool {
 	mw.runningLock.Lock()
 	defer mw.runningLock.Unlock()
+
 	return mw.running
 }

@@ -27,8 +27,10 @@ func TryFLock(filename string) (*FLock, error) {
 	}
 	if err != nil {
 		_ = syscall.Close(fd)
+
 		return nil, err
 	}
+
 	return &FLock{fd: fd}, nil
 }
 

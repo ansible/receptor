@@ -32,16 +32,19 @@ func ContextWithCancelWithErr(parent context.Context) (*CancelWithErrContext, Ca
 			select {
 			case <-parent.Done():
 				cwe.closeDoneChan()
+
 				return
 			case err := <-cwe.errChan:
 				cwe.err = err
 				if err != nil {
 					cwe.closeDoneChan()
+
 					return
 				}
 			}
 		}
 	}()
+
 	return cwe, func(err error) {
 		cwe.err = err
 		cwe.closeDoneChan()
@@ -64,6 +67,7 @@ func (cwe *CancelWithErrContext) Err() error {
 	if cwe.err != nil {
 		return cwe.err
 	}
+
 	return cwe.parentCtx.Err()
 }
 

@@ -21,6 +21,7 @@ func (t *tracerouteCommandType) InitFromString(params string) (ControlCommand, e
 	c := &tracerouteCommand{
 		target: params,
 	}
+
 	return c, nil
 }
 
@@ -36,6 +37,7 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 	c := &tracerouteCommand{
 		target: targetStr,
 	}
+
 	return c, nil
 }
 
@@ -55,5 +57,6 @@ func (c *tracerouteCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFunc
 			break
 		}
 	}
+
 	return cfr, nil
 }

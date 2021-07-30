@@ -28,6 +28,7 @@ func NewBroker(ctx context.Context, msgType reflect.Type) *Broker {
 		unsubCh:   make(chan chan interface{}),
 	}
 	go b.start()
+
 	return b
 }
 
@@ -40,6 +41,7 @@ func (b *Broker) start() {
 			for ch := range subs {
 				close(ch)
 			}
+
 			return
 		case msgCh := <-b.subCh:
 			subs[msgCh] = struct{}{}
@@ -66,8 +68,10 @@ func (b *Broker) Subscribe() chan interface{} {
 	if b.ctx.Err() == nil {
 		msgCh := make(chan interface{}, 1)
 		b.subCh <- msgCh
+
 		return msgCh
 	}
+
 	return nil
 }
 
@@ -87,5 +91,6 @@ func (b *Broker) Publish(msg interface{}) error {
 	if b.ctx.Err() == nil {
 		b.publishCh <- msg
 	}
+
 	return nil
 }

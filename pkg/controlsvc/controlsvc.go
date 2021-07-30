@@ -35,6 +35,7 @@ func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName s
 		}
 	}
 	utils.BridgeConns(s.conn, "control service", bc, bcName)
+
 	return nil
 }
 
@@ -50,6 +51,7 @@ func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -67,6 +69,7 @@ func (s *sockControl) WriteToConn(message string, in chan []byte) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -94,6 +97,7 @@ func New(stdServices bool, nc *netceptor.Netceptor) *Server {
 		s.controlTypes["connect"] = &connectCommandType{}
 		s.controlTypes["traceroute"] = &tracerouteCommandType{}
 	}
+
 	return s
 }
 
@@ -109,6 +113,7 @@ func (s *Server) AddControlFunc(name string, cType ControlCommandType) error {
 		return fmt.Errorf("control function named %s already exists", name)
 	}
 	s.controlTypes[name] = cType
+
 	return nil
 }
 
@@ -125,6 +130,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
 	if err != nil {
 		logger.Error("Write error in control service: %s\n", err)
+
 		return
 	}
 	done := false
@@ -138,9 +144,11 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			if err == io.EOF {
 				logger.Info("Control service closed\n")
 				done = true
+
 				break
 			} else if err != nil {
 				logger.Error("Read error in control service: %s\n", err)
+
 				return
 			}
 			if n == 1 {
@@ -175,6 +183,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					logger.Error("Write error in control service: %s\n", err)
+
 					return
 				}
 			}
@@ -192,6 +201,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		for f := range s.controlTypes {
 			if f == cmd {
 				ct = s.controlTypes[f]
+
 				break
 			}
 		}
@@ -214,6 +224,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					logger.Error("Write error in control service: %s\n", err)
+
 					return
 				}
 			} else {
@@ -223,6 +234,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 						_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
 						if err != nil {
 							logger.Error("Write error in control service: %s\n", err)
+
 							return
 						}
 					}
@@ -230,6 +242,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 					_, err = conn.Write(rbytes)
 					if err != nil {
 						logger.Error("Write error in control service: %s\n", err)
+
 						return
 					}
 				}
@@ -238,6 +251,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			_, err = conn.Write([]byte(fmt.Sprintf("ERROR: Unknown command\n")))
 			if err != nil {
 				logger.Error("Write error in control service: %s\n", err)
+
 				return
 			}
 		}
@@ -302,6 +316,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 			if tli != nil {
 				_ = tli.Close()
 			}
+
 			return
 		}
 	}()
@@ -316,6 +331,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 					if err != nil {
 						logger.Error("Error accepting connection: %s. Closing listener.\n", err)
 						_ = listener.Close()
+
 						return
 					}
 					go func() {
@@ -326,18 +342,21 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 							if err != nil {
 								logger.Error("Error setting timeout: %s. Closing socket.\n", err)
 								_ = conn.Close()
+
 								return
 							}
 							err = tlsConn.Handshake()
 							if err != nil {
 								logger.Error("TLS handshake error: %s. Closing socket.\n", err)
 								_ = conn.Close()
+
 								return
 							}
 							err = conn.SetDeadline(time.Time{})
 							if err != nil {
 								logger.Error("Error clearing timeout: %s. Closing socket.\n", err)
 								_ = conn.Close()
+
 								return
 							}
 						}
@@ -347,6 +366,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 			}(listener)
 		}
 	}
+
 	return nil
 }
 
@@ -393,6 +413,7 @@ func (cfg cmdlineConfigUnix) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -63,6 +63,7 @@ func makeRange(start, stop, step int) ([]int, error) {
 	} else {
 		return nil, errors.New("Unable to make range")
 	}
+
 	return out, nil
 }
 
@@ -84,6 +85,7 @@ func ReserveTCPPort() int {
 		if err == nil {
 			tcpPort.Close()
 			tcpPortPool = tcpPortPool[:len(tcpPortPool)-1]
+
 			return portNum
 		}
 		// If we havent reserved this port but it's taken, prepend it to
@@ -125,6 +127,7 @@ func ReserveUDPPort() int {
 		if err == nil {
 			udpConn.Close()
 			udpPortPool = udpPortPool[:len(udpPortPool)-1]
+
 			return portNum
 		}
 		// If we havent reserved this port but it's taken, prepend it to
@@ -165,6 +168,7 @@ func GenerateCA(name, commonName string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+
 	return keyPath, crtPath, nil
 }
 
@@ -208,6 +212,7 @@ func GenerateCert(name, commonName string, DNSNames, NodeIDs []string) (string, 
 	if err != nil {
 		return "", "", err
 	}
+
 	return keyPath, crtPath, nil
 }
 
@@ -255,6 +260,7 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, DNSNames,
 	if err != nil {
 		return "", "", err
 	}
+
 	return keyPath, crtPath, nil
 }
 
@@ -267,6 +273,7 @@ func CheckUntilTimeout(ctx context.Context, interval time.Duration, check func()
 		}
 		time.Sleep(interval)
 	}
+
 	return true
 }
 
@@ -283,5 +290,6 @@ func CheckUntilTimeoutWithErr(ctx context.Context, interval time.Duration, check
 		}
 		time.Sleep(interval)
 	}
+
 	return true, nil
 }

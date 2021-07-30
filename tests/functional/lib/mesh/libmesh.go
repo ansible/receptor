@@ -52,6 +52,7 @@ func handleError(err error, fatal bool) {
 // NewLibNode builds a node with the name passed as the argument.
 func NewLibNode(name string) *LibNode {
 	n1 := netceptor.New(context.Background(), name, nil)
+
 	return &LibNode{
 		NetceptorInstance: n1,
 		serverTLSConfigs:  make(map[string]*tls.Config),
@@ -67,6 +68,7 @@ func (n *LibNode) Dir() string {
 // Status returns the status of the node.
 func (n *LibNode) Status() (*netceptor.Status, error) {
 	status := n.NetceptorInstance.Status()
+
 	return &status, nil
 }
 
@@ -102,6 +104,7 @@ func (m *LibMesh) Nodes() map[string]Node {
 	for k, v := range m.nodes {
 		nodes[k] = v
 	}
+
 	return nodes
 }
 
@@ -114,6 +117,7 @@ func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]fl
 	}
 	n.Backends = append(n.Backends, b1)
 	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
+
 	return err
 }
 
@@ -125,6 +129,7 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 		return err
 	}
 	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+
 	return err
 }
 
@@ -137,6 +142,7 @@ func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]fl
 	}
 	n.Backends = append(n.Backends, b1)
 	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
+
 	return err
 }
 
@@ -148,6 +154,7 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 		return err
 	}
 	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+
 	return err
 }
 
@@ -161,6 +168,7 @@ func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[str
 	}
 	n.Backends = append(n.Backends, b1)
 	err = n.NetceptorInstance.AddBackend(b1, cost, nodeCost)
+
 	return err
 }
 
@@ -173,6 +181,7 @@ func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config
 		return err
 	}
 	err = n.NetceptorInstance.AddBackend(b1, cost, nil)
+
 	return err
 }
 
@@ -493,6 +502,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	}
 	mesh.nodes = nodes
 	mesh.MeshDefinition = &MeshDefinition
+
 	return mesh, nil
 }
 
@@ -529,16 +539,19 @@ func (m *LibMesh) CheckConnections() bool {
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 			listenerYaml, ok = configItemYaml["udp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 			listenerYaml, ok = configItemYaml["ws-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 		}
@@ -555,6 +568,7 @@ func (m *LibMesh) CheckConnections() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -575,6 +589,7 @@ func (m *LibMesh) CheckKnownConnectionCosts() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -596,6 +611,7 @@ func (m *LibMesh) CheckRoutes() bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -609,6 +625,7 @@ func (m *LibMesh) CheckControlSockets() bool {
 		}
 		controller.Close()
 	}
+
 	return true
 }
 
@@ -627,6 +644,7 @@ func (m *LibMesh) WaitForReady(ctx context.Context) error {
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
 		return errors.New("Timed out while waiting for routes to converge")
 	}
+
 	return nil
 }
 
@@ -640,5 +658,6 @@ func (m *LibMesh) Status() ([]*netceptor.Status, error) {
 		}
 		out = append(out, status)
 	}
+
 	return out, nil
 }

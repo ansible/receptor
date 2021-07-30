@@ -122,6 +122,7 @@ func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, er
 	if err != nil {
 		return nil, err
 	}
+
 	return lockFile, nil
 }
 
@@ -141,6 +142,7 @@ func (sfd *StatusFileData) saveToFile(file io.Writer) error {
 	}
 	jsonBytes = append(jsonBytes, '\n')
 	_, err = file.Write(jsonBytes)
+
 	return err
 }
 
@@ -158,8 +160,10 @@ func (sfd *StatusFileData) Save(filename string) error {
 	err = sfd.saveToFile(file)
 	if err != nil {
 		_ = file.Close()
+
 		return err
 	}
+
 	return file.Close()
 }
 
@@ -167,6 +171,7 @@ func (sfd *StatusFileData) Save(filename string) error {
 func (bwu *BaseWorkUnit) Save() error {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()
+
 	return bwu.status.Save(bwu.statusFileName)
 }
 
@@ -176,6 +181,7 @@ func (sfd *StatusFileData) loadFromFile(file io.Reader) error {
 	if err != nil {
 		return err
 	}
+
 	return json.Unmarshal(jsonBytes, sfd)
 }
 
@@ -193,8 +199,10 @@ func (sfd *StatusFileData) Load(filename string) error {
 	err = sfd.loadFromFile(file)
 	if err != nil {
 		_ = file.Close()
+
 		return err
 	}
+
 	return file.Close()
 }
 
@@ -202,6 +210,7 @@ func (sfd *StatusFileData) Load(filename string) error {
 func (bwu *BaseWorkUnit) Load() error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
+
 	return bwu.status.Load(bwu.statusFileName)
 }
 
@@ -250,6 +259,7 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -357,6 +367,7 @@ func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
 	var status StatusFileData
 	status = bwu.status
 	status.ExtraData = nil
+
 	return &status
 }
 
@@ -369,6 +380,7 @@ func (bwu *BaseWorkUnit) Status() *StatusFileData {
 func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()
+
 	return bwu.getStatus()
 }
 
@@ -387,9 +399,11 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 			if attemptsLeft > 0 {
 				logger.Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
 				time.Sleep(time.Second)
+
 				continue
 			} else {
 				logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+
 				return err
 			}
 		}
@@ -399,6 +413,7 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.w.activeUnitsLock.Lock()
 	defer bwu.w.activeUnitsLock.Unlock()
 	delete(bwu.w.activeUnits, bwu.unitID)
+
 	return nil
 }
 
@@ -407,6 +422,7 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	uu := &unknownUnit{}
 	uu.BaseWorkUnit.Init(w, unitID, workType)
+
 	return uu
 }
 
@@ -433,5 +449,6 @@ func (uu *unknownUnit) Cancel() error {
 func (uu *unknownUnit) Status() *StatusFileData {
 	status := uu.BaseWorkUnit.Status()
 	status.ExtraData = "Unknown WorkType"
+
 	return status
 }

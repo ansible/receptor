@@ -61,6 +61,7 @@ func (n *CLINode) Status() (*netceptor.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return status, nil
 }
 
@@ -94,6 +95,7 @@ func (n *CLINode) Start() error {
 	n.receptorCmd.Stdout = stdout
 	n.receptorCmd.Stderr = stderr
 	err = n.receptorCmd.Start()
+
 	return err
 }
 
@@ -145,6 +147,7 @@ func (m *CLIMesh) Nodes() map[string]Node {
 	for k, v := range m.nodes {
 		nodes[k] = v
 	}
+
 	return nodes
 }
 
@@ -398,6 +401,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	case node := <-failedMesh:
 		mesh.Destroy()
 		mesh.WaitForShutdown()
+
 		return nil, fmt.Errorf("Failed to create mesh: node %s exited early", node.dir)
 	case <-time.After(time.Until(time.Now().Add(100 * time.Millisecond))):
 	}
@@ -439,16 +443,19 @@ func (m *CLIMesh) CheckConnections() bool {
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 			listenerYaml, ok = configItemYaml["udp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 			listenerYaml, ok = configItemYaml["ws-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)
+
 				continue
 			}
 		}
@@ -465,6 +472,7 @@ func (m *CLIMesh) CheckConnections() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -498,6 +506,7 @@ func (m *CLIMesh) CheckAdvertisements() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -518,6 +527,7 @@ func (m *CLIMesh) CheckKnownConnectionCosts() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -539,6 +549,7 @@ func (m *CLIMesh) CheckRoutes() bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -552,6 +563,7 @@ func (m *CLIMesh) CheckControlSockets() bool {
 		}
 		controller.Close()
 	}
+
 	return true
 }
 
@@ -573,6 +585,7 @@ func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckAdvertisements) {
 		return errors.New("Timed out while waiting for Advertisements")
 	}
+
 	return nil
 }
 
@@ -586,5 +599,6 @@ func (m *CLIMesh) Status() ([]*netceptor.Status, error) {
 		}
 		out = append(out, status)
 	}
+
 	return out, nil
 }

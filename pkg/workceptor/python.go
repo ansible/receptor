@@ -32,6 +32,7 @@ func (pw *pythonUnit) Start() error {
 	}
 	cmd := exec.Command("receptor-python-worker",
 		fmt.Sprintf("%s:%s", pw.plugin, pw.function), pw.UnitDir(), string(configJSON))
+
 	return pw.runCommand(cmd)
 }
 
@@ -62,12 +63,14 @@ func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string
 		config:   cfg.Config,
 	}
 	cw.BaseWorkUnit.Init(w, unitID, workType)
+
 	return cw
 }
 
 // Run runs the action.
 func (cfg workPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+
 	return err
 }
 

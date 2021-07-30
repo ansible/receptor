@@ -38,6 +38,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					// continue
 				case <-ctx.Done():
 					_ = sess.Close()
+
 					return
 				}
 			}
@@ -59,10 +60,12 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 				} else if ctx.Err() != nil {
 					logger.Error("Backend connection exited\n")
 				}
+
 				return
 			}
 		}
 	}()
+
 	return sessChan, nil
 }
 
@@ -93,6 +96,7 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 			}
 			if err != nil {
 				logger.Error("Error accepting connection: %s\n", err)
+
 				return
 			}
 			select {
@@ -102,5 +106,6 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 			}
 		}
 	}()
+
 	return sessChan, nil
 }

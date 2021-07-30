@@ -73,6 +73,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 			c.params["startpos"] = int64(0)
 		}
 	}
+
 	return c, nil
 }
 
@@ -86,6 +87,7 @@ func strFromMap(config map[string]interface{}, name string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("field %s must be a string", name)
 	}
+
 	return valueStr, nil
 }
 
@@ -110,6 +112,7 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 			return valueInt, nil
 		}
 	}
+
 	return 0, fmt.Errorf("field %s value %s is not convertible to an int", name, value)
 }
 
@@ -160,6 +163,7 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 			return nil, err
 		}
 	}
+
 	return c, nil
 }
 
@@ -214,17 +218,20 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin)
 		if err != nil {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
+
 			return nil, err
 		}
 		err = stdin.Close()
 		if err != nil {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
+
 			return nil, err
 		}
 		worker.UpdateBasicStatus(WorkStatePending, "Starting Worker", 0)
 		err = worker.Start()
 		if err != nil && !IsPending(err) {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error starting worker: %s", err), 0)
+
 			return nil, err
 		}
 		cfr := make(map[string]interface{})
@@ -234,6 +241,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		} else {
 			cfr["result"] = "Job Started"
 		}
+
 		return cfr, nil
 	case "list":
 		var unitList []string
@@ -252,6 +260,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			}
 			cfr[unitID] = status
 		}
+
 		return cfr, nil
 	case "status":
 		unitid, err := strFromMap(c.params, "unitid")
@@ -262,6 +271,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
+
 		return cfr, nil
 	case "cancel", "release", "force-release":
 		unitid, err := strFromMap(c.params, "unitid")
@@ -296,6 +306,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 				cfr[completeMsg] = unitid
 			}
 		}
+
 		return cfr, nil
 	case "results":
 		unitid, err := strFromMap(c.params, "unitid")
@@ -322,7 +333,9 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
+
 		return nil, nil
 	}
+
 	return nil, fmt.Errorf("bad command")
 }

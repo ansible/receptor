@@ -70,6 +70,7 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 			return nil, fmt.Errorf("unknown block type %s", block.Type)
 		}
 	}
+
 	return results, nil
 }
 
@@ -91,6 +92,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 				return err
 			}
 			content = append(content, certPEM.String())
+
 			continue
 		}
 		var req *x509.CertificateRequest
@@ -105,6 +107,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 				return err
 			}
 			content = append(content, reqPEM.String())
+
 			continue
 		}
 		var key *rsa.PrivateKey
@@ -119,9 +122,11 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 				return err
 			}
 			content = append(content, keyPEM.String())
+
 			continue
 		}
 	}
+
 	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
@@ -138,6 +143,7 @@ func LoadCertificate(filename string) (*x509.Certificate, error) {
 	if !ok {
 		return nil, fmt.Errorf("certificate file does not contain certificate data")
 	}
+
 	return cert, nil
 }
 
@@ -154,6 +160,7 @@ func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 	if !ok {
 		return nil, fmt.Errorf("certificate request file does not contain certificate request data")
 	}
+
 	return req, nil
 }
 
@@ -170,6 +177,7 @@ func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 	if !ok {
 		return nil, fmt.Errorf("private key file does not contain private key data")
 	}
+
 	return key, nil
 }
 
@@ -239,6 +247,7 @@ func CreateCertReqWithKey(opts *CertOptions) (*x509.CertificateRequest, *rsa.Pri
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return req, key, nil
 }
 
@@ -290,6 +299,7 @@ func GetReqNames(request *x509.CertificateRequest) (*CertNames, error) {
 		NodeIDs:     nodeIDs,
 		IPAddresses: request.IPAddresses,
 	}
+
 	return cn, nil
 }
 
@@ -320,6 +330,7 @@ func SignCertReq(req *x509.CertificateRequest, ca *CA, opts *CertOptions) (*x509
 		if ext.Id.Equal(utils.OIDSubjectAltName) {
 			certTemplate.ExtraExtensions = []pkix.Extension{ext}
 			found = true
+
 			break
 		}
 	}
@@ -336,5 +347,6 @@ func SignCertReq(req *x509.CertificateRequest, ca *CA, opts *CertOptions) (*x509
 	if err != nil {
 		return nil, err
 	}
+
 	return cert, nil
 }

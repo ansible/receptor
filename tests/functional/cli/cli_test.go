@@ -26,6 +26,7 @@ func ConfirmListening(pid int) (bool, error) {
 	if strings.Contains(out.String(), pidString) {
 		return true, nil
 	}
+
 	return false, nil
 }
 
@@ -112,6 +113,7 @@ func TestSSLListeners(t *testing.T) {
 				if err == nil {
 					return true
 				}
+
 				return false
 			}
 

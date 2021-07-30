@@ -93,6 +93,7 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 			}
 		}
 	}
+
 	return false, nil
 }
 
@@ -123,6 +124,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 				spec.Containers[i].Stdin = true
 				spec.Containers[i].StdinOnce = true
 				foundWorker = true
+
 				break
 			}
 		}
@@ -197,10 +199,12 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
+
 			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).List(kw.ctx, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
+
 			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).Watch(kw.ctx, options)
 		},
 	}
@@ -223,6 +227,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
 			return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
 		}
+
 		return err
 	} else if err != nil {
 		kw.Cancel()
@@ -231,11 +236,13 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 				return fmt.Errorf("%s, %s", err.Error(), kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)
 			}
 		}
+
 		return err
 	}
 	if ev == nil {
 		return fmt.Errorf("pod disappeared during watch")
 	}
+
 	return nil
 }
 
@@ -263,6 +270,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	if errMsg != "" {
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		logger.Error(errMsg)
+
 		return
 	}
 
@@ -276,6 +284,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		errMsg := fmt.Sprintf("Error opening pod stream: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		logger.Error(errMsg)
+
 		return
 	}
 	defer logStream.Close()
@@ -298,6 +307,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		exec, err = remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
 		if err != nil {
 			kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error attaching to pod: %s", err), 0)
+
 			return
 		}
 	}
@@ -306,6 +316,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	select {
 	case <-kw.ctx.Done():
 		kw.UpdateBasicStatus(WorkStateFailed, "Cancelled", 0)
+
 		return
 	default:
 	}
@@ -317,6 +328,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
 			logger.Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
 			return
 		}
 	}
@@ -327,6 +339,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
 		logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
 		return
 	}
 
@@ -390,6 +403,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", errStdin, errStdout)
 		}
 		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
+
 		return
 	}
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
@@ -417,6 +431,7 @@ func getDefaultInterface() (string, error) {
 			}
 		}
 	}
+
 	return "", fmt.Errorf("could not determine local address")
 }
 
@@ -443,6 +458,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		errMsg := fmt.Sprintf("Error listening: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		logger.Error(errMsg)
+
 		return
 	}
 
@@ -467,6 +483,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			logger.Error(errMsg)
 			cancel()
+
 			return
 		}
 		connChan <- tcpConn
@@ -479,6 +496,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		logger.Error(errMsg)
 		cancel()
+
 		return
 	}
 
@@ -498,6 +516,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
+
 		return
 	}
 
@@ -508,6 +527,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
+
 		return
 	}
 
@@ -525,6 +545,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 			logger.Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			cancel()
+
 			return
 		}
 	}()
@@ -556,6 +577,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
+
 		return
 	}
 
@@ -606,6 +628,7 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -615,6 +638,7 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -634,6 +658,7 @@ func (kw *kubeUnit) connectToKube() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -646,6 +671,7 @@ func readFileToString(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return string(content), nil
 }
 
@@ -660,8 +686,10 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	setString := func(target *string) func(string) error {
 		ssf := func(value string) error {
 			*target = value
+
 			return nil
 		}
+
 		return ssf
 	}
 	setBool := func(target *bool) func(string) error {
@@ -671,8 +699,10 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 				return err
 			}
 			*target = bv
+
 			return nil
 		}
+
 		return ssf
 	}
 
@@ -725,6 +755,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		podPendingTimeout, err := time.ParseDuration(podPendingTimeoutString)
 		if err != nil {
 			logger.Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
+
 			return err
 		}
 		kw.podPendingTimeout = podPendingTimeout
@@ -744,6 +775,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	} else {
 		ked.Params = combineParams(kw.baseParams, userParams)
 	}
+
 	return nil
 }
 
@@ -755,6 +787,7 @@ func (kw *kubeUnit) Status() *StatusFileData {
 		ed.KubeConfig = ""
 		ed.KubePod = ""
 	}
+
 	return status
 }
 
@@ -768,6 +801,7 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
 	}
+
 	return status
 }
 
@@ -815,12 +849,14 @@ func (kw *kubeUnit) Restart() error {
 	if isTCP {
 		return fmt.Errorf("restart not implemented for streammethod tcp")
 	}
+
 	return fmt.Errorf("work unit is not in running state, cannot be restarted")
 }
 
 // Start launches a job with given parameters.
 func (kw *kubeUnit) Start() error {
 	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
+
 	return kw.startOrRestart()
 }
 
@@ -836,6 +872,7 @@ func (kw *kubeUnit) Cancel() error {
 	if kw.cancel != nil {
 		kw.cancel()
 	}
+
 	return nil
 }
 
@@ -845,6 +882,7 @@ func (kw *kubeUnit) Release(force bool) error {
 	if err != nil && !force {
 		return err
 	}
+
 	return kw.BaseWorkUnit.Release(force)
 }
 
@@ -901,6 +939,7 @@ func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
 	ku.BaseWorkUnit.Init(w, unitID, workType)
+
 	return ku
 }
 
@@ -938,12 +977,14 @@ func (cfg workKubeCfg) Prepare() error {
 	if method != "logger" && method != "tcp" {
 		return fmt.Errorf("stream mode must be logger or tcp")
 	}
+
 	return nil
 }
 
 // Run runs the action.
 func (cfg workKubeCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+
 	return err
 }
 

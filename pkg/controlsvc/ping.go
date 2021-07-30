@@ -23,6 +23,7 @@ func (t *pingCommandType) InitFromString(params string) (ControlCommand, error) 
 	c := &pingCommand{
 		target: params,
 	}
+
 	return c, nil
 }
 
@@ -38,6 +39,7 @@ func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCo
 	c := &pingCommand{
 		target: targetStr,
 	}
+
 	return c, nil
 }
 
@@ -121,5 +123,6 @@ func (c *pingCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperat
 		cfr["Success"] = false
 		cfr["Error"] = err.Error()
 	}
+
 	return cfr, nil
 }

@@ -55,6 +55,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
+
 	return pc, nil
 }
 
@@ -68,6 +69,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	pc.advertise = true
 	pc.adTags = tags
 	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
+
 	return pc, nil
 }
 
@@ -106,6 +108,7 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 			case msgIf, ok := <-iChan:
 				if !ok {
 					close(uChan)
+
 					return
 				}
 				msg, ok := msgIf.(UnreachableNotification)
@@ -115,10 +118,12 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 				uChan <- msg
 			case <-pc.context.Done():
 				close(uChan)
+
 				return
 			}
 		}
 	}()
+
 	return uChan
 }
 
@@ -143,6 +148,7 @@ func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		node:    m.FromNode,
 		service: m.FromService,
 	}
+
 	return nCopied, fromAddr, nil
 }
 
@@ -156,6 +162,7 @@ func (pc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return len(p), nil
 }
 
@@ -193,18 +200,21 @@ func (pc *PacketConn) Close() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // SetDeadline sets both the read and write deadlines.
 func (pc *PacketConn) SetDeadline(t time.Time) error {
 	pc.readDeadline = t
+
 	return nil
 }
 
 // SetReadDeadline sets the read deadline.
 func (pc *PacketConn) SetReadDeadline(t time.Time) error {
 	pc.readDeadline = t
+
 	return nil
 }
 

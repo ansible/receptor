@@ -65,6 +65,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			t.Fatalf("Error upgrading websocket connection: %s", err)
+
 			return
 		}
 		b1.NewConnection(netceptor.MessageConnFromWebsocketConn(conn), true)

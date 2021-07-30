@@ -83,5 +83,6 @@ func getListenerCost(listenerYaml map[interface{}]interface{}, nodeID string) fl
 	} else {
 		cost = 1.0
 	}
+
 	return cost
 }

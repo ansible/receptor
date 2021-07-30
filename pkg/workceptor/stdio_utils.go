@@ -13,6 +13,7 @@ import (
 func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	statusFilename := path.Join(unitdir, "status")
 	si := &StatusFileData{}
+
 	return si.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
 		status.StdoutSize = stdoutSize
 	})
@@ -31,6 +32,7 @@ func newStdoutWriter(unitdir string) (*stdoutWriter, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &stdoutWriter{
 		unitdir:      unitdir,
 		writer:       writer,
@@ -49,6 +51,7 @@ func (sw *stdoutWriter) Write(p []byte) (n int, err error) {
 	if werr != nil {
 		return wn, werr
 	}
+
 	return wn, serr
 }
 
@@ -71,6 +74,7 @@ func newStdinReader(unitdir string) (*stdinReader, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &stdinReader{
 		reader:   reader,
 		lasterr:  nil,
@@ -88,6 +92,7 @@ func (sr *stdinReader) Read(p []byte) (n int, err error) {
 			close(sr.doneChan)
 		})
 	}
+
 	return
 }
 

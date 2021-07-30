@@ -23,6 +23,7 @@ func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 		allowRuntimeParams: true,
 	}
 	cw.BaseWorkUnit.Init(w, unitID, workType)
+
 	return cw
 }
 

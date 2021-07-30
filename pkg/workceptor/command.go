@@ -106,7 +106,6 @@ loop:
 			if err != nil {
 				logger.Error("Error updating status file %s: %s", statusFilename, err)
 			}
-
 		}
 	}
 	if err != nil {
@@ -114,6 +113,7 @@ loop:
 		if err != nil {
 			logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
+
 		return err
 	}
 	if cmd.ProcessState.Success() {
@@ -128,6 +128,7 @@ loop:
 		}
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
+
 	return nil
 }
 
@@ -140,6 +141,7 @@ func combineParams(baseParams string, userParams string) string {
 	} else {
 		allParams = strings.Join([]string{baseParams, userParams}, " ")
 	}
+
 	return allParams
 }
 
@@ -153,6 +155,7 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
 	cw.status.ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+
 	return nil
 }
 
@@ -171,6 +174,7 @@ func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 		edCopy := *ed
 		status.ExtraData = &edCopy
 	}
+
 	return status
 }
 
@@ -183,6 +187,7 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	err := cmd.Start()
 	if err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)
+
 		return err
 	}
 	cw.UpdateFullStatus(func(status *StatusFileData) {
@@ -201,6 +206,7 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	}()
 	go cmdWaiter(cmd, doneChan)
 	go cw.monitorLocalStatus()
+
 	return nil
 }
 
@@ -213,6 +219,7 @@ func (cw *commandUnit) Start() error {
 		fmt.Sprintf("command=%s", cw.command),
 		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*commandExtraData).Params),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))
+
 	return cw.runCommand(cmd)
 }
 
@@ -232,6 +239,7 @@ func (cw *commandUnit) Restart() error {
 		cw.UpdateBasicStatus(WorkStateFailed, "Pending at restart", stdoutSize(cw.UnitDir()))
 	}
 	go cw.monitorLocalStatus()
+
 	return nil
 }
 
@@ -253,10 +261,12 @@ func (cw *commandUnit) Cancel() error {
 		if strings.Contains(err.Error(), "already finished") {
 			return nil
 		}
+
 		return err
 	}
 
 	proc.Wait()
+
 	return nil
 }
 
@@ -266,6 +276,7 @@ func (cw *commandUnit) Release(force bool) error {
 	if err != nil && !force {
 		return err
 	}
+
 	return cw.BaseWorkUnit.Release(force)
 }
 
@@ -293,12 +304,14 @@ func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) W
 		allowRuntimeParams: cfg.AllowRuntimeParams,
 	}
 	cw.BaseWorkUnit.Init(w, unitID, workType)
+
 	return cw
 }
 
 // Run runs the action.
 func (cfg commandCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+
 	return err
 }
 
@@ -323,6 +336,7 @@ func (cfg commandRunnerCfg) Run() error {
 	} else {
 		os.Exit(0)
 	}
+
 	return nil
 }
 

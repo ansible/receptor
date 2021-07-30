@@ -49,6 +49,7 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 		if shouldClose {
 			logger.Trace("    Stopping bridge %s to %s\n", c1Name, c2Name)
 			_ = c2.Close()
+
 			return
 		}
 	}

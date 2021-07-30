@@ -19,6 +19,7 @@ func (cfg cmdlineCfg) Run() error {
 	} else {
 		fmt.Printf("%s\n", Version)
 	}
+
 	return nil
 }
 

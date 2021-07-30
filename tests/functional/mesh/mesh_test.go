@@ -252,6 +252,7 @@ func TestMeshShutdown(t *testing.T) {
 				}
 				if !strings.Contains(out.String(), pidString) {
 					done = true
+
 					break
 				}
 				time.Sleep(100 * time.Millisecond)

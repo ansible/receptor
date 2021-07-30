@@ -27,5 +27,6 @@ func ErrorIsKind(err error, kind string) bool {
 	if !ok {
 		return false
 	}
+
 	return ek.kind == kind
 }

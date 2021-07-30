@@ -16,7 +16,6 @@ type PacketConn struct {
 	localService       string
 	recvChan           chan *messageData
 	readDeadline       time.Time
-	writeDeadline      time.Time
 	advertise          bool
 	adTags             map[string]string
 	connType           byte

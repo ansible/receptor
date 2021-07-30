@@ -2,7 +2,7 @@
 Description=Receptor
 
 [Service]
-ExecStart=/usr/bin/receptor -c /etc/receptor/receptor.conf
+ExecStart=/usr/bin/receptor -c /etc/receptor/%i.conf
 User=receptor
 Group=receptor
 

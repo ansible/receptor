@@ -179,7 +179,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
-	submitIDRegex := regexp.MustCompile("with ID ([a-zA-Z0-9]+)\\.")
+	submitIDRegex := regexp.MustCompile(`with ID ([a-zA-Z0-9]+)\.`)
 	match := submitIDRegex.FindSubmatch([]byte(response))
 	if match == nil || len(match) != 2 {
 		return fmt.Errorf("could not parse response: %s", strings.TrimRight(response, "\n"))
@@ -514,7 +514,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 
 func (rw *remoteUnit) setExpiration(mw *utils.JobContext) {
 	red := rw.Status().ExtraData.(*remoteExtraData)
-	dur := red.Expiration.Sub(time.Now())
+	dur := time.Until(red.Expiration)
 	select {
 	case <-mw.Done():
 	case <-time.After(dur):

@@ -118,7 +118,7 @@ func (c *pingCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperat
 		cfr["Success"] = true
 		cfr["From"] = pingRemote
 		cfr["Time"] = pingTime
-		cfr["TimeStr"] = fmt.Sprintf("%s", pingTime)
+		cfr["TimeStr"] = fmt.Sprint(pingTime)
 	} else {
 		cfr["Success"] = false
 		cfr["Error"] = err.Error()

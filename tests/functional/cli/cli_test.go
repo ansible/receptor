@@ -15,8 +15,7 @@ import (
 
 func ConfirmListening(pid int) (bool, error) {
 	pidString := "pid=" + strconv.Itoa(pid)
-	var out bytes.Buffer
-	out = bytes.Buffer{}
+	out := bytes.Buffer{}
 	ssCmd := exec.Command("ss", "-tulnp")
 	ssCmd.Stdout = &out
 	err := ssCmd.Run()
@@ -110,11 +109,8 @@ func TestSSLListeners(t *testing.T) {
 				opensslCmd.Stdin = &opensslStdIn
 				opensslCmd.Stdout = &opensslStdOut
 				err = opensslCmd.Run()
-				if err == nil {
-					return true
-				}
 
-				return false
+				return err == nil
 			}
 
 			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)

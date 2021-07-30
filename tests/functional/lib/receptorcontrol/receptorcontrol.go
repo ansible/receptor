@@ -115,7 +115,7 @@ func (r *ReceptorControl) handshake() error {
 	if err != nil {
 		return err
 	}
-	if matched != true {
+	if !matched {
 		return fmt.Errorf("failed control socket handshake, got: %s", data)
 	}
 
@@ -293,7 +293,7 @@ func (r *ReceptorControl) GetWorkStatus(unitID string) (*workceptor.StatusFileDa
 }
 
 func (r *ReceptorControl) getWorkList() (map[string]interface{}, error) {
-	_, err := r.WriteStr(fmt.Sprintf("work list\n"))
+	_, err := r.WriteStr("work list\n")
 	if err != nil {
 		return nil, err
 	}
@@ -399,11 +399,8 @@ func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string)
 			return false
 		}
 		detail := workStatus.Detail
-		if strings.HasPrefix(detail, "Work unit expired on") {
-			return true
-		}
 
-		return false
+		return strings.HasPrefix(detail, "Work unit expired on")
 	}
 	if !assertWithTimeout(ctx, check) {
 		fmt.Errorf("Failed to assert work timed out or ctx timed out")
@@ -420,11 +417,8 @@ func (r *ReceptorControl) AssertWorkReleased(ctx context.Context, unitID string)
 			return false
 		}
 		_, ok := workList[unitID] // unitID should not be in list
-		if ok {
-			return false
-		}
 
-		return true
+		return !ok
 	}
 	if !assertWithTimeout(ctx, check) {
 		return fmt.Errorf("Failed to assert %s is released or ctx timed out", unitID)

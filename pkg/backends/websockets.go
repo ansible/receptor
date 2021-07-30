@@ -58,12 +58,12 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 				TLSClientConfig: b.tlscfg,
 				Proxy:           http.ProxyFromEnvironment,
 			}
-			header := make(http.Header, 0)
+			header := make(http.Header)
 			if b.extraHeader != "" {
 				extraHeaderParts := strings.SplitN(b.extraHeader, ":", 2)
-				header.Add(http.CanonicalHeaderKey(extraHeaderParts[0]), extraHeaderParts[1])
+				header.Add(extraHeaderParts[0], extraHeaderParts[1])
 			}
-			header.Add(http.CanonicalHeaderKey("origin"), b.origin)
+			header.Add("origin", b.origin)
 			conn, resp, err := dialer.DialContext(ctx, b.address, header)
 			if err != nil {
 				return nil, err

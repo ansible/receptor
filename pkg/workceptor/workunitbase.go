@@ -364,8 +364,7 @@ loop:
 
 // getStatus returns a copy of the base status (no ExtraData).  The caller must already hold the statusLock.
 func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
-	var status StatusFileData
-	status = bwu.status
+	status := bwu.status
 	status.ExtraData = nil
 
 	return &status

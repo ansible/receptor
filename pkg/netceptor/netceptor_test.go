@@ -309,9 +309,7 @@ func TestLotsOfPings(t *testing.T) {
 	}()
 
 	t.Log("waiting for done")
-	select {
-	case <-ctx.Done():
-	}
+	<-ctx.Done()
 	t.Log("waiting for waitgroup")
 	wg.Wait()
 

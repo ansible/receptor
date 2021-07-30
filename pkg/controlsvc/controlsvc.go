@@ -248,7 +248,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				}
 			}
 		} else {
-			_, err = conn.Write([]byte(fmt.Sprintf("ERROR: Unknown command\n")))
+			_, err = conn.Write([]byte("ERROR: Unknown command\n"))
 			if err != nil {
 				logger.Error("Write error in control service: %s\n", err)
 
@@ -304,20 +304,16 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	}
 	logger.Info("Running control service %s\n", service)
 	go func() {
-		select {
-		case <-ctx.Done():
-			if uli != nil {
-				_ = uli.Close()
-				_ = lock.Unlock()
-			}
-			if li != nil {
-				_ = li.Close()
-			}
-			if tli != nil {
-				_ = tli.Close()
-			}
-
-			return
+		<-ctx.Done()
+		if uli != nil {
+			_ = uli.Close()
+			_ = lock.Unlock()
+		}
+		if li != nil {
+			_ = li.Close()
+		}
+		if tli != nil {
+			_ = tli.Close()
 		}
 	}()
 	for _, listener := range []net.Listener{uli, tli, li} {

@@ -146,7 +146,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 		found := false
 		for j := range routes {
 			route := routes[j]
-			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+			if kr.dest.IP.Equal(route.Dst.IP) && bytes.Equal(kr.dest.Mask, route.Dst.Mask) {
 				found = true
 
 				break
@@ -172,7 +172,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 		found := false
 		for j := range ipr.knownRoutes {
 			kr := ipr.knownRoutes[j]
-			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+			if kr.dest.IP.Equal(route.Dst.IP) && bytes.Equal(kr.dest.Mask, route.Dst.Mask) {
 				found = true
 
 				break

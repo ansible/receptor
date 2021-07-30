@@ -287,7 +287,7 @@ func CheckUntilTimeoutWithErr(ctx context.Context, interval time.Duration, check
 			return false, err
 		}
 		if ctx.Err() != nil {
-			return false, nil
+			return false, nil //nolint:nilerr // Make this nice later.
 		}
 		time.Sleep(interval)
 	}

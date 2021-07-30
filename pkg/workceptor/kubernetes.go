@@ -109,8 +109,8 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 
 	pod := &corev1.Pod{}
-	spec := &corev1.PodSpec{}
-	objectMeta := &metav1.ObjectMeta{}
+	var spec *corev1.PodSpec
+	var objectMeta *metav1.ObjectMeta
 	if ked.KubePod != "" {
 		decode := scheme.Codecs.UniversalDeserializer().Decode
 		_, _, err := decode([]byte(ked.KubePod), nil, pod)

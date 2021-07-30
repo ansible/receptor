@@ -843,7 +843,7 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 			opts.Intermediates.AddCert(cert)
 		}
 		var err error
-		verifiedChains, err = certs[0].Verify(opts)
+		_, err = certs[0].Verify(opts)
 		if err != nil {
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 

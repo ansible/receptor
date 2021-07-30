@@ -335,22 +335,23 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					nodeCost := make(map[string]float64)
 
 					// Use nodeCost map if possible
-					interfaceNodeCost, ok := vMap["nodecost"].(map[interface{}]interface{})
-					for k, v := range interfaceNodeCost {
-						kStr, ok := k.(string)
-						if !ok {
-							return nil, errors.New("nodecost map key was not a string")
+					if vMap["nodecost"] != nil {
+						interfaceNodeCost := vMap["nodecost"].(map[interface{}]interface{})
+						for k, v := range interfaceNodeCost {
+							key, ok := k.(string)
+							if !ok {
+								return nil, errors.New("nodecost map key was not a string")
+							}
+							value, ok := v.(float64)
+							if !ok {
+								return nil, errors.New("nodecost map value was not a float")
+							}
+							// vFloat, err := strconv.ParseFloat(vStr, 64)
+							if err != nil {
+								return nil, err
+							}
+							nodeCost[key] = value
 						}
-						// vStr, ok := v.(string)
-						vFloat, ok := v.(float64)
-						if !ok {
-							return nil, errors.New("nodecost map value was not a float")
-						}
-						// vFloat, err := strconv.ParseFloat(vStr, 64)
-						if err != nil {
-							return nil, err
-						}
-						nodeCost[kStr] = vFloat
 					}
 
 					bindaddr, ok := vMap["bindaddr"].(string)
@@ -410,7 +411,7 @@ func NewLibMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		for connNode, connYaml := range MeshDefinition.Nodes[k].Connections {
 			index := connYaml.Index
 			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
-			attrMap, ok := attr.(map[interface{}]interface{})
+			attrMap := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
 				listenerMap, ok := listener.(map[interface{}]interface{})
@@ -527,7 +528,7 @@ func (m *LibMesh) CheckConnections() bool {
 		expectedConnections := map[string]float64{}
 		for k, connYaml := range m.MeshDefinition.Nodes[status.NodeID].Connections {
 			index := connYaml.Index
-			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
+			configItemYaml := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)

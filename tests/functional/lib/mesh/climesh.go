@@ -256,7 +256,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			index := connYaml.Index
 			TLS := connYaml.TLS
 			attr := MeshDefinition.Nodes[connNode].Nodedef[index]
-			attrMap, ok := attr.(map[interface{}]interface{})
+			attrMap := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
 				dialerYaml := make(map[interface{}]interface{})
@@ -439,7 +439,7 @@ func (m *CLIMesh) CheckConnections() bool {
 		expectedConnections := map[string]float64{}
 		for k, connYaml := range m.MeshDefinition.Nodes[status.NodeID].Connections {
 			index := connYaml.Index
-			configItemYaml, ok := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
+			configItemYaml := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)

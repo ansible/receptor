@@ -403,7 +403,7 @@ func (r *ReceptorControl) AssertWorkTimedOut(ctx context.Context, unitID string)
 		return strings.HasPrefix(detail, "Work unit expired on")
 	}
 	if !assertWithTimeout(ctx, check) {
-		fmt.Errorf("Failed to assert work timed out or ctx timed out")
+		return fmt.Errorf("Failed to assert work timed out or ctx timed out")
 	}
 
 	return nil

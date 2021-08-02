@@ -11,6 +11,7 @@ import (
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	_ "github.com/project-receptor/receptor/pkg/certificates"
 	"github.com/project-receptor/receptor/pkg/controlsvc"
+	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	_ "github.com/project-receptor/receptor/pkg/services"
 	_ "github.com/project-receptor/receptor/pkg/version"
@@ -140,7 +141,7 @@ func main() {
 	//	}
 	//case <-time.After(100 * time.Millisecond):
 	//}
-	//logger.Info("Initialization complete\n")
-	//doneMain := make(chan struct{})
-	//<-doneMain
+	logger.Info("Initialization complete\n")
+	doneMain := make(chan struct{})
+	<-doneMain
 }

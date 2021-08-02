@@ -6,22 +6,69 @@ on:
   push:
 
 jobs:
-  build:
-    name: CI
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Docker Login
-        uses: azure/docker-login@v1
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
         with:
-          login-server: docker.pkg.github.com
-          username: $GITHUB_ACTOR
-          password: ${{ secrets.GITHUB_TOKEN }}
+          version: v1.39
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
 
-      - name: Pull Image
-        run: "docker pull docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: build-all target
+        run: make build-all
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Setup up python
+        uses: actions/setup-python@v2
+
+      - name: Install python packages
+        run:  sudo apt-get install python3-wheel python3-virtualenv
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: install receptor
+        run: go install cmd/receptor.go
 
       - name: Create tempdir for artifacts
         run: "mkdir -p /tmp/receptor-testing"
@@ -36,8 +83,11 @@ jobs:
       - name: Interact with the cluster
         run: kubectl get nodes
 
-      - name: Run CI tasks in Docker
-        run: "docker run --rm -v /home/runner/work/receptor/receptor:/home/test-user/receptor -v /tmp/receptor-testing:/tmp/receptor-testing -v /home/runner/.kube:/home/test-user/.kube -v /home/runner:/home/runner docker.pkg.github.com/$GITHUB_REPOSITORY/receptor-actions-ci-runner:latest"
+      - name: test target
+        run: make test
+
+      - name: receptorctl-tests target
+        run: make receptorctl-tests
 
       - name: Remove sockets for artifacting
         if: ${{ failure() }}

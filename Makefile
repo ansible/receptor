@@ -77,7 +77,7 @@ else
 TESTCMD = -run $(RUNTEST)
 endif
 
-test: receptor
+test:
 	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
 
 testloop: receptor
@@ -91,9 +91,6 @@ kubectl:
 
 kubetest: kubectl
 	./kubectl get nodes
-
-ci: pre-commit build-all test receptorctl-tests
-	@echo "All done"
 
 version:
 	@echo $(APPVER) > .VERSION
@@ -184,4 +181,4 @@ clean:
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
 
-.PHONY: lint format fmt ci pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests kubetest
+.PHONY: lint format fmt pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests kubetest

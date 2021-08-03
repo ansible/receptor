@@ -10,9 +10,7 @@ func TestIncrementalDuration(t *testing.T) {
 	if delay.duration != 1*time.Second {
 		t.Fail()
 	}
-	select {
-	case <-delay.NextTimeout():
-	}
+	<-delay.NextTimeout()
 	if delay.duration != 2*time.Second {
 		t.Fail()
 	}

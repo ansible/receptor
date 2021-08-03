@@ -4,10 +4,11 @@ package workceptor
 
 import (
 	"context"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
@@ -22,6 +23,7 @@ func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 		allowRuntimeParams: true,
 	}
 	cw.BaseWorkUnit.Init(w, unitID, workType)
+
 	return cw
 }
 
@@ -31,7 +33,7 @@ func TestWorkceptorJson(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpdir)
-	nc := netceptor.New(nil, "test", nil)
+	nc := netceptor.New(context.Background(), "test", nil)
 	w, err := New(context.Background(), nc, tmpdir)
 	if err != nil {
 		t.Fatal(err)

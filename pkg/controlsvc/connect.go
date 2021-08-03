@@ -2,16 +2,19 @@ package controlsvc
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"strings"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-type connectCommandType struct{}
-type connectCommand struct {
-	targetNode    string
-	targetService string
-	tlsConfigName string
-}
+type (
+	connectCommandType struct{}
+	connectCommand     struct {
+		targetNode    string
+		targetService string
+		tlsConfigName string
+	}
+)
 
 func (t *connectCommandType) InitFromString(params string) (ControlCommand, error) {
 	tokens := strings.Split(params, " ")
@@ -30,6 +33,7 @@ func (t *connectCommandType) InitFromString(params string) (ControlCommand, erro
 		targetService: tokens[1],
 		tlsConfigName: tlsConfigName,
 	}
+
 	return c, nil
 }
 
@@ -65,6 +69,7 @@ func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (Contro
 		targetService: targetServiceStr,
 		tlsConfigName: tlsConfigStr,
 	}
+
 	return c, nil
 }
 
@@ -81,5 +86,6 @@ func (c *connectCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOpe
 	if err != nil {
 		return nil, err
 	}
+
 	return nil, nil
 }

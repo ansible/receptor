@@ -2,10 +2,11 @@ package backends
 
 import (
 	"context"
+	"time"
+
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"time"
 )
 
 const (
@@ -14,7 +15,7 @@ const (
 
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
-// dialerSession is a convenience function for backends that use dial/retry logic
+// dialerSession is a convenience function for backends that use dial/retry logic.
 func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 	df dialerFunc) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
@@ -37,6 +38,7 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 					// continue
 				case <-ctx.Done():
 					_ = sess.Close()
+
 					return
 				}
 			}
@@ -58,21 +60,24 @@ func dialerSession(ctx context.Context, redial bool, redialDelay time.Duration,
 				} else if ctx.Err() != nil {
 					logger.Error("Backend connection exited\n")
 				}
+
 				return
 			}
 		}
 	}()
+
 	return sessChan, nil
 }
 
-type listenFunc func() error
-type acceptFunc func() (netceptor.BackendSession, error)
-type listenerCancelFunc func()
+type (
+	listenFunc         func() error
+	acceptFunc         func() (netceptor.BackendSession, error)
+	listenerCancelFunc func()
+)
 
-// listenerSession is a convenience function for backends that use listen/accept logic
+// listenerSession is a convenience function for backends that use listen/accept logic.
 func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
-	err := lf()
-	if err != nil {
+	if err := lf(); err != nil {
 		return nil, err
 	}
 	sessChan := make(chan netceptor.BackendSession)
@@ -90,6 +95,7 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 			}
 			if err != nil {
 				logger.Error("Error accepting connection: %s\n", err)
+
 				return
 			}
 			select {
@@ -99,5 +105,6 @@ func listenerSession(ctx context.Context, lf listenFunc, af acceptFunc, lcf list
 			}
 		}
 	}()
+
 	return sessChan, nil
 }

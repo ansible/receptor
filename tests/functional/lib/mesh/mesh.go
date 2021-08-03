@@ -2,11 +2,12 @@ package mesh
 
 import (
 	"context"
+
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 // Node Defines the interface for nodes made using the CLI, Library, and
-// containers
+// containers.
 type Node interface {
 	Dir() string
 	Status() (*netceptor.Status, error)
@@ -18,7 +19,7 @@ type Node interface {
 }
 
 // Mesh Defines the interface for meshes made using the CLI, Library, and
-// containers
+// containers.
 type Mesh interface {
 	Dir() string
 	Nodes() map[string]Node
@@ -32,20 +33,20 @@ type Mesh interface {
 }
 
 // YamlData is the top level structure that defines how our yaml mesh data should be
-// represented
+// represented.
 type YamlData struct {
 	Nodes map[string]*YamlNode
 }
 
 // YamlConnection represents a meta connection object that gets used to
-// generate the peer config for receptor
+// generate the peer config for receptor.
 type YamlConnection struct {
 	Index int
 	TLS   string
 }
 
 // TCRuleYaml represents the rules to apply to the receptor container interface, note this only has
-// effect on docker receptor nodes, and podman receptor nodes run by root
+// effect on docker receptor nodes, and podman receptor nodes run by root.
 type TCRuleYaml struct {
 	// Adds delay to the interface
 	Delay string
@@ -61,7 +62,7 @@ type TCRuleYaml struct {
 	Corrupt string
 }
 
-// YamlNode describes how a single node should be represented in yaml
+// YamlNode describes how a single node should be represented in yaml.
 type YamlNode struct {
 	Connections map[string]YamlConnection
 	TCRules     *TCRuleYaml
@@ -82,5 +83,6 @@ func getListenerCost(listenerYaml map[interface{}]interface{}, nodeID string) fl
 	} else {
 		cost = 1.0
 	}
+
 	return cost
 }

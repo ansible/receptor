@@ -15,7 +15,6 @@ import (
 )
 
 func TestStatusFileLock(t *testing.T) {
-
 	numWriterThreads := 8
 	numReaderThreads := 8
 	baseWaitTime := 200 * time.Millisecond
@@ -32,7 +31,7 @@ func TestStatusFileLock(t *testing.T) {
 	wg.Add(numWriterThreads)
 	for i := 0; i < numWriterThreads; i++ {
 		waitTime := time.Duration(i) * baseWaitTime
-		totalWaitTime = totalWaitTime + waitTime
+		totalWaitTime += waitTime
 		go func(iter int, waitTime time.Duration) {
 			sfd := StatusFileData{}
 			err = sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
@@ -54,6 +53,7 @@ func TestStatusFileLock(t *testing.T) {
 			for {
 				if ctx.Err() != nil {
 					wg2.Done()
+
 					return
 				}
 				err := sfd.Load(statusFilename)
@@ -70,7 +70,7 @@ func TestStatusFileLock(t *testing.T) {
 				}
 				if detailIter >= 0 {
 					if int64(sfd.State) != sfd.StdoutSize || sfd.State != detailIter {
-						t.Fatal(fmt.Sprintf("Mismatched data in struct"))
+						t.Fatal("Mismatched data in struct")
 					}
 				}
 			}
@@ -78,7 +78,7 @@ func TestStatusFileLock(t *testing.T) {
 	}
 	wg.Wait()
 	cancel()
-	totalTime := time.Now().Sub(startTime)
+	totalTime := time.Since(startTime)
 	if totalTime < totalWaitTime {
 		t.Fatal("File locks apparently not locking")
 	}

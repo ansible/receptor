@@ -8,17 +8,17 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
 	"os"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 // ErrNotImplemented is returned by most functions in this unit since it is a non-functional stub
 var ErrNotImplemented = fmt.Errorf("not implemented")
 
 // Server is an instance of a control service
-type Server struct {
-}
+type Server struct{}
 
 // New returns a new instance of a control service.
 func New(stdServices bool, nc *netceptor.Netceptor) *Server {

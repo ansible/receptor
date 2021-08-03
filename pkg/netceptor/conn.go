@@ -9,14 +9,15 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/lucas-clemente/quic-go"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"math/big"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/lucas-clemente/quic-go"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 type acceptResult struct {
@@ -24,7 +25,7 @@ type acceptResult struct {
 	err  error
 }
 
-// Listener implements the net.Listener interface via the Receptor network
+// Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
 	s          *Netceptor
 	pc         *PacketConn
@@ -34,7 +35,7 @@ type Listener struct {
 	doneOnce   *sync.Once
 }
 
-// Internal implementation of Listen and ListenAndAdvertise
+// Internal implementation of Listen and ListenAndAdvertise.
 func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
@@ -62,6 +63,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
 				tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, remoteNode, VerifyClient)
+
 				return tlscfg, nil
 			}
 		}
@@ -103,7 +105,9 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		doneChan:   doneChan,
 		doneOnce:   &sync.Once{},
 	}
+
 	go li.acceptLoop()
+
 	return li, nil
 }
 
@@ -155,6 +159,7 @@ func (li *Listener) acceptLoop() {
 		}
 		if err != nil {
 			li.sendResult(nil, err)
+
 			continue
 		}
 		go func() {
@@ -163,15 +168,18 @@ func (li *Listener) acceptLoop() {
 			select {
 			case <-li.doneChan:
 				_ = qc.CloseWithError(500, "Listener Closed")
+
 				return
 			default:
 			}
 			if os.IsTimeout(err) {
 				_ = qc.CloseWithError(500, "Accept Timeout")
+
 				return
 			} else if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("AcceptStream Error: %s", err.Error()))
 				li.sendResult(nil, err)
+
 				return
 			}
 			buf := make([]byte, 1)
@@ -179,11 +187,13 @@ func (li *Listener) acceptLoop() {
 			if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("Read Error: %s", err.Error()))
 				li.sendResult(nil, err)
+
 				return
 			}
 			if n != 1 || buf[0] != 0 {
 				_ = qc.CloseWithError(500, "Read Data Error")
 				li.sendResult(nil, fmt.Errorf("stream failed to initialize"))
+
 				return
 			}
 			doneChan := make(chan struct{}, 1)
@@ -216,7 +226,7 @@ func (li *Listener) acceptLoop() {
 	}
 }
 
-// Accept accepts a connection via the listener
+// Accept accepts a connection via the listener.
 func (li *Listener) Accept() (net.Conn, error) {
 	select {
 	case ar := <-li.acceptChan:
@@ -226,25 +236,25 @@ func (li *Listener) Accept() (net.Conn, error) {
 	}
 }
 
-// Close closes the listener
+// Close closes the listener.
 func (li *Listener) Close() error {
 	li.doneOnce.Do(func() {
 		close(li.doneChan)
 	})
-	qerr := li.ql.Close()
 	perr := li.pc.Close()
-	if qerr != nil {
+	if qerr := li.ql.Close(); qerr != nil {
 		return qerr
 	}
+
 	return perr
 }
 
-// Addr returns the local address of this listener
+// Addr returns the local address of this listener.
 func (li *Listener) Addr() net.Addr {
 	return li.pc.LocalAddr()
 }
 
-// Conn implements the net.Conn interface via the Receptor network
+// Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
@@ -306,6 +316,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
 		}
+
 		return nil, err
 	}
 	qs, err := qc.OpenStreamSync(cctx)
@@ -316,6 +327,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
 		}
+
 		return nil, err
 	}
 	// We need to write something to the stream to trigger the Accept() to happen
@@ -327,6 +339,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
 		}
+
 		return nil, err
 	}
 	close(okChan)
@@ -351,6 +364,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		doneOnce: &sync.Once{},
 		ctx:      cctx,
 	}
+
 	return conn, nil
 }
 
@@ -372,50 +386,51 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	}
 }
 
-// Read reads data from the connection
+// Read reads data from the connection.
 func (c *Conn) Read(b []byte) (n int, err error) {
 	return c.qs.Read(b)
 }
 
-// CancelRead cancels a pending read operation
+// CancelRead cancels a pending read operation.
 func (c *Conn) CancelRead() {
 	c.qs.CancelRead(499)
 }
 
-// Write writes data to the connection
+// Write writes data to the connection.
 func (c *Conn) Write(b []byte) (n int, err error) {
 	return c.qs.Write(b)
 }
 
-// Close closes the writer side of the connection
+// Close closes the writer side of the connection.
 func (c *Conn) Close() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
+
 	return c.qs.Close()
 }
 
-// LocalAddr returns the local address of this connection
+// LocalAddr returns the local address of this connection.
 func (c *Conn) LocalAddr() net.Addr {
 	return c.qc.LocalAddr()
 }
 
-// RemoteAddr returns the remote address of this connection
+// RemoteAddr returns the remote address of this connection.
 func (c *Conn) RemoteAddr() net.Addr {
 	return c.qc.RemoteAddr()
 }
 
-// SetDeadline sets both read and write deadlines
+// SetDeadline sets both read and write deadlines.
 func (c *Conn) SetDeadline(t time.Time) error {
 	return c.qs.SetDeadline(t)
 }
 
-// SetReadDeadline sets the read deadline
+// SetReadDeadline sets the read deadline.
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	return c.qs.SetReadDeadline(t)
 }
 
-// SetWriteDeadline sets the write deadline
+// SetWriteDeadline sets the write deadline.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.qs.SetWriteDeadline(t)
 }
@@ -446,6 +461,7 @@ func generateServerTLSConfig() *tls.Config {
 	if err != nil {
 		panic(err)
 	}
+
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsCert},
 		NextProtos:   []string{"netceptor"},
@@ -462,6 +478,7 @@ func verifyServerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certifi
 			return nil
 		}
 	}
+
 	return fmt.Errorf("insecure connection to secure service")
 }
 

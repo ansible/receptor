@@ -33,5 +33,6 @@ func Run(ctx context.Context, f func(), periodicInterval time.Duration, defaultR
 			}
 		}
 	}()
+
 	return runChan
 }

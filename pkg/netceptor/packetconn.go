@@ -3,19 +3,19 @@ package netceptor
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"net"
 	"reflect"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// PacketConn implements the net.PacketConn interface via the Receptor network
+// PacketConn implements the net.PacketConn interface via the Receptor network.
 type PacketConn struct {
 	s                  *Netceptor
 	localService       string
 	recvChan           chan *messageData
 	readDeadline       time.Time
-	writeDeadline      time.Time
 	advertise          bool
 	adTags             map[string]string
 	connType           byte
@@ -54,6 +54,7 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
+
 	return pc, nil
 }
 
@@ -67,10 +68,11 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	pc.advertise = true
 	pc.adTags = tags
 	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
+
 	return pc, nil
 }
 
-// startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages
+// startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages.
 func (pc *PacketConn) startUnreachable() {
 	pc.context, pc.cancel = context.WithCancel(pc.s.context)
 	pc.unreachableSubs = utils.NewBroker(pc.context, reflect.TypeOf(UnreachableNotification{}))
@@ -95,7 +97,7 @@ func (pc *PacketConn) startUnreachable() {
 	}()
 }
 
-// SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn
+// SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn.
 func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 	iChan := pc.unreachableSubs.Subscribe()
 	uChan := make(chan UnreachableNotification)
@@ -105,6 +107,7 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 			case msgIf, ok := <-iChan:
 				if !ok {
 					close(uChan)
+
 					return
 				}
 				msg, ok := msgIf.(UnreachableNotification)
@@ -114,10 +117,12 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 				uChan <- msg
 			case <-pc.context.Done():
 				close(uChan)
+
 				return
 			}
 		}
 	}()
+
 	return uChan
 }
 
@@ -142,6 +147,7 @@ func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		node:    m.FromNode,
 		service: m.FromService,
 	}
+
 	return nCopied, fromAddr, nil
 }
 
@@ -155,6 +161,7 @@ func (pc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return len(p), nil
 }
 
@@ -192,18 +199,21 @@ func (pc *PacketConn) Close() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // SetDeadline sets both the read and write deadlines.
 func (pc *PacketConn) SetDeadline(t time.Time) error {
 	pc.readDeadline = t
+
 	return nil
 }
 
 // SetReadDeadline sets the read deadline.
 func (pc *PacketConn) SetReadDeadline(t time.Time) error {
 	pc.readDeadline = t
+
 	return nil
 }
 

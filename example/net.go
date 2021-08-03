@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/backends"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"io"
 	"net"
 	"os"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/backends"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 /*
@@ -59,6 +60,7 @@ func main() {
 		conn, err := l1.Accept()
 		if err != nil {
 			fmt.Printf("Error accepting connection: %s\n", err)
+
 			return
 		}
 		fmt.Printf("Accepted a connection\n")
@@ -72,6 +74,7 @@ func main() {
 					done = true
 				} else if err != nil {
 					fmt.Printf("Read error in Receptor listener: %s\n", err)
+
 					return
 				}
 				fmt.Printf("Echo server got %d bytes\n", n)
@@ -79,6 +82,7 @@ func main() {
 					_, err := conn.Write(buf[:n])
 					if err != nil {
 						fmt.Printf("Write error in Receptor listener: %s\n", err)
+
 						return
 					}
 				}
@@ -96,8 +100,10 @@ func main() {
 		if err != nil {
 			fmt.Printf("Error dialing on Receptor network: %s\n", err)
 			time.Sleep(1 * time.Second)
+
 			continue
 		}
+
 		break
 	}
 
@@ -115,10 +121,12 @@ func main() {
 			if err == io.EOF {
 				// Shut down the whole Netceptor when any connection closes, because this is just a demo
 				n2.Shutdown()
+
 				return
 			}
 			if err != nil {
 				fmt.Printf("Read error in Receptor dialer: %s\n", err)
+
 				return
 			}
 		}
@@ -140,5 +148,4 @@ func main() {
 	// Gracefully shut down n1
 	n1.Shutdown()
 	n1.BackendWait()
-
 }

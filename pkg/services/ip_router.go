@@ -6,6 +6,12 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
@@ -14,11 +20,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"math"
-	"net"
-	"strings"
-	"sync"
-	"time"
 )
 
 const adTypeIPRouter = "IP Router"
@@ -28,7 +29,7 @@ type ipRoute struct {
 	via  string
 }
 
-// IPRouterService is an IP router service
+// IPRouterService is an IP router service.
 type IPRouterService struct {
 	nc              *netceptor.Netceptor
 	networkName     string
@@ -81,6 +82,7 @@ func NewIPRouter(nc *netceptor.Netceptor, networkName string, tunInterface strin
 	if err != nil {
 		return nil, err
 	}
+
 	return ipr, nil
 }
 
@@ -125,6 +127,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 	routes, err := netlink.RouteList(ipr.link, netlink.FAMILY_ALL)
 	if err != nil {
 		logger.Error("error retrieving kernel routes list: %s", err)
+
 		return
 	}
 
@@ -143,8 +146,9 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 		found := false
 		for j := range routes {
 			route := routes[j]
-			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+			if kr.dest.IP.Equal(route.Dst.IP) && bytes.Equal(kr.dest.Mask, route.Dst.Mask) {
 				found = true
+
 				break
 			}
 		}
@@ -168,8 +172,9 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 		found := false
 		for j := range ipr.knownRoutes {
 			kr := ipr.knownRoutes[j]
-			if bytes.Compare(kr.dest.IP, route.Dst.IP) == 0 && bytes.Compare(kr.dest.Mask, route.Dst.Mask) == 0 {
+			if kr.dest.IP.Equal(route.Dst.IP) && bytes.Equal(kr.dest.Mask, route.Dst.Mask) {
 				found = true
+
 				break
 			}
 		}
@@ -205,6 +210,7 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		n, err := ipr.tunIf.Read(buf)
 		if err != nil {
 			logger.Error("Error reading from tun device: %s\n", err)
+
 			continue
 		}
 		packet := buf[:n]
@@ -212,20 +218,22 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		// Get the destination address from the received packet
 		ipVersion := int(packet[0] >> 4)
 		var destIP net.IP
-		if ipVersion == 4 {
+		switch ipVersion {
+		case 4:
 			header, err := ipv4.ParseHeader(packet)
 			if err != nil {
 				logger.Debug("Malformed ipv4 packet received: %s", err)
 			}
 			destIP = header.Dst
-		} else if ipVersion == 6 {
+		case 6:
 			header, err := ipv6.ParseHeader(packet)
 			if err != nil {
 				logger.Debug("Malformed ipv6 packet received: %s", err)
 			}
 			destIP = header.Dst
-		} else {
+		default:
 			logger.Debug("Packet received with unknown version %d", ipVersion)
+
 			continue
 		}
 
@@ -269,6 +277,7 @@ func (ipr *IPRouterService) runNetceptorToTun() {
 		n, addr, err := ipr.nConn.ReadFrom(buf)
 		if err != nil {
 			logger.Error("Error reading from Receptor: %s\n", err)
+
 			continue
 		}
 		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
@@ -290,6 +299,7 @@ func (ipr *IPRouterService) addRoute(route *net.IPNet) error {
 	if err != nil {
 		return fmt.Errorf("error adding route to interface: %s", err)
 	}
+
 	return nil
 }
 
@@ -345,10 +355,11 @@ func (ipr *IPRouterService) run() error {
 	go ipr.runAdvertisingWatcher()
 	go ipr.runTunToNetceptor()
 	go ipr.runNetceptorToTun()
+
 	return nil
 }
 
-// ipRouterCfg is the cmdline configuration object for an IP router
+// ipRouterCfg is the cmdline configuration object for an IP router.
 type ipRouterCfg struct {
 	NetworkName string `required:"true" description:"Name of this network and service."`
 	Interface   string `description:"Name of the local tun interface"`
@@ -356,13 +367,14 @@ type ipRouterCfg struct {
 	Routes      string `description:"Comma separated list of CIDR subnets to advertise"`
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg ipRouterCfg) Run() error {
 	logger.Debug("Running tun router service %s\n", cfg)
 	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

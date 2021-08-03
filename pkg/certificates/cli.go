@@ -6,10 +6,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"github.com/ghjm/cmdline"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/ghjm/cmdline"
 )
 
 type initCA struct {
@@ -47,6 +48,7 @@ func (ica initCA) Run() error {
 	if err == nil {
 		err = SaveToPEMFile(ica.OutKey, []interface{}{ca.PrivateKey})
 	}
+
 	return err
 }
 
@@ -74,6 +76,7 @@ func (mr makeReq) Prepare() error {
 	if mr.OutKey != "" && mr.Bits == 0 {
 		return fmt.Errorf("must specify key bits when creating a new key")
 	}
+
 	return nil
 }
 
@@ -135,6 +138,7 @@ func (mr makeReq) Run() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -223,6 +227,7 @@ func (sr signReq) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return SaveToPEMFile(sr.OutCert, []interface{}{cert})
 }
 

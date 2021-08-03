@@ -5,14 +5,15 @@ package services
 
 import (
 	"crypto/tls"
+	"net"
+	"os/exec"
+	"strings"
+
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
-	"net"
-	"os/exec"
-	"strings"
 )
 
 func runCommand(qc net.Conn, command string) error {
@@ -23,22 +24,25 @@ func runCommand(qc net.Conn, command string) error {
 		return err
 	}
 	utils.BridgeConns(tty, "external command", qc, "command service")
+
 	return nil
 }
 
-// CommandService listens on the Receptor network and runs a local command
+// CommandService listens on the Receptor network and runs a local command.
 func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, command string) {
 	qli, err := s.ListenAndAdvertise(service, tlscfg, map[string]string{
 		"type": "Command Service",
 	})
 	if err != nil {
 		logger.Error("Error listening on Receptor network: %s\n", err)
+
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
 			logger.Error("Error accepting connection on Receptor network: %s\n", err)
+
 			return
 		}
 		go func() {
@@ -51,14 +55,14 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 	}
 }
 
-// commandSvcCfg is the cmdline configuration object for a command service
+// commandSvcCfg is the cmdline configuration object for a command service.
 type commandSvcCfg struct {
 	Service string `required:"true" description:"Receptor service name to bind to"`
 	Command string `required:"true" description:"Command to execute on a connection"`
 	TLS     string `description:"Name of TLS server config"`
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg commandSvcCfg) Run() error {
 	logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
@@ -66,6 +70,7 @@ func (cfg commandSvcCfg) Run() error {
 		return err
 	}
 	go CommandService(netceptor.MainInstance, cfg.Service, tlscfg, cfg.Command)
+
 	return nil
 }
 

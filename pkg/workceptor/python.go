@@ -5,11 +5,12 @@ package workceptor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ghjm/cmdline"
 	"os/exec"
+
+	"github.com/ghjm/cmdline"
 )
 
-// pythonUnit implements the WorkUnit interface
+// pythonUnit implements the WorkUnit interface.
 type pythonUnit struct {
 	commandUnit
 	plugin   string
@@ -31,6 +32,7 @@ func (pw *pythonUnit) Start() error {
 	}
 	cmd := exec.Command("receptor-python-worker",
 		fmt.Sprintf("%s:%s", pw.plugin, pw.function), pw.UnitDir(), string(configJSON))
+
 	return pw.runCommand(cmd)
 }
 
@@ -38,7 +40,7 @@ func (pw *pythonUnit) Start() error {
 // Command line
 // **************************************************************************
 
-// workPythonCfg is the cmdline configuration object for a Python worker plugin
+// workPythonCfg is the cmdline configuration object for a Python worker plugin.
 type workPythonCfg struct {
 	WorkType string                 `required:"true" description:"Name for this worker type"`
 	Plugin   string                 `required:"true" description:"Python module name of the worker plugin"`
@@ -46,7 +48,7 @@ type workPythonCfg struct {
 	Config   map[string]interface{} `description:"Plugin-specific configuration"`
 }
 
-// newWorker is a factory to produce worker instances
+// newWorker is a factory to produce worker instances.
 func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
@@ -61,12 +63,14 @@ func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string
 		config:   cfg.Config,
 	}
 	cw.BaseWorkUnit.Init(w, unitID, workType)
+
 	return cw
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg workPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+
 	return err
 }
 

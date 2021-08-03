@@ -7,6 +7,7 @@ package workceptor
 import (
 	"context"
 	"fmt"
+
 	"github.com/project-receptor/receptor/pkg/controlsvc"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
@@ -15,8 +16,7 @@ import (
 var ErrNotImplemented = fmt.Errorf("not implemented")
 
 // Workceptor is the main object that handles unit-of-work management
-type Workceptor struct {
-}
+type Workceptor struct{}
 
 // New constructs a new Workceptor instance
 func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workceptor, error) {

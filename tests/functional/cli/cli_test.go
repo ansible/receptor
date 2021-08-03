@@ -4,35 +4,34 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/project-receptor/receptor/tests/functional/lib/utils"
 )
 
 func ConfirmListening(pid int) (bool, error) {
 	pidString := "pid=" + strconv.Itoa(pid)
-	var out bytes.Buffer
-	out = bytes.Buffer{}
+	out := bytes.Buffer{}
 	ssCmd := exec.Command("ss", "-tulnp")
 	ssCmd.Stdout = &out
-	err := ssCmd.Run()
-	if err != nil {
+	if err := ssCmd.Run(); err != nil {
 		return false, err
 	}
 	if strings.Contains(out.String(), pidString) {
 		return true, nil
 	}
+
 	return false, nil
 }
 
 func TestHelp(t *testing.T) {
 	t.Parallel()
 	cmd := exec.Command("receptor", "--help")
-	err := cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -88,6 +87,9 @@ func TestSSLListeners(t *testing.T) {
 			t.Parallel()
 
 			key, crt, err := utils.GenerateCert("test", "localhost", []string{"localhost"}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			receptorStdOut := bytes.Buffer{}
 			port := utils.ReserveTCPPort()
@@ -108,10 +110,8 @@ func TestSSLListeners(t *testing.T) {
 				opensslCmd.Stdin = &opensslStdIn
 				opensslCmd.Stdout = &opensslStdOut
 				err = opensslCmd.Run()
-				if err == nil {
-					return true
-				}
-				return false
+
+				return err == nil
 			}
 
 			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)

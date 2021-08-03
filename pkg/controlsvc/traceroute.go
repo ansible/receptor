@@ -2,14 +2,17 @@ package controlsvc
 
 import (
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"strconv"
+
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-type tracerouteCommandType struct{}
-type tracerouteCommand struct {
-	target string
-}
+type (
+	tracerouteCommandType struct{}
+	tracerouteCommand     struct {
+		target string
+	}
+)
 
 func (t *tracerouteCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params == "" {
@@ -18,6 +21,7 @@ func (t *tracerouteCommandType) InitFromString(params string) (ControlCommand, e
 	c := &tracerouteCommand{
 		target: params,
 	}
+
 	return c, nil
 }
 
@@ -33,6 +37,7 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 	c := &tracerouteCommand{
 		target: targetStr,
 	}
+
 	return c, nil
 }
 
@@ -43,7 +48,7 @@ func (c *tracerouteCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFunc
 		pingTime, pingRemote, err := ping(nc, c.target, byte(i))
 		thisResult["From"] = pingRemote
 		thisResult["Time"] = pingTime
-		thisResult["TimeStr"] = fmt.Sprintf("%s", pingTime)
+		thisResult["TimeStr"] = fmt.Sprint(pingTime)
 		if err != nil && err.Error() != netceptor.ProblemExpiredInTransit {
 			thisResult["Error"] = err.Error()
 		}
@@ -52,5 +57,6 @@ func (c *tracerouteCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFunc
 			break
 		}
 	}
+
 	return cfr, nil
 }

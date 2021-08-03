@@ -17,8 +17,7 @@ import (
 )
 
 func checkSkipKube(t *testing.T) {
-	skip := os.Getenv("SKIP_KUBE")
-	if skip == "1" {
+	if skip := os.Getenv("SKIP_KUBE"); skip == "1" {
 		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
 	}
 }
@@ -127,7 +126,7 @@ func TestWork(t *testing.T) {
 			}
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{
-					"node2": mesh.YamlConnection{
+					"node2": {
 						Index: 0,
 					},
 				},
@@ -154,7 +153,7 @@ func TestWork(t *testing.T) {
 			}
 			data.Nodes["node3"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{
-					"node2": mesh.YamlConnection{
+					"node2": {
 						Index: 0,
 					},
 				},
@@ -185,6 +184,7 @@ func TestWork(t *testing.T) {
 				}
 				controllers[k] = controller
 			}
+
 			return controllers, m, expectedResults
 		}
 
@@ -202,14 +202,13 @@ func TestWork(t *testing.T) {
 			workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
 			check := func() bool {
 				_, err := os.Stat(workPath)
-				if os.IsNotExist(err) {
-					return true
-				}
-				return false
+
+				return os.IsNotExist(err)
 			}
 			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 				return fmt.Errorf("unitID %s on %s did not release", unitID, nodeID)
 			}
+
 			return nil
 		}
 
@@ -221,14 +220,13 @@ func TestWork(t *testing.T) {
 					return false
 				}
 				fstat, _ := os.Stat(stdoutFilename)
-				if int(fstat.Size()) >= waitUntilSize {
-					return true
-				}
-				return false
+
+				return int(fstat.Size()) >= waitUntilSize
 			}
 			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
 				return fmt.Errorf("file size not correct for %s", stdoutFilename)
 			}
+
 			return nil
 		}
 
@@ -530,7 +528,6 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
 				t.Fatal(err)
@@ -589,9 +586,7 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 		})
-
 	}
 }
 
@@ -630,6 +625,9 @@ func TestRuntimeParams(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
 	unitID, err := controller.WorkSubmitJSON(command)
 	if err != nil {
@@ -651,6 +649,9 @@ func TestKubeRuntimeParams(t *testing.T) {
 	home := os.Getenv("HOME")
 	configfilename := filepath.Join(home, ".kube/config")
 	reader, err := os.Open(configfilename)
+	if err != nil {
+		t.Fatal(err)
+	}
 	buf, err := ioutil.ReadAll(reader)
 	if err != nil {
 		t.Fatal(err)
@@ -688,6 +689,9 @@ func TestKubeRuntimeParams(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_pod": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
 	unitID, err := controller.WorkSubmitJSON(command)
 	if err != nil {
@@ -738,6 +742,9 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
 	_, err = controller.WorkSubmitJSON(command)
 	if err == nil {
@@ -783,6 +790,9 @@ func TestKubeContainerFailure(t *testing.T) {
 	nodes := m.Nodes()
 	controller := receptorcontrol.New()
 	err = controller.Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
 	job := `{"command":"work","subcommand":"submit","worktype":"kubejob","node":"node0"}`
 	unitID, err := controller.WorkSubmitJSON(job)
 	if err != nil {

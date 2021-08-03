@@ -8,19 +8,19 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"github.com/gorilla/websocket"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"math/big"
 	"net"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 // This test verifies that a websockets backend client can connect to an
 // external backend running the websockets protocol.
 func TestWebsocketExternalInterop(t *testing.T) {
-
 	// Create a Netceptor with an external backend
 	n1 := netceptor.New(context.Background(), "node1", nil)
 	b1, err := netceptor.NewExternalBackend()
@@ -28,6 +28,9 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = n1.AddBackend(b1, 1.0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a server TLS certificate for "localhost"
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -61,10 +64,11 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		if extra != "SomeData" {
 			t.Fatal("Extra header not passed through")
 		}
-		var upgrader = websocket.Upgrader{}
+		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			t.Fatalf("Error upgrading websocket connection: %s", err)
+
 			return
 		}
 		b1.NewConnection(netceptor.MessageConnFromWebsocketConn(conn), true)

@@ -2,22 +2,24 @@ package version
 
 import (
 	"fmt"
+
 	"github.com/ghjm/cmdline"
 )
 
-// Version is receptor app version
+// Version is receptor app version.
 var Version string
 
-// cmdlineCfg is a cmdline-compatible struct for a --version command
+// cmdlineCfg is a cmdline-compatible struct for a --version command.
 type cmdlineCfg struct{}
 
-// Run runs the action
+// Run runs the action.
 func (cfg cmdlineCfg) Run() error {
 	if Version == "" {
 		fmt.Printf("Version unknown\n")
 	} else {
 		fmt.Printf("%s\n", Version)
 	}
+
 	return nil
 }
 

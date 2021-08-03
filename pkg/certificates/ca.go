@@ -10,15 +10,16 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// CertNames lists the subjectAltNames that can be assigned to a certificate or request
+// CertNames lists the subjectAltNames that can be assigned to a certificate or request.
 type CertNames struct {
 	DNSNames    []string
 	NodeIDs     []string
@@ -44,31 +45,33 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 	var block *pem.Block
 	for len(content) > 0 {
 		block, content = pem.Decode(content)
-		if block.Type == "CERTIFICATE" {
+		switch block.Type {
+		case "CERTIFICATE":
 			var cert *x509.Certificate
 			cert, err = x509.ParseCertificate(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, cert)
-		} else if block.Type == "CERTIFICATE REQUEST" {
+		case "CERTIFICATE REQUEST":
 			var req *x509.CertificateRequest
 			req, err = x509.ParseCertificateRequest(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, req)
-		} else if block.Type == "RSA PRIVATE KEY" {
+		case "RSA PRIVATE KEY":
 			var key *rsa.PrivateKey
 			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, key)
-		} else {
+		default:
 			return nil, fmt.Errorf("unknown block type %s", block.Type)
 		}
 	}
+
 	return results, nil
 }
 
@@ -90,6 +93,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 				return err
 			}
 			content = append(content, certPEM.String())
+
 			continue
 		}
 		var req *x509.CertificateRequest
@@ -104,6 +108,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 				return err
 			}
 			content = append(content, reqPEM.String())
+
 			continue
 		}
 		var key *rsa.PrivateKey
@@ -118,13 +123,15 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 				return err
 			}
 			content = append(content, keyPEM.String())
+
 			continue
 		}
 	}
-	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0600)
+
+	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
-// LoadCertificate loads a single certificate from a file
+// LoadCertificate loads a single certificate from a file.
 func LoadCertificate(filename string) (*x509.Certificate, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
@@ -137,10 +144,11 @@ func LoadCertificate(filename string) (*x509.Certificate, error) {
 	if !ok {
 		return nil, fmt.Errorf("certificate file does not contain certificate data")
 	}
+
 	return cert, nil
 }
 
-// LoadRequest loads a single certificate request from a file
+// LoadRequest loads a single certificate request from a file.
 func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
@@ -153,10 +161,11 @@ func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 	if !ok {
 		return nil, fmt.Errorf("certificate request file does not contain certificate request data")
 	}
+
 	return req, nil
 }
 
-// LoadPrivateKey loads a single RSA private key from a file
+// LoadPrivateKey loads a single RSA private key from a file.
 func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 	data, err := LoadFromPEMFile(filename)
 	if err != nil {
@@ -169,6 +178,7 @@ func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 	if !ok {
 		return nil, fmt.Errorf("private key file does not contain private key data")
 	}
+
 	return key, nil
 }
 
@@ -238,6 +248,7 @@ func CreateCertReqWithKey(opts *CertOptions) (*x509.CertificateRequest, *rsa.Pri
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return req, key, nil
 }
 
@@ -289,6 +300,7 @@ func GetReqNames(request *x509.CertificateRequest) (*CertNames, error) {
 		NodeIDs:     nodeIDs,
 		IPAddresses: request.IPAddresses,
 	}
+
 	return cn, nil
 }
 
@@ -319,6 +331,7 @@ func SignCertReq(req *x509.CertificateRequest, ca *CA, opts *CertOptions) (*x509
 		if ext.Id.Equal(utils.OIDSubjectAltName) {
 			certTemplate.ExtraExtensions = []pkix.Extension{ext}
 			found = true
+
 			break
 		}
 	}
@@ -335,5 +348,6 @@ func SignCertReq(req *x509.CertificateRequest, ca *CA, opts *CertOptions) (*x509
 	if err != nil {
 		return nil, err
 	}
+
 	return cert, nil
 }

@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	_ "github.com/fortytw2/leaktest"
-	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -15,10 +11,15 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/fortytw2/leaktest"
+	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
+	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
+	"gopkg.in/yaml.v2"
 )
 
 // Test that a mesh starts and that connections are what we expect and that
-// each node's view of the mesh converges
+// each node's view of the mesh converges.
 func TestMeshStartup(t *testing.T) {
 	testTable := []struct {
 		filename string
@@ -73,7 +74,7 @@ func TestMeshStartup(t *testing.T) {
 	}
 }
 
-// Test that a mesh starts and that connections are what we expect
+// Test that a mesh starts and that connections are what we expect.
 func TestMeshConnections(t *testing.T) {
 	testTable := []struct {
 		filename string
@@ -121,7 +122,7 @@ func TestMeshConnections(t *testing.T) {
 	}
 }
 
-// Test that traceroute works
+// Test that traceroute works.
 func TestTraceroute(t *testing.T) {
 	testTable := []struct {
 		filename string
@@ -151,6 +152,9 @@ func TestTraceroute(t *testing.T) {
 			controlNode := m.Nodes()["controller"]
 			controller := receptorcontrol.New()
 			err = controller.Connect(controlNode.ControlSocket())
+			if err != nil {
+				t.Fatal(err)
+			}
 			_, err = controller.WriteStr("traceroute node7\n")
 			if err != nil {
 				t.Fatal(err)
@@ -211,9 +215,9 @@ func TestTraceroute(t *testing.T) {
 	}
 }
 
-// Test that a mesh starts and that connections are what we expect
+// Test that a mesh starts and that connections are what we expect.
 func TestMeshShutdown(t *testing.T) {
-	//defer leaktest.Check(t)()
+	// defer leaktest.Check(t)()
 	testTable := []struct {
 		filename string
 	}{
@@ -251,6 +255,7 @@ func TestMeshShutdown(t *testing.T) {
 				}
 				if !strings.Contains(out.String(), pidString) {
 					done = true
+
 					break
 				}
 				time.Sleep(100 * time.Millisecond)
@@ -287,7 +292,7 @@ func TestCosts(t *testing.T) {
 	}
 	data.Nodes["node2"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
-			"node1": mesh.YamlConnection{
+			"node1": {
 				Index: 0,
 			},
 		},
@@ -295,7 +300,7 @@ func TestCosts(t *testing.T) {
 	}
 	data.Nodes["node3"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
-			"node1": mesh.YamlConnection{
+			"node1": {
 				Index: 0,
 			},
 		},
@@ -303,7 +308,7 @@ func TestCosts(t *testing.T) {
 	}
 	data.Nodes["node4"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
-			"node1": mesh.YamlConnection{
+			"node1": {
 				Index: 0,
 			},
 		},
@@ -338,7 +343,6 @@ func TestCosts(t *testing.T) {
 		}
 		controller.Close()
 	}
-
 }
 
 func TestDuplicateNodes(t *testing.T) {
@@ -359,7 +363,7 @@ func TestDuplicateNodes(t *testing.T) {
 	}
 	data.Nodes["node2"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
-			"node1": mesh.YamlConnection{
+			"node1": {
 				Index: 0,
 			},
 		},
@@ -371,7 +375,7 @@ func TestDuplicateNodes(t *testing.T) {
 	}
 	data.Nodes["node1_dup"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
-			"node2": mesh.YamlConnection{
+			"node2": {
 				Index: 0,
 			},
 		},

@@ -3,14 +3,15 @@ package netceptor
 import (
 	"context"
 	"fmt"
-	"github.com/prep/socketpair"
-	"github.com/project-receptor/receptor/pkg/logger"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/prep/socketpair"
+	"github.com/project-receptor/receptor/pkg/logger"
 )
 
 type logWriter struct {
@@ -23,8 +24,9 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 	s := strings.Trim(string(p), "\n")
 	if strings.HasPrefix(s, "ERROR") {
 		if !strings.Contains(s, "maximum number of forwarding hops") {
-			fmt.Printf(s)
+			fmt.Print(s)
 			lw.t.Fatal(s)
+
 			return
 		}
 	} else if strings.HasPrefix(s, "TRACE") {
@@ -35,6 +37,7 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 		}
 	}
 	lw.t.Log(s)
+
 	return len(p), nil
 }
 
@@ -157,9 +160,9 @@ func TestLotsOfPings(t *testing.T) {
 	numBackboneNodes := 3
 	numLeafNodesPerBackbone := 3
 
-	nodes := make([]*Netceptor, numBackboneNodes)
+	nodes := []*Netceptor{}
 	for i := 0; i < numBackboneNodes; i++ {
-		nodes[i] = New(context.Background(), fmt.Sprintf("backbone_%d", i), nil)
+		nodes = append(nodes, New(context.Background(), fmt.Sprintf("backbone_%d", i), nil))
 	}
 	for i := 0; i < numBackboneNodes; i++ {
 		for j := 0; j < i; j++ {
@@ -283,6 +286,7 @@ func TestLotsOfPings(t *testing.T) {
 				for j := range nodes {
 					if !responses[i][j] {
 						good = false
+
 						break
 					}
 				}
@@ -293,6 +297,7 @@ func TestLotsOfPings(t *testing.T) {
 			if good {
 				t.Log("all pings received")
 				cancel()
+
 				return
 			}
 			select {
@@ -304,9 +309,7 @@ func TestLotsOfPings(t *testing.T) {
 	}()
 
 	t.Log("waiting for done")
-	select {
-	case <-ctx.Done():
-	}
+	<-ctx.Done()
 	t.Log("waiting for waitgroup")
 	wg.Wait()
 
@@ -321,7 +324,6 @@ func TestLotsOfPings(t *testing.T) {
 }
 
 func TestDuplicateNodeDetection(t *testing.T) {
-
 	// Create Netceptor nodes
 	netsize := 4
 	nodes := make([]*Netceptor, netsize)
@@ -383,15 +385,18 @@ func TestDuplicateNodeDetection(t *testing.T) {
 			_, ok := knownRoutes[i][fmt.Sprintf("node%d", peer)]
 			if !ok {
 				knownRoutesLock.RUnlock()
+
 				continue
 			}
 			_, ok = knownRoutes[peer][fmt.Sprintf("node%d", i)]
 			if !ok {
 				knownRoutesLock.RUnlock()
+
 				continue
 			}
 			knownRoutesLock.RUnlock()
 		}
+
 		break
 	}
 
@@ -431,7 +436,6 @@ func TestDuplicateNodeDetection(t *testing.T) {
 
 		// Force close the connection to the connected node
 		_ = c2.Close()
-
 	}
 
 	// Shut down the rest of the network

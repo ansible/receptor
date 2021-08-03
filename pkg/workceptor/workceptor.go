@@ -5,11 +5,6 @@ package workceptor
 import (
 	"context"
 	"fmt"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/randstr"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,9 +13,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/project-receptor/receptor/pkg/controlsvc"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/randstr"
+	"github.com/project-receptor/receptor/pkg/utils"
 )
 
-// Workceptor is the main object that handles unit-of-work management
+// Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
 	ctx             context.Context
 	nc              *netceptor.Netceptor
@@ -31,12 +32,12 @@ type Workceptor struct {
 	activeUnits     map[string]WorkUnit
 }
 
-// workType is the record for a registered type of work
+// workType is the record for a registered type of work.
 type workType struct {
 	newWorkerFunc NewWorkerFunc
 }
 
-// New constructs a new Workceptor instance
+// New constructs a new Workceptor instance.
 func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workceptor, error) {
 	if dataDir == "" {
 		dataDir = path.Join(os.TempDir(), "receptor")
@@ -55,22 +56,24 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 	if err != nil {
 		return nil, fmt.Errorf("could not register remote worker function: %s", err)
 	}
+
 	return w, nil
 }
 
-// MainInstance is the global instance of Workceptor instantiated by the command-line main() function
+// MainInstance is the global instance of Workceptor instantiated by the command-line main() function.
 var MainInstance *Workceptor
 
-// stdoutSize returns size of stdout, if it exists, or 0 otherwise
+// stdoutSize returns size of stdout, if it exists, or 0 otherwise.
 func stdoutSize(unitdir string) int64 {
 	stat, err := os.Stat(path.Join(unitdir, "stdout"))
 	if err != nil {
 		return 0
 	}
+
 	return stat.Size()
 }
 
-// RegisterWithControlService registers this workceptor instance with a control service instance
+// RegisterWithControlService registers this workceptor instance with a control service instance.
 func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
 	err := cs.AddControlFunc("work", &workceptorCommandType{
 		w: w,
@@ -78,15 +81,17 @@ func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
 	if err != nil {
 		return fmt.Errorf("could not add work control function: %s", err)
 	}
+
 	return nil
 }
 
-// RegisterWorker notifies the Workceptor of a new kind of work that can be done
+// RegisterWorker notifies the Workceptor of a new kind of work that can be done.
 func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc) error {
 	w.workTypesLock.Lock()
 	_, ok := w.workTypes[typeName]
 	if ok {
 		w.workTypesLock.Unlock()
+
 		return fmt.Errorf("work type %s already registered", typeName)
 	}
 	w.workTypes[typeName] = &workType{
@@ -107,6 +112,7 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc
 	}
 	w.activeUnitsLock.Unlock()
 	w.scanForUnits()
+
 	return nil
 }
 
@@ -125,12 +131,13 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 			if err == nil {
 				continue
 			}
-			return ident, os.MkdirAll(unitdir, 0700)
+
+			return ident, os.MkdirAll(unitdir, 0o700)
 		}
 	}
 }
 
-// AllocateUnit creates a new local work unit and generates an identifier for it
+// AllocateUnit creates a new local work unit and generates an identifier for it.
 func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string) (WorkUnit, error) {
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workTypeName]
@@ -153,10 +160,11 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 		return nil, err
 	}
 	w.activeUnits[ident] = worker
+
 	return worker, nil
 }
 
-// AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
+// AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it.
 func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, ttl string, params map[string]string) (WorkUnit, error) {
 	if tlsclient != "" {
 		_, err := w.nc.GetClientTLSConfig(tlsclient, "testhost", "receptor")
@@ -168,6 +176,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 	for k := range params {
 		if strings.HasPrefix(strings.ToLower(k), "secret_") {
 			hasSecrets = true
+
 			break
 		}
 	}
@@ -183,6 +192,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 		duration, err := time.ParseDuration(ttl)
 		if err != nil {
 			logger.Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
+
 			return nil, err
 		}
 		expiration = time.Now().Add(duration)
@@ -199,6 +209,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 	if rw.LastUpdateError() != nil {
 		return nil, rw.LastUpdateError()
 	}
+
 	return rw, nil
 }
 
@@ -207,6 +218,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	fi, _ := os.Stat(unitdir)
 	if fi == nil || !fi.IsDir() {
 		logger.Error("Error locating unit: %s", unitID)
+
 		return
 	}
 	ident := fi.Name()
@@ -228,6 +240,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 		}
 		if _, err := os.Stat(statusFilename); os.IsNotExist(err) {
 			logger.Error("Status file has disappeared for %s.", ident)
+
 			return
 		}
 		err := worker.Load()
@@ -265,19 +278,21 @@ func (w *Workceptor) findUnit(unitID string) (WorkUnit, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown work unit %s", unitID)
 	}
+
 	return unit, nil
 }
 
-// StartUnit starts a unit of work
+// StartUnit starts a unit of work.
 func (w *Workceptor) StartUnit(unitID string) error {
 	unit, err := w.findUnit(unitID)
 	if err != nil {
 		return err
 	}
+
 	return unit.Start()
 }
 
-// ListKnownUnitIDs returns a slice containing the known unit IDs
+// ListKnownUnitIDs returns a slice containing the known unit IDs.
 func (w *Workceptor) ListKnownUnitIDs() []string {
 	w.activeUnitsLock.RLock()
 	defer w.activeUnitsLock.RUnlock()
@@ -285,24 +300,27 @@ func (w *Workceptor) ListKnownUnitIDs() []string {
 	for id := range w.activeUnits {
 		result = append(result, id)
 	}
+
 	return result
 }
 
-// UnitStatus returns the state of a unit
+// UnitStatus returns the state of a unit.
 func (w *Workceptor) UnitStatus(unitID string) (*StatusFileData, error) {
 	unit, err := w.findUnit(unitID)
 	if err != nil {
 		return nil, err
 	}
+
 	return unit.Status(), nil
 }
 
-// CancelUnit cancels a unit of work, killing any processes
+// CancelUnit cancels a unit of work, killing any processes.
 func (w *Workceptor) CancelUnit(unitID string) error {
 	unit, err := w.findUnit(unitID)
 	if err != nil {
 		return err
 	}
+
 	return unit.Cancel()
 }
 
@@ -312,10 +330,11 @@ func (w *Workceptor) ReleaseUnit(unitID string, force bool) error {
 	if err != nil {
 		return err
 	}
+
 	return unit.Release(force)
 }
 
-// unitStatusForCFR returns status information as a map, suitable for a control function return value
+// unitStatusForCFR returns status information as a map, suitable for a control function return value.
 func (w *Workceptor) unitStatusForCFR(unitID string) (map[string]interface{}, error) {
 	status, err := w.UnitStatus(unitID)
 	if err != nil {
@@ -328,10 +347,11 @@ func (w *Workceptor) unitStatusForCFR(unitID string) (map[string]interface{}, er
 		retMap[t.Field(i).Name] = v.Field(i).Interface()
 	}
 	retMap["StateName"] = WorkStateToString(status.State)
+
 	return retMap, nil
 }
 
-// sleepOrDone sleeps until a timeout or the done channel is signaled
+// sleepOrDone sleeps until a timeout or the done channel is signaled.
 func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 	select {
 	case <-doneChan:
@@ -341,7 +361,7 @@ func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 	}
 }
 
-// GetResults returns a live stream of the results of a unit
+// GetResults returns a live stream of the results of a unit.
 func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan struct{}) (chan []byte, error) {
 	w.scanForUnit(unitID)
 	w.activeUnitsLock.RLock()
@@ -357,21 +377,28 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 		// Wait for stdout file to exist
 		for {
 			_, err := os.Stat(stdoutFilename)
-			if err == nil {
-				break
-			} else if os.IsNotExist(err) {
+
+			switch {
+			case err == nil:
+			case os.IsNotExist(err):
 				if IsComplete(unit.Status().State) {
 					close(resultChan)
 					logger.Warning("Unit completed without producing any stdout\n")
+
 					return
 				}
 				if sleepOrDone(doneChan, 250*time.Millisecond) {
 					return
 				}
-			} else {
+
+				continue
+			default:
 				logger.Error("Error accessing stdout file: %s\n", err)
+
 				return
 			}
+
+			break
 		}
 		var stdout *os.File
 		var err error
@@ -391,10 +418,12 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 				newPos, err = stdout.Seek(filePos, 0)
 				if err != nil {
 					logger.Warning("Seek error processing stdout: %s\n", err)
+
 					return
 				}
 				if newPos != filePos {
 					logger.Warning("Seek error processing stdout\n")
+
 					return
 				}
 				var n int
@@ -409,6 +438,7 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 				err = stdout.Close()
 				if err != nil {
 					logger.Error("Error closing stdout\n")
+
 					return
 				}
 				stdout = nil
@@ -416,14 +446,18 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 				if IsComplete(unit.Status().State) && stdoutSize >= unit.Status().StdoutSize {
 					close(resultChan)
 					logger.Info("Stdout complete - closing channel for: %s \n", unitID)
+
 					return
 				}
+
 				continue
 			} else if err != nil {
 				logger.Error("Error reading stdout: %s\n", err)
+
 				return
 			}
 		}
 	}()
+
 	return resultChan, nil
 }

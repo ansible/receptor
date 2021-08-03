@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/ghjm/cmdline"
 	_ "github.com/project-receptor/receptor/pkg/backends"
 	_ "github.com/project-receptor/receptor/pkg/certificates"
@@ -12,9 +16,6 @@ import (
 	_ "github.com/project-receptor/receptor/pkg/services"
 	_ "github.com/project-receptor/receptor/pkg/version"
 	"github.com/project-receptor/receptor/pkg/workceptor"
-	"os"
-	"strings"
-	"time"
 )
 
 type nodeCfg struct {
@@ -56,27 +57,30 @@ func (cfg nodeCfg) Init() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (cfg nodeCfg) Run() error {
 	workceptor.MainInstance.ListKnownUnitIDs() // Triggers a scan of unit dirs and restarts any that need it
+
 	return nil
 }
 
 type nullBackendCfg struct{}
 
-// make the nullBackendCfg object be usable as a do-nothing Backend
+// make the nullBackendCfg object be usable as a do-nothing Backend.
 func (cfg nullBackendCfg) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
 
-// Run runs the action, in this case adding a null backend to keep the wait group alive
+// Run runs the action, in this case adding a null backend to keep the wait group alive.
 func (cfg nullBackendCfg) Run() error {
 	err := netceptor.MainInstance.AddBackend(&nullBackendCfg{}, 1.0, nil)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

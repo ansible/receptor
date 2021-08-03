@@ -2,21 +2,25 @@ package controlsvc
 
 import (
 	"fmt"
+
 	"github.com/project-receptor/receptor/pkg/netceptor"
 	"github.com/project-receptor/receptor/pkg/utils"
 	"github.com/project-receptor/receptor/pkg/version"
 )
 
-type statusCommandType struct{}
-type statusCommand struct {
-	requestedFields []string
-}
+type (
+	statusCommandType struct{}
+	statusCommand     struct {
+		requestedFields []string
+	}
+)
 
 func (t *statusCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params != "" {
 		return nil, fmt.Errorf("status command does not take parameters")
 	}
 	c := &statusCommand{}
+
 	return c, nil
 }
 
@@ -38,6 +42,7 @@ func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (Control
 	c := &statusCommand{
 		requestedFields: requestedFieldsStr,
 	}
+
 	return c, nil
 }
 
@@ -64,5 +69,6 @@ func (c *statusCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 			cfr[field] = getter()
 		}
 	}
+
 	return cfr, nil
 }

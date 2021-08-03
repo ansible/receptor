@@ -1,12 +1,13 @@
 package utils
 
 import (
-	"github.com/project-receptor/receptor/pkg/logger"
 	"io"
 	"strings"
+
+	"github.com/project-receptor/receptor/pkg/logger"
 )
 
-// NormalBufferSize is the size of buffers used by various processes when copying data between sockets
+// NormalBufferSize is the size of buffers used by various processes when copying data between sockets.
 const NormalBufferSize = 65536
 
 // BridgeConns bridges two connections, like netcat.
@@ -48,6 +49,7 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 		if shouldClose {
 			logger.Trace("    Stopping bridge %s to %s\n", c1Name, c2Name)
 			_ = c2.Close()
+
 			return
 		}
 	}

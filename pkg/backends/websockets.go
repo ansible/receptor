@@ -7,19 +7,20 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/ghjm/cmdline"
-	"github.com/gorilla/websocket"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ghjm/cmdline"
+	"github.com/gorilla/websocket"
+	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-// WebsocketDialer implements Backend for outbound Websocket
+// WebsocketDialer implements Backend for outbound Websocket.
 type WebsocketDialer struct {
 	address     string
 	origin      string
@@ -28,7 +29,7 @@ type WebsocketDialer struct {
 	extraHeader string
 }
 
-// NewWebsocketDialer instantiates a new WebsocketDialer backend
+// NewWebsocketDialer instantiates a new WebsocketDialer backend.
 func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, redial bool) (*WebsocketDialer, error) {
 	addrURL, err := url.Parse(address)
 	if err != nil {
@@ -45,10 +46,11 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 		tlscfg:      tlscfg,
 		extraHeader: extraHeader,
 	}
+
 	return &wd, nil
 }
 
-// Start runs the given session function over this backend service
+// Start runs the given session function over this backend service.
 func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
@@ -56,22 +58,26 @@ func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSess
 				TLSClientConfig: b.tlscfg,
 				Proxy:           http.ProxyFromEnvironment,
 			}
-			header := make(http.Header, 0)
+			header := make(http.Header)
 			if b.extraHeader != "" {
 				extraHeaderParts := strings.SplitN(b.extraHeader, ":", 2)
-				header.Add(http.CanonicalHeaderKey(extraHeaderParts[0]), extraHeaderParts[1])
+				header.Add(extraHeaderParts[0], extraHeaderParts[1])
 			}
-			header.Add(http.CanonicalHeaderKey("origin"), b.origin)
-			conn, _, err := dialer.DialContext(ctx, b.address, header)
+			header.Add("origin", b.origin)
+			conn, resp, err := dialer.DialContext(ctx, b.address, header)
 			if err != nil {
 				return nil, err
 			}
+			if resp.Body.Close(); err != nil {
+				return nil, err
+			}
 			ns := newWebsocketSession(conn, closeChan)
+
 			return ns, nil
 		})
 }
 
-// WebsocketListener implements Backend for inbound Websocket
+// WebsocketListener implements Backend for inbound Websocket.
 type WebsocketListener struct {
 	address string
 	path    string
@@ -80,7 +86,7 @@ type WebsocketListener struct {
 	server  *http.Server
 }
 
-// NewWebsocketListener instantiates a new WebsocketListener backend
+// NewWebsocketListener instantiates a new WebsocketListener backend.
 func NewWebsocketListener(address string, tlscfg *tls.Config) (*WebsocketListener, error) {
 	ul := WebsocketListener{
 		address: address,
@@ -88,6 +94,7 @@ func NewWebsocketListener(address string, tlscfg *tls.Config) (*WebsocketListene
 		tlscfg:  tlscfg,
 		li:      nil,
 	}
+
 	return &ul, nil
 }
 
@@ -97,29 +104,31 @@ func (b *WebsocketListener) SetPath(path string) {
 	b.path = path
 }
 
-// Addr returns the network address the listener is listening on
+// Addr returns the network address the listener is listening on.
 func (b *WebsocketListener) Addr() net.Addr {
 	if b.li == nil {
 		return nil
 	}
+
 	return b.li.Addr()
 }
 
-// Path returns the URI path the websocket is configured on
+// Path returns the URI path the websocket is configured on.
 func (b *WebsocketListener) Path() string {
 	return b.path
 }
 
-// Start runs the given session function over the WebsocketListener backend
+// Start runs the given session function over the WebsocketListener backend.
 func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
 	var err error
 	sessChan := make(chan netceptor.BackendSession)
 	mux := http.NewServeMux()
 	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
-		var upgrader = websocket.Upgrader{}
+		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			logger.Error("Error upgrading websocket connection: %s\n", err)
+
 			return
 		}
 		ws := newWebsocketSession(conn, nil)
@@ -150,10 +159,11 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 		_ = b.server.Close()
 	}()
 	logger.Debug("Listening on Websocket %s path %s\n", b.Addr().String(), b.Path())
+
 	return sessChan, nil
 }
 
-// WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener
+// WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener.
 type WebsocketSession struct {
 	conn            *websocket.Conn
 	recvChan        chan *recvResult
@@ -174,6 +184,7 @@ func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *Websock
 		closeChanCloser: sync.Once{},
 	}
 	go ws.recvChannelizer()
+
 	return ws
 }
 
@@ -191,16 +202,17 @@ func (ns *WebsocketSession) recvChannelizer() {
 	}
 }
 
-// Send sends data over the session
+// Send sends data over the session.
 func (ns *WebsocketSession) Send(data []byte) error {
 	err := ns.conn.WriteMessage(websocket.BinaryMessage, data)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// Recv receives data via the session
+// Recv receives data via the session.
 func (ns *WebsocketSession) Recv(timeout time.Duration) ([]byte, error) {
 	select {
 	case rr := <-ns.recvChan:
@@ -210,7 +222,7 @@ func (ns *WebsocketSession) Recv(timeout time.Duration) ([]byte, error) {
 	}
 }
 
-// Close closes the session
+// Close closes the session.
 func (ns *WebsocketSession) Close() error {
 	if ns.closeChan != nil {
 		ns.closeChanCloser.Do(func() {
@@ -218,6 +230,7 @@ func (ns *WebsocketSession) Close() error {
 			ns.closeChan = nil
 		})
 	}
+
 	return ns.conn.Close()
 }
 
@@ -225,7 +238,7 @@ func (ns *WebsocketSession) Close() error {
 // Command line
 // **************************************************************************
 
-// websocketListenerCfg is the cmdline configuration object for a websocket listener
+// websocketListenerCfg is the cmdline configuration object for a websocket listener.
 type websocketListenerCfg struct {
 	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port     int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
@@ -235,7 +248,7 @@ type websocketListenerCfg struct {
 	NodeCost map[string]float64 `description:"Per-node costs"`
 }
 
-// Prepare verifies the parameters are correct
+// Prepare verifies the parameters are correct.
 func (cfg websocketListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
@@ -245,10 +258,11 @@ func (cfg websocketListenerCfg) Prepare() error {
 			return fmt.Errorf("connection cost must be positive for %s", node)
 		}
 	}
+
 	return nil
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg websocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
@@ -258,6 +272,7 @@ func (cfg websocketListenerCfg) Run() error {
 	b, err := NewWebsocketListener(address, tlscfg)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)
+
 		return err
 	}
 	b.SetPath(cfg.Path)
@@ -265,10 +280,11 @@ func (cfg websocketListenerCfg) Run() error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// websocketDialerCfg is the cmdline configuration object for a Websocket listener
+// websocketDialerCfg is the cmdline configuration object for a Websocket listener.
 type websocketDialerCfg struct {
 	Address     string  `description:"URL to connect to" barevalue:"yes" required:"yes"`
 	Redial      bool    `description:"Keep redialing on lost connection" default:"true"`
@@ -277,22 +293,22 @@ type websocketDialerCfg struct {
 	Cost        float64 `description:"Connection cost (weight)" default:"1.0"`
 }
 
-// Prepare verifies that we are reasonably ready to go
+// Prepare verifies that we are reasonably ready to go.
 func (cfg websocketDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
-	_, err := url.Parse(cfg.Address)
-	if err != nil {
+	if _, err := url.Parse(cfg.Address); err != nil {
 		return fmt.Errorf("address %s is not a valid URL: %s", cfg.Address, err)
 	}
 	if cfg.ExtraHeader != "" && !strings.Contains(cfg.ExtraHeader, ":") {
 		return fmt.Errorf("extra header must be in the form key:value")
 	}
+
 	return nil
 }
 
-// Run runs the action
+// Run runs the action.
 func (cfg websocketDialerCfg) Run() error {
 	logger.Debug("Running Websocket peer connection %s\n", cfg.Address)
 	u, err := url.Parse(cfg.Address)
@@ -310,12 +326,14 @@ func (cfg websocketDialerCfg) Run() error {
 	b, err := NewWebsocketDialer(cfg.Address, tlscfg, cfg.ExtraHeader, cfg.Redial)
 	if err != nil {
 		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+
 		return err
 	}
 	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

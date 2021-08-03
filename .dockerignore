@@ -17,7 +17,3 @@ kubectl
 /receptor-python-worker/AUTHORS
 .vagrant/
 Dockerfile
-
-tests/
-!tests/environments/container-*/*.conf
-!tests/environments/container-*/*.sh

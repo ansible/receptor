@@ -89,6 +89,7 @@ type Netceptor struct {
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
 	allowedPeers           []string
+	workCommands           []string
 	epoch                  uint64
 	sequence               uint64
 	connLock               *sync.RWMutex
@@ -462,6 +463,7 @@ func (s *Netceptor) Status() Status {
 			adCopy := *ad
 			if adCopy.NodeID == s.nodeID {
 				adCopy.Time = time.Now()
+				adCopy.WorkCommands = s.workCommands
 			}
 			serviceAds = append(serviceAds, &adCopy)
 		}
@@ -574,11 +576,7 @@ func (s *Netceptor) sendServiceAds() {
 			}
 			if svcType, ok := sa.Tags["type"]; ok {
 				if svcType == "Control Service" {
-					if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
-						if adControl, ok := ad[sn]; ok {
-							sa.WorkCommands = adControl.WorkCommands
-						}
-					}
+					sa.WorkCommands = s.workCommands
 				}
 			}
 			ads = append(ads, sa)
@@ -761,19 +759,7 @@ func (s *Netceptor) AddWorkCommand(command string) error {
 	if command == "" {
 		return fmt.Errorf("must provide a name")
 	}
-	// check if s.serviceAdsReceived["foo"]["control"].Tags["type"] == "Control Service"
-	// and only add work command names to that service ad
-	if ad, ok := s.serviceAdsReceived[s.NodeID()]; ok {
-		for serviceName, svc := range ad {
-			for key := range svc.Tags {
-				if key == "type" {
-					if svc.Tags["type"] == "Control Service" {
-						ad[serviceName].WorkCommands = append(ad[serviceName].WorkCommands, command)
-					}
-				}
-			}
-		}
-	}
+	s.workCommands = append(s.workCommands, command)
 
 	return nil
 }

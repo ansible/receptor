@@ -1,5 +1,5 @@
 CONTAINER_IMAGE_TAG_builder=ansible/receptor:builder
-CONTAINER_IMAGE_TAG_dev=ansible/receptor:test
+CONTAINER_IMAGE_TAG_dev=ansible/receptor:dev
 
 CONTAINER_RUN:=$$(./receptor-tester.sh container-runtime)
 

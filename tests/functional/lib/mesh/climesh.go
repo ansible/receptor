@@ -608,6 +608,11 @@ func ModifyCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string, ExistingMe
 
 	// At this point we have created a new Mesh with a new configuration but with the same directory and control sockets
 
+	// Now we need to copy the new mesh Yaml configuration for each node in the old mesh
+	for old_node_name, old_node := range ExistingMesh.nodes {
+		old_node.yamlConfig = new_nodes[old_node_name].yamlConfig
+	}
+
 	return nil
 }
 

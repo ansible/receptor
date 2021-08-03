@@ -1,0 +1,78 @@
+FROM centos:8
+
+# Python options = [3.8, 3.9]
+ARG PYTHON_VERSION=3.8
+
+ENV PATH=${PATH}:/usr/local/go/bin
+
+RUN set -x \
+    && echo 'fastestmirror=True' >> /etc/dnf/dnf.conf \
+    && dnf update -y \
+    # Receptor build tools
+    && dnf install -y \
+        git wget make iproute openssl findutils virtualenv \
+    # Install specific python version
+    && export PYTHON_PKG_NAME=python$(echo ${PYTHON_VERSION} | sed 's/\.//g') \
+    && dnf module install -y ${PYTHON_PKG_NAME} \
+    && alternatives --set python /usr/bin/python${PYTHON_VERSION} \
+    # Install specific golang version
+    && dnf install -y golang \
+    && dnf clean all
+
+# --- ALL IMAGE MUST BE THE SAME UNTIL NOW ---
+
+# Build steps
+
+WORKDIR /dependencies
+
+ADD . .
+
+RUN set -x \
+    # Go dependencies
+    && go get -u golang.org/x/lint/golint \
+    && go get -d -v ./... \
+    # Python dependencies
+    && virtualenv -p python${PYTHON_VERSION} /opt/venv \
+    && source /opt/venv/bin/activate \
+    && cd receptorctl \
+    && pip3 install -r requirements.txt \
+    && pip3 install --upgrade -r build-requirements.txt \
+    && cd - \
+    # Build receptor
+    && make receptor \
+    # Build receptorctl
+    && cd receptorctl \
+    && python -m build
+
+# Final image
+FROM centos:8
+
+ARG PYTHON_VERSION=3.8
+
+ENV PATH=${PATH}:/opt/venv/bin/
+ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
+
+RUN set -x \
+    && echo 'fastestmirror=True' >> /etc/dnf/dnf.conf \
+    && dnf update -y \
+    # OS dependencies
+    && dnf install -y \
+        virtualenv \
+    # Install specific python version
+    && export PYTHON_PKG_NAME=python$(echo ${PYTHON_VERSION} | sed 's/\.//g') \
+    && dnf module install -y ${PYTHON_PKG_NAME} \
+    && alternatives --set python /usr/bin/python${PYTHON_VERSION} \
+    && dnf clean all \
+    # Python virtualenv
+    && virtualenv -p python${PYTHON_VERSION} /opt/venv
+
+COPY --from=0 /dependencies/receptor /usr/local/bin/receptor
+COPY --from=0 /dependencies/receptorctl/dist/* /tmp/receptorctl_dist/
+ADD ./tests/environments/container-dev/receptor.conf /etc/receptor.conf
+
+# Install 
+RUN set -x \
+    && source /opt/venv/bin/activate \
+    && pip install /tmp/receptorctl_dist/receptorctl-*.whl
+
+CMD ["/usr/local/bin/receptor", "--config", "/etc/receptor.conf"] 

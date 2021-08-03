@@ -1,5 +1,5 @@
-CONTAINER_IMAGE_TAG_BASE=ansible/receptor:base
-CONTAINER_IMAGE_TAG_TEST=ansible/receptor:test
+CONTAINER_IMAGE_TAG_builder=ansible/receptor:builder
+CONTAINER_IMAGE_TAG_dev=ansible/receptor:test
 
 CONTAINER_RUN:=$$(./receptor-tester.sh container-runtime)
 
@@ -7,34 +7,45 @@ CONTAINER_RUN:=$$(./receptor-tester.sh container-runtime)
 GO_FUNCTIONAL_TESTS_DIRS:=$$(find ./functional -type d)
 
 # Generate artifacts
-artifacts: container-image-base
+artifacts: container-image-builder
 	mkdir -p $(PWD)/artifacts
 	$(CONTAINER_RUN) run --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v $(PWD)/artifacts/:/artifacts/:rw \
 		-v receptor_go_root_cache:/root/go:rw \
-		$(CONTAINER_IMAGE_TAG_BASE) \
+		$(CONTAINER_IMAGE_TAG_builder) \
 		/build-artifacts.sh
 
-artifacts-no-cache: container-image-base
+artifacts-no-cache: container-image-builder
 	mkdir -p $(PWD)/artifacts
 	$(CONTAINER_RUN) run --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v $(PWD)/artifacts/:/artifacts/:rw \
-		$(CONTAINER_IMAGE_TAG_BASE) \
+		$(CONTAINER_IMAGE_TAG_builder) \
 		/build-artifacts.sh
 
 # Container environment
-container-image: container-image-base
+container-image-dev:
+	$(CONTAINER_RUN) build \
+		-t $(CONTAINER_IMAGE_TAG_dev) \
+		-f ./environments/container-dev/Containerfile \
+		./../
 
-container-image-base:
-	$(CONTAINER_RUN) build -t $(CONTAINER_IMAGE_TAG_BASE) -f ./environments/container/Containerfile ./../
+container-image-builder:
+	$(CONTAINER_RUN) build \
+		-t $(CONTAINER_IMAGE_TAG_builder) \
+		-f ./environments/container-builder/Containerfile \
+		./../
 
-container-shell-base:
+container-image-dev-shell:
+	$(CONTAINER_RUN) run -it --rm \
+		$(CONTAINER_IMAGE_TAG_dev) bash
+
+container-image-builder-shell:
 	$(CONTAINER_RUN) run -it --rm \
 		-v $(PWD)/../:/source/:ro \
 		-v receptor_go_root_cache:/root/go:rw \
-		$(CONTAINER_IMAGE_TAG_BASE) bash -c \
+		$(CONTAINER_IMAGE_TAG_builder) bash -c \
 			'cp -r /source /build; cd /build; bash'
 
 # VM (vagrant)

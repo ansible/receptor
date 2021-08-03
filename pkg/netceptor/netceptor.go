@@ -463,6 +463,7 @@ func (s *Netceptor) Status() Status {
 			adCopy := *ad
 			if adCopy.NodeID == s.nodeID {
 				adCopy.Time = time.Now()
+				adCopy.WorkCommands = s.workCommands
 			}
 			serviceAds = append(serviceAds, &adCopy)
 		}
@@ -508,12 +509,11 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 		s.serviceAdsReceived[s.nodeID] = n
 	}
 	n[service] = &ServiceAdvertisement{
-		NodeID:       s.nodeID,
-		Service:      service,
-		Time:         time.Now(),
-		ConnType:     connType,
-		Tags:         tags,
-		WorkCommands: s.workCommands,
+		NodeID:   s.nodeID,
+		Service:  service,
+		Time:     time.Now(),
+		ConnType: connType,
+		Tags:     tags,
 	}
 	s.sendServiceAdsChan <- 0
 }
@@ -568,12 +568,16 @@ func (s *Netceptor) sendServiceAds() {
 	for sn := range s.listenerRegistry {
 		if s.listenerRegistry[sn].advertise {
 			sa := ServiceAdvertisement{
-				NodeID:       s.nodeID,
-				Service:      sn,
-				Time:         time.Now(),
-				ConnType:     s.listenerRegistry[sn].connType,
-				Tags:         s.listenerRegistry[sn].adTags,
-				WorkCommands: s.workCommands,
+				NodeID:   s.nodeID,
+				Service:  sn,
+				Time:     time.Now(),
+				ConnType: s.listenerRegistry[sn].connType,
+				Tags:     s.listenerRegistry[sn].adTags,
+			}
+			if svcType, ok := sa.Tags["type"]; ok {
+				if svcType == "Control Service" {
+					sa.WorkCommands = s.workCommands
+				}
 			}
 			ads = append(ads, sa)
 		}
@@ -755,17 +759,7 @@ func (s *Netceptor) AddWorkCommand(command string) error {
 	if command == "" {
 		return fmt.Errorf("must provide a name")
 	}
-	s.serviceAdsLock.Lock()
-	defer s.serviceAdsLock.Unlock()
-	if n, ok := s.serviceAdsReceived[s.NodeID()]; ok {
-		// if it's the local node, just update the local service advertisement
-		// structs directly
-		for _, ad := range n {
-			ad.WorkCommands = append(ad.WorkCommands, command)
-		}
-	} else {
-		s.workCommands = append(s.workCommands, command)
-	}
+	s.workCommands = append(s.workCommands, command)
 
 	return nil
 }

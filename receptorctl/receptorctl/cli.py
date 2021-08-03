@@ -104,7 +104,8 @@ def status(ctx):
     ads = status.pop('Advertisements', None)
     if ads:
         print()
-        print(f"{'Node':<{longest_node}} Service   Type       Last Seen           Tags                            Work Types")
+        print(f"{'Node':<{longest_node}} Service   Type       Last Seen             Tags")
+        workcommands = {}
         for ad in ads:
             time = dateutil.parser.parse(ad['Time'])
             if ad['ConnType'] == 0:
@@ -113,15 +114,27 @@ def status(ctx):
                 conn_type = 'Stream'
             elif ad['ConnType'] == 2:
                 conn_type = 'StreamTLS'
+            last_seen = f"{time:%Y-%m-%d %H:%M:%S}"
+            print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}")
+
+    if ads:
+        print()
+        print(f"{'Node':<{longest_node}} Work Types")
+        seen_nodes = []
+        for ad in ads:
+            commands = ad['WorkCommands']
+            if not commands:
+                continue
+            node = ad['NodeID']
+            if node in seen_nodes:
+                continue
+            else:
+                seen_nodes.append(node)
+            commands = ', '.join(commands)
             print(
-                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {time:%Y-%m-%d %H:%M:%S} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<32}",
+                f"{ad['NodeID']:<{longest_node}} ",
                 end=""
             )
-            commands = ad['WorkCommands']
-            if commands:
-                commands = ', '.join(commands)
-            else:
-                commands = '-'
             print(commands)
 
     if status:

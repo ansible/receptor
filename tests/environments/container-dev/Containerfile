@@ -57,14 +57,16 @@ RUN set -x \
     && dnf update -y \
     # OS dependencies
     && dnf install -y \
-        virtualenv \
+        virtualenv podman \
     # Install specific python version
     && export PYTHON_PKG_NAME=python$(echo ${PYTHON_VERSION} | sed 's/\.//g') \
     && dnf module install -y ${PYTHON_PKG_NAME} \
     && alternatives --set python /usr/bin/python${PYTHON_VERSION} \
     && dnf clean all \
     # Python virtualenv
-    && virtualenv -p python${PYTHON_VERSION} /opt/venv
+    && virtualenv -p python${PYTHON_VERSION} /opt/venv \
+    && source /opt/venv/bin/activate \
+    && pip install ansible-runner
 
 COPY --from=0 /dependencies/receptor /usr/local/bin/receptor
 COPY --from=0 /dependencies/receptorctl/dist/* /tmp/receptorctl_dist/

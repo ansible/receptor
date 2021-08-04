@@ -73,12 +73,11 @@ jobs:
       - name: Create tempdir for artifacts
         run: "mkdir -p /tmp/receptor-testing"
 
-      - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v2.3.0
-        with:
-          minikube version: 'v1.13.1'
-          kubernetes version: 'v1.19.2'
-          github token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download kind binary
+        run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.1/kind-linux-amd64 && chmod +x ./kind
+
+      - name: Create k8s cluster
+        run: ./kind create cluster
 
       - name: Interact with the cluster
         run: kubectl get nodes
@@ -93,7 +92,7 @@ jobs:
         if: ${{ failure() }}
         run: "find /tmp/receptor-testing -type s -exec /bin/rm {} \\;"
 
-      - name: get minikube logs
+      - name: get k8s logs
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh
 

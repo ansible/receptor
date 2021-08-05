@@ -1,10 +1,9 @@
-.DS_Store
 .idea
 receptor
 receptor.exe
 receptor.app
 recepcert
-/net
+net
 receptorctl-test-venv/
 rpmbuild/
 .container-flag*
@@ -17,3 +16,4 @@ kubectl
 /receptor-python-worker/ChangeLog
 /receptor-python-worker/AUTHORS
 .vagrant/
+Dockerfile

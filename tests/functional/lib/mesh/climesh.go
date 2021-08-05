@@ -408,79 +408,9 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 
 func ModifyCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string, ExistingMesh CLIMesh) error {
 
-	// Logic :
-	// need to generate a new yamlconfig with some old constant data such as control socket and directory and all
-	// step 1 : create a new mesh with
-	// step 2 : copy old common data to new mesh ( such as directory and control socket and all )
-	// step 3 : create YAMLconfig based on this values
-	// Step 4 : write the new Yaml config in the old directory
-
-	new_mesh := &CLIMesh{}
-	new_mesh.dir = ExistingMesh.dir
-	new_nodes := make(map[string]*CLINode)
-	fmt.Println(new_nodes)
-
-	// Just copying the data that does not change
-	for old_node, old_params := range ExistingMesh.nodes {
-		new_node := NewCLINode(old_node)
-		new_node.receptorCmd = old_params.receptorCmd
-		new_node.dir = old_params.dir
-		new_node.yamlConfigPath = old_params.yamlConfigPath
-		new_node.controlSocket = old_params.controlSocket
-		new_nodes[old_node] = new_node
-	}
-
-	for k := range MeshDefinition.Nodes {
-		node := new_nodes[k]
-		// Keep track of if we need to add an attribute for the node id or if
-		// it already exists
-		needsIDAttr := true
-		for attrkey, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
-			for k, v := range attrMap {
-				k = k.(string)
-				if k == "tcp-listener" || k == "udp-listener" || k == "ws-listener" {
-					vMap, ok := v.(map[interface{}]interface{})
-					if !ok {
-						vMap = make(map[interface{}]interface{})
-					}
-					if k == "tcp-listener" || k == "ws-listener" {
-						_, ok = vMap["port"]
-						if !ok {
-							vMap["port"] = strconv.Itoa(utils.ReserveTCPPort())
-						}
-						attrMap[k] = vMap
-					} else if k == "udp-listener" {
-						_, ok = vMap["port"]
-						if !ok {
-							vMap["port"] = strconv.Itoa(utils.ReserveUDPPort())
-						}
-						attrMap[k] = vMap
-					}
-				} else if k == "node" {
-					vMap, _ := v.(map[interface{}]interface{})
-					_, ok := vMap["id"]
-					if ok {
-						needsIDAttr = false
-					}
-				}
-			}
-			MeshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
-		}
-		if needsIDAttr {
-			idYaml := make(map[interface{}]interface{})
-			nodeYaml := make(map[interface{}]interface{})
-			nodeYaml["id"] = k
-			nodeYaml["datadir"] = filepath.Join(node.dir, "datadir")
-			//os.Mkdir(nodeYaml["datadir"].(string), 0755)				// the directorey already exists , so no need to make it again
-			idYaml["node"] = nodeYaml
-			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, idYaml)
-		}
-		logYaml := make(map[interface{}]interface{})
-		levelYaml := make(map[interface{}]interface{})
-		levelYaml["level"] = "debug"
-		logYaml["log-level"] = levelYaml
-		MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, logYaml)
+	// remove NodedefConnection []interface{} from existing mesh
+	for k := range MeshDefinition.Nodes{
+		MeshDefinition.Nodes[k].NodedefConnection=nil;
 	}
 
 	for k := range MeshDefinition.Nodes {
@@ -511,7 +441,7 @@ func ModifyCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string, ExistingMe
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["tcp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				MeshDefinition.Nodes[k].NodedefConnection = append(MeshDefinition.Nodes[k].NodedefConnection, dialerYaml)
 			}
 			listener, ok = attrMap["udp-listener"]
 			if ok {
@@ -531,7 +461,7 @@ func ModifyCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string, ExistingMe
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["udp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				MeshDefinition.Nodes[k].NodedefConnection = append(MeshDefinition.Nodes[k].NodedefConnection, dialerYaml)
 			}
 			listener, ok = attrMap["ws-listener"]
 			if ok {
@@ -561,62 +491,21 @@ func ModifyCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string, ExistingMe
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["ws-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				MeshDefinition.Nodes[k].NodedefConnection = append(MeshDefinition.Nodes[k].NodedefConnection, dialerYaml)
 			}
 		}
 	}
 
-	// Setup the controlsvc and sockets
-	for k, new_node := range new_nodes {
-		needsControlService := true
-		controlServiceIndex := 0
-		for index, attr := range MeshDefinition.Nodes[k].Nodedef {
-			attrMap := attr.(map[interface{}]interface{})
-			for k, v := range attrMap {
-				k = k.(string)
-				if k == "control-service" {
-					vMap, _ := v.(map[interface{}]interface{})
-					csvName, ok := vMap["service"]
-					if ok {
-						if csvName == "control" {
-							_, ok = vMap["filename"].(string)
-							if ok {
-								return fmt.Errorf("control-service definition should not specify a filename")
-							}
-							controlServiceIndex = index
-							needsControlService = false
-						}
-					}
-				}
-			}
+	// At this point we have populated `[]NodedefConnection{}` for each node
+
+	// Now we combine `[]NodedefConnection{}` and `[]Nodedef{}` for each node in the mesh and write to disk
+	for k, node := range ExistingMesh.nodes {
+		node.yamlConfig = MeshDefinition.Nodes[k].Nodedef
+		node.yamlConfig = append(node.yamlConfig, MeshDefinition.Nodes[k].NodedefConnection)
+		err := ( write the config file ) // have to write that function 
+		if err != nil {
+			return nil, err
 		}
-		if needsControlService {
-			tmp := make(map[interface{}]interface{})
-			tmp["filename"] = new_node.controlSocket
-			controlServiceYaml := make(map[interface{}]interface{})
-			controlServiceYaml["control-service"] = tmp
-			MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, controlServiceYaml)
-		} else {
-			MeshDefinition.Nodes[k].Nodedef[controlServiceIndex].(map[interface{}]interface{})["control-service"].(map[interface{}]interface{})["filename"] = new_node.controlSocket
-		}
-	}
-
-	for k, new_node := range new_nodes {
-		new_node.yamlConfig = MeshDefinition.Nodes[k].Nodedef
-	}
-	new_mesh.nodes = new_nodes
-	new_mesh.MeshDefinition = &MeshDefinition
-
-	// At this point we have created a new Mesh with a new configuration but with the same directory and control sockets
-
-	// Now we need to copy the new mesh Yaml configuration for each node in the old mesh
-	for old_node_name, old_node := range ExistingMesh.nodes {
-		old_node.yamlConfig = new_nodes[old_node_name].yamlConfig
-	}
-
-	// now we want to overwrite the YamlConfig files for the old nodes
-	for old_node_name, old_node := range ExistingMesh.nodes {
-		old_node.yamlConfig = new_nodes[old_node_name].yamlConfig
 	}
 
 	return nil

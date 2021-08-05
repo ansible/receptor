@@ -402,7 +402,6 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
 	sessChan, err := backend.Start(ctxBackend, &s.backendWaitGroup)
-
 	if err != nil {
 		return err
 	}
@@ -439,22 +438,22 @@ func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()
 }
 
-// BackendWaitGroupAdd increments backendWaitGroup counter
+// BackendWaitGroupAdd increments backendWaitGroup counter.
 func (s *Netceptor) BackendWaitGroupAdd() {
 	s.backendWaitGroup.Add(1)
 }
 
-// BackendDone calls Done on the backendWaitGroup
+// BackendDone calls Done on the backendWaitGroup.
 func (s *Netceptor) BackendDone() {
 	s.backendWaitGroup.Done()
 }
 
-// BackendCount returns the number of backends that ever registered with this Netceptor
+// BackendCount returns the number of backends that ever registered with this Netceptor.
 func (s *Netceptor) BackendCount() int {
 	return s.backendCount
 }
 
-// CancelBackends stops all backends by calling a context cancel
+// CancelBackends stops all backends by calling a context cancel.
 func (s *Netceptor) CancelBackends() {
 	logger.Debug("Canceling backends")
 	for i := range s.backendCancel {
@@ -466,7 +465,7 @@ func (s *Netceptor) CancelBackends() {
 	s.backendCount = 0
 }
 
-// Status returns the current state of the Netceptor object
+// Status returns the current state of the Netceptor object.
 func (s *Netceptor) Status() Status {
 	s.connLock.RLock()
 	conns := make([]*ConnStatus, 0)
@@ -1528,7 +1527,7 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 	return fmt.Errorf("rejected connection with node %s because %s", remoteNodeID, reason)
 }
 
-// Main Netceptor protocol loop
+// Main Netceptor protocol loop.
 func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
 	if connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")

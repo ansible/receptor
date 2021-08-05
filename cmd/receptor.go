@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ghjm/cmdline"
@@ -69,7 +70,7 @@ func (cfg nodeCfg) Run() error {
 
 type nullBackendCfg struct{}
 
-// make the nullBackendCfg object be usable as a do-nothing Backend
+// make the nullBackendCfg object be usable as a do-nothing Backend.
 func (cfg nullBackendCfg) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
@@ -111,6 +112,7 @@ func main() {
 		if dryRun {
 			return cl.ParseAndRun(osArgs, []string{""}, cmdline.ShowHelpIfNoArgs)
 		}
+
 		return cl.ParseAndRun(osArgs, []string{"Reload"}, cmdline.ShowHelpIfNoArgs)
 	}
 

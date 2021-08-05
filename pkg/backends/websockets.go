@@ -50,7 +50,7 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 	return &wd, nil
 }
 
-// Start runs the given session function over this backend service
+// Start runs the given session function over this backend service.
 func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, wg, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
@@ -118,7 +118,7 @@ func (b *WebsocketListener) Path() string {
 	return b.path
 }
 
-// Start runs the given session function over the WebsocketListener backend
+// Start runs the given session function over the WebsocketListener backend.
 func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	var err error
 	sessChan := make(chan netceptor.BackendSession)

@@ -2,23 +2,28 @@ package controlsvc
 
 import (
 	"fmt"
+
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
-type reloadCommandType struct{}
-type reloadCommand struct{}
+type (
+	reloadCommandType struct{}
+	reloadCommand     struct{}
+)
 
-// ReloadCL is ParseAndRun closure set with the initial receptor arguments
+// ReloadCL is ParseAndRun closure set with the initial receptor arguments.
 var ReloadCL func(bool) error
 
 func (t *reloadCommandType) InitFromString(params string) (ControlCommand, error) {
 	c := &reloadCommand{}
+
 	return c, nil
 }
 
 func (t *reloadCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
 	c := &reloadCommand{}
+
 	return c, nil
 }
 
@@ -33,6 +38,7 @@ func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 	if err != nil {
 		cfr["Success"] = false
 		cfr["Error"] = err.Error()
+
 		return cfr, err
 	}
 
@@ -42,14 +48,16 @@ func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOper
 	if err != nil {
 		cfr["Success"] = false
 		cfr["Error"] = err.Error()
+
 		return cfr, err
 	}
 	cfr["Success"] = true
+
 	return cfr, nil
 }
 
 func init() {
 	ReloadCL = func(dryRun bool) error {
-		return fmt.Errorf("Reload function not set")
+		return fmt.Errorf("reload function not set")
 	}
 }

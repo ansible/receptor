@@ -276,7 +276,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["tcp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				MeshDefinition.Nodes[k].NodedefConnection = append(MeshDefinition.Nodes[k].NodedefConnection, dialerYaml)
 			}
 			listener, ok = attrMap["udp-listener"]
 			if ok {
@@ -296,7 +296,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 				peerYaml["address"] = addr
 				peerYaml["cost"] = getListenerCost(listenerMap, k)
 				dialerYaml["udp-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				MeshDefinition.Nodes[k].NodedefConnection = append(MeshDefinition.Nodes[k].NodedefConnection, dialerYaml)
 			}
 			listener, ok = attrMap["ws-listener"]
 			if ok {
@@ -326,7 +326,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 					peerYaml["tls"] = TLS
 				}
 				dialerYaml["ws-peer"] = peerYaml
-				MeshDefinition.Nodes[k].Nodedef = append(MeshDefinition.Nodes[k].Nodedef, dialerYaml)
+				MeshDefinition.Nodes[k].NodedefConnection = append(MeshDefinition.Nodes[k].NodedefConnection, dialerYaml)
 			}
 		}
 	}
@@ -374,6 +374,7 @@ func NewCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 
 	for k, node := range nodes {
 		node.yamlConfig = MeshDefinition.Nodes[k].Nodedef
+		node.yamlConfig = append(node.yamlConfig, MeshDefinition.Nodes[k].NodedefConnection)
 		err = node.Start()
 		if err != nil {
 			return nil, err
@@ -609,6 +610,11 @@ func ModifyCLIMeshFromYaml(MeshDefinition YamlData, dirSuffix string, ExistingMe
 	// At this point we have created a new Mesh with a new configuration but with the same directory and control sockets
 
 	// Now we need to copy the new mesh Yaml configuration for each node in the old mesh
+	for old_node_name, old_node := range ExistingMesh.nodes {
+		old_node.yamlConfig = new_nodes[old_node_name].yamlConfig
+	}
+
+	// now we want to overwrite the YamlConfig files for the old nodes
 	for old_node_name, old_node := range ExistingMesh.nodes {
 		old_node.yamlConfig = new_nodes[old_node_name].yamlConfig
 	}

@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"context"
+
 	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
@@ -63,9 +64,10 @@ type TCRuleYaml struct {
 
 // YamlNode describes how a single node should be represented in yaml
 type YamlNode struct {
-	Connections map[string]YamlConnection
-	TCRules     *TCRuleYaml
-	Nodedef     []interface{}
+	Connections       map[string]YamlConnection
+	TCRules           *TCRuleYaml
+	Nodedef           []interface{}
+	NodedefConnection []interface{}
 }
 
 func getListenerCost(listenerYaml map[interface{}]interface{}, nodeID string) float64 {

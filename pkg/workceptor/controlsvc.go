@@ -290,7 +290,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		unit, err := c.w.findUnit(unitid)
 		if err != nil {
-			cfr["already gone"] = unitid
+			cfr["unit not found"] = unitid
 		} else {
 			if c.subcommand == "cancel" {
 				err = unit.Cancel()

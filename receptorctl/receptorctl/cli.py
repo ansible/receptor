@@ -233,13 +233,13 @@ def version(ctx):
     print(f"{delim}receptor     {receptorVersion}")
 
 
-@work.command(help="List known units of work.")
+@work.command(name="list", help="List known units of work.")
 @click.option('--quiet', '-q', is_flag=True, help="Only list unit IDs with no detail")
 @click.option('--node', default=None, type=str, help="Receptor node to list work from. Defaults to the local node.")
 @click.option('--unit_id', type=str, required=False, default="", help="Only show detail for a specific unit id")
 @click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client config name used when connecting to remote node")
 @click.pass_context
-def list(ctx, unit_id, node, tlsclient, quiet):
+def list_units(ctx, unit_id, node, tlsclient, quiet):
     rc = get_rc(ctx)
     if node:
         rc.connect_to_service(node, "control", tlsclient)
@@ -339,7 +339,8 @@ def op_on_unit_ids(ctx, op, unit_ids):
     rc = get_rc(ctx)
     for unit_id in unit_ids:
         try:
-            rc.simple_command(f"work {op} {unit_id}")
+            res = list(rc.simple_command(f"work {op} {unit_id}").items())[0]
+            print(f"({res[1]}, {res[0]})")
         except Exception as e:
             print(f"{unit_id}: ERROR: {e}")
             sys.exit(1)
@@ -352,8 +353,8 @@ def cancel(ctx, unit_ids):
     if len(unit_ids) == 0:
         print("No unit IDs supplied: Not doing anything")
         return
+    print("Cancelled:")
     op_on_unit_ids(ctx, "cancel", unit_ids)
-    print("Cancelled:", unit_ids)
 
 
 @work.command(help="Release (delete) one or more units of work.")
@@ -365,8 +366,8 @@ def release(ctx, force, unit_ids):
         print("No unit IDs supplied: Not doing anything")
         return
     op = "release" if not force else "force-release"
+    print("Released:")
     op_on_unit_ids(ctx, op, unit_ids)
-    print("Released:", unit_ids)
 
 
 def run():

@@ -48,8 +48,8 @@ else
 	TAGPARAM=--tags $(TAGS)
 endif
 
-receptor: $(shell find pkg -type f -name '*.go') cmd/receptor.go
-	CGO_ENABLED=0 go build -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) cmd/receptor.go
+receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
+	CGO_ENABLED=0 go build -o receptor -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -64,11 +64,11 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows go build -o receptor.exe cmd/receptor.go && \
-	GOOS=darwin go build -o receptor.app cmd/receptor.go && \
+	GOOS=windows go build -o receptor.exe ./cmd/receptor-cl && \
+	GOOS=darwin go build -o receptor.app ./cmd/receptor-cl && \
 	go build example/*.go && \
-	go build --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
-	go build cmd/receptor.go
+	go build -o receptor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth ./cmd/receptor-cl && \
+	go build -o receptor ./cmd/receptor-cl
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)

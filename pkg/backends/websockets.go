@@ -51,8 +51,8 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 }
 
 // Start runs the given session function over this backend service.
-func (b *WebsocketDialer) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
-	return dialerSession(ctx, b.redial, 5*time.Second,
+func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+	return dialerSession(ctx, wg, b.redial, 5*time.Second,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			dialer := websocket.Dialer{
 				TLSClientConfig: b.tlscfg,
@@ -119,7 +119,7 @@ func (b *WebsocketListener) Path() string {
 }
 
 // Start runs the given session function over the WebsocketListener backend.
-func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSession, error) {
+func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	var err error
 	sessChan := make(chan netceptor.BackendSession)
 	mux := http.NewServeMux()
@@ -138,7 +138,9 @@ func (b *WebsocketListener) Start(ctx context.Context) (chan netceptor.BackendSe
 	if err != nil {
 		return nil, err
 	}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		var err error
 		b.server = &http.Server{
 			Addr:    b.address,
@@ -335,6 +337,14 @@ func (cfg websocketDialerCfg) Run() error {
 	}
 
 	return nil
+}
+
+func (cfg websocketDialerCfg) Reload() error {
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+}
+
+func (cfg websocketListenerCfg) Reload() error {
+	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
 }
 
 func init() {

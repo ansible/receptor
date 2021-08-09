@@ -146,6 +146,6 @@ func main() {
 	case <-time.After(100 * time.Millisecond):
 	}
 	logger.Info("Initialization complete\n")
-	doneMain := make(chan struct{})
-	<-doneMain
+
+	<-netceptor.MainInstance.NetceptorDone()
 }

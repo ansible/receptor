@@ -362,6 +362,11 @@ func (s *Netceptor) Shutdown() {
 	s.cancelFunc()
 }
 
+// NetceptorDone returns the channel for the netceptor context.
+func (s *Netceptor) NetceptorDone() <-chan struct{} {
+	return s.context.Done()
+}
+
 // NodeID returns the local Node ID of this Netceptor instance.
 func (s *Netceptor) NodeID() string {
 	return s.nodeID

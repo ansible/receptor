@@ -1,7 +1,5 @@
 #!/bin/bash
 
-minikube logs > /tmp/receptor-testing/minikube.log
-
 PODS_DIR=/tmp/receptor-testing/K8sPods
 
 mkdir "$PODS_DIR"

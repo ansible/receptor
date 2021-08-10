@@ -1,0 +1,26 @@
+---
+
+name: Publish quay.io/ansible/receptor:devel
+
+on:
+  push:
+    branches: [devel]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    name: Push devel image
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build Image
+        run: |
+          TAG=receptor:devel make container
+
+      - name: Push To Quay
+        uses: redhat-actions/push-to-registry@v2.1.1
+        with:
+          image: receptor
+          tags: devel
+          registry: quay.io/ansible/
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}

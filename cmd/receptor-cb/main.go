@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ansible/receptor/internal/version"
 	"github.com/ansible/receptor/pkg"
-	"github.com/ansible/receptor/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

@@ -81,7 +81,9 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		Addr:    li.Addr().String(),
 		Handler: mux,
 		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{tlsCert},
+			Certificates:             []tls.Certificate{tlsCert},
+			MinVersion:               tls.VersionTLS12,
+			PreferServerCipherSuites: true,
 		},
 	}
 	go func() {
@@ -96,8 +98,10 @@ func TestWebsocketExternalInterop(t *testing.T) {
 	CAcerts := x509.NewCertPool()
 	CAcerts.AppendCertsFromPEM(certPEM)
 	tls2 := &tls.Config{
-		RootCAs:    CAcerts,
-		ServerName: "localhost",
+		RootCAs:          CAcerts,
+		ServerName:       "localhost",
+		MinVersion:       tls.VersionTLS12,
+		CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
 	}
 	b2, err := NewWebsocketDialer("wss://"+li.Addr().String(), tls2, "X-Extra-Data: SomeData", true)
 	if err != nil {

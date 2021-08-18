@@ -85,6 +85,10 @@ func (cfg nullBackendCfg) Run() error {
 	return nil
 }
 
+func (cfg nullBackendCfg) Reload() error {
+	return cfg.Run()
+}
+
 func main() {
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
@@ -107,14 +111,6 @@ func main() {
 	}
 
 	osArgs := os.Args[1:]
-	// create closure with the passed in args to be ran during a reload
-	controlsvc.ReloadCL = func(dryRun bool) error {
-		if dryRun {
-			return cl.ParseAndRun(osArgs, []string{""}, cmdline.ShowHelpIfNoArgs)
-		}
-
-		return cl.ParseAndRun(osArgs, []string{"Reload"}, cmdline.ShowHelpIfNoArgs)
-	}
 
 	err := cl.ParseAndRun(osArgs, []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
 	if err != nil {
@@ -126,6 +122,30 @@ func main() {
 		os.Exit(0)
 	}
 
+	configPath := ""
+	for i, arg := range osArgs {
+		if arg == "--config" || arg == "-c" {
+			if len(osArgs) > i+1 {
+				configPath = osArgs[i+1]
+			}
+
+			break
+		}
+	}
+
+	// only allow reloading if a configuration file was provided. If ReloadCL is
+	// not set, then the control service reload command will fail
+	if configPath != "" {
+		// create closure with the passed in args to be ran during a reload
+		reloadParseAndRun := func(toRun []string) error {
+			return cl.ParseAndRun(osArgs, toRun)
+		}
+		err = controlsvc.InitReload(configPath, reloadParseAndRun)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+			os.Exit(1)
+		}
+	}
 	done := make(chan struct{})
 	go func() {
 		netceptor.MainInstance.BackendWait()

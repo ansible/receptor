@@ -309,12 +309,20 @@ func (cfg tcpDialerCfg) Run() error {
 	return nil
 }
 
+func (cfg tcpDialerCfg) PreReload() error {
+	return cfg.Prepare()
+}
+
+func (cfg tcpListenerCfg) PreReload() error {
+	return cfg.Prepare()
+}
+
 func (cfg tcpDialerCfg) Reload() error {
-	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+	return cfg.Run()
 }
 
 func (cfg tcpListenerCfg) Reload() error {
-	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+	return cfg.Run()
 }
 
 func init() {

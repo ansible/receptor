@@ -340,12 +340,20 @@ func (cfg websocketDialerCfg) Run() error {
 	return nil
 }
 
+func (cfg websocketDialerCfg) PreReload() error {
+	return cfg.Prepare()
+}
+
+func (cfg websocketListenerCfg) PreReload() error {
+	return cfg.Prepare()
+}
+
 func (cfg websocketDialerCfg) Reload() error {
-	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+	return cfg.Run()
 }
 
 func (cfg websocketListenerCfg) Reload() error {
-	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+	return cfg.Run()
 }
 
 func init() {

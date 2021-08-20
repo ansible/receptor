@@ -280,8 +280,8 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
-		HandshakeTimeout: 15 * time.Second,
-		KeepAlive:        true,
+		HandshakeIdleTimeout: 15 * time.Second,
+		KeepAlive:            true,
 	}
 	if tlscfg == nil {
 		tlscfg = generateClientTLSConfig()

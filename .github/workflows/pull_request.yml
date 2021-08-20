@@ -24,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.17
 
       - uses: actions/cache@v2
         with:
@@ -47,7 +47,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.17
 
       - uses: actions/cache@v2
         with:
@@ -58,6 +58,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: increase UDP buffer
+        run: sudo sysctl -w net.core.rmem_max=2500000
+
       - name: Setup up python
         uses: actions/setup-python@v2
 
@@ -66,6 +69,9 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v2
+
+      - name: Create /tmp/receptor-testing
+        run: mkdir /tmp/receptor-testing
 
       - name: install receptor
         run: go build -o $GOROOT/bin/receptor ./cmd/receptor-cl

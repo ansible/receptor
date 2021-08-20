@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/prep/socketpair"
-	"github.com/project-receptor/receptor/pkg/logger"
 )
 
 type logWriter struct {

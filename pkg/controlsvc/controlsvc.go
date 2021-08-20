@@ -1,3 +1,4 @@
+//go:build !no_controlsvc
 // +build !no_controlsvc
 
 package controlsvc
@@ -15,11 +16,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/tls"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/tls"
-	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type (

@@ -1,3 +1,4 @@
+//go:build !no_workceptor
 // +build !no_workceptor
 
 package workceptor
@@ -15,9 +16,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

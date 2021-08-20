@@ -16,12 +16,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/randstr"
+	"github.com/ansible/receptor/pkg/tickrunner"
+	"github.com/ansible/receptor/pkg/utils"
 	priorityQueue "github.com/jupp0r/go-priority-queue"
 	"github.com/minio/highwayhash"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/randstr"
-	"github.com/project-receptor/receptor/pkg/tickrunner"
-	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // defaultMTU is the largest message sendable over the Netceptor network.

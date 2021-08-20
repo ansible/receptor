@@ -1,5 +1,5 @@
-// +build !no_websocket_backend
-// +build !no_backends
+//go:build !no_websocket_backend && !no_backends
+// +build !no_websocket_backend,!no_backends
 
 package backends
 
@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/tls"
 	"github.com/ghjm/cmdline"
 	"github.com/gorilla/websocket"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/tls"
 )
 
 // WebsocketDialer implements Backend for outbound Websocket.

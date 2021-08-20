@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/gorilla/websocket"
-	"github.com/project-receptor/receptor/pkg/netceptor"
 )
 
 // This test verifies that a websockets backend client can connect to an

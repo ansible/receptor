@@ -3,7 +3,7 @@ package mesh
 import (
 	"context"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // Node Defines the interface for nodes made using the CLI, Library, and

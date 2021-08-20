@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/project-receptor/receptor/pkg"
+	"github.com/ansible/receptor/pkg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

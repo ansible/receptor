@@ -1,3 +1,4 @@
+//go:build !no_workceptor
 // +build !no_workceptor
 
 package workceptor
@@ -12,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.com/project-receptor/receptor/pkg/logger"
 )
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.

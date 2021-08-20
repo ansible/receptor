@@ -1,5 +1,5 @@
-// +build !no_tcp_backend
-// +build !no_backends
+//go:build !no_tcp_backend && !no_backends
+// +build !no_tcp_backend,!no_backends
 
 package backends
 
@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/framer"
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/tls"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
-	"github.com/project-receptor/receptor/pkg/framer"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/tls"
-	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // TCPDialer implements Backend for outbound TCP.

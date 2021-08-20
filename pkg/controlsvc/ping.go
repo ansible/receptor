@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type (

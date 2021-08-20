@@ -1,3 +1,4 @@
+//go:build no_controlsvc
 // +build no_controlsvc
 
 // Stub package to satisfy controlsvc dependencies while providing no functionality
@@ -11,7 +12,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // ErrNotImplemented is returned by most functions in this unit since it is a non-functional stub

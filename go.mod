@@ -1,4 +1,4 @@
-module github.com/project-receptor/receptor
+module github.com/ansible/receptor
 
 go 1.16
 

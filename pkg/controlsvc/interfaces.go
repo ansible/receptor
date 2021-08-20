@@ -3,7 +3,7 @@ package controlsvc
 import (
 	"io"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // ControlCommandType is a type of command that can be run from the control service.

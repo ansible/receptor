@@ -1,6 +1,6 @@
 module github.com/project-receptor/receptor
 
-go 1.15
+go 1.16
 
 require (
 	github.com/creack/pty v1.1.11
@@ -16,8 +16,12 @@ require (
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
 	github.com/rogpeppe/go-internal v1.6.1
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
+	github.com/spf13/cobra v1.2.1
+	github.com/spf13/viper v1.8.1
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
+	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+	golang.org/x/text v0.3.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.18.6
 	k8s.io/apimachinery v0.18.6

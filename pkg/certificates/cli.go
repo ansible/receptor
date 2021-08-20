@@ -13,6 +13,18 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
+func InitCA(opts *CertOptions, certOut, keyOut string) error {
+	ca, err := CreateCA(opts)
+	if err == nil {
+		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate})
+	}
+	if err == nil {
+		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey})
+	}
+
+	return err
+}
+
 type initCA struct {
 	CommonName string `description:"Common name to assign to the certificate" required:"Yes"`
 	Bits       int    `description:"Bit length of the encryption keys of the certificate" required:"Yes"`
@@ -22,34 +34,71 @@ type initCA struct {
 	OutKey     string `description:"File to save the CA private key to" required:"Yes"`
 }
 
-func (ica initCA) Run() error {
+func (ica initCA) Run() (err error) {
 	opts := &CertOptions{
 		CommonName: ica.CommonName,
 		Bits:       ica.Bits,
 	}
 	if ica.NotBefore != "" {
-		t, err := time.Parse(time.RFC3339, ica.NotBefore)
+		opts.NotBefore, err = time.Parse(time.RFC3339, ica.NotBefore)
 		if err != nil {
-			return err
+			return
 		}
-		opts.NotBefore = t
 	}
 	if ica.NotAfter != "" {
-		t, err := time.Parse(time.RFC3339, ica.NotAfter)
+		opts.NotAfter, err = time.Parse(time.RFC3339, ica.NotAfter)
+		if err != nil {
+			return
+		}
+	}
+
+	return InitCA(opts, ica.OutCert, ica.OutKey)
+}
+
+func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
+	var req *x509.CertificateRequest
+	var key *rsa.PrivateKey
+	if keyIn != "" {
+		data, err := LoadFromPEMFile(keyIn)
 		if err != nil {
 			return err
 		}
-		opts.NotAfter = t
+		for _, elem := range data {
+			ckey, ok := elem.(*rsa.PrivateKey)
+			if !ok {
+				continue
+			}
+			if key != nil {
+				return fmt.Errorf("multiple private keys in file %s", keyIn)
+			}
+			key = ckey
+		}
+		if key == nil {
+			return fmt.Errorf("no private keys in file %s", keyIn)
+		}
+		req, err = CreateCertReq(opts, key)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		req, key, err = CreateCertReqWithKey(opts)
+		if err != nil {
+			return err
+		}
 	}
-	ca, err := CreateCA(opts)
-	if err == nil {
-		err = SaveToPEMFile(ica.OutCert, []interface{}{ca.Certificate})
+	err := SaveToPEMFile(reqOut, []interface{}{req})
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		err = SaveToPEMFile(ica.OutKey, []interface{}{ca.PrivateKey})
+	if keyOut != "" {
+		err = SaveToPEMFile(keyOut, []interface{}{key})
+		if err != nil {
+			return err
+		}
 	}
 
-	return err
+	return nil
 }
 
 type makeReq struct {
@@ -97,89 +146,23 @@ func (mr makeReq) Run() error {
 		}
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
-	var req *x509.CertificateRequest
-	var key *rsa.PrivateKey
-	if mr.InKey != "" {
-		data, err := LoadFromPEMFile(mr.InKey)
-		if err != nil {
-			return err
-		}
-		for _, elem := range data {
-			ckey, ok := elem.(*rsa.PrivateKey)
-			if !ok {
-				continue
-			}
-			if key != nil {
-				return fmt.Errorf("multiple private keys in file %s", mr.InKey)
-			}
-			key = ckey
-		}
-		if key == nil {
-			return fmt.Errorf("no private keys in file %s", mr.InKey)
-		}
-		req, err = CreateCertReq(opts, key)
-		if err != nil {
-			return err
-		}
-	} else {
-		var err error
-		req, key, err = CreateCertReqWithKey(opts)
-		if err != nil {
-			return err
-		}
-	}
-	err := SaveToPEMFile(mr.OutReq, []interface{}{req})
-	if err != nil {
-		return err
-	}
-	if mr.OutKey != "" {
-		err = SaveToPEMFile(mr.OutKey, []interface{}{key})
-		if err != nil {
-			return err
-		}
-	}
 
-	return nil
+	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq)
 }
 
-type signReq struct {
-	Req       string `description:"Certificate Request PEM filename" required:"Yes"`
-	CACert    string `description:"CA certificate PEM filename" required:"Yes"`
-	CAKey     string `description:"CA private key PEM filename" required:"Yes"`
-	NotBefore string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
-	NotAfter  string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
-	OutCert   string `description:"File to save the signed certificate to" required:"Yes"`
-	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
-}
-
-func (sr signReq) Run() error {
-	opts := &CertOptions{}
-	if sr.NotBefore != "" {
-		t, err := time.Parse(time.RFC3339, sr.NotBefore)
-		if err != nil {
-			return err
-		}
-		opts.NotBefore = t
-	}
-	if sr.NotAfter != "" {
-		t, err := time.Parse(time.RFC3339, sr.NotAfter)
-		if err != nil {
-			return err
-		}
-		opts.NotAfter = t
-	}
+func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool) error {
 	ca := &CA{}
 	var err error
-	ca.Certificate, err = LoadCertificate(sr.CACert)
+	ca.Certificate, err = LoadCertificate(caCrtPath)
 	if err != nil {
 		return err
 	}
-	ca.PrivateKey, err = LoadPrivateKey(sr.CAKey)
+	ca.PrivateKey, err = LoadPrivateKey(caKeyPath)
 	if err != nil {
 		return err
 	}
 	var req *x509.CertificateRequest
-	req, err = LoadRequest(sr.Req)
+	req, err = LoadRequest(reqPath)
 	if err != nil {
 		return err
 	}
@@ -191,7 +174,7 @@ func (sr signReq) Run() error {
 	if len(names.DNSNames) == 0 && len(names.IPAddresses) == 0 && len(names.NodeIDs) == 0 {
 		return fmt.Errorf("cannot sign: no names found in certificate")
 	}
-	if !sr.Verify {
+	if !verify {
 		fmt.Printf("Requested certificate:\n")
 		fmt.Printf("  Subject: %s\n", req.Subject)
 		algo := req.PublicKeyAlgorithm.String()
@@ -228,7 +211,37 @@ func (sr signReq) Run() error {
 		return err
 	}
 
-	return SaveToPEMFile(sr.OutCert, []interface{}{cert})
+	return SaveToPEMFile(certOut, []interface{}{cert})
+}
+
+type signReq struct {
+	Req       string `description:"Certificate Request PEM filename" required:"Yes"`
+	CACert    string `description:"CA certificate PEM filename" required:"Yes"`
+	CAKey     string `description:"CA private key PEM filename" required:"Yes"`
+	NotBefore string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
+	NotAfter  string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
+	OutCert   string `description:"File to save the signed certificate to" required:"Yes"`
+	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
+}
+
+func (sr signReq) Run() error {
+	opts := &CertOptions{}
+	if sr.NotBefore != "" {
+		t, err := time.Parse(time.RFC3339, sr.NotBefore)
+		if err != nil {
+			return err
+		}
+		opts.NotBefore = t
+	}
+	if sr.NotAfter != "" {
+		t, err := time.Parse(time.RFC3339, sr.NotAfter)
+		if err != nil {
+			return err
+		}
+		opts.NotAfter = t
+	}
+
+	return SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify)
 }
 
 func init() {

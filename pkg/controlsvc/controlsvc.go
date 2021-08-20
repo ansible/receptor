@@ -4,10 +4,10 @@ package controlsvc
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"runtime"
@@ -18,6 +18,7 @@ import (
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/tls"
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
@@ -432,4 +433,116 @@ func init() {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
 			"control-service", "Run a control service", cmdlineConfigUnix{})
 	}
+}
+
+type Controllers struct {
+	UnixControl []UnixControl `mapstructure:"unix"`
+	TCPControl  []TCPControl  `mapstructure:"tcp"`
+}
+
+func (c Controllers) Setup(ctx context.Context, cv *Server) error {
+	for _, c := range c.UnixControl {
+		if err := c.setup(ctx, cv); err != nil {
+			return fmt.Errorf("could not setup unix controller from controllers config: %w", err)
+		}
+	}
+
+	for _, c := range c.TCPControl {
+		if err := c.setup(ctx, cv); err != nil {
+			return fmt.Errorf("could not setup tcp controller from controllers config: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// UnixControl exposes a receptor control socket via unix socket.
+type UnixControl struct {
+	// Receptor service name to listen on.
+	Service *string `mapstructure:"service"`
+	// Filename of local Unix socket to bind to the service.
+	File string `mapstructure:"filename"`
+	// Socket file permissions.
+	Permissions *int `mapstructure:"permissions"`
+	// TLS config to use for the transport within receptor.
+	// Leave empty for no TLS.
+	ReceptorTLS *tls.ServerConf `mapstructure:"receptor-tls"`
+}
+
+func (s *UnixControl) setup(ctx context.Context, cv *Server) error {
+	service := "control"
+	if s.Service != nil {
+		service = *s.Service
+	}
+	perms := 0600
+	if s.Permissions != nil {
+		perms = *s.Permissions
+	}
+
+	var err error
+	var tlsReceptor *tls.Config
+	if s.ReceptorTLS != nil {
+		tlsReceptor, err = s.ReceptorTLS.TLSConfig()
+		if err != nil {
+			return fmt.Errorf("could not create receptor tls config for tcp control service %s: %w", service, err)
+		}
+	}
+
+	return cv.RunControlSvc(
+		ctx,
+		service,
+		tlsReceptor,
+		s.File,
+		fs.FileMode(perms),
+		"",
+		nil,
+	)
+}
+
+// TCPControl exposes a receptor control socket via TCP.
+type TCPControl struct {
+	// Receptor service name to listen on.
+	Service *string `mapstructure:"service"`
+	// TLS config to use for the transport within receptor.
+	// Leave empty for no TLS.
+	ReceptorTLS *tls.ServerConf `mapstructure:"receptor-tls"`
+	// TLS config to use for the exposed control port..
+	// Leave empty for no TLS.
+	TCPTLS *tls.ServerConf `mapstructure:"tcp-tls"`
+	// Address to listen on ("host:port" from net package).
+	Address string `mapstructure:"address"`
+}
+
+func (s *TCPControl) setup(ctx context.Context, cv *Server) error {
+	service := "control"
+	if s.Service != nil {
+		service = *s.Service
+	}
+
+	var err error
+	var tlsReceptor *tls.Config
+	var tcptls *tls.Config
+	if s.ReceptorTLS != nil {
+		tlsReceptor, err = s.ReceptorTLS.TLSConfig()
+		if err != nil {
+			return fmt.Errorf("could not create receptor tls config for tcp control service %s: %w", service, err)
+		}
+	}
+
+	if s.TCPTLS != nil {
+		tcptls, err = s.TCPTLS.TLSConfig()
+		if err != nil {
+			return fmt.Errorf("could not create tcp tls config for tcp control service %s: %w", service, err)
+		}
+	}
+
+	return cv.RunControlSvc(
+		ctx,
+		service,
+		tlsReceptor,
+		"",
+		0,
+		s.Address,
+		tcptls,
+	)
 }

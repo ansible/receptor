@@ -993,3 +993,120 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-kubernetes", "Run a worker using Kubernetes", workKubeCfg{}, cmdline.Section(workersSection))
 }
+
+// Kubernetes allows receptor interfacing with a k8s cluster.
+type Kubernetes struct {
+	// Name for this worker type.
+	WorkType string `mapstructure:"work-type"`
+	// Kubernetes namespace to create pods in.
+	Namespace *string `mapstructure:"namespace"`
+	// Container image to use for the worker pod.
+	Image string `mapstructure:"image"`
+	// Command to run in the container (overrides entrypoint).
+	Command string `mapstructure:"command"`
+	// Command-line parameters to pass to the entrypoint.
+	Params string `mapstructure:"parameters"`
+	// One of: kubeconfig, incluster.
+	AuthMethod *string `mapstructure:"auth-method"` // default:"incluster"`
+	// Kubeconfig filename (for authmethod=kubeconfig).
+	KubeConfig *string `mapstructure:"kube-config"`
+	// Pod definition filename, in json or yaml format.
+	Pod string `mapstructure:"pod"`
+	// Do not verify server TLS certificate/hostname.
+	KubeNoVerifyTLS bool `mapstructure:"insecure-kube-no-verify-tls"`
+	// CA certificate PEM data to verify against.
+	KubeTLSCAData string `mapstructure:"kube-tls-ca-data"`
+	// Allow passing API parameters at runtime.
+	AllowRuntimeAuth bool `mapstructure:"allow-runtime-auth"`
+	// Allow passing TLS parameters at runtime.
+	AllowRuntimeTLS bool `mapstructure:"allow-runtime-tls"`
+	// Allow specifying image & command at runtime.
+	AllowRuntimeCommand bool `mapstructure:"allow-runtime-command"`
+	// Allow adding command parameters at runtime.
+	AllowRuntimeParams bool `mapstructure:"allow-runtime-parameters"`
+	// Allow passing Pod at runtime.
+	AllowRuntimePod bool `mapstructure:"allow-runtime-pod"`
+	// On restart, keep the pod if in pending state instead of deleting it.
+	KeepPodOnRestart bool `mapstructure:"keep-pod-on-restart"`
+	// Method for connecting to worker pods: logger or tcp.
+	StreamMethod *string `mapstructure:""`
+}
+
+func (k Kubernetes) setup(wc *Workceptor) error {
+	authMethod := "incluster"
+	if k.AuthMethod != nil {
+		authMethod = *k.AuthMethod
+	}
+	if authMethod != "kubeconfig" && authMethod != "incluster" && authMethod != "runtime" {
+		return fmt.Errorf("invalid AuthMethod: %s", authMethod)
+	}
+	namespace := ""
+	if k.Namespace != nil {
+		namespace = *k.Namespace
+	} else if !(authMethod == "kubeconfig" || k.AllowRuntimeAuth) {
+		return fmt.Errorf("must provide namespace when AuthMethod is not kubeconfig")
+	}
+	kubeConfig := ""
+	if k.KubeConfig != nil {
+		if authMethod != "kubeconfig" {
+			return fmt.Errorf("can only provide KubeConfig when AuthMethod=kubeconfig")
+		}
+
+		if _, err := os.Stat(*k.KubeConfig); err != nil {
+			return fmt.Errorf("error accessing kubeconfig file: %s", err)
+		}
+		kubeConfig = *k.KubeConfig
+	}
+
+	if k.Pod != "" && (k.Image != "" || k.Command != "" || k.Params != "") {
+		return fmt.Errorf("can only provide Pod when Image, Command, and Params are empty")
+	}
+	if k.KubeTLSCAData != "" {
+		if block, _ := pem.Decode([]byte(k.KubeTLSCAData)); block == nil || block.Type != "BEGIN CERTIFICATE" {
+			return fmt.Errorf("could not decode KubeTLSCAData as a PEM formatted certificate")
+		}
+	}
+	if k.Image == "" && !k.AllowRuntimeCommand && !k.AllowRuntimePod {
+		return fmt.Errorf("must specify a container image to run")
+	}
+	streamMethod := "logger"
+	if k.StreamMethod != nil {
+		streamMethod = *k.StreamMethod
+	}
+	if streamMethod != "logger" && streamMethod != "tcp" {
+		return fmt.Errorf("stream mode must be logger or tcp")
+	}
+
+	factory := func(w *Workceptor, unitID string, workType string) WorkUnit {
+		ku := &kubeUnit{
+			BaseWorkUnit: BaseWorkUnit{
+				status: StatusFileData{
+					ExtraData: &kubeExtraData{
+						Image:         k.Image,
+						Command:       k.Command,
+						KubeNamespace: namespace,
+						KubePod:       k.Pod,
+						KubeConfig:    kubeConfig,
+						KubeVerifyTLS: !k.KubeNoVerifyTLS,
+						KubeTLSCAData: k.KubeTLSCAData,
+					},
+				},
+			},
+			authMethod:          authMethod,
+			streamMethod:        streamMethod,
+			baseParams:          k.Params,
+			allowRuntimeAuth:    k.AllowRuntimeAuth,
+			allowRuntimeTLS:     k.AllowRuntimeTLS,
+			allowRuntimeCommand: k.AllowRuntimeCommand,
+			allowRuntimeParams:  k.AllowRuntimeParams,
+			allowRuntimePod:     k.AllowRuntimePod,
+			deletePodOnRestart:  !k.KeepPodOnRestart,
+			namePrefix:          fmt.Sprintf("%s-", strings.ToLower(k.WorkType)),
+		}
+		ku.BaseWorkUnit.Init(w, unitID, workType)
+
+		return ku
+	}
+
+	return wc.RegisterWorker(k.WorkType, factory)
+}

@@ -5,7 +5,7 @@ package backends
 
 import (
 	"context"
-	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/tls"
 )
 
 // WebsocketDialer implements Backend for outbound Websocket.
@@ -352,4 +353,97 @@ func init() {
 		"ws-listener", "Run an http server that accepts websocket connections", websocketListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"ws-peer", "Connect outbound to a websocket peer", websocketDialerCfg{}, cmdline.Section(backendSection))
+}
+
+var ErrInvalidHTTPHeader = errors.New("invalid http header")
+
+type WSListen struct {
+	// TLS configuration for listening. Leave empty for no TLS at all.
+	TLS *tls.ServerConf `mapstructure:"tls"`
+	// Address to listen on ("host:port" from net package).
+	Address string `mapstructure:"address"`
+	// Path cost for this connection. Defaults to 1.0, may not be <= 0.0.`
+	Cost *float64 `mapstructure:"cost"`
+	// Extra costs for specific nodes connecting.
+	NodeCosts map[string]float64 `mapstructure:"node-costs"`
+	// URI path to the websocket server. Default to /.
+	Path *string `mapstructure:"path" `
+}
+
+func (c WSListen) setup(nc *netceptor.Netceptor) error {
+	var err error
+	var tlsConf *tls.Config
+	if c.TLS != nil {
+		tlsConf, err = c.TLS.TLSConfig()
+		if err != nil {
+			return fmt.Errorf("could not create tls config for ws listener %s: %w", c.Address, err)
+		}
+	}
+
+	b, err := NewWebsocketListener(c.Address, tlsConf)
+	if c.Path != nil {
+		b.SetPath(*c.Path)
+	}
+	if err != nil {
+		return fmt.Errorf("could not create ws listener for %s from config: %w", c.Address, err)
+	}
+
+	cost, nodeCosts, err := validateListenerCost(c.Cost, c.NodeCosts)
+	if err != nil {
+		return fmt.Errorf("invalid ws listener config for %s: %w", c.Address, err)
+	}
+
+	if err := nc.AddBackend(b, cost, nodeCosts); err != nil {
+		return fmt.Errorf("error creating backend for ws listener %s: %w", c.Address, err)
+	}
+
+	return nil
+}
+
+// WSDial to a remote host.
+type WSDial struct {
+	// TLS configuration for listening. Leave empty for no TLS at all.
+	TLS *tls.ServerConf `mapstructure:"tls"`
+	// Address to connect to ("host:port" from net package).
+	Address string `mapstructure:"address"`
+	// Path cost for this connection. Defaults to 1.0, may not be <= 0.0.`
+	Cost *float64 `mapstructure:"cost"`
+	// Do not keep redialing on lost connection.
+	NoRedial bool `mapstructure:"no-redial"`
+	// Sends extra HTTP header on initial connection.
+	ExtraHeader *string `mapstructure:"extra-header"`
+}
+
+func (c WSDial) setup(nc *netceptor.Netceptor) error {
+	extraHeader := ""
+	if c.ExtraHeader != nil {
+		if *c.ExtraHeader == "" || !strings.Contains(*c.ExtraHeader, ":") {
+			return fmt.Errorf("invalid ws parameters for ws listener %s: %w", c.Address, ErrInvalidHTTPHeader)
+		}
+		extraHeader = *c.ExtraHeader
+	}
+
+	var err error
+	var tlsConf *tls.Config
+	if c.TLS != nil {
+		tlsConf, err = c.TLS.TLSConfig()
+		if err != nil {
+			return fmt.Errorf("could not create tls config for ws dialer %s: %w", c.Address, err)
+		}
+	}
+	b, err := NewWebsocketDialer(c.Address, tlsConf, extraHeader, !c.NoRedial)
+	if err != nil {
+		return fmt.Errorf("could not create ws dialer for %s from config: %w", c.Address, err)
+	}
+
+	cost, err := validateDialCost(c.Cost)
+	if err != nil {
+		return fmt.Errorf("invalid ws listener dialer for %s: %w", c.Address, err)
+	}
+
+	if err := nc.AddBackend(b, cost, nil); err != nil {
+		return fmt.Errorf("error creating backend for ws dialer %s: %w", c.Address, err)
+	}
+
+	return nil
 }

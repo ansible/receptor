@@ -4,7 +4,7 @@
 package services
 
 import (
-	"crypto/tls"
+	"fmt"
 	"net"
 	"os/exec"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/ghjm/cmdline"
 	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/project-receptor/receptor/pkg/tls"
 	"github.com/project-receptor/receptor/pkg/utils"
 )
 
@@ -77,4 +78,30 @@ func (cfg commandSvcCfg) Run() error {
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-command-service",
 		"command-service", "Run an interactive command via a Receptor service", commandSvcCfg{}, cmdline.Section(servicesSection))
+}
+
+// Command executes a command on a connection.
+type Command struct {
+	// Receptor service name to bind to.
+	Service string `mapstructure:"service"`
+	// Command to execute on a connection.
+	Command string `mapstructure:"command"`
+	// TLS config to use for the transport within receptor.
+	// Leave empty for no TLS.
+	TLS *tls.ServerConf `mapstructure:"tls"`
+}
+
+func (s *Command) setup(nc *netceptor.Netceptor) error {
+	var t *tls.Config
+	var err error
+	if s.TLS != nil {
+		t, err = s.TLS.TLSConfig()
+		if err != nil {
+			return fmt.Errorf("could not create tls config for command service %s: %w", s.Service, err)
+		}
+	}
+
+	go CommandService(nc, s.Service, t, s.Command)
+
+	return nil
 }

@@ -5,7 +5,6 @@ import (
 )
 
 func TestFirewallRules(t *testing.T) {
-
 	// Rule #1
 	rule, err := ParseFirewallRule("all:accept")
 	if err != nil {
@@ -68,5 +67,4 @@ func TestFirewallRules(t *testing.T) {
 	}) != FirewallResultReject {
 		t.Fatal("rule #4 did not return Reject")
 	}
-
 }

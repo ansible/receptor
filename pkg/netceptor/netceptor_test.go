@@ -233,6 +233,7 @@ func TestLotsOfPings(t *testing.T) {
 				pc, err := sender.ListenPacket("")
 				if err != nil {
 					errorChan <- err
+
 					return
 				}
 				go func() {
@@ -242,6 +243,7 @@ func TestLotsOfPings(t *testing.T) {
 						err := pc.SetReadDeadline(time.Now().Add(1 * time.Second))
 						if err != nil {
 							errorChan <- fmt.Errorf("error in SetReadDeadline: %s", err)
+
 							return
 						}
 						_, addr, err := pc.ReadFrom(buf)
@@ -254,10 +256,12 @@ func TestLotsOfPings(t *testing.T) {
 						ncAddr, ok := addr.(Addr)
 						if !ok {
 							errorChan <- fmt.Errorf("addr was not a Netceptor address")
+
 							return
 						}
 						if ncAddr.node != recipient.nodeID {
 							errorChan <- fmt.Errorf("received response from wrong node")
+
 							return
 						}
 						t.Logf("%s received response from %s", sender.nodeID, recipient.nodeID)
@@ -496,6 +500,7 @@ func TestFirewalling(t *testing.T) {
 			if string(md.Data) == "bad" {
 				return FirewallResultReject
 			}
+
 			return FirewallResultAccept
 		},
 	}, true)
@@ -598,7 +603,7 @@ func TestFirewalling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, _, err = pc1.ReadFrom(buf)
+	_, _, err = pc1.ReadFrom(buf)
 	if err != ErrTimeout {
 		if err == nil {
 			err = fmt.Errorf("received message that should have been firewalled")
@@ -654,6 +659,7 @@ func TestAllowedPeers(t *testing.T) {
 			if string(md.Data) == "bad" {
 				return FirewallResultReject
 			}
+
 			return FirewallResultAccept
 		},
 	}, true)
@@ -756,7 +762,7 @@ func TestAllowedPeers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, _, err = pc1.ReadFrom(buf)
+	_, _, err = pc1.ReadFrom(buf)
 	if err != ErrTimeout {
 		if err == nil {
 			err = fmt.Errorf("received message that should have been firewalled")

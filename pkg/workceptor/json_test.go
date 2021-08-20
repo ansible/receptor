@@ -34,7 +34,7 @@ func TestWorkceptorJson(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpdir)
-	nc := netceptor.New(nil, "test")
+	nc := netceptor.New(context.TODO(), "test")
 	w, err := New(context.Background(), nc, tmpdir)
 	if err != nil {
 		t.Fatal(err)

@@ -2,11 +2,12 @@ package mesh
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	_ "github.com/fortytw2/leaktest"
 	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
 	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"testing"
-	"time"
 )
 
 func TestFirewall(t *testing.T) {
@@ -29,7 +30,7 @@ func TestFirewall(t *testing.T) {
 			// but node1 and node3 can't talk to each other because node2 blocks the traffic
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{
-					"node2": mesh.YamlConnection{
+					"node2": {
 						Index: 0,
 					},
 				},
@@ -58,7 +59,7 @@ func TestFirewall(t *testing.T) {
 			}
 			data.Nodes["node3"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{
-					"node2": mesh.YamlConnection{
+					"node2": {
 						Index: 0,
 					},
 				},
@@ -113,7 +114,6 @@ func TestFirewall(t *testing.T) {
 				t.Logf("%v", err)
 				controller.Close()
 			}
-
 		})
 	}
 }

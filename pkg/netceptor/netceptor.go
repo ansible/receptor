@@ -82,17 +82,17 @@ type BackendSession interface {
 // FirewallRule is a function that takes a message and returns a firewall decision.
 type FirewallRule func(*MessageData) FirewallResult
 
-// FirewallResult enumerates the actions that can be taken as a result of a firewall rule
+// FirewallResult enumerates the actions that can be taken as a result of a firewall rule.
 type FirewallResult int
 
 const (
-	// FirewallResultContinue continues processing further rules (no result)
+	// FirewallResultContinue continues processing further rules (no result).
 	FirewallResultContinue FirewallResult = iota
-	// FirewallResultAccept accepts the message for normal processing
+	// FirewallResultAccept accepts the message for normal processing.
 	FirewallResultAccept
-	// FirewallResultReject denies the message, sending an unreachable message to the originator
+	// FirewallResultReject denies the message, sending an unreachable message to the originator.
 	FirewallResultReject
-	// FirewallResultDrop denies the message silently, leaving the originator to time out
+	// FirewallResultDrop denies the message silently, leaving the originator to time out.
 	FirewallResultDrop
 )
 
@@ -174,11 +174,11 @@ const (
 	ProblemServiceUnknown = "service unknown"
 	// ProblemExpiredInTransit occurs when a message's HopsToLive expires in transit.
 	ProblemExpiredInTransit = "message expired"
-	// ProblemRejected occurs when a packet is rejected by a firewall rule
+	// ProblemRejected occurs when a packet is rejected by a firewall rule.
 	ProblemRejected = "blocked by firewall"
 )
 
-// MessageData contains a single message packet from the network
+// MessageData contains a single message packet from the network.
 type MessageData struct {
 	FromNode    string
 	FromService string
@@ -360,9 +360,9 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	return &s
 }
 
-// New constructs a new Receptor network protocol instance
-func New(ctx context.Context, NodeID string) *Netceptor {
-	return NewWithConsts(ctx, NodeID, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
+// New constructs a new Receptor network protocol instance.
+func New(ctx context.Context, nodeID string) *Netceptor {
+	return NewWithConsts(ctx, nodeID, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
 		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
@@ -431,21 +431,21 @@ type backendInfo struct {
 	allowedPeers   []string
 }
 
-// BackendConnectionCost is a modifier for AddBackend, which sets the global connection cost
+// BackendConnectionCost is a modifier for AddBackend, which sets the global connection cost.
 func BackendConnectionCost(cost float64) func(*backendInfo) {
 	return func(bi *backendInfo) {
 		bi.connectionCost = cost
 	}
 }
 
-// BackendNodeCost is a modifier for AddBackend, which sets the per-node connection costs
+// BackendNodeCost is a modifier for AddBackend, which sets the per-node connection costs.
 func BackendNodeCost(nodeCost map[string]float64) func(*backendInfo) {
 	return func(bi *backendInfo) {
 		bi.nodeCost = nodeCost
 	}
 }
 
-// BackendAllowedPeers is a modifier for AddBackend, which sets the list of peers allowed to connect
+// BackendAllowedPeers is a modifier for AddBackend, which sets the list of peers allowed to connect.
 func BackendAllowedPeers(peers []string) func(*backendInfo) {
 	return func(bi *backendInfo) {
 		bi.allowedPeers = peers
@@ -608,6 +608,7 @@ func (s *Netceptor) AddFirewallRules(rules []FirewallRule, clearExisting bool) e
 		s.firewallRules = nil
 	}
 	s.firewallRules = append(s.firewallRules, rules...)
+
 	return nil
 }
 
@@ -1428,7 +1429,6 @@ func (s *Netceptor) dispatchReservedService(md *MessageData) (bool, error) {
 
 // Handles incoming data and dispatches it to a service listener.
 func (s *Netceptor) handleMessageData(md *MessageData) error {
-
 	// Check firewall rules for this packet
 	s.firewallLock.RLock()
 	result := FirewallResultAccept
@@ -1452,6 +1452,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 			ToService:   md.ToService,
 			Problem:     ProblemRejected,
 		})
+
 		return nil
 	}
 

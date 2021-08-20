@@ -2,10 +2,11 @@ package netceptor
 
 import (
 	"fmt"
-	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer/stateful"
 	"regexp"
 	"strings"
+
+	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer/stateful"
 )
 
 /*
@@ -39,7 +40,7 @@ TONODE = /(?i)a.*b/ : reject
 
 */
 
-// ParseFirewallRule takes a single string describing a firewall rule, and returns a FirewallRule function
+// ParseFirewallRule takes a single string describing a firewall rule, and returns a FirewallRule function.
 func ParseFirewallRule(rule string) (FirewallRule, error) {
 	parsedRule := &ruleString{}
 	err := ruleParser.ParseString("rule", rule, parsedRule)
@@ -48,19 +49,20 @@ func ParseFirewallRule(rule string) (FirewallRule, error) {
 	}
 	comps := make([]compareFunc, 0)
 	for _, pr := range parsedRule.RuleSpec.Rules {
-		if pr.Value.Value != "" {
+		switch rv := pr.Value; {
+		case rv.Value != "":
 			comp, err := stringCompare(pr.Field, pr.Value.Value)
 			if err != nil {
 				return nil, err
 			}
 			comps = append(comps, comp)
-		} else if pr.Value.Regex != "" {
+		case rv.Regex != "":
 			comp, err := regexCompare(pr.Field, pr.Value.Regex)
 			if err != nil {
 				return nil, err
 			}
 			comps = append(comps, comp)
-		} else {
+		default:
 			return nil, fmt.Errorf("no value or regex provided for field %s", pr.Field)
 		}
 	}
@@ -68,10 +70,11 @@ func ParseFirewallRule(rule string) (FirewallRule, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return fwr, nil
 }
 
-// ParseFirewallRules takes a slice of string describing firewall rules, and returns a slice of FirewallRule functions
+// ParseFirewallRules takes a slice of string describing firewall rules, and returns a slice of FirewallRule functions.
 func ParseFirewallRules(rules []string) ([]FirewallRule, error) {
 	results := make([]FirewallRule, 0)
 	for i, rule := range rules {
@@ -81,6 +84,7 @@ func ParseFirewallRules(rules []string) ([]FirewallRule, error) {
 		}
 		results = append(results, result)
 	}
+
 	return results, nil
 }
 
@@ -103,6 +107,7 @@ func firewallRule(comparers []compareFunc, action string) (FirewallRule, error) 
 			return result
 		}, nil
 	}
+
 	return func(md *MessageData) FirewallResult {
 		matched := true
 		for _, comp := range comparers {
@@ -111,6 +116,7 @@ func firewallRule(comparers []compareFunc, action string) (FirewallRule, error) 
 		if matched {
 			return result
 		}
+
 		return FirewallResultContinue
 	}, nil
 }
@@ -134,6 +140,7 @@ func stringCompare(field string, value string) (compareFunc, error) {
 			return md.ToService == value
 		}, nil
 	}
+
 	return nil, fmt.Errorf("unknown field: %s", field)
 }
 
@@ -164,6 +171,7 @@ func regexCompare(field string, value string) (compareFunc, error) {
 			return re.MatchString(md.ToService)
 		}, nil
 	}
+
 	return nil, fmt.Errorf("unknown field: %s", field)
 }
 
@@ -193,11 +201,11 @@ type ruleValue struct {
 
 var (
 	ruleLexer = stateful.MustSimple([]stateful.Rule{
-		{"Ident", `\w+`, nil},
-		{"Regex", `\/((?:[^/\\]|\\.)*)\/`, nil},
-		{"Text", `[^/,:= \t\r\n][^,:= \t\r\n]*`, nil},
-		{"Whitespace", `\s+`, nil},
-		{"Punctuation", `[-[~!@#$%^&*()+_={}\|:;"'<,>.?/]|]`, nil},
+		{Name: "Ident", Pattern: `\w+`, Action: nil},
+		{Name: "Regex", Pattern: `\/((?:[^/\\]|\\.)*)\/`, Action: nil},
+		{Name: "Text", Pattern: `[^/,:= \t\r\n][^,:= \t\r\n]*`, Action: nil},
+		{Name: "Whitespace", Pattern: `\s+`, Action: nil},
+		{Name: "Punctuation", Pattern: `[-[~!@#$%^&*()+_={}\|:;"'<,>.?/]|]`, Action: nil},
 	})
 	ruleParser = participle.MustBuild(&ruleString{},
 		participle.Lexer(ruleLexer),

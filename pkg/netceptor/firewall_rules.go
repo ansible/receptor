@@ -177,26 +177,26 @@ func regexCompare(field string, value string) (compareFunc, error) {
 
 //goland:noinspection GoVetStructTag
 type ruleString struct {
-	RuleSpec *ruleSpec `@@`
-	Action   string    `":" @Ident`
+	RuleSpec *ruleSpec `@@`         //nolint
+	Action   string    `":" @Ident` //nolint
 }
 
 //goland:noinspection GoVetStructTag
 type ruleSpec struct {
-	All   string  `@"all"`
-	Rules []*rule `| @@ ( "," @@ )*`
+	All   string  `@"all"`           //nolint
+	Rules []*rule `| @@ ( "," @@ )*` //nolint
 }
 
 //goland:noinspection GoVetStructTag
 type rule struct {
-	Field string     `@Ident`
-	Value *ruleValue `@@`
+	Field string     `@Ident` //nolint
+	Value *ruleValue `@@`     //nolint
 }
 
 //goland:noinspection GoVetStructTag
 type ruleValue struct {
-	Value string `"=" (@Ident|@Text)`
-	Regex string `| "=" @Regex`
+	Value string `"=" (@Ident|@Text)` //nolint
+	Regex string `| "=" @Regex`       //nolint
 }
 
 var (

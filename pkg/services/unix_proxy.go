@@ -141,7 +141,7 @@ type UnixInProxy struct {
 }
 
 func (p *UnixInProxy) setup(nc *netceptor.Netceptor) error {
-	perms := 0600
+	perms := 0o600
 	if p.Permissions != nil {
 		perms = *p.Permissions
 	}

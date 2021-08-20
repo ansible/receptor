@@ -1,5 +1,5 @@
-// +build !no_proxies
-// +build !no_services
+//go:build !no_proxies && !no_services
+// +build !no_proxies,!no_services
 
 package services
 
@@ -8,10 +8,10 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 // UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service.

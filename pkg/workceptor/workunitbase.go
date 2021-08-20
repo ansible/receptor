@@ -1,3 +1,4 @@
+//go:build !no_workceptor
 // +build !no_workceptor
 
 package workceptor
@@ -13,8 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/fsnotify/fsnotify"
-	"github.com/project-receptor/receptor/pkg/logger"
 	"github.com/rogpeppe/go-internal/lockedfile"
 )
 

@@ -49,7 +49,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 go build -o receptor -ldflags "-X 'github.com/project-receptor/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 go build -o receptor -ldflags "-X 'github.com/ansible/receptor/pkg/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
 
 lint:
 	@golint cmd/... pkg/... example/...

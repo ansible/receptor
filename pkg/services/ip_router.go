@@ -1,5 +1,5 @@
-// +build linux,!no_ip_router
-// +build linux,!no_services
+//go:build linux && !no_ip_router && linux && !no_services
+// +build linux,!no_ip_router,linux,!no_services
 
 package services
 
@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/utils"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"

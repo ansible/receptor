@@ -1,5 +1,5 @@
-// +build !windows,!no_command_service
-// +build !windows,!no_services
+//go:build !windows && !no_command_service && !windows && !no_services
+// +build !windows,!no_command_service,!windows,!no_services
 
 package services
 
@@ -9,12 +9,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/tls"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/pkg/tls"
-	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 func runCommand(qc net.Conn, command string) error {

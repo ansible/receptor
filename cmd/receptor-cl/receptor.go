@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/ansible/receptor/pkg/backends"
+	_ "github.com/ansible/receptor/pkg/certificates"
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	_ "github.com/ansible/receptor/pkg/services"
+	_ "github.com/ansible/receptor/pkg/version"
+	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ghjm/cmdline"
-	_ "github.com/project-receptor/receptor/pkg/backends"
-	_ "github.com/project-receptor/receptor/pkg/certificates"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	_ "github.com/project-receptor/receptor/pkg/services"
-	_ "github.com/project-receptor/receptor/pkg/version"
-	"github.com/project-receptor/receptor/pkg/workceptor"
 )
 
 type nodeCfg struct {

@@ -1,3 +1,4 @@
+//go:build !no_workceptor
 // +build !no_workceptor
 
 package workceptor
@@ -9,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {

@@ -1,3 +1,4 @@
+//go:build !no_backends
 // +build !no_backends
 
 package backends
@@ -6,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // ErrInvalidCost indicates an invalid path cost.

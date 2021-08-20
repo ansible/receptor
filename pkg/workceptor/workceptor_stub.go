@@ -1,3 +1,4 @@
+//go:build no_workceptor
 // +build no_workceptor
 
 package workceptor
@@ -8,8 +9,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // ErrNotImplemented is returned from functions that are stubbed out

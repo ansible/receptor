@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/certificates"
+	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/spf13/cobra"
 )
 

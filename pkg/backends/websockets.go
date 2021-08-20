@@ -408,7 +408,7 @@ func (c WSListen) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid ws listener config for %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nodeCosts); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCosts)); err != nil {
 		return fmt.Errorf("error creating backend for ws listener %s: %w", c.Address, err)
 	}
 
@@ -456,7 +456,7 @@ func (c WSDial) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid ws listener dialer for %s: %w", c.URL, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nil); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), nil); err != nil {
 		return fmt.Errorf("error creating backend for ws dialer %s: %w", c.URL, err)
 	}
 

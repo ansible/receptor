@@ -63,7 +63,7 @@ func (r Receptor) Serve(ctx context.Context) error {
 		id = *r.ID
 	}
 
-	nc := netceptor.New(ctx, id, r.AllowedPeers)
+	nc := netceptor.New(ctx, id)
 	wc, err := workceptor.New(ctx, nc, r.DataDir)
 	if err != nil {
 		return fmt.Errorf("could not setup workceptor from serve config: %w", err)

@@ -371,7 +371,7 @@ func (c TCPListen) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid tcp listener config for %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nodeCosts); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCosts)); err != nil {
 		return fmt.Errorf("error creating backend for tcp listener %s: %w", c.Address, err)
 	}
 
@@ -410,7 +410,7 @@ func (c TCPDial) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid cost for tcp dial %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nil); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), nil); err != nil {
 		return fmt.Errorf("error creating backend for tcp dial %s: %w", c.Address, err)
 	}
 

@@ -392,7 +392,7 @@ func (c UDPListen) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid udp listener config for %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nodeCosts); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCosts)); err != nil {
 		return fmt.Errorf("error creating backend for udp listener %s: %w", c.Address, err)
 	}
 
@@ -420,7 +420,7 @@ func (c UDPDial) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid udp listener connection for %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nil); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), nil); err != nil {
 		return fmt.Errorf("error creating backend for udp connection %s: %w", c.Address, err)
 	}
 

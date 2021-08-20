@@ -474,7 +474,7 @@ func (s *UnixControl) setup(ctx context.Context, cv *Server) error {
 	if s.Service != nil {
 		service = *s.Service
 	}
-	perms := 0600
+	perms := 0o600
 	if s.Permissions != nil {
 		perms = *s.Permissions
 	}

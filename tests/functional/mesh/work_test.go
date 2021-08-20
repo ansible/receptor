@@ -22,6 +22,16 @@ func checkSkipKube(t *testing.T) {
 	}
 }
 
+func tearDown(controllers map[string]*receptorcontrol.ReceptorControl, m *mesh.CLIMesh) {
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+	defer func() {
+		for _, controller := range controllers {
+			controller.Close()
+		}
+	}()
+}
+
 func TestWork(t *testing.T) {
 	t.Parallel()
 	home := os.Getenv("HOME")
@@ -186,16 +196,6 @@ func TestWork(t *testing.T) {
 			}
 
 			return controllers, m, expectedResults
-		}
-
-		tearDown := func(controllers map[string]*receptorcontrol.ReceptorControl, m *mesh.CLIMesh) {
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-			defer func() {
-				for _, controller := range controllers {
-					controller.Close()
-				}
-			}()
 		}
 
 		assertFilesReleased := func(ctx context.Context, nodeDir, nodeID, unitID string) error {
@@ -623,22 +623,24 @@ func TestRuntimeParams(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodes := m.Nodes()
-	controller := receptorcontrol.New()
-	err = controller.Connect(nodes["node0"].ControlSocket())
+	controllers := make(map[string]*receptorcontrol.ReceptorControl)
+	defer tearDown(controllers, m)
+	controllers["node0"] = receptorcontrol.New()
+	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
 		t.Fatal(err)
 	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
-	unitID, err := controller.WorkSubmitJSON(command)
+	unitID, err := controllers["node0"].WorkSubmitJSON(command)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = controller.AssertWorkSucceeded(ctx, unitID)
+	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = controller.AssertWorkResults(unitID, []byte("it worked!"))
+	err = controllers["node0"].AssertWorkResults(unitID, []byte("it worked!"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -687,21 +689,23 @@ func TestKubeRuntimeParams(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodes := m.Nodes()
-	controller := receptorcontrol.New()
-	err = controller.Connect(nodes["node0"].ControlSocket())
+	controllers := make(map[string]*receptorcontrol.ReceptorControl)
+	defer tearDown(controllers, m)
+	controllers["node0"] = receptorcontrol.New()
+	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
 		t.Fatal(err)
 	}
 	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_pod": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
-	unitID, err := controller.WorkSubmitJSON(command)
+	unitID, err := controllers["node0"].WorkSubmitJSON(command)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = controller.AssertWorkSucceeded(ctx, unitID)
+	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = controller.AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
+	err = controllers["node0"].AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -740,13 +744,15 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodes := m.Nodes()
-	controller := receptorcontrol.New()
-	err = controller.Connect(nodes["node0"].ControlSocket())
+	controllers := make(map[string]*receptorcontrol.ReceptorControl)
+	defer tearDown(controllers, m)
+	controllers["node0"] = receptorcontrol.New()
+	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
 		t.Fatal(err)
 	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
-	_, err = controller.WorkSubmitJSON(command)
+	_, err = controllers["node0"].WorkSubmitJSON(command)
 	if err == nil {
 		t.Fatal("Expected work submit to fail but it succeeded")
 	}
@@ -788,18 +794,20 @@ func TestKubeContainerFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodes := m.Nodes()
-	controller := receptorcontrol.New()
-	err = controller.Connect(nodes["node0"].ControlSocket())
+	controllers := make(map[string]*receptorcontrol.ReceptorControl)
+	defer tearDown(controllers, m)
+	controllers["node0"] = receptorcontrol.New()
+	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
 		t.Fatal(err)
 	}
 	job := `{"command":"work","subcommand":"submit","worktype":"kubejob","node":"node0"}`
-	unitID, err := controller.WorkSubmitJSON(job)
+	unitID, err := controllers["node0"].WorkSubmitJSON(job)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
-	err = controller.AssertWorkFailed(ctx, unitID)
+	err = controllers["node0"].AssertWorkFailed(ctx, unitID)
 	if err != nil {
 		t.Fatal("Expected work to fail but it succeeded")
 	}

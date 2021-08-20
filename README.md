@@ -19,7 +19,7 @@ Receptor is an overlay network intended to ease the distribution of work across 
 
 The easiest way to check out Receptor is to run it as a container.  Images are kept on the Quay registry.  To use this, run:
 ```
-[docker|podman] pull quay.io/project-receptor/receptor
+[docker|podman] pull quay.io/ansible/receptor
 [docker|podman] run -d -v /path/to/receptor.conf:/etc/receptor/receptor.conf:Z receptor
 ```
 
@@ -33,8 +33,8 @@ dnf install receptor receptorctl
 
 This code can be imported and used from Go programs.  The main libraries are:
 
-* _Netceptor_: https://pkg.go.dev/github.com/project-receptor/receptor/pkg/netceptor
-* _Workceptor_: https://pkg.go.dev/github.com/project-receptor/receptor/pkg/workceptor
+* _Netceptor_: https://pkg.go.dev/github.com/ansible/receptor/pkg/netceptor
+* _Workceptor_: https://pkg.go.dev/github.com/ansible/receptor/pkg/workceptor
 
 See the `example/` directory for examples of using these libraries from Go.
 
@@ -58,4 +58,4 @@ Receptor can also take its configuration from a file in YAML format.  The allowe
 
 ## Python Receptor and the 0.6 versions
 
-As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at https://github.com/project-receptor/python-receptor.
+As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at https://github.com/ansible/python-receptor.

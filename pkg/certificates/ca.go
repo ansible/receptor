@@ -1,3 +1,4 @@
+//go:build !no_cert_auth
 // +build !no_cert_auth
 
 package certificates
@@ -16,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/utils"
+	"github.com/ansible/receptor/pkg/utils"
 )
 
 // CertNames lists the subjectAltNames that can be assigned to a certificate or request.

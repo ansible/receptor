@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/lucas-clemente/quic-go"
-	"github.com/project-receptor/receptor/pkg/utils"
 )
 
 type acceptResult struct {

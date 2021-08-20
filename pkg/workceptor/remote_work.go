@@ -1,3 +1,4 @@
+//go:build !no_workceptor
 // +build !no_workceptor
 
 package workceptor
@@ -16,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/utils"
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/utils"
 )
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.

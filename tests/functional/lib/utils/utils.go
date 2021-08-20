@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/certificates"
+	"github.com/ansible/receptor/pkg/certificates"
 )
 
 var (

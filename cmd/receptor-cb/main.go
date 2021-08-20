@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/project-receptor/receptor/pkg/version"
+	"github.com/ansible/receptor/pkg/version"
 	"github.com/spf13/cobra"
 )
 

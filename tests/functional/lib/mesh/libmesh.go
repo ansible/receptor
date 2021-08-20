@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/backends"
-	"github.com/project-receptor/receptor/pkg/controlsvc"
-	"github.com/project-receptor/receptor/pkg/netceptor"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/project-receptor/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/pkg/backends"
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/ansible/receptor/tests/functional/lib/utils"
 	"gopkg.in/yaml.v2"
 )
 

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/tests/functional/lib/mesh"
+	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
 	_ "github.com/fortytw2/leaktest"
-	"github.com/project-receptor/receptor/tests/functional/lib/mesh"
-	"github.com/project-receptor/receptor/tests/functional/lib/receptorcontrol"
 	"gopkg.in/yaml.v2"
 )
 

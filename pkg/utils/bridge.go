@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/project-receptor/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/logger"
 )
 
 // NormalBufferSize is the size of buffers used by various processes when copying data between sockets.

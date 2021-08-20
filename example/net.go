@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/project-receptor/receptor/pkg/backends"
-	"github.com/project-receptor/receptor/pkg/logger"
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/backends"
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 /*

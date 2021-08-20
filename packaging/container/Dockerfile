@@ -11,7 +11,7 @@ ARG VERSION
 
 LABEL license="ASL2"
 LABEL name="receptor"
-LABEL vendor="project-receptor"
+LABEL vendor="ansible"
 LABEL version="${VERSION}"
 
 RUN dnf -y update && \

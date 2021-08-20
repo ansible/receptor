@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/project-receptor/receptor/pkg/certificates"
+	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/spf13/cobra"
 )
 

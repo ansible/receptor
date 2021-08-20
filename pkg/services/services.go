@@ -1,12 +1,12 @@
-// +build linux,!no_ip_router
-// +build linux,!no_services
+//go:build linux && !no_ip_router && linux && !no_services
+// +build linux,!no_ip_router,linux,!no_services
 
 package services
 
 import (
 	"fmt"
 
-	"github.com/project-receptor/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // Services defines a set of receptor services.

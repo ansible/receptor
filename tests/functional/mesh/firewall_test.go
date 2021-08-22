@@ -48,10 +48,10 @@ func TestFirewall(t *testing.T) {
 					map[interface{}]interface{}{
 						"node": map[interface{}]interface{}{
 							"id": "node2",
-							"firewallrules": []interface{}{
-								"FromNode=node2:accept",
-								"ToNode=node3:reject",
-								"ToNode=node1:reject",
+							"firewallrules": []map[string]string{
+								{"Action": "accept", "FromNode": "node2"},
+								{"Action": "reject", "ToNode": "node3"},
+								{"Action": "reject", "ToNode": "node1"},
 							},
 						},
 					},

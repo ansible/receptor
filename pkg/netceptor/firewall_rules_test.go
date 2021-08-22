@@ -5,8 +5,12 @@ import (
 )
 
 func TestFirewallRules(t *testing.T) {
+	var frd FirewallRuleData
+
 	// Rule #1
-	rule, err := ParseFirewallRule("all:accept")
+	frd = FirewallRuleData{}
+	frd["action"] = "accept"
+	rule, err := frd.ParseFirewallRule()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,8 +18,13 @@ func TestFirewallRules(t *testing.T) {
 		t.Fatal("rule #1 did not return Accept")
 	}
 
-	// Rule #2
-	rule, err = ParseFirewallRule("FromNode=foo, ToNode=bar, ToService=control: drop")
+	// // Rule #2
+	frd = FirewallRuleData{}
+	frd["Action"] = "drop"
+	frd["FromNode"] = "foo"
+	frd["ToNode"] = "bar"
+	frd["ToService"] = "control"
+	rule, err = frd.ParseFirewallRule()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +40,10 @@ func TestFirewallRules(t *testing.T) {
 	}
 
 	// Rule #3
-	rule, err = ParseFirewallRule("fromnode = /a.*b/ : reject")
+	frd = FirewallRuleData{}
+	frd["fromnode"] = "/a.*b/"
+	frd["action"] = "reject"
+	rule, err = frd.ParseFirewallRule()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +62,10 @@ func TestFirewallRules(t *testing.T) {
 	}
 
 	// Rule #4
-	rule, err = ParseFirewallRule("TONODE = /(?i)a.*b/ : reject")
+	frd = FirewallRuleData{}
+	frd["TONODE"] = "/(?i)a.*b/"
+	frd["ACTION"] = "reject"
+	rule, err = frd.ParseFirewallRule()
 	if err != nil {
 		t.Fatal(err)
 	}

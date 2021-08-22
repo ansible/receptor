@@ -79,8 +79,8 @@ type BackendSession interface {
 	Close() error
 }
 
-// FirewallRule is a function that takes a message and returns a firewall decision.
-type FirewallRule func(*MessageData) FirewallResult
+// FirewallRuleFunc is a function that takes a message and returns a firewall decision.
+type FirewallRuleFunc func(*MessageData) FirewallResult
 
 // FirewallResult enumerates the actions that can be taken as a result of a firewall rule.
 type FirewallResult int
@@ -139,7 +139,7 @@ type Netceptor struct {
 	unreachableBroker      *utils.Broker
 	routingUpdateBroker    *utils.Broker
 	firewallLock           *sync.RWMutex
-	firewallRules          []FirewallRule
+	firewallRules          []FirewallRuleFunc
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -601,7 +601,7 @@ func (s *Netceptor) PathCost(nodeID string) (float64, error) {
 }
 
 // AddFirewallRules adds firewall rules, optionally clearing existing rules first.
-func (s *Netceptor) AddFirewallRules(rules []FirewallRule, clearExisting bool) error {
+func (s *Netceptor) AddFirewallRules(rules []FirewallRuleFunc, clearExisting bool) error {
 	s.firewallLock.Lock()
 	defer s.firewallLock.Unlock()
 	if clearExisting {

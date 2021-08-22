@@ -495,7 +495,7 @@ func TestFirewalling(t *testing.T) {
 	}
 
 	// Add a firewall to node 1 that rejects messages whose data is "bad"
-	err = n1.AddFirewallRules([]FirewallRule{
+	err = n1.AddFirewallRules([]FirewallRuleFunc{
 		func(md *MessageData) FirewallResult {
 			if string(md.Data) == "bad" {
 				return FirewallResultReject
@@ -654,7 +654,7 @@ func TestAllowedPeers(t *testing.T) {
 	}
 
 	// Add a firewall to node 1 that rejects messages whose data is "bad"
-	err = n1.AddFirewallRules([]FirewallRule{
+	err = n1.AddFirewallRules([]FirewallRuleFunc{
 		func(md *MessageData) FirewallResult {
 			if string(md.Data) == "bad" {
 				return FirewallResultReject

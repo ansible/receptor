@@ -123,4 +123,5 @@ Note: the config file does not specify a node ID, so the hostname (on the contai
    workceptor
    k8s
    tls
+   firewall
    developer_guide

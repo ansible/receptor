@@ -2,71 +2,99 @@ package netceptor
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
-
-	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer/stateful"
 )
 
-/*
+type FirewallRuleData map[interface{}]interface{}
 
-This file provides a parser for firewall rules provided by the CLI.  It takes strings
-and returns rule functions suitable for passing to AddFirewallRules().
+type FirewallRule struct {
+	Action      string
+	FromNode    string
+	ToNode      string
+	FromService string
+	ToService   string
+}
 
-The firewall language is as follows:
-
-RULE[, RULE, ...]: ACTION
-
-Each RULE is either the word "all", or an expression of the form field=value or field=/regex/, where field
-can be FromNode, FromService, ToNode or ToService.  Regular expressions must match the whole string, not
-a substring.  A special RULE of "all" matches everything.  ACTION can be one of Accept, Reject or Drop.
-All tokens are case insensitive and all whitespace is optional; field values contents are case sensitive.
-
-Example rules:
-
-all:accept
-  Accepts everything
-
-FromNode=foo, ToNode=bar, ToService=control: drop
-  Silently drops messages from foo to bar's control service
-  Note that "foo", "bar" and "control" are case sensitive
-
-fromnode = /a.*b/ : reject
-  Rejects messages originating from any node whose node ID starts with a and ends with b
-
-TONODE = /(?i)a.*b/ : reject
-  Rejects messages destined for any node whose node ID starts with a or A and ends with b or B
-
-*/
-
-// ParseFirewallRule takes a single string describing a firewall rule, and returns a FirewallRule function.
-func ParseFirewallRule(rule string) (FirewallRule, error) {
-	parsedRule := &ruleString{}
-	err := ruleParser.ParseString("rule", rule, parsedRule)
-	if err != nil {
-		return nil, err
+func buildComp(field string, pattern string) CompareFunc {
+	if pattern == "" {
+		return nil
 	}
-	comps := make([]compareFunc, 0)
-	for _, pr := range parsedRule.RuleSpec.Rules {
-		switch rv := pr.Value; {
-		case rv.Value != "":
-			comp, err := stringCompare(pr.Field, pr.Value.Value)
-			if err != nil {
-				return nil, err
-			}
-			comps = append(comps, comp)
-		case rv.Regex != "":
-			comp, err := regexCompare(pr.Field, pr.Value.Regex)
-			if err != nil {
-				return nil, err
-			}
-			comps = append(comps, comp)
+	var comp CompareFunc
+	if strings.HasPrefix(pattern, "/") {
+		comp, _ = regexCompare(field, pattern)
+	} else {
+		comp, _ = stringCompare(field, pattern)
+	}
+
+	return comp
+}
+
+func (fr FirewallRule) BuildComps() []CompareFunc {
+	var comps []CompareFunc
+	fnc := buildComp("fromnode", fr.FromNode)
+	if fnc != nil {
+		comps = append(comps, fnc)
+	}
+
+	tnc := buildComp("tonode", fr.ToNode)
+	if tnc != nil {
+		comps = append(comps, tnc)
+	}
+
+	fsc := buildComp("fromservice", fr.FromService)
+	if fsc != nil {
+		comps = append(comps, fsc)
+	}
+
+	tsc := buildComp("toservice", fr.ToService)
+	if tsc != nil {
+		comps = append(comps, tsc)
+	}
+
+	return comps
+}
+
+// ParseFirewallRule takes a single string describing a firewall rule, and returns a FirewallRuleFunc function.
+func (frd FirewallRuleData) ParseFirewallRule() (FirewallRuleFunc, error) {
+	rv := reflect.ValueOf(frd)
+	if rv.Kind() != reflect.Map {
+		return nil, fmt.Errorf("invalid firewall rule. see documentation for syntax")
+	}
+
+	fr := FirewallRule{}
+	for _, key := range rv.MapKeys() {
+		mkv := rv.MapIndex(key)
+		key := key.Elem().String()
+
+		switch mkv.Interface().(type) {
+		case string:
+			// expected
 		default:
-			return nil, fmt.Errorf("no value or regex provided for field %s", pr.Field)
+			return nil, fmt.Errorf("invalid firewall rule. %s must be a string", key)
+		}
+
+		val := mkv.Elem().String()
+
+		switch strings.ToLower(key) {
+		case "action":
+			fr.Action = val
+		case "fromnode":
+			fr.FromNode = val
+		case "tonode":
+			fr.ToNode = val
+		case "fromservice":
+			fr.FromService = val
+		case "toservice":
+			fr.ToService = val
+		default:
+			return nil, fmt.Errorf("invalid filewall rule. unknown key: %s", key)
 		}
 	}
-	fwr, err := firewallRule(comps, parsedRule.Action)
+
+	comps := fr.BuildComps()
+	fwr, err := firewallRule(comps, fr.Action)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +102,11 @@ func ParseFirewallRule(rule string) (FirewallRule, error) {
 	return fwr, nil
 }
 
-// ParseFirewallRules takes a slice of string describing firewall rules, and returns a slice of FirewallRule functions.
-func ParseFirewallRules(rules []string) ([]FirewallRule, error) {
-	results := make([]FirewallRule, 0)
+// ParseFirewallRules takes a slice of string describing firewall rules, and returns a slice of FirewallRuleFunc functions.
+func ParseFirewallRules(rules []FirewallRuleData) ([]FirewallRuleFunc, error) {
+	results := make([]FirewallRuleFunc, 0)
 	for i, rule := range rules {
-		result, err := ParseFirewallRule(rule)
+		result, err := rule.ParseFirewallRule()
 		if err != nil {
 			return nil, fmt.Errorf("error in rule %d: %s", i, err)
 		}
@@ -88,9 +116,9 @@ func ParseFirewallRules(rules []string) ([]FirewallRule, error) {
 	return results, nil
 }
 
-type compareFunc func(md *MessageData) bool
+type CompareFunc func(md *MessageData) bool
 
-func firewallRule(comparers []compareFunc, action string) (FirewallRule, error) {
+func firewallRule(comparers []CompareFunc, action string) (FirewallRuleFunc, error) {
 	var result FirewallResult
 	switch strings.ToLower(action) {
 	case "accept":
@@ -121,7 +149,7 @@ func firewallRule(comparers []compareFunc, action string) (FirewallRule, error) 
 	}, nil
 }
 
-func stringCompare(field string, value string) (compareFunc, error) {
+func stringCompare(field string, value string) (CompareFunc, error) {
 	switch strings.ToLower(field) {
 	case "fromnode":
 		return func(md *MessageData) bool {
@@ -144,7 +172,7 @@ func stringCompare(field string, value string) (compareFunc, error) {
 	return nil, fmt.Errorf("unknown field: %s", field)
 }
 
-func regexCompare(field string, value string) (compareFunc, error) {
+func regexCompare(field string, value string) (CompareFunc, error) {
 	if value[0] != '/' || value[len(value)-1] != '/' {
 		return nil, fmt.Errorf("regex not enclosed in //")
 	}
@@ -174,41 +202,3 @@ func regexCompare(field string, value string) (compareFunc, error) {
 
 	return nil, fmt.Errorf("unknown field: %s", field)
 }
-
-//goland:noinspection GoVetStructTag
-type ruleString struct {
-	RuleSpec *ruleSpec `@@`         //nolint
-	Action   string    `":" @Ident` //nolint
-}
-
-//goland:noinspection GoVetStructTag
-type ruleSpec struct {
-	All   string  `@"all"`           //nolint
-	Rules []*rule `| @@ ( "," @@ )*` //nolint
-}
-
-//goland:noinspection GoVetStructTag
-type rule struct {
-	Field string     `@Ident` //nolint
-	Value *ruleValue `@@`     //nolint
-}
-
-//goland:noinspection GoVetStructTag
-type ruleValue struct {
-	Value string `"=" (@Ident|@Text)` //nolint
-	Regex string `| "=" @Regex`       //nolint
-}
-
-var (
-	ruleLexer = stateful.MustSimple([]stateful.Rule{
-		{Name: "Ident", Pattern: `\w+`, Action: nil},
-		{Name: "Regex", Pattern: `\/((?:[^/\\]|\\.)*)\/`, Action: nil},
-		{Name: "Text", Pattern: `[^/,:= \t\r\n][^,:= \t\r\n]*`, Action: nil},
-		{Name: "Whitespace", Pattern: `\s+`, Action: nil},
-		{Name: "Punctuation", Pattern: `[-[~!@#$%^&*()+_={}\|:;"'<,>.?/]|]`, Action: nil},
-	})
-	ruleParser = participle.MustBuild(&ruleString{},
-		participle.Lexer(ruleLexer),
-		participle.Elide("Whitespace"),
-		participle.UseLookahead(2))
-)

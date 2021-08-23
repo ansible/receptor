@@ -341,12 +341,20 @@ func (cfg udpDialerCfg) Run() error {
 	return nil
 }
 
+func (cfg udpDialerCfg) PreReload() error {
+	return cfg.Prepare()
+}
+
+func (cfg udpListenerCfg) PreReload() error {
+	return cfg.Prepare()
+}
+
 func (cfg udpDialerCfg) Reload() error {
-	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+	return cfg.Run()
 }
 
 func (cfg udpListenerCfg) Reload() error {
-	return runFuncs([]func() error{cfg.Prepare, cfg.Run})
+	return cfg.Run()
 }
 
 func init() {

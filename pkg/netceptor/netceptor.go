@@ -406,21 +406,37 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
+	// Start() runs a go routine that attempts establish a session over this
+	// backend. For listeners, each time a peer dials this backend, sessChan is
+	// written to, resulting in multiple ongoing sessions at once.
 	sessChan, err := backend.Start(ctxBackend, &s.backendWaitGroup)
 	if err != nil {
 		return err
 	}
 	s.backendWaitGroup.Add(1)
 	s.backendCount++
+	// Outer go routine -- this go routine waits for new sessions to be written to the sessChan and
+	// starts the runProtocol() for that session
 	go func() {
-		defer s.backendWaitGroup.Done()
+		runProtocolWg := sync.WaitGroup{}
+		defer func() {
+			// First wait for all session protocols to finish (the inner go routines)
+			// for this backend before exiting this outer go routine.
+			// It is important that the inner go routine is on a separate wait group
+			// from the outer go routine.
+			runProtocolWg.Wait()
+			s.backendWaitGroup.Done()
+		}()
 		for {
 			select {
 			case sess, ok := <-sessChan:
 				if ok {
-					s.backendWaitGroup.Add(1)
+					runProtocolWg.Add(1)
+					// Inner go routine -- start the runProtocol loop for the new session
+					// that was just passed to sessChan (which was written to from the
+					// Start() method above)
 					go func() {
-						defer s.backendWaitGroup.Done()
+						defer runProtocolWg.Done()
 						err := s.runProtocol(ctxBackend, sess, connectionCost, nodeCost)
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
@@ -441,11 +457,6 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 // BackendWait waits for the backend wait group.
 func (s *Netceptor) BackendWait() {
 	s.backendWaitGroup.Wait()
-}
-
-// BackendWaitGroupAdd increments backendWaitGroup counter.
-func (s *Netceptor) BackendWaitGroupAdd() {
-	s.backendWaitGroup.Add(1)
 }
 
 // BackendDone calls Done on the backendWaitGroup.

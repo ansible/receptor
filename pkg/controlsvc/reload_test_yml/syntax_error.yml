@@ -1,0 +1,15 @@
+---
+1234syntaxerror # syntax error
+- node:
+    id: foo
+    allowedpeers: bar
+
+- log-level: Info
+- trace
+
+- tcp-peer:
+    address: localhost:8001
+
+- control-service:
+    service: control
+    filename: /tmp/foo.sock

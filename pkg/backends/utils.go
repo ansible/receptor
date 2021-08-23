@@ -115,16 +115,3 @@ func listenerSession(ctx context.Context, wg *sync.WaitGroup, lf listenFunc, af 
 
 	return sessChan, nil
 }
-
-func runFuncs(f []func() error) error {
-	// convenience for running an slice of functions and returning any
-	// errors along the way
-	for _, toRun := range f {
-		err := toRun()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}

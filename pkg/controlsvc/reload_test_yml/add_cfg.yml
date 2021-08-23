@@ -1,0 +1,24 @@
+---
+- node:
+    id: foo
+    allowedpeers: bar
+
+- log-level: Info
+- trace
+
+- tcp-peer:
+    address: localhost:8001
+
+- control-service:
+    service: control
+    filename: /tmp/foo.sock
+
+- work-command:
+    workType: hello
+    command: bash
+    params: "-c \"echo hello\""
+
+- work-command: # not reloadable
+    workType: hello2
+    command: bash
+    params: "-c \"echo hello2\""

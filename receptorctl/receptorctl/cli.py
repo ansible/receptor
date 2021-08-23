@@ -171,7 +171,12 @@ def reload(ctx):
         print(f"Reload successful")
     else:
         print(f"Error: {results['Error']}")
-
+        if "ERRORCODE 3" in results['Error']:
+            sys.exit(3)
+        elif "ERRORCODE 4" in results['Error']:
+            sys.exit(4)
+        else:
+            sys.exit(4)
 
 @cli.command(help="Do a traceroute to a Receptor node.")
 @click.pass_context

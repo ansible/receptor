@@ -42,27 +42,32 @@ func validateListenerCost(rawCost *float64, rawNodeCost map[string]float64) (flo
 	return cost, rawNodeCost, nil
 }
 
+// Dial to other instances.
+type Dial struct {
+	// WS dial.
+	WS []WSDial `mapstructure:"ws"`
+	// UDP dial.
+	UDP []UDPDial `mapstructure:"udp"`
+	// TCP dial.
+	TCP []TCPDial `mapstructure:"tcp"`
+}
+
+// Listen for connections of other instances.
+type Listen struct {
+	// WS listener.
+	WS []WSListen `mapstructure:"ws"`
+	// UDP listener.
+	UDP []UDPListen `mapstructure:"udp"`
+	// TCP listener.
+	TCP []TCPListen `mapstructure:"tcp"`
+}
+
 // Backends is a set of backends used by a receptor instance.
 type Backends struct {
 	// Dial to other instances.
-	Dial struct {
-		// WS dial.
-		WS []WSDial `mapstructure:"ws"`
-		// UDP dial.
-		UDP []UDPDial `mapstructure:"udp"`
-		// TCP dial.
-		TCP []TCPDial `mapstructure:"tcp"`
-	} `mapstructure:"dial"`
-
+	Dial Dial `mapstructure:"dial"`
 	// Listen for connections of other instances.
-	Listen struct {
-		// WS listener.
-		WS []WSListen `mapstructure:"ws"`
-		// UDP listener.
-		UDP []UDPListen `mapstructure:"udp"`
-		// TCP listener.
-		TCP []TCPListen `mapstructure:"tcp"`
-	} `mapstructure:"listen"`
+	Listen Listen `mapstructure:"listen"`
 }
 
 // Setup attaches the defined backends to the given netceptor.

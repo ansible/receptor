@@ -155,7 +155,7 @@ type TCPInProxy struct {
 	PortTLS *tls.ClientConf `mapstructure:"port-tls"`
 	// TLS config to use for the transport within receptor.
 	// Leave empty for no TLS.
-	ReceptorTLS *tls.ServerConf `mapstructure:"receptor-tls"`
+	MeshTLS *tls.ServerConf `mapstructure:"mesh-tls"`
 }
 
 func (t TCPInProxy) setup(nc *netceptor.Netceptor) error {
@@ -167,8 +167,8 @@ func (t TCPInProxy) setup(nc *netceptor.Netceptor) error {
 			return fmt.Errorf("could not create tls client config for tls inbound proxy %s: %w", t.Address, err)
 		}
 	}
-	if t.ReceptorTLS != nil {
-		tServer, err = t.ReceptorTLS.TLSConfig()
+	if t.MeshTLS != nil {
+		tServer, err = t.MeshTLS.TLSConfig()
 		if err != nil {
 			return fmt.Errorf("could not create tls server config for tls inbound proxy %s: %w", t.Address, err)
 		}
@@ -204,7 +204,7 @@ type TCPOutProxy struct {
 	PortTLS *tls.ClientConf `mapstructure:"port-tls"`
 	// TLS config to use for the transport within receptor.
 	// Leave empty for no TLS.
-	ReceptorTLS *tls.ServerConf `mapstructure:"receptor-tls"`
+	MeshTLS *tls.ServerConf `mapstructure:"mesh-tls"`
 }
 
 func (t TCPOutProxy) setup(nc *netceptor.Netceptor) error {
@@ -216,8 +216,8 @@ func (t TCPOutProxy) setup(nc *netceptor.Netceptor) error {
 			return fmt.Errorf("could not create tls client config for tls outbound proxy %s: %w", t.Address, err)
 		}
 	}
-	if t.ReceptorTLS != nil {
-		tServer, err = t.ReceptorTLS.TLSConfig()
+	if t.MeshTLS != nil {
+		tServer, err = t.MeshTLS.TLSConfig()
 		if err != nil {
 			return fmt.Errorf("could not create tls server config for tls outbound proxy %s: %w", t.Address, err)
 		}

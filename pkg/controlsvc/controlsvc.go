@@ -461,12 +461,12 @@ type UnixControl struct {
 	// Receptor service name to listen on.
 	Service *string `mapstructure:"service"`
 	// Filename of local Unix socket to bind to the service.
-	File string `mapstructure:"filename"`
+	File string `mapstructure:"file"`
 	// Socket file permissions.
 	Permissions *int `mapstructure:"permissions"`
 	// TLS config to use for the transport within receptor.
 	// Leave empty for no TLS.
-	ReceptorTLS *tls.ServerConf `mapstructure:"receptor-tls"`
+	MeshTLS *tls.ServerConf `mapstructure:"mesh-tls"`
 }
 
 func (s *UnixControl) setup(ctx context.Context, cv *Server) error {
@@ -481,8 +481,8 @@ func (s *UnixControl) setup(ctx context.Context, cv *Server) error {
 
 	var err error
 	var tlsReceptor *tls.Config
-	if s.ReceptorTLS != nil {
-		tlsReceptor, err = s.ReceptorTLS.TLSConfig()
+	if s.MeshTLS != nil {
+		tlsReceptor, err = s.MeshTLS.TLSConfig()
 		if err != nil {
 			return fmt.Errorf("could not create receptor tls config for tcp control service %s: %w", service, err)
 		}
@@ -505,7 +505,7 @@ type TCPControl struct {
 	Service *string `mapstructure:"service"`
 	// TLS config to use for the transport within receptor.
 	// Leave empty for no TLS.
-	ReceptorTLS *tls.ServerConf `mapstructure:"receptor-tls"`
+	MeshTLS *tls.ServerConf `mapstructure:"mesh-tls"`
 	// TLS config to use for the exposed control port..
 	// Leave empty for no TLS.
 	TCPTLS *tls.ServerConf `mapstructure:"tcp-tls"`
@@ -522,8 +522,8 @@ func (s *TCPControl) setup(ctx context.Context, cv *Server) error {
 	var err error
 	var tlsReceptor *tls.Config
 	var tcptls *tls.Config
-	if s.ReceptorTLS != nil {
-		tlsReceptor, err = s.ReceptorTLS.TLSConfig()
+	if s.MeshTLS != nil {
+		tlsReceptor, err = s.MeshTLS.TLSConfig()
 		if err != nil {
 			return fmt.Errorf("could not create receptor tls config for tcp control service %s: %w", service, err)
 		}

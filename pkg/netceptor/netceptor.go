@@ -406,16 +406,17 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
-	// Starts a go routine that attempts return a connection session on this
-	// backend. For listeners, this could result in multiple sessions at once.
+	// Start() runs a go routine that attempts establish a session over this
+	// backend. For listeners, each time a peer dials this backend, sessChan is
+	// written to, resulting in multiple ongoing sessions at once.
 	sessChan, err := backend.Start(ctxBackend, &s.backendWaitGroup)
 	if err != nil {
 		return err
 	}
 	s.backendWaitGroup.Add(1)
 	s.backendCount++
-	// Outer go routine -- This go routine waits for new sessions to be written to the sessChan and
-	// run the runProtocol loop over this session.
+	// Outer go routine -- this go routine waits for new sessions to be written to the sessChan and
+	// starts the runProtocol() for that session
 	go func() {
 		runProtocolWg := sync.WaitGroup{}
 		defer func() {
@@ -433,7 +434,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 					runProtocolWg.Add(1)
 					// Inner go routine -- start the runProtocol loop for the new session
 					// that was just passed to sessChan (which was written to from the
-					// Start method above)
+					// Start() method above)
 					go func() {
 						defer runProtocolWg.Done()
 						err := s.runProtocol(ctxBackend, sess, connectionCost, nodeCost)

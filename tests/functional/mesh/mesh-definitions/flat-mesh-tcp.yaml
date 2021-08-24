@@ -2,77 +2,77 @@
 nodes:
   controller:
     connections: {}
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node1:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node10:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node11:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node12:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node2:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node3:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node4:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node5:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node6:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node7:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node8:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefbase:
       - tcp-listener: {}
   node9:
     connections:
       controller:
         index: 0
-    nodedef:
+    nodedefBase:
       - tcp-listener: {}

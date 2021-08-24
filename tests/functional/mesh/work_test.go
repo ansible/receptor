@@ -49,6 +49,13 @@ func TestWork(t *testing.T) {
 			"params":   "-c \"for i in {1..5}; do echo $i;done\"",
 		},
 	}
+	echoSleepLong50 := map[interface{}]interface{}{
+		"work-command": map[interface{}]interface{}{
+			"workType": "echosleeplong50",
+			"command":  "bash",
+			"params":   "-c \"for i in {1..50}; do echo $i; sleep 4;done\"",
+		},
+	}
 	kubeEchoSleepLong := map[interface{}]interface{}{
 		"work-kubernetes": map[interface{}]interface{}{
 			"workType":   "echosleeplong",
@@ -57,6 +64,16 @@ func TestWork(t *testing.T) {
 			"kubeconfig": filepath.Join(home, ".kube/config"),
 			"image":      "alpine",
 			"command":    "sh -c \"for i in `seq 1 5`; do echo $i; sleep 3;done\"",
+		},
+	}
+	kubeEchoSleepLong50 := map[interface{}]interface{}{
+		"work-kubernetes": map[interface{}]interface{}{
+			"workType":   "echosleeplong50",
+			"authmethod": "kubeconfig",
+			"namespace":  "default",
+			"kubeconfig": filepath.Join(home, ".kube/config"),
+			"image":      "alpine",
+			"command":    "sh -c \"for i in `seq 1 50`; do echo $i; sleep 4;done\"",
 		},
 	}
 	kubeEchoSleepShort := map[interface{}]interface{}{
@@ -70,17 +87,19 @@ func TestWork(t *testing.T) {
 		},
 	}
 	testTable := []struct {
-		testGroup    string
-		shortCommand map[interface{}]interface{}
-		longCommand  map[interface{}]interface{}
+		testGroup     string
+		shortCommand  map[interface{}]interface{}
+		longCommand   map[interface{}]interface{}
+		longCommand50 map[interface{}]interface{}
 	}{
-		{"normal_worker", echoSleepShort, echoSleepLong},
-		{"kube_worker", kubeEchoSleepShort, kubeEchoSleepLong},
+		{"normal_worker", echoSleepShort, echoSleepLong, echoSleepLong50},
+		{"kube_worker", kubeEchoSleepShort, kubeEchoSleepLong, kubeEchoSleepLong50},
 	}
 	for _, subtest := range testTable {
 		testGroup := subtest.testGroup
 		shortCommand := subtest.shortCommand
 		longCommand := subtest.longCommand
+		longCommand50 := subtest.longCommand50
 		// Setup our mesh yaml data
 		workSetup := func(testName string) (map[string]*receptorcontrol.ReceptorControl, *mesh.CLIMesh, []byte) {
 			data := mesh.YamlData{}
@@ -106,7 +125,7 @@ func TestWork(t *testing.T) {
 			// Generate a mesh with 3 nodes
 			data.Nodes["node2"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tcp-listener": map[interface{}]interface{}{
 							"cost": 1.0,
@@ -140,7 +159,7 @@ func TestWork(t *testing.T) {
 						Index: 0,
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
 							"name":               "tlsclient",
@@ -167,9 +186,10 @@ func TestWork(t *testing.T) {
 						Index: 0,
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					longCommand,
 					shortCommand,
+					longCommand50,
 				},
 			}
 
@@ -587,6 +607,142 @@ func TestWork(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		t.Run(testGroup+"/reload backends while streaming work results", func(t *testing.T) {
+			t.Parallel()
+			if strings.Contains(t.Name(), "kube") {
+				checkSkipKube(t)
+			}
+			controllers, m, _ := workSetup(t.Name())
+			defer tearDown(controllers, m)
+
+			// submit work from node 2 to node 3
+			unitID, err := controllers["node2"].WorkSubmit("node3", "echosleeplong50")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// wait for 10 seconds, and check if the work is in pending state
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			err = controllers["node2"].AssertWorkPending(ctx, unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// declare a new mesh with no connection between nodes
+			modifiedData := mesh.YamlData{}
+			modifiedData.Nodes = make(map[string]*mesh.YamlNode)
+			modifiedData.Nodes["node2"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{},
+			}
+			modifiedData.Nodes["node1"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{},
+			}
+			modifiedData.Nodes["node3"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{},
+			}
+
+			// modify the existing mesh
+			err = mesh.ModifyCLIMeshFromYaml(modifiedData, *m)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// reload the entire mesh
+			for k := range controllers {
+				err = controllers[k].Reload()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// ping should not be successful in a broken mesh
+			_, err = controllers["node1"].Ping("node3")
+			if err == nil {
+				t.Fatal("ping should not be successful")
+			}
+
+			// read the work status
+			workStatus, err := controllers["node2"].GetWorkStatus(unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// modify the mesh to have connection again
+			withConnectionData := mesh.YamlData{}
+			withConnectionData.Nodes = make(map[string]*mesh.YamlNode)
+			withConnectionData.Nodes["node2"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{},
+			}
+			withConnectionData.Nodes["node1"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{
+					"node2": {
+						Index: 0,
+					},
+				},
+			}
+			withConnectionData.Nodes["node3"] = &mesh.YamlNode{
+				Connections: map[string]mesh.YamlConnection{
+					"node2": {
+						Index: 0,
+					},
+				},
+			}
+
+			err = mesh.ModifyCLIMeshFromYaml(withConnectionData, *m)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// reload the entire mesh
+			for k := range controllers {
+				err = controllers[k].Reload()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// wait for mesh to become ready again
+			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			err = m.WaitForReady(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// ping should be successful in the mesh with connections
+			_, err = controllers["node1"].Ping("node3")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
+			err = controllers["node2"].AssertWorkSizeIncreasing(ctx, unitID, workStatus.StdoutSize)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// it takes some time for the streaming to start again
+			time.Sleep(15 * time.Second)
+
+			newWorkStatus, err := controllers["node2"].GetWorkStatus(unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if newWorkStatus.StdoutSize <= workStatus.StdoutSize {
+				t.Fatal("Work size is not increasing")
+			}
+
+			// cancel the work so that it doesnt run after the test ends
+			_, err = controllers["node2"].WorkCancel(unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
+			err = controllers["node2"].AssertWorkCancelled(ctx, unitID)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -602,7 +758,7 @@ func TestRuntimeParams(t *testing.T) {
 	data.Nodes = make(map[string]*mesh.YamlNode)
 	data.Nodes["node0"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{},
 			},
@@ -664,7 +820,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	data.Nodes = make(map[string]*mesh.YamlNode)
 	data.Nodes["node0"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{},
 			},
@@ -723,7 +879,7 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	data.Nodes = make(map[string]*mesh.YamlNode)
 	data.Nodes["node0"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{},
 			},
@@ -776,7 +932,7 @@ func TestKubeContainerFailure(t *testing.T) {
 	data.Nodes = make(map[string]*mesh.YamlNode)
 	data.Nodes["node0"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{},
 			},

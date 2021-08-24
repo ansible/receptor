@@ -150,6 +150,111 @@ func (m *CLIMesh) Nodes() map[string]Node {
 	return nodes
 }
 
+func createNodedefConnections(meshDefinition *YamlData, existingMesh *CLIMesh) error {
+	for k := range meshDefinition.Nodes {
+		for connNode, connYaml := range meshDefinition.Nodes[k].Connections {
+			index := connYaml.Index
+			TLS := connYaml.TLS
+			var attr interface{}
+			if existingMesh != nil {
+				attr = existingMesh.MeshDefinition.Nodes[connNode].NodedefBase[index]
+			} else {
+				attr = meshDefinition.Nodes[connNode].NodedefBase[index]
+			}
+			attrMap, _ := attr.(map[interface{}]interface{})
+			listener, ok := attrMap["tcp-listener"]
+			if ok {
+				dialerYaml := make(map[interface{}]interface{})
+				listenerMap, ok := listener.(map[interface{}]interface{})
+				if !ok {
+					return errors.New("listener object is not a map")
+				}
+				peerYaml := make(map[interface{}]interface{})
+				bindaddr, ok := listenerMap["bindaddr"].(string)
+				var addr string
+				if ok {
+					addr = bindaddr + ":" + listenerMap["port"].(string)
+				} else {
+					addr = "localhost:" + listenerMap["port"].(string)
+				}
+				peerYaml["address"] = addr
+				peerYaml["cost"] = getListenerCost(listenerMap, k)
+
+				if TLS != "" {
+					peerYaml["tls"] = TLS
+				}
+				dialerYaml["tcp-peer"] = peerYaml
+				if existingMesh != nil {
+					existingMesh.MeshDefinition.Nodes[k].NodedefConnections = append(existingMesh.MeshDefinition.Nodes[k].NodedefConnections, dialerYaml)
+				} else {
+					meshDefinition.Nodes[k].NodedefConnections = append(meshDefinition.Nodes[k].NodedefConnections, dialerYaml)
+				}
+			}
+			listener, ok = attrMap["udp-listener"]
+			if ok {
+				dialerYaml := make(map[interface{}]interface{})
+				listenerMap, ok := listener.(map[interface{}]interface{})
+				if !ok {
+					return errors.New("listener object is not a map")
+				}
+				peerYaml := make(map[interface{}]interface{})
+				bindaddr, ok := listenerMap["bindaddr"].(string)
+				var addr string
+				if ok {
+					addr = bindaddr + ":" + listenerMap["port"].(string)
+				} else {
+					addr = "localhost:" + listenerMap["port"].(string)
+				}
+				peerYaml["address"] = addr
+				peerYaml["cost"] = getListenerCost(listenerMap, k)
+				dialerYaml["udp-peer"] = peerYaml
+				if existingMesh != nil {
+					existingMesh.MeshDefinition.Nodes[k].NodedefConnections = append(existingMesh.MeshDefinition.Nodes[k].NodedefConnections, dialerYaml)
+				} else {
+					meshDefinition.Nodes[k].NodedefConnections = append(meshDefinition.Nodes[k].NodedefConnections, dialerYaml)
+				}
+			}
+
+			listener, ok = attrMap["ws-listener"]
+			if ok {
+				dialerYaml := make(map[interface{}]interface{})
+				listenerMap, ok := listener.(map[interface{}]interface{})
+				if !ok {
+					return errors.New("listener object is not a map")
+				}
+				peerYaml := make(map[interface{}]interface{})
+
+				proto := "ws://"
+				tlsName, tlsEnabled := listenerMap["tls"].(string)
+				if tlsEnabled && tlsName != "" {
+					proto = "wss://"
+				}
+
+				bindaddr, ok := listenerMap["bindaddr"].(string)
+				var addr string
+				if ok {
+					addr = proto + bindaddr + ":" + listenerMap["port"].(string)
+				} else {
+					addr = proto + "localhost:" + listenerMap["port"].(string)
+				}
+				peerYaml["address"] = addr
+				peerYaml["cost"] = getListenerCost(listenerMap, k)
+				if TLS != "" {
+					peerYaml["tls"] = TLS
+				}
+				dialerYaml["ws-peer"] = peerYaml
+				if existingMesh != nil {
+					existingMesh.MeshDefinition.Nodes[k].NodedefConnections = append(existingMesh.MeshDefinition.Nodes[k].NodedefConnections, dialerYaml)
+				} else {
+					meshDefinition.Nodes[k].NodedefConnections = append(meshDefinition.Nodes[k].NodedefConnections, dialerYaml)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // NewCLIMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it.
 func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
@@ -202,7 +307,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 		// Keep track of if we need to add an attribute for the node id or if
 		// it already exists
 		needsIDAttr := true
-		for attrkey, attr := range meshDefinition.Nodes[k].Nodedef {
+		for attrkey, attr := range meshDefinition.Nodes[k].NodedefBase {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -232,7 +337,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 					}
 				}
 			}
-			meshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
+			meshDefinition.Nodes[k].NodedefBase[attrkey] = attrMap
 		}
 		if needsIDAttr {
 			idYaml := make(map[interface{}]interface{})
@@ -241,103 +346,26 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			nodeYaml["datadir"] = filepath.Join(node.dir, "datadir")
 			os.Mkdir(nodeYaml["datadir"].(string), 0o755)
 			idYaml["node"] = nodeYaml
-			meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, idYaml)
+			meshDefinition.Nodes[k].NodedefBase = append(meshDefinition.Nodes[k].NodedefBase, idYaml)
 		}
 		logYaml := make(map[interface{}]interface{})
 		levelYaml := make(map[interface{}]interface{})
 		levelYaml["level"] = "debug"
 		logYaml["log-level"] = levelYaml
-		meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, logYaml)
+		meshDefinition.Nodes[k].NodedefBase = append(meshDefinition.Nodes[k].NodedefBase, logYaml)
 		nodes[k] = node
 	}
-	for k := range meshDefinition.Nodes {
-		for connNode, connYaml := range meshDefinition.Nodes[k].Connections {
-			index := connYaml.Index
-			TLS := connYaml.TLS
-			attr := meshDefinition.Nodes[connNode].Nodedef[index]
-			attrMap := attr.(map[interface{}]interface{})
-			listener, ok := attrMap["tcp-listener"]
-			if ok {
-				dialerYaml := make(map[interface{}]interface{})
-				listenerMap, ok := listener.(map[interface{}]interface{})
-				if !ok {
-					return nil, errors.New("listener object is not a map")
-				}
-				peerYaml := make(map[interface{}]interface{})
-				bindaddr, ok := listenerMap["bindaddr"].(string)
-				var addr string
-				if ok {
-					addr = bindaddr + ":" + listenerMap["port"].(string)
-				} else {
-					addr = "localhost:" + listenerMap["port"].(string)
-				}
-				peerYaml["address"] = addr
-				peerYaml["cost"] = getListenerCost(listenerMap, k)
 
-				if TLS != "" {
-					peerYaml["tls"] = TLS
-				}
-				dialerYaml["tcp-peer"] = peerYaml
-				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
-			}
-			listener, ok = attrMap["udp-listener"]
-			if ok {
-				dialerYaml := make(map[interface{}]interface{})
-				listenerMap, ok := listener.(map[interface{}]interface{})
-				if !ok {
-					return nil, errors.New("listener object is not a map")
-				}
-				peerYaml := make(map[interface{}]interface{})
-				bindaddr, ok := listenerMap["bindaddr"].(string)
-				var addr string
-				if ok {
-					addr = bindaddr + ":" + listenerMap["port"].(string)
-				} else {
-					addr = "localhost:" + listenerMap["port"].(string)
-				}
-				peerYaml["address"] = addr
-				peerYaml["cost"] = getListenerCost(listenerMap, k)
-				dialerYaml["udp-peer"] = peerYaml
-				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
-			}
-			listener, ok = attrMap["ws-listener"]
-			if ok {
-				dialerYaml := make(map[interface{}]interface{})
-				listenerMap, ok := listener.(map[interface{}]interface{})
-				if !ok {
-					return nil, errors.New("listener object is not a map")
-				}
-				peerYaml := make(map[interface{}]interface{})
-
-				proto := "ws://"
-				tlsName, tlsEnabled := listenerMap["tls"].(string)
-				if tlsEnabled && tlsName != "" {
-					proto = "wss://"
-				}
-
-				bindaddr, ok := listenerMap["bindaddr"].(string)
-				var addr string
-				if ok {
-					addr = proto + bindaddr + ":" + listenerMap["port"].(string)
-				} else {
-					addr = proto + "localhost:" + listenerMap["port"].(string)
-				}
-				peerYaml["address"] = addr
-				peerYaml["cost"] = getListenerCost(listenerMap, k)
-				if TLS != "" {
-					peerYaml["tls"] = TLS
-				}
-				dialerYaml["ws-peer"] = peerYaml
-				meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, dialerYaml)
-			}
-		}
+	err = createNodedefConnections(&meshDefinition, nil)
+	if err != nil {
+		return nil, err
 	}
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
 		needsControlService := true
 		controlServiceIndex := 0
-		for index, attr := range meshDefinition.Nodes[k].Nodedef {
+		for index, attr := range meshDefinition.Nodes[k].NodedefBase {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -368,14 +396,26 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 			tmp["filename"] = controlSocket
 			controlServiceYaml := make(map[interface{}]interface{})
 			controlServiceYaml["control-service"] = tmp
-			meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, controlServiceYaml)
+			meshDefinition.Nodes[k].NodedefBase = append(meshDefinition.Nodes[k].NodedefBase, controlServiceYaml)
 		} else {
-			meshDefinition.Nodes[k].Nodedef[controlServiceIndex].(map[interface{}]interface{})["control-service"].(map[interface{}]interface{})["filename"] = controlSocket
+			meshDefinition.Nodes[k].NodedefBase[controlServiceIndex].(map[interface{}]interface{})["control-service"].(map[interface{}]interface{})["filename"] = controlSocket
 		}
 	}
 
+	// nodedef = NodedefBase
+	for k := range meshDefinition.Nodes {
+		if meshDefinition.Nodes[k].NodedefBase != nil {
+			// trying to avoid = due to pointer issues in []interface{}
+			meshDefinition.Nodes[k].Nodedef = append(meshDefinition.Nodes[k].Nodedef, meshDefinition.Nodes[k].NodedefBase...)
+		}
+	}
+
+	// yamlConfig = Nodedef+NodedefConnections
 	for k, node := range nodes {
 		node.yamlConfig = meshDefinition.Nodes[k].Nodedef
+		if meshDefinition.Nodes[k].NodedefConnections != nil {
+			node.yamlConfig = append(node.yamlConfig, meshDefinition.Nodes[k].NodedefConnections...)
+		}
 		err = node.Start()
 		if err != nil {
 			return nil, err
@@ -406,6 +446,54 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	}
 
 	return mesh, nil
+}
+
+func ModifyCLIMeshFromYaml(meshDefinition YamlData, existingMesh CLIMesh) error {
+	// setting the current `yamlConfig` for each node as nil
+	for existingNodes := range existingMesh.nodes {
+		existingMesh.nodes[existingNodes].yamlConfig = nil
+	}
+
+	// clear out `[]Nodedef{}`
+	for nodes := range existingMesh.MeshDefinition.Nodes {
+		existingMesh.MeshDefinition.Nodes[nodes].Nodedef = nil
+	}
+
+	// setting `[]NodedefConnections{}` to nil in existing mesh
+	for nodes := range existingMesh.MeshDefinition.Nodes {
+		existingMesh.MeshDefinition.Nodes[nodes].NodedefConnections = nil
+	}
+
+	err := createNodedefConnections(&meshDefinition, &existingMesh)
+	if err != nil {
+		return err
+	}
+
+	// Now we combine NodedefConnections` and `NodedefBase` and assign it to Nodedef
+	for k := range existingMesh.MeshDefinition.Nodes {
+		if existingMesh.MeshDefinition.Nodes[k].NodedefBase != nil {
+			existingMesh.MeshDefinition.Nodes[k].Nodedef = append(existingMesh.MeshDefinition.Nodes[k].Nodedef, existingMesh.MeshDefinition.Nodes[k].NodedefBase...)
+		}
+		if existingMesh.MeshDefinition.Nodes[k].NodedefConnections != nil {
+			existingMesh.MeshDefinition.Nodes[k].Nodedef = append(existingMesh.MeshDefinition.Nodes[k].Nodedef, existingMesh.MeshDefinition.Nodes[k].NodedefConnections...)
+		}
+	}
+
+	// Now we combine `[]NodedefConnections{}` and `[]Nodedef{}` for each node in the mesh and write to disk
+	for k, node := range existingMesh.nodes {
+		node.yamlConfig = existingMesh.MeshDefinition.Nodes[k].Nodedef
+		strData, err := yaml.Marshal(node.yamlConfig)
+		if err != nil {
+			return err
+		}
+		nodedefPath := filepath.Join(node.dir, "nodedef.yaml")
+		err = ioutil.WriteFile(nodedefPath, strData, 0o644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Destroy stops all running Netceptors and their backends and frees all

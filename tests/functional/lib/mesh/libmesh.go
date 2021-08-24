@@ -230,7 +230,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			return nil, err
 		}
 		os.Mkdir(node.dir, 0o755)
-		for _, attr := range meshDefinition.Nodes[k].Nodedef {
+		for _, attr := range meshDefinition.Nodes[k].NodedefBase {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -321,7 +321,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 			}
 		}
 
-		for attrkey, attr := range meshDefinition.Nodes[k].Nodedef {
+		for attrkey, attr := range meshDefinition.Nodes[k].NodedefBase {
 			attrMap := attr.(map[interface{}]interface{})
 			for k, v := range attrMap {
 				k = k.(string)
@@ -411,7 +411,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					}
 				}
 			}
-			meshDefinition.Nodes[k].Nodedef[attrkey] = attrMap
+			meshDefinition.Nodes[k].NodedefBase[attrkey] = attrMap
 		}
 		nodes[k] = node
 	}
@@ -419,7 +419,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		node := nodes[k]
 		for connNode, connYaml := range meshDefinition.Nodes[k].Connections {
 			index := connYaml.Index
-			attr := meshDefinition.Nodes[connNode].Nodedef[index]
+			attr := meshDefinition.Nodes[connNode].NodedefBase[index]
 			attrMap := attr.(map[interface{}]interface{})
 			listener, ok := attrMap["tcp-listener"]
 			if ok {
@@ -537,7 +537,7 @@ func (m *LibMesh) CheckConnections() bool {
 		expectedConnections := map[string]float64{}
 		for k, connYaml := range m.MeshDefinition.Nodes[status.NodeID].Connections {
 			index := connYaml.Index
-			configItemYaml := m.MeshDefinition.Nodes[k].Nodedef[index].(map[interface{}]interface{})
+			configItemYaml := m.MeshDefinition.Nodes[k].NodedefBase[index].(map[interface{}]interface{})
 			listenerYaml, ok := configItemYaml["tcp-listener"].(map[interface{}]interface{})
 			if ok {
 				expectedConnections[k] = getListenerCost(listenerYaml, status.NodeID)

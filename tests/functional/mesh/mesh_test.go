@@ -278,7 +278,7 @@ func TestCosts(t *testing.T) {
 	// if they exist
 	data.Nodes["node1"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{
 					"cost": 4.5,
@@ -296,7 +296,7 @@ func TestCosts(t *testing.T) {
 				Index: 0,
 			},
 		},
-		Nodedef: []interface{}{},
+		NodedefBase: []interface{}{},
 	}
 	data.Nodes["node3"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
@@ -304,7 +304,7 @@ func TestCosts(t *testing.T) {
 				Index: 0,
 			},
 		},
-		Nodedef: []interface{}{},
+		NodedefBase: []interface{}{},
 	}
 	data.Nodes["node4"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{
@@ -312,7 +312,7 @@ func TestCosts(t *testing.T) {
 				Index: 0,
 			},
 		},
-		Nodedef: []interface{}{},
+		NodedefBase: []interface{}{},
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
@@ -355,7 +355,7 @@ func TestDuplicateNodes(t *testing.T) {
 	// if they exist
 	data.Nodes["node1"] = &mesh.YamlNode{
 		Connections: map[string]mesh.YamlConnection{},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{},
 			},
@@ -367,7 +367,7 @@ func TestDuplicateNodes(t *testing.T) {
 				Index: 0,
 			},
 		},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"tcp-listener": map[interface{}]interface{}{},
 			},
@@ -379,7 +379,7 @@ func TestDuplicateNodes(t *testing.T) {
 				Index: 0,
 			},
 		},
-		Nodedef: []interface{}{
+		NodedefBase: []interface{}{
 			map[interface{}]interface{}{
 				"node": map[interface{}]interface{}{
 					"id": "node1",
@@ -421,7 +421,7 @@ func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
 			}
 			data.Nodes[nodeID] = &mesh.YamlNode{
 				Connections: connections,
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tcp-listener": map[interface{}]interface{}{},
 					},

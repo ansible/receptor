@@ -463,8 +463,10 @@ func generateServerTLSConfig() *tls.Config {
 	}
 
 	return &tls.Config{
-		Certificates: []tls.Certificate{tlsCert},
-		NextProtos:   []string{"netceptor"},
+		Certificates:             []tls.Certificate{tlsCert},
+		NextProtos:               []string{"netceptor"},
+		MinVersion:               tls.VersionTLS12,
+		PreferServerCipherSuites: true,
 	}
 }
 
@@ -488,5 +490,6 @@ func generateClientTLSConfig() *tls.Config {
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
 		ServerName:            insecureCommonName,
+		MinVersion:            tls.VersionTLS12,
 	}
 }

@@ -1,3 +1,4 @@
+//go:build !no_tls_config
 // +build !no_tls_config
 
 package netceptor
@@ -31,7 +32,10 @@ type tlsServerCfg struct {
 
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsServerCfg) Prepare() error {
-	tlscfg := &tls.Config{}
+	tlscfg := &tls.Config{
+		MinVersion:               tls.VersionTLS12,
+		PreferServerCipherSuites: true,
+	}
 
 	certbytes, err := ioutil.ReadFile(cfg.Cert)
 	if err != nil {
@@ -81,7 +85,10 @@ type tlsClientConfig struct {
 
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsClientConfig) Prepare() error {
-	tlscfg := &tls.Config{}
+	tlscfg := &tls.Config{
+		MinVersion:               tls.VersionTLS12,
+		PreferServerCipherSuites: true,
+	}
 
 	if cfg.Cert != "" || cfg.Key != "" {
 		if cfg.Cert == "" || cfg.Key == "" {

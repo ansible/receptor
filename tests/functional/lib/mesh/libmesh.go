@@ -237,7 +237,9 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 				if k == "tls-client" {
 					vMap := v.(map[interface{}]interface{})
 					// Taken from pkg/netceptor/tlsconfig.go
-					tlscfg := &tls.Config{}
+					tlscfg := &tls.Config{
+						MinVersion: tls.VersionTLS12,
+					}
 
 					if vMap["cert"] != "" || vMap["key"] != "" {
 						if vMap["cert"] == "" || vMap["key"] == "" {
@@ -275,7 +277,10 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 				} else if k == "tls-server" {
 					vMap := v.(map[interface{}]interface{})
 					// Taken from pkg/netceptor/tlsconfig.go
-					tlscfg := &tls.Config{}
+					tlscfg := &tls.Config{
+						MinVersion:               tls.VersionTLS12,
+						PreferServerCipherSuites: true,
+					}
 
 					certbytes, err := ioutil.ReadFile(vMap["cert"].(string))
 					if err != nil {

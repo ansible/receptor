@@ -309,7 +309,9 @@ func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	s.clientTLSConfigs["default"] = &tls.Config{}
+	s.clientTLSConfigs["default"] = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 	s.addNameHash(nodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))

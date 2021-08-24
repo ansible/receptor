@@ -1030,7 +1030,7 @@ type Kubernetes struct {
 	// On restart, keep the pod if in pending state instead of deleting it.
 	KeepPodOnRestart bool `mapstructure:"keep-pod-on-restart"`
 	// Method for connecting to worker pods: logger or tcp.
-	StreamMethod *string `mapstructure:""`
+	StreamMethod *string `mapstructure:"stream-method"`
 }
 
 func (k Kubernetes) setup(wc *Workceptor) error {

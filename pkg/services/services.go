@@ -22,9 +22,9 @@ type Services struct {
 // Services defines a set of receptor services that proxy sockets.
 type Proxies struct {
 	// Expose TCP ports.
-	TCPIn []TCPInProxy `mapstructure:"tls-in"`
+	TCPIn []TCPInProxy `mapstructure:"tcp-in"`
 	// Export TCP ports.
-	TCPOut []TCPOutProxy `mapstructure:"tls-out"`
+	TCPOut []TCPOutProxy `mapstructure:"tcp-out"`
 	// Expose UDP ports.
 	UDPIn []UDPInProxy `mapstructure:"udp-in"`
 	// Export udp sockets.

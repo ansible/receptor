@@ -412,8 +412,8 @@ func (c WSListen) setup(nc *netceptor.Netceptor) error {
 type WSDial struct {
 	// TLS configuration for listening. Leave empty for no TLS at all.
 	TLS *tls.ServerConf `mapstructure:"tls"`
-	// Address to connect to ("host:port" from net package).
-	Address string `mapstructure:"address"`
+	// URL to connect to.
+	URL string `mapstructure:"url"`
 	// Path cost for this connection. Defaults to 1.0, may not be <= 0.0.`
 	Cost *float64 `mapstructure:"cost"`
 	// Do not keep redialing on lost connection.
@@ -426,7 +426,7 @@ func (c WSDial) setup(nc *netceptor.Netceptor) error {
 	extraHeader := ""
 	if c.ExtraHeader != nil {
 		if *c.ExtraHeader == "" || !strings.Contains(*c.ExtraHeader, ":") {
-			return fmt.Errorf("invalid ws parameters for ws listener %s: %w", c.Address, ErrInvalidHTTPHeader)
+			return fmt.Errorf("invalid ws parameters for ws listener %s: %w", c.URL, ErrInvalidHTTPHeader)
 		}
 		extraHeader = *c.ExtraHeader
 	}
@@ -436,21 +436,21 @@ func (c WSDial) setup(nc *netceptor.Netceptor) error {
 	if c.TLS != nil {
 		tlsConf, err = c.TLS.TLSConfig()
 		if err != nil {
-			return fmt.Errorf("could not create tls config for ws dialer %s: %w", c.Address, err)
+			return fmt.Errorf("could not create tls config for ws dialer %s: %w", c.URL, err)
 		}
 	}
-	b, err := NewWebsocketDialer(c.Address, tlsConf, extraHeader, !c.NoRedial)
+	b, err := NewWebsocketDialer(c.URL, tlsConf, extraHeader, !c.NoRedial)
 	if err != nil {
-		return fmt.Errorf("could not create ws dialer for %s from config: %w", c.Address, err)
+		return fmt.Errorf("could not create ws dialer for %s from config: %w", c.URL, err)
 	}
 
 	cost, err := validateDialCost(c.Cost)
 	if err != nil {
-		return fmt.Errorf("invalid ws listener dialer for %s: %w", c.Address, err)
+		return fmt.Errorf("invalid ws listener dialer for %s: %w", c.URL, err)
 	}
 
 	if err := nc.AddBackend(b, cost, nil); err != nil {
-		return fmt.Errorf("error creating backend for ws dialer %s: %w", c.Address, err)
+		return fmt.Errorf("error creating backend for ws dialer %s: %w", c.URL, err)
 	}
 
 	return nil

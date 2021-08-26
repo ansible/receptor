@@ -1445,13 +1445,15 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 	case FirewallResultDrop:
 		return nil
 	case FirewallResultReject:
-		_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
-			FromNode:    md.FromNode,
-			ToNode:      md.ToNode,
-			FromService: md.FromService,
-			ToService:   md.ToService,
-			Problem:     ProblemRejected,
-		})
+		if md.FromService != "unreach" {
+			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
+				FromNode:    md.FromNode,
+				ToNode:      md.ToNode,
+				FromService: md.FromService,
+				ToService:   md.ToService,
+				Problem:     ProblemRejected,
+			})
+		}
 
 		return nil
 	}

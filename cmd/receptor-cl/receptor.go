@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	_ "github.com/ansible/receptor/pkg/backends"
 	_ "github.com/ansible/receptor/pkg/certificates"
@@ -146,25 +145,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	done := make(chan struct{})
-	go func() {
-		netceptor.MainInstance.BackendWait()
-		close(done)
-	}()
 
-	// Fancy footwork to set an error exitcode if we're immediately exiting at startup
-	select {
-	case <-done:
-		if netceptor.MainInstance.BackendCount() > 0 {
-			logger.Error("All backends have failed. Exiting.\n")
-			os.Exit(1)
-		} else {
-			logger.Warning("Nothing to do - no backends were specified.\n")
-			fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
-			os.Exit(1)
-		}
-	case <-time.After(100 * time.Millisecond):
+	if netceptor.MainInstance.BackendCount() == 0 {
+		logger.Warning("Nothing to do - no backends are running.\n")
+		fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
+		os.Exit(1)
 	}
+
 	logger.Info("Initialization complete\n")
 
 	<-netceptor.MainInstance.NetceptorDone()

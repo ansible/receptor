@@ -5,6 +5,20 @@ work. This will cover both high level and low level details of how the tests
 are setup and run including the assumptions being made and the best way to
 add tests going forward.
 
+## Test Dependencies
+
+The following are needed to run the integration tests:
+ * `receptor` must be in your path, I have symlinked `~/bin/receptor` to the
+   `receptor` binary in my repo so my current dev build is always in my path.
+ * `ss` is used to check if processes are bound to the right ports
+ * In order to run the kubernetes integration tests you must have a running
+   kubernetes and a `~/.kube/config` that has access to the default namespace
+   as the kubernetes tests will expect they can run there. To skip kubernetes
+   tests set `SKIP_KUBE=1` in your environment.
+ * In order to run the receptorctl tests you must have python3, virtualenv, and
+   pip installed. The `receptorctl-tests` make target will setup a virtualenv
+   for the tests.
+
 ## CLI Tests
 
 The cli tests are found in `functional/cli/cli_test.go`. The intention for

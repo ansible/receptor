@@ -51,7 +51,7 @@ This forms a three-node mesh. Notice `bar` and `fish` are not directly connected
 
 Logs from `fish` shows a successful connection to `bar` via `foo`.
 
-.. code-block::
+.. code-block:: bash
 
     INFO 2021/07/22 23:04:31 Known Connections:
     INFO 2021/07/22 23:04:31    fish: foo(1.00)
@@ -73,7 +73,7 @@ Configuring backends
 
 in foo.yml
 
-.. code-block::
+.. code-block:: bash
 
     - tcp-listener:
         port: 2222
@@ -88,7 +88,7 @@ The costs on the two ends of the connection must match. For example, the ``tcp-p
 
 in fish.yml
 
-.. code-block::
+.. code-block:: bash
 
     - tcp-peer:
         address: localhost:2222

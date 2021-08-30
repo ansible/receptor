@@ -44,7 +44,7 @@ func TestTCPSSLConnections(t *testing.T) {
 			// if they exist
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
 							"name":              "cert1",
@@ -68,7 +68,7 @@ func TestTCPSSLConnections(t *testing.T) {
 						TLS:   "client-cert2",
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
 							"name": "server-cert2",
@@ -98,7 +98,7 @@ func TestTCPSSLConnections(t *testing.T) {
 						TLS:   "client-secure",
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
 							"name":    "client-secure",
@@ -174,7 +174,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			// if they exist
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
 							"name":              "cert1",
@@ -198,7 +198,7 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 						TLS:   "client-insecure",
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
 							"name":               "client-insecure",
@@ -263,7 +263,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			// if they exist
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
 							"name":              "cert1",
@@ -287,7 +287,7 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 						TLS:   "client-insecure",
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
 							"name":               "client-insecure",
@@ -347,7 +347,7 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 			// if they exist
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						listener: map[interface{}]interface{}{},
 					},
@@ -360,7 +360,7 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 						TLS:   "client-secure",
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
 							"name":    "client-secure",
@@ -425,7 +425,7 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 			// if they exist
 			data.Nodes["node1"] = &mesh.YamlNode{
 				Connections: map[string]mesh.YamlConnection{},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-server": map[interface{}]interface{}{
 							"name": "cert1",
@@ -447,7 +447,7 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 						TLS:   "client-secure",
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
 							"name":    "client-secure",

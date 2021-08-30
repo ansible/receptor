@@ -52,6 +52,22 @@ func (r *ReceptorControl) Connect(filename string) error {
 	return nil
 }
 
+func (r *ReceptorControl) Reload() error {
+	if _, err := r.WriteStr("reload \n"); err != nil {
+		return err
+	}
+	jsonData, err := r.ReadAndParseJSON()
+	if err != nil {
+		return err
+	}
+	success := jsonData["Success"].(bool)
+	if !success {
+		return errors.New("Error")
+	}
+
+	return nil
+}
+
 // Reconnect to unix socket.
 func (r *ReceptorControl) Reconnect() error {
 	if r.socketFilename != "" {
@@ -317,6 +333,25 @@ func (r *ReceptorControl) assertWorkState(ctx context.Context, unitID string, st
 	}
 
 	return assertWithTimeout(ctx, check)
+}
+
+func (r *ReceptorControl) assertWorkSize(ctx context.Context, unitID string, size int64) bool {
+	check := func() bool {
+		workStatus, _ := r.GetWorkStatus(unitID)
+
+		return workStatus.StdoutSize > size
+	}
+
+	return assertWithTimeout(ctx, check)
+}
+
+// assert if the work size is increasing.
+func (r *ReceptorControl) AssertWorkSizeIncreasing(ctx context.Context, unitID string, size int64) error {
+	if !r.assertWorkSize(ctx, unitID, size) {
+		return fmt.Errorf("failed to assert %s is increasing or ctx timed out", unitID)
+	}
+
+	return nil
 }
 
 // AssertWorkRunning waits until work status is running.

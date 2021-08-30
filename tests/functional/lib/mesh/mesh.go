@@ -64,9 +64,11 @@ type TCRuleYaml struct {
 
 // YamlNode describes how a single node should be represented in yaml.
 type YamlNode struct {
-	Connections map[string]YamlConnection
-	TCRules     *TCRuleYaml
-	Nodedef     []interface{}
+	Connections        map[string]YamlConnection
+	TCRules            *TCRuleYaml
+	Nodedef            []interface{}
+	NodedefConnections []interface{}
+	NodedefBase        []interface{}
 }
 
 func getListenerCost(listenerYaml map[interface{}]interface{}, nodeID string) float64 {

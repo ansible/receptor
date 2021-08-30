@@ -78,7 +78,7 @@ TESTCMD = -run $(RUNTEST)
 endif
 
 test:
-	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -v
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \

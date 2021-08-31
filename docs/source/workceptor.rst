@@ -73,7 +73,7 @@ Local work
 
 Start the work by connecting to the ``control-service`` and issuing a "work submit" command
 
-.. code-block:: bash
+.. code::
 
     $ receptorctl --socket /tmp/foo.sock work submit echoint --no-payload
     Result:  Job Started
@@ -86,7 +86,7 @@ Work results
 
 Use the "Unit ID" to get work results
 
-.. code-block:: bash
+.. code::
 
     receptorctl --socket /tmp/foo.sock work results t1BlAB18
     1
@@ -107,7 +107,7 @@ Although connected to `foo`, by providing the "--node" option the work can be st
 
 The work type must be defined on the node it is intended to run on, e.g. `bar` must have a ``work-command`` called "echoint", in this case.
 
-.. code-block:: bash
+.. code::
 
     $ receptorctl --socket /tmp/foo.sock work submit echoint --node bar --no-payload
     Result:  Job Started
@@ -140,7 +140,7 @@ Here the bash command expects to read a line from stdin, echo the line in all up
 
 Payloads can be passed into receptor using the "--payload" option.
 
-.. code-block:: bash
+.. code::
 
     $ echo -e "hi\ni am foo\nwhat is your name" | receptorctl --socket /tmp/foo.sock work submit echopayload --node bar --payload - -f
     HI
@@ -156,7 +156,7 @@ Work list
 ^^^^^^^^^
 "work list" returns information about all work units that have ran on this receptor node. The following shows two work units, ``12L8s8h2`` and ``T0oN0CAp``
 
-.. code-block:: bash
+.. code::
 
     $ receptorctl --socket /tmp/foo.sock work list
     {'12L8s8h2': {'Detail': 'exit status 0',
@@ -219,7 +219,7 @@ For a given work unit, receptor will store files in ``{datadir}/{nodeID}/{unitID
 
 Here is the receptor directory tree after running ``work submit echopayload`` described in :ref:`work_payload`.
 
-.. code-block:: bash
+.. code::
 
     $ tree /tmp/receptor
     /tmp/receptor
@@ -240,7 +240,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 ``stdin`` is a copy of the submitted payload. The contents of this file is the same on both the local (`foo`) and remote (`bar`) machines.
 
-.. code-block:: bash
+.. code::
 
     $ cat /tmp/receptor/bar/NImim5WA/stdin
     hi
@@ -249,7 +249,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 ``stdout`` contains the work unit results; the stdout of the command execution. It will also be the same on both the local node and remote node.
 
-.. code-block:: bash
+.. code::
 
     $ cat /tmp/receptor/bar/NImim5WA/stdout
     HI
@@ -258,7 +258,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 ``status`` contains additional information related to the work unit. The contents of status are different on `foo` and `bar`.
 
-.. code-block:: bash
+.. code::
 
     $ cat /tmp/receptor/bar/NImim5WA/stdout
     {
@@ -269,7 +269,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
        "ExtraData":null
     }
 
-.. code-block:: bash
+.. code::
 
     $ cat /tmp/receptor/foo/BsAjS4wi/stdout
     {

@@ -65,7 +65,7 @@ Receptor supports X.509 compliant certificates. Although numerous tools can be u
 
 makecerts.sh
 
-.. code-block:: bash
+.. code::
 
     #!/bin/bash
     mkdir -p certs

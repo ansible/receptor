@@ -53,21 +53,21 @@ func TestHopCountLimit(t *testing.T) {
 	}()
 
 	// Create two Netceptor nodes using external backends
-	n1 := New(context.Background(), "node1", nil)
+	n1 := New(context.Background(), "node1")
 	b1, err := NewExternalBackend()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = n1.AddBackend(b1, 1.0, nil)
+	err = n1.AddBackend(b1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	n2 := New(context.Background(), "node2", nil)
+	n2 := New(context.Background(), "node2")
 	b2, err := NewExternalBackend()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = n2.AddBackend(b2, 1.0, nil)
+	err = n2.AddBackend(b2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,8 @@ func TestHopCountLimit(t *testing.T) {
 	// Wait for the nodes to establish routing to each other
 	var routes1 map[string]string
 	var routes2 map[string]string
-	timeout, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	for {
 		select {
 		case <-timeout.Done():
@@ -129,7 +130,8 @@ func TestHopCountLimit(t *testing.T) {
 	}
 
 	// If the hop count limit is not working, the connections will never become inactive
-	timeout, _ = context.WithTimeout(context.Background(), 2*time.Second)
+	timeout, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	for {
 		c, ok := n1.connections["node2"]
 		if !ok {
@@ -162,20 +164,20 @@ func TestLotsOfPings(t *testing.T) {
 
 	nodes := []*Netceptor{}
 	for i := 0; i < numBackboneNodes; i++ {
-		nodes = append(nodes, New(context.Background(), fmt.Sprintf("backbone_%d", i), nil))
+		nodes = append(nodes, New(context.Background(), fmt.Sprintf("backbone_%d", i)))
 	}
 	for i := 0; i < numBackboneNodes; i++ {
 		for j := 0; j < i; j++ {
 			b1, err := NewExternalBackend()
 			if err == nil {
-				err = nodes[i].AddBackend(b1, 1.0, nil)
+				err = nodes[i].AddBackend(b1)
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
 			b2, err := NewExternalBackend()
 			if err == nil {
-				err = nodes[j].AddBackend(b2, 1.0, nil)
+				err = nodes[j].AddBackend(b2)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -193,16 +195,16 @@ func TestLotsOfPings(t *testing.T) {
 		for j := 0; j < numLeafNodesPerBackbone; j++ {
 			b1, err := NewExternalBackend()
 			if err == nil {
-				err = nodes[i].AddBackend(b1, 1.0, nil)
+				err = nodes[i].AddBackend(b1)
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			newNode := New(context.Background(), fmt.Sprintf("leaf_%d_%d", i, j), nil)
+			newNode := New(context.Background(), fmt.Sprintf("leaf_%d_%d", i, j))
 			nodes = append(nodes, newNode)
 			b2, err := NewExternalBackend()
 			if err == nil {
-				err = newNode.AddBackend(b2, 1.0, nil)
+				err = newNode.AddBackend(b2)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -221,6 +223,7 @@ func TestLotsOfPings(t *testing.T) {
 		responses[i] = make([]bool, len(nodes))
 	}
 
+	errorChan := make(chan error)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	wg := sync.WaitGroup{}
 	for i := range nodes {
@@ -229,7 +232,9 @@ func TestLotsOfPings(t *testing.T) {
 			go func(sender *Netceptor, recipient *Netceptor, response *bool) {
 				pc, err := sender.ListenPacket("")
 				if err != nil {
-					t.Fatal(err)
+					errorChan <- err
+
+					return
 				}
 				go func() {
 					defer wg.Done()
@@ -237,7 +242,9 @@ func TestLotsOfPings(t *testing.T) {
 						buf := make([]byte, 1024)
 						err := pc.SetReadDeadline(time.Now().Add(1 * time.Second))
 						if err != nil {
-							t.Fatalf("error in SetReadDeadline: %s", err)
+							errorChan <- fmt.Errorf("error in SetReadDeadline: %s", err)
+
+							return
 						}
 						_, addr, err := pc.ReadFrom(buf)
 						if ctx.Err() != nil {
@@ -248,10 +255,14 @@ func TestLotsOfPings(t *testing.T) {
 						}
 						ncAddr, ok := addr.(Addr)
 						if !ok {
-							t.Fatal("addr was not a Netceptor address")
+							errorChan <- fmt.Errorf("addr was not a Netceptor address")
+
+							return
 						}
 						if ncAddr.node != recipient.nodeID {
-							t.Fatal("Received response from wrong node")
+							errorChan <- fmt.Errorf("received response from wrong node")
+
+							return
 						}
 						t.Logf("%s received response from %s", sender.nodeID, recipient.nodeID)
 						*response = true
@@ -309,7 +320,11 @@ func TestLotsOfPings(t *testing.T) {
 	}()
 
 	t.Log("waiting for done")
-	<-ctx.Done()
+	select {
+	case err := <-errorChan:
+		t.Fatal(err)
+	case <-ctx.Done():
+	}
 	t.Log("waiting for waitgroup")
 	wg.Wait()
 
@@ -330,14 +345,14 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	backends := make([]*ExternalBackend, netsize)
 	routingChans := make([]chan map[string]string, netsize)
 	for i := 0; i < netsize; i++ {
-		nodes[i] = New(context.Background(), fmt.Sprintf("node%d", i), nil)
+		nodes[i] = New(context.Background(), fmt.Sprintf("node%d", i))
 		routingChans[i] = nodes[i].SubscribeRoutingUpdates()
 		var err error
 		backends[i], err = NewExternalBackend()
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = nodes[i].AddBackend(backends[i], 1.0, nil)
+		err = nodes[i].AddBackend(backends[i])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -372,7 +387,8 @@ func TestDuplicateNodeDetection(t *testing.T) {
 			}
 		}(i)
 	}
-	timeout, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	timeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	for {
 		select {
 		case <-timeout.Done():
@@ -405,13 +421,13 @@ func TestDuplicateNodeDetection(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		// Create and connect a new node with a duplicate name
-		n := New(context.Background(), "node0", nil)
+		n := New(context.Background(), "node0")
 		logger.Info("Duplicate node0 has epoch %d\n", n.epoch)
 		b, err := NewExternalBackend()
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = n.AddBackend(b, 1.0, nil)
+		err = n.AddBackend(b)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -445,4 +461,322 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	for i := 0; i < netsize; i++ {
 		nodes[i].BackendWait()
 	}
+}
+
+func TestFirewalling(t *testing.T) {
+	lw := &logWriter{
+		t: t,
+	}
+	log.SetOutput(lw)
+	logger.SetShowTrace(true)
+	defer func() {
+		log.SetOutput(os.Stdout)
+		logger.SetShowTrace(false)
+	}()
+
+	// Create two Netceptor nodes using external backends
+	n1 := New(context.Background(), "node1")
+	b1, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n1.AddBackend(b1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n2 := New(context.Background(), "node2")
+	b2, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n2.AddBackend(b2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a firewall to node 1 that rejects messages whose data is "bad"
+	err = n1.AddFirewallRules([]FirewallRuleFunc{
+		func(md *MessageData) FirewallResult {
+			if string(md.Data) == "bad" {
+				return FirewallResultReject
+			}
+
+			return FirewallResultAccept
+		},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a Unix socket pair and use it to connect the backends
+	c1, c2, err := socketpair.New("unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe for node list updates
+	nCh1 := n1.SubscribeRoutingUpdates()
+	nCh2 := n2.SubscribeRoutingUpdates()
+
+	// Connect the two nodes
+	b1.NewConnection(MessageConnFromNetConn(c1), true)
+	b2.NewConnection(MessageConnFromNetConn(c2), true)
+
+	// Wait for the nodes to establish routing to each other
+	var routes1 map[string]string
+	var routes2 map[string]string
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for {
+		select {
+		case <-timeout.Done():
+			t.Fatal("timed out waiting for nodes to connect")
+		case routes1 = <-nCh1:
+		case routes2 = <-nCh2:
+		}
+		if routes1 != nil && routes2 != nil {
+			_, ok := routes1["node2"]
+			if ok {
+				_, ok := routes2["node1"]
+				if ok {
+					break
+				}
+			}
+		}
+	}
+
+	// Set up packet connection
+	pc1, err := n1.ListenPacket("testsvc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc2, err := n2.ListenPacket("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe for unreachable messages
+	unreach2chan := pc2.SubscribeUnreachable()
+
+	// Save received unreachable messages to a variable
+	var lastUnreachMsg *UnreachableNotification
+	go func() {
+		for {
+			select {
+			case <-timeout.Done():
+				return
+			case unreach := <-unreach2chan:
+				lastUnreachMsg = &unreach
+			}
+		}
+	}()
+
+	// Send a good message
+	lastUnreachMsg = nil
+	_, err = pc2.WriteTo([]byte("good"), n2.NewAddr("node1", "testsvc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = pc1.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 256)
+	n, _, err := pc1.ReadFrom(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(buf[:n]) != "good" {
+		t.Fatal("incorrect message received")
+	}
+	time.Sleep(100 * time.Millisecond)
+	if lastUnreachMsg != nil {
+		t.Fatalf("unexpected unreachable message received: %v", lastUnreachMsg)
+	}
+
+	// Send a bad message
+	_, err = pc2.WriteTo([]byte("bad"), n2.NewAddr("node1", "testsvc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = pc1.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = pc1.ReadFrom(buf)
+	if err != ErrTimeout {
+		if err == nil {
+			err = fmt.Errorf("received message that should have been firewalled")
+		}
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if lastUnreachMsg == nil {
+		t.Fatal("did not receive expected unreachable message")
+	}
+
+	// Shut down the network
+	n1.Shutdown()
+	n2.Shutdown()
+	n1.BackendWait()
+	n2.BackendWait()
+}
+
+func TestAllowedPeers(t *testing.T) {
+	lw := &logWriter{
+		t: t,
+	}
+	log.SetOutput(lw)
+	logger.SetShowTrace(true)
+	defer func() {
+		log.SetOutput(os.Stdout)
+		logger.SetShowTrace(false)
+	}()
+
+	// Create two Netceptor nodes using external backends
+	n1 := New(context.Background(), "node1")
+	b1, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n1.AddBackend(b1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n2 := New(context.Background(), "node2")
+	b2, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n2.AddBackend(b2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a firewall to node 1 that rejects messages whose data is "bad"
+	err = n1.AddFirewallRules([]FirewallRuleFunc{
+		func(md *MessageData) FirewallResult {
+			if string(md.Data) == "bad" {
+				return FirewallResultReject
+			}
+
+			return FirewallResultAccept
+		},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a Unix socket pair and use it to connect the backends
+	c1, c2, err := socketpair.New("unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe for node list updates
+	nCh1 := n1.SubscribeRoutingUpdates()
+	nCh2 := n2.SubscribeRoutingUpdates()
+
+	// Connect the two nodes
+	b1.NewConnection(MessageConnFromNetConn(c1), true)
+	b2.NewConnection(MessageConnFromNetConn(c2), true)
+
+	// Wait for the nodes to establish routing to each other
+	var routes1 map[string]string
+	var routes2 map[string]string
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for {
+		select {
+		case <-timeout.Done():
+			t.Fatal("timed out waiting for nodes to connect")
+		case routes1 = <-nCh1:
+		case routes2 = <-nCh2:
+		}
+		if routes1 != nil && routes2 != nil {
+			_, ok := routes1["node2"]
+			if ok {
+				_, ok := routes2["node1"]
+				if ok {
+					break
+				}
+			}
+		}
+	}
+
+	// Set up packet connection
+	pc1, err := n1.ListenPacket("testsvc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc2, err := n2.ListenPacket("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe for unreachable messages
+	unreach2chan := pc2.SubscribeUnreachable()
+
+	// Save received unreachable messages to a variable
+	var lastUnreachMsg *UnreachableNotification
+	go func() {
+		for {
+			select {
+			case <-timeout.Done():
+				return
+			case unreach := <-unreach2chan:
+				lastUnreachMsg = &unreach
+			}
+		}
+	}()
+
+	// Send a good message
+	lastUnreachMsg = nil
+	_, err = pc2.WriteTo([]byte("good"), n2.NewAddr("node1", "testsvc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = pc1.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 256)
+	n, _, err := pc1.ReadFrom(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(buf[:n]) != "good" {
+		t.Fatal("incorrect message received")
+	}
+	time.Sleep(100 * time.Millisecond)
+	if lastUnreachMsg != nil {
+		t.Fatalf("unexpected unreachable message received: %v", lastUnreachMsg)
+	}
+
+	// Send a bad message
+	_, err = pc2.WriteTo([]byte("bad"), n2.NewAddr("node1", "testsvc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = pc1.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = pc1.ReadFrom(buf)
+	if err != ErrTimeout {
+		if err == nil {
+			err = fmt.Errorf("received message that should have been firewalled")
+		}
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if lastUnreachMsg == nil {
+		t.Fatal("did not receive expected unreachable message")
+	}
+
+	// Shut down the network
+	n1.Shutdown()
+	n2.Shutdown()
+	n1.BackendWait()
+	n2.BackendWait()
 }

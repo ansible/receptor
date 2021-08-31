@@ -225,11 +225,12 @@ func (ns *TCPSession) Close() error {
 
 // tcpListenerCfg is the cmdline configuration object for a TCP listener.
 type tcpListenerCfg struct {
-	BindAddr string             `description:"Local address to bind to" default:"0.0.0.0"`
-	Port     int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
-	TLS      string             `description:"Name of TLS server config"`
-	Cost     float64            `description:"Connection cost (weight)" default:"1.0"`
-	NodeCost map[string]float64 `description:"Per-node costs"`
+	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
+	Port         int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
+	TLS          string             `description:"Name of TLS server config"`
+	Cost         float64            `description:"Connection cost (weight)" default:"1.0"`
+	NodeCost     map[string]float64 `description:"Per-node costs"`
+	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct.
@@ -259,7 +260,10 @@ func (cfg tcpListenerCfg) Run() error {
 
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, cfg.NodeCost)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendNodeCost(cfg.NodeCost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		return err
 	}
@@ -269,10 +273,11 @@ func (cfg tcpListenerCfg) Run() error {
 
 // tcpDialerCfg is the cmdline configuration object for a TCP dialer.
 type tcpDialerCfg struct {
-	Address string  `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
-	Redial  bool    `description:"Keep redialing on lost connection" default:"true"`
-	TLS     string  `description:"Name of TLS client config"`
-	Cost    float64 `description:"Connection cost (weight)" default:"1.0"`
+	Address      string   `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
+	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
+	TLS          string   `description:"Name of TLS client config"`
+	Cost         float64  `description:"Connection cost (weight)" default:"1.0"`
+	AllowedPeers []string `description:"Peer node IDs to allow via this connection"`
 }
 
 // Prepare verifies the parameters are correct.
@@ -301,7 +306,9 @@ func (cfg tcpDialerCfg) Run() error {
 
 		return err
 	}
-	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+	err = netceptor.MainInstance.AddBackend(b,
+		netceptor.BackendConnectionCost(cfg.Cost),
+		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
 		return err
 	}
@@ -364,7 +371,7 @@ func (c TCPListen) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid tcp listener config for %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nodeCosts); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCosts)); err != nil {
 		return fmt.Errorf("error creating backend for tcp listener %s: %w", c.Address, err)
 	}
 
@@ -403,7 +410,7 @@ func (c TCPDial) setup(nc *netceptor.Netceptor) error {
 		return fmt.Errorf("invalid cost for tcp dial %s: %w", c.Address, err)
 	}
 
-	if err := nc.AddBackend(b, cost, nil); err != nil {
+	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), nil); err != nil {
 		return fmt.Errorf("error creating backend for tcp dial %s: %w", c.Address, err)
 	}
 

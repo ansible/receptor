@@ -79,6 +79,23 @@ type BackendSession interface {
 	Close() error
 }
 
+// FirewallRuleFunc is a function that takes a message and returns a firewall decision.
+type FirewallRuleFunc func(*MessageData) FirewallResult
+
+// FirewallResult enumerates the actions that can be taken as a result of a firewall rule.
+type FirewallResult int
+
+const (
+	// FirewallResultContinue continues processing further rules (no result).
+	FirewallResultContinue FirewallResult = iota
+	// FirewallResultAccept accepts the message for normal processing.
+	FirewallResultAccept
+	// FirewallResultReject denies the message, sending an unreachable message to the originator.
+	FirewallResultReject
+	// FirewallResultDrop denies the message silently, leaving the originator to time out.
+	FirewallResultDrop
+)
+
 // Netceptor is the main object of the Receptor mesh network protocol.
 type Netceptor struct {
 	nodeID                 string
@@ -88,7 +105,6 @@ type Netceptor struct {
 	seenUpdateExpireTime   time.Duration
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
-	allowedPeers           []string
 	workCommands           []string
 	epoch                  uint64
 	sequence               uint64
@@ -110,7 +126,7 @@ type Netceptor struct {
 	cancelFunc             context.CancelFunc
 	hashLock               *sync.RWMutex
 	nameHashes             map[uint64]string
-	reservedServices       map[string]func(*messageData) error
+	reservedServices       map[string]func(*MessageData) error
 	serviceAdsLock         *sync.RWMutex
 	serviceAdsReceived     map[string]map[string]*ServiceAdvertisement
 	sendServiceAdsChan     chan time.Duration
@@ -122,6 +138,8 @@ type Netceptor struct {
 	clientTLSConfigs       map[string]*tls.Config
 	unreachableBroker      *utils.Broker
 	routingUpdateBroker    *utils.Broker
+	firewallLock           *sync.RWMutex
+	firewallRules          []FirewallRuleFunc
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -156,9 +174,12 @@ const (
 	ProblemServiceUnknown = "service unknown"
 	// ProblemExpiredInTransit occurs when a message's HopsToLive expires in transit.
 	ProblemExpiredInTransit = "message expired"
+	// ProblemRejected occurs when a packet is rejected by a firewall rule.
+	ProblemRejected = "blocked by firewall"
 )
 
-type messageData struct {
+// MessageData contains a single message packet from the network.
+type MessageData struct {
 	FromNode    string
 	FromService string
 	ToNode      string
@@ -262,7 +283,7 @@ func makeNetworkName(nodeID string) string {
 }
 
 // NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants.
-func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
+func NewWithConsts(ctx context.Context, nodeID string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
 	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
 	s := Netceptor{
@@ -273,7 +294,6 @@ func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 		seenUpdateExpireTime:   seenUpdateExpireTime,
 		maxForwardingHops:      maxForwardingHops,
 		maxConnectionIdleTime:  maxConnectionIdleTime,
-		allowedPeers:           allowedPeers,
 		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:               0,
 		connLock:               &sync.RWMutex{},
@@ -301,8 +321,9 @@ func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 		networkName:            makeNetworkName(nodeID),
 		clientTLSConfigs:       make(map[string]*tls.Config),
 		serverTLSConfigs:       make(map[string]*tls.Config),
+		firewallLock:           &sync.RWMutex{},
 	}
-	s.reservedServices = map[string]func(*messageData) error{
+	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
 		"unreach": s.handleUnreachable,
 	}
@@ -340,8 +361,8 @@ func NewWithConsts(ctx context.Context, nodeID string, allowedPeers []string,
 }
 
 // New constructs a new Receptor network protocol instance.
-func New(ctx context.Context, nodeID string, allowedPeers []string) *Netceptor {
-	return NewWithConsts(ctx, nodeID, allowedPeers, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
+func New(ctx context.Context, nodeID string) *Netceptor {
+	return NewWithConsts(ctx, nodeID, defaultMTU, defaultRouteUpdateTime, defaultServiceAdTime,
 		defaultSeenUpdateExpireTime, defaultMaxForwardingHops, defaultMaxConnectionIdleTime)
 }
 
@@ -404,8 +425,43 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
 }
 
+type backendInfo struct {
+	connectionCost float64
+	nodeCost       map[string]float64
+	allowedPeers   []string
+}
+
+// BackendConnectionCost is a modifier for AddBackend, which sets the global connection cost.
+func BackendConnectionCost(cost float64) func(*backendInfo) {
+	return func(bi *backendInfo) {
+		bi.connectionCost = cost
+	}
+}
+
+// BackendNodeCost is a modifier for AddBackend, which sets the per-node connection costs.
+func BackendNodeCost(nodeCost map[string]float64) func(*backendInfo) {
+	return func(bi *backendInfo) {
+		bi.nodeCost = nodeCost
+	}
+}
+
+// BackendAllowedPeers is a modifier for AddBackend, which sets the list of peers allowed to connect.
+func BackendAllowedPeers(peers []string) func(*backendInfo) {
+	return func(bi *backendInfo) {
+		bi.allowedPeers = peers
+	}
+}
+
 // AddBackend adds a backend to the Netceptor system.
-func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost map[string]float64) error {
+func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*backendInfo)) error {
+	bi := &backendInfo{
+		connectionCost: 1.0,
+		nodeCost:       nil,
+		allowedPeers:   nil,
+	}
+	for _, mod := range modifiers {
+		mod(bi)
+	}
 	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
 	// Start() runs a go routine that attempts establish a session over this
@@ -439,7 +495,7 @@ func (s *Netceptor) AddBackend(backend Backend, connectionCost float64, nodeCost
 					// Start() method above)
 					go func() {
 						defer runProtocolWg.Done()
-						err := s.runProtocol(ctxBackend, sess, connectionCost, nodeCost)
+						err := s.runProtocol(ctxBackend, sess, bi)
 						if err != nil {
 							logger.Error("Backend error: %s\n", err)
 						}
@@ -542,6 +598,18 @@ func (s *Netceptor) PathCost(nodeID string) (float64, error) {
 	}
 
 	return cost, nil
+}
+
+// AddFirewallRules adds firewall rules, optionally clearing existing rules first.
+func (s *Netceptor) AddFirewallRules(rules []FirewallRuleFunc, clearExisting bool) error {
+	s.firewallLock.Lock()
+	defer s.firewallLock.Unlock()
+	if clearExisting {
+		s.firewallRules = nil
+	}
+	s.firewallRules = append(s.firewallRules, rules...)
+
+	return nil
 }
 
 func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
@@ -1002,8 +1070,8 @@ func fixedLenBytesFromString(s string, l int) []byte {
 	return bytes
 }
 
-// Translates an incoming message from wire protocol to messageData object.
-func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
+// Translates an incoming message from wire protocol to MessageData object.
+func (s *Netceptor) translateDataToMessage(data []byte) (*MessageData, error) {
 	if len(data) < 36 {
 		return nil, fmt.Errorf("data too short to be a valid message")
 	}
@@ -1017,7 +1085,7 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 	}
 	fromService := stringFromFixedLenBytes(data[20:28])
 	toService := stringFromFixedLenBytes(data[28:36])
-	md := &messageData{
+	md := &MessageData{
 		FromNode:    fromNode,
 		FromService: fromService,
 		ToNode:      toNode,
@@ -1029,8 +1097,8 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*messageData, error) {
 	return md, nil
 }
 
-// Translates an outgoing message from a messageData object to wire protocol.
-func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
+// Translates an outgoing message from a MessageData object to wire protocol.
+func (s *Netceptor) translateDataFromMessage(msg *MessageData) ([]byte, error) {
 	data := make([]byte, 36+len(msg.Data))
 	data[0] = MsgTypeData
 	data[1] = msg.HopsToLive
@@ -1044,7 +1112,7 @@ func (s *Netceptor) translateDataFromMessage(msg *messageData) ([]byte, error) {
 }
 
 // Forwards a message to its next hop.
-func (s *Netceptor) forwardMessage(md *messageData) error {
+func (s *Netceptor) forwardMessage(md *MessageData) error {
 	if md.HopsToLive <= 0 {
 		if md.FromService != "unreach" {
 			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
@@ -1090,7 +1158,7 @@ func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string,
 	if strings.EqualFold(toNode, "localhost") {
 		toNode = s.nodeID
 	}
-	md := &messageData{
+	md := &MessageData{
 		FromNode:    s.nodeID,
 		FromService: fromService,
 		ToNode:      toNode,
@@ -1315,12 +1383,12 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 }
 
 // Handles a ping request.
-func (s *Netceptor) handlePing(md *messageData) error {
+func (s *Netceptor) handlePing(md *MessageData) error {
 	return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
 }
 
 // Handles an unreachable response.
-func (s *Netceptor) handleUnreachable(md *messageData) error {
+func (s *Netceptor) handleUnreachable(md *MessageData) error {
 	unrMsg := UnreachableMessage{}
 	err := json.Unmarshal(md.Data, &unrMsg)
 	if err != nil {
@@ -1350,7 +1418,7 @@ func (s *Netceptor) sendUnreachable(toNode string, message *UnreachableMessage) 
 }
 
 // Dispatches a message to a reserved service.  Returns true if handled, false otherwise.
-func (s *Netceptor) dispatchReservedService(md *messageData) (bool, error) {
+func (s *Netceptor) dispatchReservedService(md *MessageData) (bool, error) {
 	svc, ok := s.reservedServices[md.ToService]
 	if ok {
 		return true, svc(md)
@@ -1360,7 +1428,37 @@ func (s *Netceptor) dispatchReservedService(md *messageData) (bool, error) {
 }
 
 // Handles incoming data and dispatches it to a service listener.
-func (s *Netceptor) handleMessageData(md *messageData) error {
+func (s *Netceptor) handleMessageData(md *MessageData) error {
+	// Check firewall rules for this packet
+	s.firewallLock.RLock()
+	result := FirewallResultAccept
+	for _, rule := range s.firewallRules {
+		result = rule(md)
+		if result != FirewallResultContinue {
+			break
+		}
+	}
+	s.firewallLock.RUnlock()
+	switch result {
+	case FirewallResultAccept:
+		// do nothing
+	case FirewallResultDrop:
+		return nil
+	case FirewallResultReject:
+		if md.FromService != "unreach" {
+			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
+				FromNode:    md.FromNode,
+				ToNode:      md.ToNode,
+				FromService: md.FromService,
+				ToService:   md.ToService,
+				Problem:     ProblemRejected,
+			})
+		}
+
+		return nil
+	}
+
+	// If the destination is local, then dispatch the message to a service
 	if md.ToNode == s.nodeID {
 		handled, err := s.dispatchReservedService(md)
 		if err != nil {
@@ -1392,6 +1490,7 @@ func (s *Netceptor) handleMessageData(md *messageData) error {
 		return nil
 	}
 
+	// The destination is non-local, so forward the message.
 	return s.forwardMessage(md)
 }
 
@@ -1546,13 +1645,14 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 }
 
 // Main Netceptor protocol loop.
-func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connectionCost float64, nodeCost map[string]float64) error {
-	if connectionCost <= 0.0 {
+func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *backendInfo) error {
+	if bi.connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
 	established := false
 	remoteEstablished := false
 	remoteNodeID := ""
+	connectionCost := bi.connectionCost
 	defer func() {
 		_ = sess.Close()
 		if established {
@@ -1676,10 +1776,10 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connec
 					if !remoteNodeAccepted {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
 					}
-					if s.allowedPeers != nil {
+					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
-						for i := range s.allowedPeers {
-							if s.allowedPeers[i] == remoteNodeID {
+						for i := range bi.allowedPeers {
+							if bi.allowedPeers[i] == remoteNodeID {
 								remoteNodeAccepted = true
 
 								break
@@ -1687,10 +1787,10 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, connec
 						}
 					}
 					if !remoteNodeAccepted {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the accepted connections list")
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
 					}
 
-					remoteNodeCost, ok := nodeCost[remoteNodeID]
+					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost

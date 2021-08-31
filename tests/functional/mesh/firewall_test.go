@@ -34,21 +34,21 @@ func TestFirewall(t *testing.T) {
 						Index: 0,
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						listener: map[interface{}]interface{}{},
 					},
 				},
 			}
 			data.Nodes["node2"] = &mesh.YamlNode{
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						listener: map[interface{}]interface{}{},
 					},
 					map[interface{}]interface{}{
 						"node": map[interface{}]interface{}{
 							"id": "node2",
-							"firewallrules": []map[string]string{
+							"firewallrules": []map[interface{}]interface{}{
 								{"Action": "accept", "FromNode": "node2"},
 								{"Action": "reject", "ToNode": "node3"},
 								{"Action": "reject", "ToNode": "node1"},
@@ -63,7 +63,7 @@ func TestFirewall(t *testing.T) {
 						Index: 0,
 					},
 				},
-				Nodedef: []interface{}{
+				NodedefBase: []interface{}{
 					map[interface{}]interface{}{
 						listener: map[interface{}]interface{}{},
 					},

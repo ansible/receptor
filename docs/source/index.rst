@@ -25,20 +25,20 @@ Installation
 
 Compile from source code (Golang 1.15.x required)
 
-.. code-block:: bash
+.. code::
 
     make receptor
 
 Test the installation with
 
-.. code-block:: bash
+.. code::
 
     receptor --help
     receptor --version
 
 The preferred way to interact with receptor nodes is to use the receptorctl command line tool
 
-.. code-block:: bash
+.. code::
 
     pip install receptorctl
 
@@ -49,7 +49,7 @@ Basic usage
 
 Run the following command in a terminal to start a node called `foo`,
 
-.. code-block:: bash
+.. code::
 
     receptor --node id=foo --local-only -- log-level Debug
 
@@ -79,7 +79,7 @@ Receptor can be configured on the command-line, exemplified above, or via a yaml
 
 Start receptor using the config file
 
-.. code-block:: bash
+.. code::
 
     receptor --config foo.yml
 
@@ -88,19 +88,19 @@ Changing the configuration file does take effect until the receptor process is r
 Container image
 ^^^^^^^^^^^^^^^
 
-.. code-block:: bash
+.. code::
 
     podman pull quay.io/project-receptor/receptor
 
 Start a container, which automatically runs receptor with the default config located at ``/etc/receptor/receptor.conf``
 
-.. code-block:: bash
+.. code::
 
     podman run -it --rm --name receptor quay.io/project-receptor/receptor
 
 In another terminal, issue a basic "status" command to the running receptor process
 
-.. code-block:: bash
+.. code::
 
     $ podman exec receptor receptorctl status
     Node ID: d9b5a8e3c156

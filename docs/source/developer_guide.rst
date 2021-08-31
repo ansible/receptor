@@ -14,7 +14,7 @@ To skip tests that depend on Kubernetes, set environment variable ``export SKIP_
 
 Additionally, all code must pass a suite of Go linters. There is a pre-commit yaml file in the receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
 
-.. code-block:: bash
+.. code::
 
     cd $HOME
     go get github.com/golangci/golangci-lint/cmd/golangci-lint
@@ -294,7 +294,7 @@ The FromService here is not "ping", but rather the ephemeral service that was cr
 
 With ``trace`` enabled in the receptor configuration, the following log statements show the reply from `bar`,
 
-.. code-block:: bash
+.. code::
 
     TRACE --- Received data length 0 from foo:h73opPEh to bar:ping via foo
     TRACE --- Sending data length 0 from bar:ping to foo:h73opPEh

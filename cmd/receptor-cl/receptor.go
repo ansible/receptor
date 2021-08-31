@@ -7,13 +7,13 @@ import (
 	"strings"
 	"sync"
 
+	_ "github.com/ansible/receptor/internal/version"
 	_ "github.com/ansible/receptor/pkg/backends"
 	_ "github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	_ "github.com/ansible/receptor/pkg/services"
-	_ "github.com/ansible/receptor/pkg/version"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ghjm/cmdline"
 )

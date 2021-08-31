@@ -3,9 +3,9 @@ package controlsvc
 import (
 	"fmt"
 
+	"github.com/ansible/receptor/internal/version"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
-	"github.com/ansible/receptor/pkg/version"
 )
 
 type (

@@ -17,3 +17,4 @@ kubectl
 /receptor-python-worker/ChangeLog
 /receptor-python-worker/AUTHORS
 .vagrant/
+/docs/build

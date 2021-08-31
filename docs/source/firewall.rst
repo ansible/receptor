@@ -1,41 +1,48 @@
 Firewall Rules
 ==============
 
+Receptor has the ability to accept, drop, or reject traffic based on any combination of the following:
 
-Blah blah blah
+- ``FromNode``
+- ``ToNode``
+- ``FromService``
+- ``ToService``
+
+Firewall rules are added under the ``node`` entry in a Receptor configuration file:
 
 .. code-block:: yaml
-    
-    # Accepts everything
 
+    # Accepts everything
     ---
     node:
-    firewallrules:
+      firewallrules:
         - action: "accept"
 
-
 .. code-block:: yaml
+
     # Drops traffic from `foo` to `bar`'s control service
-
     ---
     node:
-    firewallrules:
+      firewallrules:
         - action: "drop"
-        fromnode: "foo"
-        tonode: "bar"
-        toservice: "control"
-    # Rejects traffic originating from nodes like abcb, adfb, etc
+          fromnode: "foo"
+          tonode: "bar"
+          toservice: "control"
 
 .. code-block:: yaml
-    ---
-    node:
-    firewallrules:
-        - action: "reject"
-        fromnode: "/a.*b/"
-    # Rejects traffic destined for nodes like abcb, AdfB, etc
 
+    # Rejects traffic originating from nodes like abcb, adfb, etc
     ---
     node:
-    firewallrules:
+      firewallrules:
         - action: "reject"
-        tonode: "/(?i)a.*b/"
+          fromnode: "/a.*b/"
+
+.. code-block:: yaml
+
+    # Rejects traffic destined for nodes like abcb, AdfB, etc
+    ---
+    node:
+      firewallrules:
+        - action: "reject"
+          tonode: "/(?i)a.*b/"

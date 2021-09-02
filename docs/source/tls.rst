@@ -22,10 +22,10 @@ foo.yml
 
     - tls-server:
         name: myserver
-        cert: foo.crt
-        key: foo.key
+        cert: /full/path/foo.crt
+        key: /full/path/foo.key
         requireclientcert: true
-        clientcas: ca.crt
+        clientcas: /full/path/ca.crt
 
     - tcp-listener:
         port: 2222

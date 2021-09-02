@@ -968,3 +968,100 @@ func TestKubeContainerFailure(t *testing.T) {
 		t.Fatal("Expected work to fail but it succeeded")
 	}
 }
+
+func TestSignedWorkVerification(t *testing.T) {
+	t.Parallel()
+	echoCommand := map[interface{}]interface{}{
+		"workType":        "echo",
+		"command":         "echo",
+		"params":          "",
+		"verifysignature": true,
+	}
+	privateKey, publicKey, err := utils.GenerateRSAPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, publicKeyWrong, err := utils.GenerateRSAPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := mesh.YamlData{}
+	data.Nodes = make(map[string]*mesh.YamlNode)
+	data.Nodes["node0"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{},
+		NodedefBase: []interface{}{
+			map[interface{}]interface{}{
+				"tcp-listener": map[interface{}]interface{}{},
+			},
+			map[interface{}]interface{}{
+				"work-signing": privateKey,
+			},
+		},
+	}
+	data.Nodes["node1"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{
+			"node0": {
+				Index: 0,
+			},
+		},
+		NodedefBase: []interface{}{
+			map[interface{}]interface{}{
+				"work-command": echoCommand,
+			},
+			map[interface{}]interface{}{
+				"work-verification": publicKey,
+			},
+		},
+	}
+	data.Nodes["node2"] = &mesh.YamlNode{
+		Connections: map[string]mesh.YamlConnection{
+			"node0": {
+				Index: 0,
+			},
+		},
+		NodedefBase: []interface{}{
+			map[interface{}]interface{}{
+				"work-command": echoCommand,
+			},
+			map[interface{}]interface{}{
+				"work-verification": publicKeyWrong,
+			},
+		},
+	}
+	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	err = m.WaitForReady(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := m.Nodes()
+	controllers := make(map[string]*receptorcontrol.ReceptorControl)
+	defer tearDown(controllers, m)
+	controllers["node0"] = receptorcontrol.New()
+	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node1", "signwork":"true"}`
+	unitID, err := controllers["node0"].WorkSubmitJSON(job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// node2 has the wrong public key to verify work signatures, so the work submission should fail
+	job = `{"command":"work","subcommand":"submit","worktype":"echo","node":"node2", "signwork":"true"}`
+	_, err = controllers["node0"].WorkSubmitJSON(job)
+	if err == nil {
+		t.Fatal("expected work submission to fail")
+	}
+}

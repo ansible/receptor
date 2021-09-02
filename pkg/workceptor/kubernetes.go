@@ -5,13 +5,11 @@ package workceptor
 
 import (
 	"context"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,7 +40,6 @@ type kubeUnit struct {
 	streamMethod        string
 	baseParams          string
 	allowRuntimeAuth    bool
-	allowRuntimeTLS     bool
 	allowRuntimeCommand bool
 	allowRuntimeParams  bool
 	allowRuntimePod     bool
@@ -60,8 +57,6 @@ type kubeExtraData struct {
 	Command       string
 	Params        string
 	KubeNamespace string
-	KubeVerifyTLS bool
-	KubeTLSCAData string
 	KubeConfig    string
 	KubePod       string
 	PodName       string
@@ -695,20 +690,6 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 
 		return ssf
 	}
-	setBool := func(target *bool) func(string) error {
-		ssf := func(value string) error {
-			bv, err := strconv.ParseBool(value)
-			if err != nil {
-				return err
-			}
-			*target = bv
-
-			return nil
-		}
-
-		return ssf
-	}
-
 	var err error
 	ked.KubePod, err = readFileToString(ked.KubePod)
 	if err != nil {
@@ -730,8 +711,6 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
 		{name: "secret_kube_pod", permission: kw.allowRuntimePod, setter: setString(&userPod)},
-		{name: "kube_verify_tls", permission: kw.allowRuntimeTLS, setter: setBool(&ked.KubeVerifyTLS)},
-		{name: "kube_tls_ca", permission: kw.allowRuntimeTLS, setter: setString(&ked.KubeTLSCAData)},
 		{name: "pod_pending_timeout", permission: kw.allowRuntimeParams, setter: setString(&podPendingTimeoutString)},
 	}
 	for i := range values {
@@ -902,15 +881,13 @@ type workKubeCfg struct {
 	AuthMethod          string `description:"One of: kubeconfig, incluster" default:"incluster"`
 	KubeConfig          string `description:"Kubeconfig filename (for authmethod=kubeconfig)"`
 	Pod                 string `description:"Pod definition filename, in json or yaml format"`
-	KubeVerifyTLS       bool   `description:"verify server TLS certificate/hostname" default:"true"`
-	KubeTLSCAData       string `description:"CA certificate PEM data to verify against"`
 	AllowRuntimeAuth    bool   `description:"Allow passing API parameters at runtime" default:"false"`
-	AllowRuntimeTLS     bool   `description:"Allow passing TLS parameters at runtime" default:"false"`
 	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
 	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
 	AllowRuntimePod     bool   `description:"Allow passing Pod at runtime" default:"false"`
 	DeletePodOnRestart  bool   `description:"On restart, delete the pod if in pending state" default:"true"`
 	StreamMethod        string `description:"Method for connecting to worker pods: logger or tcp" default:"logger"`
+	VerifySignature     bool   `description:"Verify a signed work submission" default:"false"`
 }
 
 // newWorker is a factory to produce worker instances.
@@ -924,8 +901,6 @@ func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 					KubeNamespace: cfg.Namespace,
 					KubePod:       cfg.Pod,
 					KubeConfig:    cfg.KubeConfig,
-					KubeVerifyTLS: cfg.KubeVerifyTLS,
-					KubeTLSCAData: cfg.KubeTLSCAData,
 				},
 			},
 		},
@@ -933,7 +908,6 @@ func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 		streamMethod:        strings.ToLower(cfg.StreamMethod),
 		baseParams:          cfg.Params,
 		allowRuntimeAuth:    cfg.AllowRuntimeAuth,
-		allowRuntimeTLS:     cfg.AllowRuntimeTLS,
 		allowRuntimeCommand: cfg.AllowRuntimeCommand,
 		allowRuntimeParams:  cfg.AllowRuntimeParams,
 		allowRuntimePod:     cfg.AllowRuntimePod,
@@ -966,12 +940,6 @@ func (cfg workKubeCfg) Prepare() error {
 	if cfg.Pod != "" && (cfg.Image != "" || cfg.Command != "" || cfg.Params != "") {
 		return fmt.Errorf("can only provide Pod when Image, Command, and Params are empty")
 	}
-	if cfg.KubeTLSCAData != "" {
-		block, _ := pem.Decode([]byte(cfg.KubeTLSCAData))
-		if block == nil || block.Type != "BEGIN CERTIFICATE" {
-			return fmt.Errorf("could not decode KubeTLSCAData as a PEM formatted certificate")
-		}
-	}
 	if cfg.Image == "" && !cfg.AllowRuntimeCommand && !cfg.AllowRuntimePod {
 		return fmt.Errorf("must specify a container image to run")
 	}
@@ -985,7 +953,7 @@ func (cfg workKubeCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg workKubeCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, cfg.VerifySignature)
 
 	return err
 }
@@ -1013,14 +981,8 @@ type Kubernetes struct {
 	KubeConfig *string `mapstructure:"kube-config"`
 	// Pod definition filename, in json or yaml format.
 	Pod string `mapstructure:"pod"`
-	// Do not verify server TLS certificate/hostname.
-	KubeNoVerifyTLS bool `mapstructure:"insecure-kube-no-verify-tls"`
-	// CA certificate PEM data to verify against.
-	KubeTLSCAData string `mapstructure:"kube-tls-ca-data"`
 	// Allow passing API parameters at runtime.
 	AllowRuntimeAuth bool `mapstructure:"allow-runtime-auth"`
-	// Allow passing TLS parameters at runtime.
-	AllowRuntimeTLS bool `mapstructure:"allow-runtime-tls"`
 	// Allow specifying image & command at runtime.
 	AllowRuntimeCommand bool `mapstructure:"allow-runtime-command"`
 	// Allow adding command parameters at runtime.
@@ -1062,11 +1024,6 @@ func (k Kubernetes) setup(wc *Workceptor) error {
 	if k.Pod != "" && (k.Image != "" || k.Command != "" || k.Params != "") {
 		return fmt.Errorf("can only provide Pod when Image, Command, and Params are empty")
 	}
-	if k.KubeTLSCAData != "" {
-		if block, _ := pem.Decode([]byte(k.KubeTLSCAData)); block == nil || block.Type != "BEGIN CERTIFICATE" {
-			return fmt.Errorf("could not decode KubeTLSCAData as a PEM formatted certificate")
-		}
-	}
 	if k.Image == "" && !k.AllowRuntimeCommand && !k.AllowRuntimePod {
 		return fmt.Errorf("must specify a container image to run")
 	}
@@ -1088,8 +1045,6 @@ func (k Kubernetes) setup(wc *Workceptor) error {
 						KubeNamespace: namespace,
 						KubePod:       k.Pod,
 						KubeConfig:    kubeConfig,
-						KubeVerifyTLS: !k.KubeNoVerifyTLS,
-						KubeTLSCAData: k.KubeTLSCAData,
 					},
 				},
 			},
@@ -1097,7 +1052,6 @@ func (k Kubernetes) setup(wc *Workceptor) error {
 			streamMethod:        streamMethod,
 			baseParams:          k.Params,
 			allowRuntimeAuth:    k.AllowRuntimeAuth,
-			allowRuntimeTLS:     k.AllowRuntimeTLS,
 			allowRuntimeCommand: k.AllowRuntimeCommand,
 			allowRuntimeParams:  k.AllowRuntimeParams,
 			allowRuntimePod:     k.AllowRuntimePod,
@@ -1109,5 +1063,5 @@ func (k Kubernetes) setup(wc *Workceptor) error {
 		return ku
 	}
 
-	return wc.RegisterWorker(k.WorkType, factory)
+	return wc.RegisterWorker(k.WorkType, factory, false)
 }

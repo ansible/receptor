@@ -109,7 +109,6 @@ def status(ctx, printjson):
     if ads:
         print()
         print(f"{'Node':<{longest_node}} Service   Type       Last Seen             Tags")
-        workcommands = {}
         for ad in ads:
             time = dateutil.parser.parse(ad['Time'])
             if ad['ConnType'] == 0:
@@ -121,25 +120,40 @@ def status(ctx, printjson):
             last_seen = f"{time:%Y-%m-%d %H:%M:%S}"
             print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}")
 
-    if ads:
-        print()
-        print(f"{'Node':<{longest_node}} Work Types")
+    def print_worktypes(header, isSecure):
+        printOnce = True
         seen_nodes = []
         for ad in ads:
-            commands = ad['WorkCommands']
+            commands = ad["WorkCommands"]
             if not commands:
+                continue
+            commands = json.loads(commands)
+            workTypes = []
+            for c in commands:
+                wT = c["WorkType"]
+                if c["Secure"] == isSecure:
+                    workTypes.append(wT)
+            if not workTypes:
                 continue
             node = ad['NodeID']
             if node in seen_nodes:
                 continue
             else:
                 seen_nodes.append(node)
-            commands = ', '.join(commands)
+            workTypes = ', '.join(workTypes)
+            if printOnce:
+                print()
+                print(f"{'Node':<{longest_node}} {header}")
+                printOnce = False
             print(
                 f"{ad['NodeID']:<{longest_node}} ",
                 end=""
             )
-            print(commands)
+            print(workTypes)
+
+    if ads:
+        print_worktypes("Work Types", False)
+        print_worktypes("Secure Work Types", True)
 
     if status:
         print("Additional data returned from Receptor:")
@@ -283,11 +297,12 @@ def list_units(ctx, unit_id, node, tlsclient, quiet):
 @click.option('--no-payload', '-n', is_flag=True, help="Send an empty payload.")
 @click.option('--tls-client', 'tlsclient', type=str, default="", help="TLS client used when submitting work to a remote node")
 @click.option('--ttl', type=str, default="", help="Time to live until remote work must start, e.g. 1h20m30s or 30m10s")
+@click.option('--signwork', help="Digitally sign remote work submissions", is_flag=True)
 @click.option('--follow', '-f', help="Remain attached to the job and print its results to stdout", is_flag=True)
 @click.option('--rm', help="Release unit after completion", is_flag=True)
 @click.option('--param', '-a', help="Additional Receptor parameter (key=value format)", multiple=True)
 @click.argument('cmdparams', type=str, required=False, nargs=-1)
-def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient, ttl, follow, rm, param, cmdparams):
+def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient, ttl, signwork, follow, rm, param, cmdparams):
     pcmds = 0
     if payload:
         pcmds += 1
@@ -324,7 +339,7 @@ def submit(ctx, worktype, node, payload, no_payload, payload_literal, tlsclient,
         if node == "":
             node = None
         rc = get_rc(ctx)
-        work = rc.submit_work(worktype, payload_data, node=node, tlsclient=tlsclient, ttl=ttl, params=params)
+        work = rc.submit_work(worktype, payload_data, node=node, tlsclient=tlsclient, ttl=ttl, signwork=signwork, params=params)
         result = work.pop('result')
         unitid = work.pop('unitid')
         if follow:

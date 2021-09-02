@@ -69,7 +69,7 @@ func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string
 
 // Run runs the action.
 func (cfg workPythonCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, false)
 
 	return err
 }
@@ -106,5 +106,5 @@ func (p Python) setup(wc *Workceptor) error {
 		return cw
 	}
 
-	return wc.RegisterWorker(p.WorkType, factory)
+	return wc.RegisterWorker(p.WorkType, factory, false)
 }

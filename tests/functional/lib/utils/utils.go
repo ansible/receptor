@@ -2,7 +2,9 @@ package utils
 
 import (
 	"context"
-	"errors"
+	"crypto/rand"
+	"crypto/rsa"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -62,7 +64,7 @@ func makeRange(start, stop, step int) ([]int, error) {
 			out = append(out, start)
 		}
 	default:
-		return nil, errors.New("unable to make range")
+		return nil, fmt.Errorf("unable to make range")
 	}
 
 	return out, nil
@@ -263,6 +265,32 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 	}
 
 	return keyPath, crtPath, nil
+}
+
+func GenerateRSAPair() (string, string, error) {
+	dir, err := ioutil.TempDir(CertBaseDir, "")
+	if err != nil {
+		return "", "", err
+	}
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+	publicKey := &privateKey.PublicKey
+
+	privateKeyPath := filepath.Join(dir, "private.pem")
+	err = certificates.SaveToPEMFile(privateKeyPath, []interface{}{privateKey})
+	if err != nil {
+		return "", "", err
+	}
+
+	publicKeyPath := filepath.Join(dir, "public.pem")
+	err = certificates.SaveToPEMFile(publicKeyPath, []interface{}{publicKey})
+	if err != nil {
+		return "", "", err
+	}
+
+	return privateKeyPath, publicKeyPath, nil
 }
 
 // CheckUntilTimeout Polls the check function until the context expires, in

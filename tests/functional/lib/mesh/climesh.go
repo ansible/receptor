@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -570,7 +571,11 @@ func (m *CLIMesh) CheckAdvertisements() bool {
 		actual := map[string][]string{}
 		for _, ad := range status.Advertisements {
 			if len(ad.WorkCommands) > 0 {
-				actual[ad.NodeID] = ad.WorkCommands
+				wcs := []netceptor.WorkCommand{}
+				json.Unmarshal([]byte(ad.WorkCommands), &wcs)
+				for _, workCommand := range wcs {
+					actual[ad.NodeID] = append(actual[ad.NodeID], workCommand.WorkType)
+				}
 			}
 		}
 		expected := map[string][]string{}

@@ -39,11 +39,12 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.RegisterWorker("command", newCommandWorker)
+	err = w.RegisterWorker("command", newCommandWorker, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cw, err := w.AllocateUnit("command", make(map[string]string))
+	signature := ""
+	cw, err := w.AllocateUnit("command", signature, make(map[string]string))
 	if err != nil {
 		t.Fatal(err)
 	}

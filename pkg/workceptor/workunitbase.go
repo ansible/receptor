@@ -74,6 +74,7 @@ type BaseWorkUnit struct {
 	lastUpdateError error
 	ctx             context.Context
 	cancel          context.CancelFunc
+	signWork        bool
 }
 
 // Init initializes the basic work unit data, in memory only.
@@ -89,6 +90,11 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
+	bwu.signWork = false
+}
+
+func (bwu *BaseWorkUnit) SetSignWork(signWork bool) {
+	bwu.signWork = signWork
 }
 
 // SetFromParams sets the in-memory state from parameters.

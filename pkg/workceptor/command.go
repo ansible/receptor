@@ -289,6 +289,7 @@ type commandCfg struct {
 	Command            string `required:"true" description:"Command to run to process units of work"`
 	Params             string `description:"Command-line parameters"`
 	AllowRuntimeParams bool   `description:"Allow users to add more parameters" default:"false"`
+	VerifySignature    bool   `description:"Verify a signed work submission" default:"false"`
 }
 
 func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
@@ -309,7 +310,7 @@ func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) W
 
 // Run runs the action.
 func (cfg commandCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, cfg.VerifySignature)
 
 	return err
 }
@@ -339,7 +340,67 @@ func (cfg commandRunnerCfg) Run() error {
 	return nil
 }
 
+type signingKeyPrivateCfg struct {
+	PrivateKey      string `description:"Private key to sign work submissions" barevalue:"yes" default:""`
+	TokenExpiration string `description:"Expiration of the signed json web token, e.g. 3h or 3h30m" default:""`
+}
+
+type verifyingKeyPublicCfg struct {
+	PublicKey string `description:"Public key to verify signed work submissions" barevalue:"yes" default:""`
+}
+
+func filenameExists(filename string) error {
+	if _, err := os.Stat(filename); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s does not exist", filename)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (cfg signingKeyPrivateCfg) Prepare() error {
+	err := filenameExists(cfg.PrivateKey)
+	if err != nil {
+		return err
+	}
+	if cfg.TokenExpiration != "" {
+		_, err = time.ParseDuration(cfg.TokenExpiration)
+		if err != nil {
+			return fmt.Errorf("failed to parse TokenExpiration -- valid examples include '1.5h', '30m', '30m10s'")
+		}
+	}
+
+	return nil
+}
+
+func (cfg verifyingKeyPublicCfg) Prepare() error {
+	return filenameExists(cfg.PublicKey)
+}
+
+func (cfg signingKeyPrivateCfg) Run() error {
+	MainInstance.signingkey = cfg.PrivateKey
+	if cfg.TokenExpiration != "" {
+		duration, _ := time.ParseDuration(cfg.TokenExpiration)
+		MainInstance.signingexpiration = duration
+	}
+
+	return nil
+}
+
+func (cfg verifyingKeyPublicCfg) Run() error {
+	MainInstance.verifyingkey = cfg.PublicKey
+
+	return nil
+}
+
 func init() {
+	cmdline.RegisterConfigTypeForApp("receptor-workers",
+		"work-signing", "Private key to sign work submissions", signingKeyPrivateCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
+	cmdline.RegisterConfigTypeForApp("receptor-workers",
+		"work-verification", "Public key to verify work submissions", verifyingKeyPublicCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-command", "Run a worker using an external command", commandCfg{}, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
@@ -371,5 +432,5 @@ func (c Command) setup(wc *Workceptor) error {
 		return cw
 	}
 
-	return wc.RegisterWorker(c.WorkType, factory)
+	return wc.RegisterWorker(c.WorkType, factory, false)
 }

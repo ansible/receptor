@@ -6,6 +6,7 @@ import fcntl
 import tty
 import termios
 import click
+import json
 from pprint import pprint
 from functools import partial
 import dateutil.parser
@@ -54,7 +55,7 @@ def status(ctx, printjson):
     rc = get_rc(ctx)
     status = rc.simple_command("status")
     if printjson:
-        print(status)
+        print(json.dumps(status))
         return
     node_id = status.pop('NodeID')
     print(f"Node ID: {node_id}")

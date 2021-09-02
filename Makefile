@@ -103,8 +103,13 @@ specfiles: $(SPECFILES)
 $(SPECFILES): %.spec: %.spec.j2
 	@jinja2 -D version=$(VERSION) -D release=$(RELEASE) $< -o $@
 
-DIST = $(shell rpm --eval '%{dist}')
-ARCH = $(shell rpm --eval '%{_arch}')
+ifeq ($(shell if which rpm >& /dev/null; then echo yes; fi)),yes) 
+DIST := $(shell rpm --eval '%{dist}')
+ARCH := $(shell rpm --eval '%{_arch}')
+else
+DIST :=
+ARCH := $(shell uname -m)
+endif
 
 RPMSOURCEDIRS = cmd example pkg receptorctl receptor-python-worker packaging/rpm tests
 RPMSOURCETAR = rpmbuild/SOURCES/receptor-$(VERSION).tar.gz

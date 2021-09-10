@@ -3,6 +3,10 @@ Receptor
 
 Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers.  Receptor nodes establish peer-to-peer connections with each other via existing networks.  Once connected, the Receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.
 
+See the readthedocs page for Receptor at:
+
+https://receptor.readthedocs.io/en/latest
+
 ## Terminology and Concepts
 
 * _Receptor_: The Receptor application taken as a whole, that typically runs as a daemon.
@@ -23,12 +27,6 @@ The easiest way to check out Receptor is to run it as a container.  Images are k
 [docker|podman] run -d -v /path/to/receptor.conf:/etc/receptor/receptor.conf:Z receptor
 ```
 
-RPMs for Fedora 32 also exist at https://copr.fedorainfracloud.org/coprs/ghjm/Receptor/.  To install these on a Fedora 32 system, run:
-```
-dnf copr enable ghjm/Receptor
-dnf install receptor receptorctl
-```
-
 ## Use as a Go library
 
 This code can be imported and used from Go programs.  The main libraries are:
@@ -42,9 +40,9 @@ See the `example/` directory for examples of using these libraries from Go.
 
 The `receptor` command runs a Receptor node with access to all included backends and services.  See `receptor --help` for details.
 
-The command line is organized into entities which take parameters, like: `receptor --entity1 param1=value1 param2=value1 --entity2 param1=value2 param2=value2`.  In this case we are configuring two things, entity1 and entity2, each of which takes two parameters.  Distinct entities are marked with a double dash, and bare parameters attach to the immediately preceding entity.
+The command line is organized into entities which take parameters, like: `receptor --entity1 param1=value1 param2=value1 --entity2 param1=value2 param2=value2`.  In this case we are configuring two things, `entity1` and `entity2`, each of which takes two parameters.  Distinct entities are marked with a double dash, and bare parameters attach to the immediately preceding entity.
 
-Receptor can also take its configuration from a file in YAML format.  The allowed directives are the same as on the command line, with a top level list of entities and each entity receiving zero or more parameters as a dict.  The above command in YAML format would look like this:
+Receptor can also take its configuration from a file in YAML format.  The allowed directives are the same as on the command line, with a top-level list of entities and each entity receiving zero or more parameters as a dict.  The above command in YAML format would look like this:
 
 ```
 ---

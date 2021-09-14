@@ -1,0 +1,29 @@
+---
+
+name: Publish nightly wheel
+
+on:
+  push:
+    branches: [devel]
+
+jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    name: Build wheel
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Build wheel
+        run: |
+          make clean receptorctl_wheel
+
+      - name: Upload wheel
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          pip install boto3
+          ansible -i localhost, -c local all -m aws_s3 \
+            -a "bucket=receptor-nightlies object=receptorctl/receptorctl-latest-py3-none-any.whl src=$(ls receptorctl/dist/*.whl | head -n 1) mode=put"

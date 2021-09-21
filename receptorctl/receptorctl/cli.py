@@ -127,7 +127,6 @@ def status(ctx, printjson):
             commands = ad["WorkCommands"]
             if not commands:
                 continue
-            commands = json.loads(commands)
             workTypes = []
             for c in commands:
                 wT = c["WorkType"]

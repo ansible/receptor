@@ -221,9 +221,11 @@ const (
 	ConnTypeStreamTLS = 2
 )
 
+// WorkCommand tracks available work types and whether they verify work submissions.
 type WorkCommand struct {
 	WorkType string
-	Secure   bool
+	// Secure true means receptor will verify the signature of the work submit payload
+	Secure bool
 }
 
 // ServiceAdvertisement is the data associated with a service advertisement.
@@ -233,7 +235,7 @@ type ServiceAdvertisement struct {
 	Time         time.Time
 	ConnType     byte
 	Tags         map[string]string
-	WorkCommands string
+	WorkCommands []WorkCommand
 }
 
 // serviceAdvertisementFull is the whole message from the network.
@@ -569,8 +571,7 @@ func (s *Netceptor) Status() Status {
 			if adCopy.NodeID == s.nodeID {
 				adCopy.Time = time.Now()
 				if len(s.workCommands) > 0 {
-					wCBytes, _ := json.Marshal(s.workCommands)
-					adCopy.WorkCommands = string(wCBytes)
+					adCopy.WorkCommands = s.workCommands
 				}
 			}
 			serviceAds = append(serviceAds, &adCopy)
@@ -697,8 +698,7 @@ func (s *Netceptor) sendServiceAds() {
 			if svcType, ok := sa.Tags["type"]; ok {
 				if svcType == "Control Service" {
 					if len(s.workCommands) > 0 {
-						wCBytes, _ := json.Marshal(s.workCommands)
-						sa.WorkCommands = string(wCBytes)
+						sa.WorkCommands = s.workCommands
 					}
 				}
 			}

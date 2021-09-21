@@ -162,9 +162,12 @@ func (w *Workceptor) AllocateUnit(workTypeName, signature string, params map[str
 		if signature == "" {
 			return nil, fmt.Errorf("could not verify signature: signature is empty")
 		}
+		if w.verifyingkey == "" {
+			return nil, fmt.Errorf("could not verify signature: verifying key not specified")
+		}
 		rsaPublicKey, err := certificates.LoadPublicKey(w.verifyingkey)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not load verifying key file: %s", err.Error())
 		}
 		token, err := jwt.ParseWithClaims(signature, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
 			return rsaPublicKey, nil

@@ -177,7 +177,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 		}
 		rsaPrivateKey, err := certificates.LoadPrivateKey(rw.w.signingkey)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not load signing key file: %s", err.Error())
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodRS512, claims)
 		tokenString, err := token.SignedString(rsaPrivateKey)

@@ -570,7 +570,9 @@ func (m *CLIMesh) CheckAdvertisements() bool {
 		actual := map[string][]string{}
 		for _, ad := range status.Advertisements {
 			if len(ad.WorkCommands) > 0 {
-				actual[ad.NodeID] = ad.WorkCommands
+				for _, workCommand := range ad.WorkCommands {
+					actual[ad.NodeID] = append(actual[ad.NodeID], workCommand.WorkType)
+				}
 			}
 		}
 		expected := map[string][]string{}

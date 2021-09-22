@@ -33,17 +33,17 @@ func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
 }
 
 // RegisterWorker notifies the Workceptor of a new kind of work that can be done
-func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc) error {
+func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc, verifySignature bool) error {
 	return ErrNotImplemented
 }
 
 // AllocateUnit creates a new local work unit and generates an identifier for it
-func (w *Workceptor) AllocateUnit(workTypeName string, params string) (WorkUnit, error) {
+func (w *Workceptor) AllocateUnit(workTypeName, signature string, params string) (WorkUnit, error) {
 	return nil, ErrNotImplemented
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it
-func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, tlsclient string, ttl string, params string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode string, remoteWorkType string, tlsclient string, ttl string, signWork bool, params string) (WorkUnit, error) {
 	return nil, ErrNotImplemented
 }
 

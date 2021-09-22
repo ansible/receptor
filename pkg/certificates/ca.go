@@ -46,6 +46,9 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 	var block *pem.Block
 	for len(content) > 0 {
 		block, content = pem.Decode(content)
+		if block == nil {
+			return nil, fmt.Errorf("failed to decode PEM block")
+		}
 		switch block.Type {
 		case "CERTIFICATE":
 			var cert *x509.Certificate
@@ -64,6 +67,12 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 		case "RSA PRIVATE KEY":
 			var key *rsa.PrivateKey
 			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, key)
+		case "PUBLIC KEY":
+			key, err := x509.ParsePKIXPublicKey(block.Bytes)
 			if err != nil {
 				return nil, err
 			}
@@ -112,13 +121,32 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 
 			continue
 		}
-		var key *rsa.PrivateKey
-		key, ok = elem.(*rsa.PrivateKey)
+		var keyPrivate *rsa.PrivateKey
+		keyPrivate, ok = elem.(*rsa.PrivateKey)
 		if ok {
 			keyPEM := new(bytes.Buffer)
 			err = pem.Encode(keyPEM, &pem.Block{
 				Type:  "RSA PRIVATE KEY",
-				Bytes: x509.MarshalPKCS1PrivateKey(key),
+				Bytes: x509.MarshalPKCS1PrivateKey(keyPrivate),
+			})
+			if err != nil {
+				return err
+			}
+			content = append(content, keyPEM.String())
+
+			continue
+		}
+		var keyPublic *rsa.PublicKey
+		keyPublic, ok = elem.(*rsa.PublicKey)
+		if ok {
+			keyPEM := new(bytes.Buffer)
+			keyPublicBytes, err := x509.MarshalPKIXPublicKey(keyPublic)
+			if err != nil {
+				return err
+			}
+			err = pem.Encode(keyPEM, &pem.Block{
+				Type:  "PUBLIC KEY",
+				Bytes: keyPublicBytes,
 			})
 			if err != nil {
 				return err
@@ -178,6 +206,23 @@ func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 	key, ok := data[0].(*rsa.PrivateKey)
 	if !ok {
 		return nil, fmt.Errorf("private key file does not contain private key data")
+	}
+
+	return key, nil
+}
+
+// LoadPublicKey loads a single RSA public key from a file.
+func LoadPublicKey(filename string) (*rsa.PublicKey, error) {
+	data, err := LoadFromPEMFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) != 1 {
+		return nil, fmt.Errorf("public key file should contain exactly one item")
+	}
+	key, ok := data[0].(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("public key file does not contain public key data")
 	}
 
 	return key, nil

@@ -223,6 +223,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				cfr, err = cc.ControlFunc(s.nc, cfo)
 			}
 			if err != nil {
+				logger.Error(err.Error())
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					logger.Error("Write error in control service: %s\n", err)

@@ -15,27 +15,33 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/randstr"
 	"github.com/ansible/receptor/pkg/utils"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 // Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
-	ctx             context.Context
-	nc              *netceptor.Netceptor
-	dataDir         string
-	workTypesLock   *sync.RWMutex
-	workTypes       map[string]*workType
-	activeUnitsLock *sync.RWMutex
-	activeUnits     map[string]WorkUnit
+	ctx               context.Context
+	nc                *netceptor.Netceptor
+	dataDir           string
+	workTypesLock     *sync.RWMutex
+	workTypes         map[string]*workType
+	activeUnitsLock   *sync.RWMutex
+	activeUnits       map[string]WorkUnit
+	signingkey        string
+	signingexpiration time.Duration
+	verifyingkey      string
 }
 
 // workType is the record for a registered type of work.
 type workType struct {
-	newWorkerFunc NewWorkerFunc
+	newWorkerFunc   NewWorkerFunc
+	verifySignature bool
 }
 
 // New constructs a new Workceptor instance.
@@ -45,15 +51,18 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 	}
 	dataDir = path.Join(dataDir, nc.NodeID())
 	w := &Workceptor{
-		ctx:             ctx,
-		nc:              nc,
-		dataDir:         dataDir,
-		workTypesLock:   &sync.RWMutex{},
-		workTypes:       make(map[string]*workType),
-		activeUnitsLock: &sync.RWMutex{},
-		activeUnits:     make(map[string]WorkUnit),
+		ctx:               ctx,
+		nc:                nc,
+		dataDir:           dataDir,
+		workTypesLock:     &sync.RWMutex{},
+		workTypes:         make(map[string]*workType),
+		activeUnitsLock:   &sync.RWMutex{},
+		activeUnits:       make(map[string]WorkUnit),
+		signingkey:        "",
+		signingexpiration: 5 * time.Minute,
+		verifyingkey:      "",
 	}
-	err := w.RegisterWorker("remote", newRemoteWorker)
+	err := w.RegisterWorker("remote", newRemoteWorker, false)
 	if err != nil {
 		return nil, fmt.Errorf("could not register remote worker function: %s", err)
 	}
@@ -87,7 +96,7 @@ func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
 }
 
 // RegisterWorker notifies the Workceptor of a new kind of work that can be done.
-func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc) error {
+func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc, verifySignature bool) error {
 	w.workTypesLock.Lock()
 	_, ok := w.workTypes[typeName]
 	if ok {
@@ -96,10 +105,11 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc
 		return fmt.Errorf("work type %s already registered", typeName)
 	}
 	w.workTypes[typeName] = &workType{
-		newWorkerFunc: newWorkerFunc,
+		newWorkerFunc:   newWorkerFunc,
+		verifySignature: verifySignature,
 	}
 	if typeName != "remote" { // all workceptors get a remote command by default
-		w.nc.AddWorkCommand(typeName)
+		w.nc.AddWorkCommand(typeName, verifySignature)
 	}
 	w.workTypesLock.Unlock()
 
@@ -139,7 +149,7 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 }
 
 // AllocateUnit creates a new local work unit and generates an identifier for it.
-func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateUnit(workTypeName, signature string, params map[string]string) (WorkUnit, error) {
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workTypeName]
 	w.workTypesLock.RUnlock()
@@ -148,6 +158,32 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 	}
 	w.activeUnitsLock.Lock()
 	defer w.activeUnitsLock.Unlock()
+	if wt.verifySignature {
+		if signature == "" {
+			return nil, fmt.Errorf("could not verify signature: signature is empty")
+		}
+		if w.verifyingkey == "" {
+			return nil, fmt.Errorf("could not verify signature: verifying key not specified")
+		}
+		rsaPublicKey, err := certificates.LoadPublicKey(w.verifyingkey)
+		if err != nil {
+			return nil, fmt.Errorf("could not load verifying key file: %s", err.Error())
+		}
+		token, err := jwt.ParseWithClaims(signature, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
+			return rsaPublicKey, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not verify signature: %s", err.Error())
+		}
+		if !token.Valid {
+			return nil, fmt.Errorf("token not valid")
+		}
+		claims := token.Claims.(*jwt.StandardClaims)
+		ok := claims.VerifyAudience(w.nc.NodeID(), true)
+		if !ok {
+			return nil, fmt.Errorf("token audience did not match node ID")
+		}
+	}
 	ident, err := w.generateUnitID(false)
 	if err != nil {
 		return nil, err
@@ -166,7 +202,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it.
-func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, ttl string, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, ttl string, signWork bool, params map[string]string) (WorkUnit, error) {
 	if tlsclient != "" {
 		_, err := w.nc.GetClientTLSConfig(tlsclient, "testhost", "receptor")
 		if err != nil {
@@ -184,7 +220,9 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 	if hasSecrets && tlsclient == "" {
 		return nil, fmt.Errorf("cannot send secrets over a non-TLS connection")
 	}
-	rw, err := w.AllocateUnit("remote", params)
+	signature := ""
+	rw, err := w.AllocateUnit("remote", signature, params)
+	rw.SetSignWork(signWork)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +233,9 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 			logger.Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
 
 			return nil, err
+		}
+		if signWork && duration > w.signingexpiration {
+			logger.Warning("json web token expires before ttl")
 		}
 		expiration = time.Now().Add(duration)
 	} else {

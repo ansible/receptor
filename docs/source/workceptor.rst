@@ -208,6 +208,51 @@ For local work, transitioning from Pending to Running occurs the moment the ``co
 
 For remote work, transitioning from Pending to Running occurs when the status reported from the remote node has a Running state.
 
+Signed work
+^^^^^^^^^^^^^^^^^^
+
+Remote work submissions can be digitally signed by the sender. The target node will verify the signature of the work command before starting the work unit.
+
+A pair of RSA public and private keys are created offline and distributed to the nodes. The public key should be on the node receiving work (PKIX format). The private key should be on the node submitting work (PKCS1 format).
+
+The following commands can be used to create keys for signing work:
+
+.. code::
+
+    openssl genrsa -out signworkprivate.pem 2048
+    openssl rsa -in signworkprivate.pem -pubout -out signworkpublic.pem
+
+in `bar.yml`
+
+.. code-block:: yaml
+
+    # PKIX
+    - work-verification:
+        publickey: /full/path/signworkpublic.pem
+
+    - work-command:
+        workType: echopayload
+        command: bash
+        params: "-c \"while read -r line; do echo ${line^^}; sleep 5; done\""
+        verifysignature: true
+
+in `foo.yml`
+
+.. code-block:: yaml
+
+    # PKCS1
+    - work-signing:
+        privatekey: /full/path/signworkprivate.pem
+        tokenexpiration: 30m
+
+Tokenexpiration determines how long a the signature is valid for. This expiration directly corresponds to the "expiresAt" field in the generated JSON web token. Valid units include "h" and "m", e.g. 1h30m for one hour and 30 minutes.
+
+Use the "--signwork" parameter to sign the work.
+
+.. code::
+
+    $ receptorctl --socket /tmp/foo.sock work submit echoint --node bar --no-payload --signwork
+
 Units on disk
 ^^^^^^^^^^^^^^^^^^
 

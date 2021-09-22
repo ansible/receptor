@@ -117,6 +117,25 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	return 0, fmt.Errorf("field %s value %s is not convertible to an int", name, value)
 }
 
+func boolFromMap(config map[string]interface{}, name string) (bool, error) {
+	value, ok := config[name]
+	if !ok {
+		return false, fmt.Errorf("field %s missing", name)
+	}
+	valueBoolStr, ok := value.(string)
+	if !ok {
+		return false, fmt.Errorf("field %s must be a string", name)
+	}
+	if valueBoolStr == "true" {
+		return true, nil
+	}
+	if valueBoolStr == "false" {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("field %s value %s is not convertible to an bool", name, value)
+}
+
 func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (controlsvc.ControlCommand, error) {
 	subCmd, err := strFromMap(config, "subcommand")
 	if err != nil {
@@ -188,9 +207,27 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			ttl = ""
 		}
+		signWork, err := boolFromMap(c.params, "signwork")
+		if err != nil {
+			signWork = false
+		}
+		signature, err := strFromMap(c.params, "signature")
+		if err != nil {
+			signature = ""
+		}
 		workParams := make(map[string]string)
+		nonParams := []string{"command", "subcommand", "node", "worktype", "tlsclient", "ttl", "signwork", "signature"}
+		inNonParams := func(p string) bool {
+			for _, nonparam := range nonParams {
+				if p == nonparam {
+					return true
+				}
+			}
+
+			return false
+		}
 		for k, v := range c.params {
-			if k == "command" || k == "subcommand" || k == "node" || k == "worktype" || k == "tlsclient" || k == "ttl" {
+			if ok := inNonParams(k); ok {
 				continue
 			}
 			vStr, ok := v.(string)
@@ -199,14 +236,18 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			}
 			workParams[k] = vStr
 		}
+		isLocalHost := strings.EqualFold(workNode, "localhost")
 		var worker WorkUnit
-		if workNode == nc.NodeID() || strings.EqualFold(workNode, "localhost") {
+		if workNode == nc.NodeID() || isLocalHost {
 			if ttl != "" {
 				return nil, fmt.Errorf("ttl option is intended for remote work only")
 			}
-			worker, err = c.w.AllocateUnit(workType, workParams)
+			if signWork {
+				return nil, fmt.Errorf("signwork option is intended for remote work only")
+			}
+			worker, err = c.w.AllocateUnit(workType, signature, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsclient, ttl, workParams)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsclient, ttl, signWork, workParams)
 		}
 		if err != nil {
 			return nil, err

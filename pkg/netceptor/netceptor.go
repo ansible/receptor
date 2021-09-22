@@ -105,7 +105,7 @@ type Netceptor struct {
 	seenUpdateExpireTime   time.Duration
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
-	workCommands           []string
+	workCommands           []WorkCommand
 	epoch                  uint64
 	sequence               uint64
 	connLock               *sync.RWMutex
@@ -221,6 +221,13 @@ const (
 	ConnTypeStreamTLS = 2
 )
 
+// WorkCommand tracks available work types and whether they verify work submissions.
+type WorkCommand struct {
+	WorkType string
+	// Secure true means receptor will verify the signature of the work submit payload
+	Secure bool
+}
+
 // ServiceAdvertisement is the data associated with a service advertisement.
 type ServiceAdvertisement struct {
 	NodeID       string
@@ -228,7 +235,7 @@ type ServiceAdvertisement struct {
 	Time         time.Time
 	ConnType     byte
 	Tags         map[string]string
-	WorkCommands []string
+	WorkCommands []WorkCommand
 }
 
 // serviceAdvertisementFull is the whole message from the network.
@@ -563,7 +570,9 @@ func (s *Netceptor) Status() Status {
 			adCopy := *ad
 			if adCopy.NodeID == s.nodeID {
 				adCopy.Time = time.Now()
-				adCopy.WorkCommands = s.workCommands
+				if len(s.workCommands) > 0 {
+					adCopy.WorkCommands = s.workCommands
+				}
 			}
 			serviceAds = append(serviceAds, &adCopy)
 		}
@@ -688,7 +697,9 @@ func (s *Netceptor) sendServiceAds() {
 			}
 			if svcType, ok := sa.Tags["type"]; ok {
 				if svcType == "Control Service" {
-					sa.WorkCommands = s.workCommands
+					if len(s.workCommands) > 0 {
+						sa.WorkCommands = s.workCommands
+					}
 				}
 			}
 			ads = append(ads, sa)
@@ -867,11 +878,12 @@ func (s *Netceptor) GetServerTLSConfig(name string) (*tls.Config, error) {
 }
 
 // AddWorkCommand records a work command so it can be included in service announcements.
-func (s *Netceptor) AddWorkCommand(command string) error {
+func (s *Netceptor) AddWorkCommand(command string, secure bool) error {
 	if command == "" {
 		return fmt.Errorf("must provide a name")
 	}
-	s.workCommands = append(s.workCommands, command)
+	wC := WorkCommand{WorkType: command, Secure: secure}
+	s.workCommands = append(s.workCommands, wC)
 
 	return nil
 }

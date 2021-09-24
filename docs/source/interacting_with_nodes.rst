@@ -133,6 +133,9 @@ The order of the parameters (from left to right) in the following table matter, 
     * - reload
       -
       -
+    * - purge
+      -
+      - node
     * - ping
       - target
       -
@@ -188,3 +191,36 @@ After saving the configuration file to disk, connect to a control service and is
 This command will cancel all running backend connections and sessions, re-parse the configuration file, and start the backends once more.
 
 This allows users to add or remove backend connections without disrupting ongoing receptor operations. For example, sending payloads or getting work results will only momentarily pause after a reload and will resume once the connections are reestablished.
+
+Purge
+^^^^^
+
+If the "status" command displays information related to nodes that are disconnected or no longer part of the mesh, the ``purge`` command can be used to clean up this information.
+
+Purge will not forcibly remove nodes from the mesh. If the target node still has an active connection to the mesh, purge will fail.
+
+The following status shows that `baz` is no longer connected to the mesh.
+
+.. code::
+
+    Known Node   Known Connections
+    bar          {'fish': 1, 'foo': 1}
+    baz          {}
+    fish         {'bar': 1}
+    foo          {'bar': 1}
+
+.. code::
+
+    receptorctl --socket /tmp/foo.sock purge --node baz
+
+After purge, `baz` no longer shows up in the status.
+
+.. code::
+
+    Known Node   Known Connections
+    bar          {'fish': 1, 'foo': 1}
+    fish         {'bar': 1}
+    foo          {'bar': 1}
+
+
+Use the `--all` parameter to clean up all disconnected or unreachable nodes on the mesh.

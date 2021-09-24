@@ -1670,6 +1670,56 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 	return fmt.Errorf("rejected connection with node %s because %s", remoteNodeID, reason)
 }
 
+// PurgeUnreachableNodes cleans up internal data of nodes that are no longer on mesh.
+func (s *Netceptor) PurgeUnreachableNodes(node string) ([]string, error) {
+	s.knownNodeLock.Lock()
+	s.routingTableLock.Lock()
+	s.serviceAdsLock.Lock()
+	defer func() {
+		s.routingTableLock.Unlock()
+		s.knownNodeLock.Unlock()
+		s.serviceAdsLock.Unlock()
+	}()
+
+	// Find which nodes currently have routes on the mesh. These cannot be purged.
+	nodesReachable := make(map[string]struct{})
+	for k, v := range s.routingTable {
+		nodesReachable[k] = struct{}{}
+		nodesReachable[v] = struct{}{}
+	}
+	nodesReachable[s.nodeID] = struct{}{}
+
+	if _, ok := nodesReachable[node]; ok && node != "" {
+		return nil, fmt.Errorf("target node is still reachable on mesh")
+	}
+
+	// knownNodeInfo has a history of all seen nodes, whether they are reachable or not.
+	// Find nodes in this map that are not in nodesReachable. These will be purged.
+	nodesToPurge := []string{}
+	for k := range s.knownNodeInfo {
+		if _, ok := nodesReachable[k]; !ok && (node == "" || node == k) {
+			nodesToPurge = append(nodesToPurge, k)
+		}
+	}
+
+	if node != "" && len(nodesToPurge) == 0 {
+		return nil, fmt.Errorf("target node is not part of mesh")
+	}
+
+	// Delete the data.
+	for _, p := range nodesToPurge {
+		delete(s.knownNodeInfo, p)
+		delete(s.knownConnectionCosts, p)
+		for g := range s.knownConnectionCosts {
+			delete(s.knownConnectionCosts[g], p)
+		}
+		delete(s.routingPathCosts, p)
+		delete(s.serviceAdsReceived, p)
+	}
+
+	return nodesToPurge, nil
+}
+
 // Main Netceptor protocol loop.
 func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *backendInfo) error {
 	if bi.connectionCost <= 0.0 {

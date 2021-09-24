@@ -102,6 +102,7 @@ func New(stdServices bool, nc *netceptor.Netceptor) *Server {
 		s.controlTypes["connect"] = &connectCommandType{}
 		s.controlTypes["traceroute"] = &tracerouteCommandType{}
 		s.controlTypes["reload"] = &reloadCommandType{}
+		s.controlTypes["purge"] = &purgeCommandType{}
 	}
 
 	return s

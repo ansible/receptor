@@ -251,11 +251,42 @@ def reload(ctx):
     else:
         print_error(f"{results['Error']}")
         if "ERRORCODE 3" in results["Error"]:
+            # config file was fine, but some changes were non-reloadable
             sys.exit(3)
         elif "ERRORCODE 4" in results["Error"]:
+            # problem loading the config file, probably a syntax error
             sys.exit(4)
         else:
             sys.exit(5)
+
+
+@cli.command(
+    help="Purge data related to unreachable or disconnected nodes. Useful for cleaning up status output."  # noqa: E501
+)
+@click.option(
+    "--all", "purgeall", help="All disconnected nodes will be removed", is_flag=True
+)
+@click.option("--node", type=str, default="", help="Purge a specific disconnected node")
+@click.pass_context
+def purge(ctx, purgeall, node):
+    if purgeall is False and not node:
+        print("one of --all or --node is required")
+        sys.exit(1)
+    if node and purgeall:
+        print("--all or --node are mutually exclusive")
+        sys.exit(1)
+    rc = get_rc(ctx)
+    results = rc.simple_command(f"purge {node}")
+    if "Success" in results and results["Success"]:
+        purged_nodes = results["PurgedNodes"]
+        purged_nodes = ", ".join(purged_nodes)
+        if purged_nodes:
+            print(f"Purged {purged_nodes}")
+        else:
+            print("Purge successful, but nothing to clean up")
+    else:
+        print(f"Error: {results['Error']}")
+        sys.exit(2)
 
 
 @cli.command(help="Do a traceroute to a Receptor node.")

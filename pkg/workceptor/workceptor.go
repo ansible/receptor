@@ -148,6 +148,29 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 	}
 }
 
+func (w *Workceptor) createSignature(nodeID string) (string, error) {
+	if w.signingkey == "" {
+		return "", fmt.Errorf("cannot sign work: signing key is empty")
+	}
+	exp := time.Now().Add(w.signingexpiration)
+
+	claims := &jwt.StandardClaims{
+		ExpiresAt: exp.Unix(),
+		Audience:  nodeID,
+	}
+	rsaPrivateKey, err := certificates.LoadPrivateKey(w.signingkey)
+	if err != nil {
+		return "", fmt.Errorf("could not load signing key file: %s", err.Error())
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS512, claims)
+	tokenString, err := token.SignedString(rsaPrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
 // AllocateUnit creates a new local work unit and generates an identifier for it.
 func (w *Workceptor) AllocateUnit(workTypeName, signature string, params map[string]string) (WorkUnit, error) {
 	w.workTypesLock.RLock()

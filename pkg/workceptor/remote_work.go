@@ -17,10 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/utils"
-	"github.com/golang-jwt/jwt/v4"
 )
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
@@ -166,25 +164,11 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	workSubmitCmd["worktype"] = red.RemoteWorkType
 	workSubmitCmd["tlsclient"] = red.TLSClient
 	if rw.signWork {
-		if rw.w.signingkey == "" {
-			return fmt.Errorf("cannot sign work: signing key is empty")
-		}
-		exp := time.Now().Add(rw.w.signingexpiration)
-
-		claims := &jwt.StandardClaims{
-			ExpiresAt: exp.Unix(),
-			Audience:  red.RemoteNode,
-		}
-		rsaPrivateKey, err := certificates.LoadPrivateKey(rw.w.signingkey)
-		if err != nil {
-			return fmt.Errorf("could not load signing key file: %s", err.Error())
-		}
-		token := jwt.NewWithClaims(jwt.SigningMethodRS512, claims)
-		tokenString, err := token.SignedString(rsaPrivateKey)
+		signature, err := rw.w.createSignature(red.RemoteNode)
+		workSubmitCmd["signature"] = signature
 		if err != nil {
 			return err
 		}
-		workSubmitCmd["signature"] = tokenString
 	}
 	wscBytes, err := json.Marshal(workSubmitCmd)
 	if err != nil {

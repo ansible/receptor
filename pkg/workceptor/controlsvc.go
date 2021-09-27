@@ -238,12 +238,16 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		}
 		isLocalHost := strings.EqualFold(workNode, "localhost")
 		var worker WorkUnit
+
 		if workNode == nc.NodeID() || isLocalHost {
 			if ttl != "" {
 				return nil, fmt.Errorf("ttl option is intended for remote work only")
 			}
 			if signWork {
-				return nil, fmt.Errorf("signwork option is intended for remote work only")
+				signature, err = c.w.createSignature(nc.NodeID())
+				if err != nil {
+					return nil, err
+				}
 			}
 			worker, err = c.w.AllocateUnit(workType, signature, workParams)
 		} else {

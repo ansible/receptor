@@ -26,4 +26,4 @@ jobs:
         run: |
           pip install boto3
           ansible -i localhost, -c local all -m aws_s3 \
-            -a "bucket=receptor-nightlies object=receptorctl/receptorctl-latest-py3-none-any.whl src=$(ls receptorctl/dist/*.whl | head -n 1) mode=put"
+            -a "bucket=receptor-nightlies object=receptorctl/receptorctl-0.0.0-py3-none-any.whl src=$(ls receptorctl/dist/*.whl | head -n 1) mode=put"

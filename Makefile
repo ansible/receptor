@@ -96,51 +96,6 @@ version:
 	@echo $(APPVER) > .VERSION
 	@echo ".VERSION created for $(APPVER)"
 
-SPECFILES = packaging/rpm/receptor.spec packaging/rpm/receptorctl.spec packaging/rpm/receptor-python-worker.spec
-
-specfiles: $(SPECFILES)
-
-$(SPECFILES): %.spec: %.spec.j2
-	@jinja2 -D version=$(VERSION) -D release=$(RELEASE) $< -o $@
-
-ifeq ($(shell if which rpm >& /dev/null; then echo yes; fi)),yes) 
-DIST := $(shell rpm --eval '%{dist}')
-ARCH := $(shell rpm --eval '%{_arch}')
-else
-DIST :=
-ARCH := $(shell uname -m)
-endif
-
-RPMSOURCEDIRS = cmd example pkg receptorctl receptor-python-worker packaging/rpm tests
-RPMSOURCETAR = rpmbuild/SOURCES/receptor-$(VERSION).tar.gz
-$(RPMSOURCETAR): $(shell find $(RPMSOURCEDIRS) -type f)
-	mkdir receptor-$(VERSION)
-	cp -av cmd/ example/ pkg/ receptorctl/ receptor-python-worker/ packaging/ tests/ receptor-$(VERSION)
-	mkdir -p rpmbuild/SOURCES
-	tar cfvz $(RPMSOURCETAR) receptor-$(VERSION)
-	rm -rf receptor-$(VERSION)
-
-RECEPTOR_RPM = rpmbuild/RPMS/x86_64/receptor-$(VERSION)-$(RELEASE)$(DIST).$(ARCH).rpm
-RECEPTORCTL_RPM = rpmbuild/RPMS/noarch/receptorctl-$(VERSION)-$(RELEASE)$(DIST).noarch.rpm
-RECEPTOR_PYTHON_WORKER_RPM = rpmbuild/RPMS/noarch/receptor-python-worker-$(VERSION)-$(RELEASE)$(DIST).noarch.rpm
-
-RPMS = $(RECEPTOR_RPM) $(RECEPTORCTL_RPM) $(RECEPTOR_PYTHON_WORKER_RPM)
-
-$(RECEPTOR_RPM): packaging/rpm/receptor.spec $(RPMSOURCETAR)
-	rpmbuild -ba packaging/rpm/receptor.spec --without check -D "%_topdir $$PWD/rpmbuild"
-
-$(RECEPTORCTL_RPM): packaging/rpm/receptorctl.spec $(RPMSOURCETAR)
-	rpmbuild -ba packaging/rpm/receptorctl.spec -D "%_topdir $$PWD/rpmbuild"
-
-$(RECEPTOR_PYTHON_WORKER_RPM): packaging/rpm/receptor-python-worker.spec $(RPMSOURCETAR)
-	rpmbuild -ba packaging/rpm/receptor-python-worker.spec -D "%_topdir $$PWD/rpmbuild"
-
-rpms: $(RPMS)
-
-RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
-$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 setup.py bdist_wheel
-
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
@@ -174,16 +129,15 @@ receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
 	cd receptorctl && ../receptorctl-test-venv/bin/pytest tests/tests.py
 
 clean:
-	@rm -fv receptor receptor.exe receptor.app net $(SPECFILES)
-	@rm -rfv rpmbuild/
+	@rm -fv receptor receptor.exe receptor.app net
 	@rm -rfv packaging/container/RPMS/
 	@rm -fv receptorctl/dist/*
 	@rm -fv receptor-python-worker/dist/*
 	@rm -fv packaging/container/receptor
 	@rm -fv packaging/container/*.whl
-	@rm -fv .container-flag* .rpm-flag* .rpm-builder-flag
+	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop specfiles rpms container version receptorctl-tests kubetest
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest

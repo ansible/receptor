@@ -5,10 +5,7 @@ receptor.app
 recepcert
 net
 receptorctl-test-venv/
-rpmbuild/
 .container-flag*
-.rpm-flag*
-.rpm-builder-flag
 .VERSION
 kubectl
 /receptorctl/AUTHORS

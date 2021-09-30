@@ -18,7 +18,6 @@ type WorkUnit interface {
 	Restart() error
 	Cancel() error
 	Release(force bool) error
-	SetSignWork(signWork bool)
 }
 
 // NewWorkerFunc represents a factory of WorkUnit instances.

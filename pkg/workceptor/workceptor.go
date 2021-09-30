@@ -33,9 +33,9 @@ type Workceptor struct {
 	workTypes         map[string]*workType
 	activeUnitsLock   *sync.RWMutex
 	activeUnits       map[string]WorkUnit
-	signingkey        string
-	signingexpiration time.Duration
-	verifyingkey      string
+	signingKey        string
+	signingExpiration time.Duration
+	verifyingKey      string
 }
 
 // workType is the record for a registered type of work.
@@ -58,9 +58,9 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 		workTypes:         make(map[string]*workType),
 		activeUnitsLock:   &sync.RWMutex{},
 		activeUnits:       make(map[string]WorkUnit),
-		signingkey:        "",
-		signingexpiration: 5 * time.Minute,
-		verifyingkey:      "",
+		signingKey:        "",
+		signingExpiration: 5 * time.Minute,
+		verifyingKey:      "",
 	}
 	err := w.RegisterWorker("remote", newRemoteWorker, false)
 	if err != nil {
@@ -149,16 +149,16 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 }
 
 func (w *Workceptor) createSignature(nodeID string) (string, error) {
-	if w.signingkey == "" {
+	if w.signingKey == "" {
 		return "", fmt.Errorf("cannot sign work: signing key is empty")
 	}
-	exp := time.Now().Add(w.signingexpiration)
+	exp := time.Now().Add(w.signingExpiration)
 
 	claims := &jwt.StandardClaims{
 		ExpiresAt: exp.Unix(),
 		Audience:  nodeID,
 	}
-	rsaPrivateKey, err := certificates.LoadPrivateKey(w.signingkey)
+	rsaPrivateKey, err := certificates.LoadPrivateKey(w.signingKey)
 	if err != nil {
 		return "", fmt.Errorf("could not load signing key file: %s", err.Error())
 	}
@@ -171,8 +171,48 @@ func (w *Workceptor) createSignature(nodeID string) (string, error) {
 	return tokenString, nil
 }
 
+func (w *Workceptor) ShouldVerifySignature(workType string) bool {
+	w.workTypesLock.RLock()
+	wt, ok := w.workTypes[workType]
+	w.workTypesLock.RUnlock()
+	if ok && wt.verifySignature {
+		return true
+	}
+
+	return false
+}
+
+func (w *Workceptor) VerifySignature(signature string) error {
+	if signature == "" {
+		return fmt.Errorf("could not verify signature: signature is empty")
+	}
+	if w.verifyingKey == "" {
+		return fmt.Errorf("could not verify signature: verifying key not specified")
+	}
+	rsaPublicKey, err := certificates.LoadPublicKey(w.verifyingKey)
+	if err != nil {
+		return fmt.Errorf("could not load verifying key file: %s", err.Error())
+	}
+	token, err := jwt.ParseWithClaims(signature, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return rsaPublicKey, nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not verify signature: %s", err.Error())
+	}
+	if !token.Valid {
+		return fmt.Errorf("token not valid")
+	}
+	claims := token.Claims.(*jwt.StandardClaims)
+	ok := claims.VerifyAudience(w.nc.NodeID(), true)
+	if !ok {
+		return fmt.Errorf("token audience did not match node ID")
+	}
+
+	return nil
+}
+
 // AllocateUnit creates a new local work unit and generates an identifier for it.
-func (w *Workceptor) AllocateUnit(workTypeName, signature string, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string) (WorkUnit, error) {
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workTypeName]
 	w.workTypesLock.RUnlock()
@@ -181,32 +221,6 @@ func (w *Workceptor) AllocateUnit(workTypeName, signature string, params map[str
 	}
 	w.activeUnitsLock.Lock()
 	defer w.activeUnitsLock.Unlock()
-	if wt.verifySignature {
-		if signature == "" {
-			return nil, fmt.Errorf("could not verify signature: signature is empty")
-		}
-		if w.verifyingkey == "" {
-			return nil, fmt.Errorf("could not verify signature: verifying key not specified")
-		}
-		rsaPublicKey, err := certificates.LoadPublicKey(w.verifyingkey)
-		if err != nil {
-			return nil, fmt.Errorf("could not load verifying key file: %s", err.Error())
-		}
-		token, err := jwt.ParseWithClaims(signature, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
-			return rsaPublicKey, nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not verify signature: %s", err.Error())
-		}
-		if !token.Valid {
-			return nil, fmt.Errorf("token not valid")
-		}
-		claims := token.Claims.(*jwt.StandardClaims)
-		ok := claims.VerifyAudience(w.nc.NodeID(), true)
-		if !ok {
-			return nil, fmt.Errorf("token audience did not match node ID")
-		}
-	}
 	ident, err := w.generateUnitID(false)
 	if err != nil {
 		return nil, err
@@ -225,9 +239,9 @@ func (w *Workceptor) AllocateUnit(workTypeName, signature string, params map[str
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it.
-func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, ttl string, signWork bool, params map[string]string) (WorkUnit, error) {
-	if tlsclient != "" {
-		_, err := w.nc.GetClientTLSConfig(tlsclient, "testhost", "receptor")
+func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, ttl string, signWork bool, params map[string]string) (WorkUnit, error) {
+	if tlsClient != "" {
+		_, err := w.nc.GetClientTLSConfig(tlsClient, "testhost", "receptor")
 		if err != nil {
 			return nil, err
 		}
@@ -240,12 +254,10 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 			break
 		}
 	}
-	if hasSecrets && tlsclient == "" {
+	if hasSecrets && tlsClient == "" {
 		return nil, fmt.Errorf("cannot send secrets over a non-TLS connection")
 	}
-	signature := ""
-	rw, err := w.AllocateUnit("remote", signature, params)
-	rw.SetSignWork(signWork)
+	rw, err := w.AllocateUnit("remote", params)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +269,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 
 			return nil, err
 		}
-		if signWork && duration > w.signingexpiration {
+		if signWork && duration > w.signingExpiration {
 			logger.Warning("json web token expires before ttl")
 		}
 		expiration = time.Now().Add(duration)
@@ -268,8 +280,9 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsclient, t
 		ed := status.ExtraData.(*remoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
-		ed.TLSClient = tlsclient
+		ed.TLSClient = tlsClient
 		ed.Expiration = expiration
+		ed.SignWork = signWork
 	})
 	if rw.LastUpdateError() != nil {
 		return nil, rw.LastUpdateError()
@@ -336,10 +349,15 @@ func (w *Workceptor) scanForUnits() {
 }
 
 func (w *Workceptor) findUnit(unitID string) (WorkUnit, error) {
-	w.scanForUnit(unitID)
 	w.activeUnitsLock.RLock()
 	defer w.activeUnitsLock.RUnlock()
 	unit, ok := w.activeUnits[unitID]
+	if ok {
+		return unit, nil
+	}
+	// if not in active units, rescan work unit dir and recheck
+	w.scanForUnit(unitID)
+	unit, ok = w.activeUnits[unitID]
 	if !ok {
 		return nil, fmt.Errorf("unknown work unit %s", unitID)
 	}
@@ -428,12 +446,9 @@ func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 
 // GetResults returns a live stream of the results of a unit.
 func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan struct{}) (chan []byte, error) {
-	w.scanForUnit(unitID)
-	w.activeUnitsLock.RLock()
-	unit, ok := w.activeUnits[unitID]
-	w.activeUnitsLock.RUnlock()
-	if !ok {
-		return nil, fmt.Errorf("unknown work unit %s", unitID)
+	unit, err := w.findUnit(unitID)
+	if err != nil {
+		return nil, err
 	}
 	resultChan := make(chan []byte)
 	go func() {

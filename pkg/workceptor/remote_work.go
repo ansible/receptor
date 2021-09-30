@@ -36,6 +36,7 @@ type remoteExtraData struct {
 	RemoteStarted  bool
 	LocalCancelled bool
 	LocalReleased  bool
+	SignWork       bool
 	TLSClient      string
 	Expiration     time.Time
 }
@@ -163,12 +164,12 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	workSubmitCmd["node"] = red.RemoteNode
 	workSubmitCmd["worktype"] = red.RemoteWorkType
 	workSubmitCmd["tlsclient"] = red.TLSClient
-	if rw.signWork {
+	if red.SignWork {
 		signature, err := rw.w.createSignature(red.RemoteNode)
-		workSubmitCmd["signature"] = signature
 		if err != nil {
 			return err
 		}
+		workSubmitCmd["signature"] = signature
 	}
 	wscBytes, err := json.Marshal(workSubmitCmd)
 	if err != nil {
@@ -239,7 +240,23 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	} else {
 		workCmd = "cancel"
 	}
-	_, err := conn.Write([]byte(fmt.Sprintf("work %s %s\n", workCmd, red.RemoteUnitID)))
+	workSubmitCmd := make(map[string]interface{})
+	workSubmitCmd["command"] = "work"
+	workSubmitCmd["subcommand"] = workCmd
+	workSubmitCmd["unitid"] = red.RemoteUnitID
+	if red.SignWork {
+		signature, err := rw.w.createSignature(red.RemoteNode)
+		if err != nil {
+			return err
+		}
+		workSubmitCmd["signature"] = signature
+	}
+	wscBytes, err := json.Marshal(workSubmitCmd)
+	if err != nil {
+		return fmt.Errorf("error constructing work %s command: %s", workCmd, err)
+	}
+	wscBytes = append(wscBytes, '\n')
+	_, err = conn.Write(wscBytes)
 	if err != nil {
 		return fmt.Errorf("write error sending to %s: %s", red.RemoteNode, err)
 	}
@@ -383,7 +400,28 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			if conn == nil {
 				return
 			}
-			_, err := conn.Write([]byte(fmt.Sprintf("work results %s %d\n", remoteUnitID, diskStdoutSize)))
+			workSubmitCmd := make(map[string]interface{})
+			workSubmitCmd["command"] = "work"
+			workSubmitCmd["subcommand"] = "results"
+			workSubmitCmd["unitid"] = remoteUnitID
+			workSubmitCmd["startpos"] = diskStdoutSize
+			if red.SignWork {
+				signature, err := rw.w.createSignature(red.RemoteNode)
+				if err != nil {
+					logger.Error("could not create signature to get results")
+
+					return
+				}
+				workSubmitCmd["signature"] = signature
+			}
+			wscBytes, err := json.Marshal(workSubmitCmd)
+			if err != nil {
+				logger.Error("error constructing work results command: %s", err)
+
+				return
+			}
+			wscBytes = append(wscBytes, '\n')
+			_, err = conn.Write(wscBytes)
 			if err != nil {
 				logger.Warning("Write error sending to %s: %s\n", remoteNode, err)
 

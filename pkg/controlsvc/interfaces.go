@@ -2,6 +2,7 @@ package controlsvc
 
 import (
 	"io"
+	"net"
 
 	"github.com/ansible/receptor/pkg/netceptor"
 )
@@ -23,4 +24,5 @@ type ControlFuncOperations interface {
 	ReadFromConn(message string, out io.Writer) error
 	WriteToConn(message string, in chan []byte) error
 	Close() error
+	RemoteAddr() net.Addr
 }

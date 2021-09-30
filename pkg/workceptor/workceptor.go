@@ -62,7 +62,7 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 		signingExpiration: 5 * time.Minute,
 		verifyingKey:      "",
 	}
-	err := w.RegisterWorker("remote", newRemoteWorker, false)
+	err := w.RegisterWorker("remote", newRemoteWorker, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not register remote worker function: %s", err)
 	}

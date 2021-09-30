@@ -38,7 +38,7 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc
 }
 
 // AllocateUnit creates a new local work unit and generates an identifier for it
-func (w *Workceptor) AllocateUnit(workTypeName, signature string, params string) (WorkUnit, error) {
+func (w *Workceptor) AllocateUnit(workTypeName, params string) (WorkUnit, error) {
 	return nil, ErrNotImplemented
 }
 

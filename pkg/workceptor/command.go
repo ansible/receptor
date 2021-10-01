@@ -38,7 +38,7 @@ func termThenKill(cmd *exec.Cmd) {
 		return
 	}
 	_ = cmd.Process.Signal(os.Interrupt)
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Second)
 	if cmd.Process != nil {
 		_ = cmd.Process.Kill()
 	}

@@ -166,17 +166,21 @@ def status(ctx, printjson):
 @click.option('--delay', default=1.0, help="Time to wait between pings", show_default=True)
 def ping(ctx, node, count, delay):
     rc = get_rc(ctx)
+    ping_error = False
     for i in range(count):
         results = rc.simple_command(f"ping {node}")
         if "Success" in results and results["Success"]:
             print(f"Reply from {results['From']} in {results['TimeStr']}")
         else:
+            ping_error = True
             if "From" in results and "TimeStr" in results:
                 print(f"Error {results['Error']} from {results['From']} in {results['TimeStr']}")
             else:
                 print(f"Error: {results['Error']}")
         if i < count-1:
             time.sleep(delay)
+    if ping_error:
+        sys.exit(2)
 
 
 @cli.command(help="Reload receptor configuration.")

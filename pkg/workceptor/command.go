@@ -310,7 +310,7 @@ func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) W
 
 // Run runs the action.
 func (cfg commandCfg) Run() error {
-	if cfg.VerifySignature && MainInstance.verifyingkey == "" {
+	if cfg.VerifySignature && MainInstance.verifyingKey == "" {
 		return fmt.Errorf("VerifySignature for work command '%s' is true, but the work verification public key is not specified", cfg.WorkType)
 	}
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, cfg.VerifySignature)
@@ -374,9 +374,9 @@ func (cfg signingKeyPrivateCfg) Prepare() error {
 		if err != nil {
 			return fmt.Errorf("failed to parse TokenExpiration -- valid examples include '1.5h', '30m', '30m10s'")
 		}
-		MainInstance.signingexpiration = duration
+		MainInstance.signingExpiration = duration
 	}
-	MainInstance.signingkey = cfg.PrivateKey
+	MainInstance.signingKey = cfg.PrivateKey
 
 	return nil
 }
@@ -386,7 +386,7 @@ func (cfg verifyingKeyPublicCfg) Prepare() error {
 	if err != nil {
 		return err
 	}
-	MainInstance.verifyingkey = cfg.PublicKey
+	MainInstance.verifyingKey = cfg.PublicKey
 
 	return nil
 }

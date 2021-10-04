@@ -168,6 +168,10 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err != nil {
 			return nil, err
 		}
+		signature, err := strFromMap(config, "signature")
+		if err == nil {
+			c.params["signature"] = signature
+		}
 	case "list":
 		unitID, err := strFromMap(config, "unitid")
 		if err == nil {
@@ -182,13 +186,37 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err != nil {
 			return nil, err
 		}
+		signature, err := strFromMap(config, "signature")
+		if err == nil {
+			c.params["signature"] = signature
+		}
 	}
 
 	return c, nil
 }
 
+func (c *workceptorCommand) processSignature(workType, signature string, connIsUnix bool) error {
+	shouldVerifySignature := c.w.ShouldVerifySignature(workType)
+	if !shouldVerifySignature && signature != "" {
+		return fmt.Errorf("work type did not expect a signature")
+	}
+	if shouldVerifySignature && !connIsUnix {
+		err := c.w.VerifySignature(signature)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Worker function called by the control service to process a "work" command.
 func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+	addr := cfo.RemoteAddr()
+	connIsUnix := false
+	if addr.Network() == "unix" {
+		connIsUnix = true
+	}
 	switch c.subcommand {
 	case "submit":
 		workNode, err := strFromMap(c.params, "node")
@@ -199,9 +227,9 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
-		tlsclient, err := strFromMap(c.params, "tlsclient")
+		tlsClient, err := strFromMap(c.params, "tlsclient")
 		if err != nil {
-			tlsclient = "" // optional so don't return
+			tlsClient = "" // optional so don't return
 		}
 		ttl, err := strFromMap(c.params, "ttl")
 		if err != nil {
@@ -236,22 +264,19 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			}
 			workParams[k] = vStr
 		}
+		err = c.processSignature(workType, signature, connIsUnix)
+		if err != nil {
+			return nil, err
+		}
 		isLocalHost := strings.EqualFold(workNode, "localhost")
 		var worker WorkUnit
-
 		if workNode == nc.NodeID() || isLocalHost {
 			if ttl != "" {
 				return nil, fmt.Errorf("ttl option is intended for remote work only")
 			}
-			if signWork {
-				signature, err = c.w.createSignature(nc.NodeID())
-				if err != nil {
-					return nil, err
-				}
-			}
-			worker, err = c.w.AllocateUnit(workType, signature, workParams)
+			worker, err = c.w.AllocateUnit(workType, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsclient, ttl, signWork, workParams)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsClient, ttl, signWork, workParams)
 		}
 		if err != nil {
 			return nil, err
@@ -324,6 +349,10 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
+		signature, err := strFromMap(c.params, "signature")
+		if err != nil {
+			signature = ""
+		}
 		cfr := make(map[string]interface{})
 		var pendingMsg string
 		var completeMsg string
@@ -337,20 +366,26 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		unit, err := c.w.findUnit(unitid)
 		if err != nil {
 			cfr["unit not found"] = unitid
+
+			return cfr, err
+		}
+		status := unit.Status()
+		err = c.processSignature(status.WorkType, signature, connIsUnix)
+		if err != nil {
+			return nil, err
+		}
+		if c.subcommand == "cancel" {
+			err = unit.Cancel()
 		} else {
-			if c.subcommand == "cancel" {
-				err = unit.Cancel()
-			} else {
-				err = unit.Release(c.subcommand == "force-release")
-			}
-			if err != nil && !IsPending(err) {
-				return nil, err
-			}
-			if IsPending(err) {
-				cfr[pendingMsg] = unitid
-			} else {
-				cfr[completeMsg] = unitid
-			}
+			err = unit.Release(c.subcommand == "force-release")
+		}
+		if err != nil && !IsPending(err) {
+			return nil, err
+		}
+		if IsPending(err) {
+			cfr[pendingMsg] = unitid
+		} else {
+			cfr[completeMsg] = unitid
 		}
 
 		return cfr, nil
@@ -360,6 +395,19 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			return nil, err
 		}
 		startPos, err := intFromMap(c.params, "startpos")
+		if err != nil {
+			return nil, err
+		}
+		signature, err := strFromMap(c.params, "signature")
+		if err != nil {
+			signature = ""
+		}
+		unit, err := c.w.findUnit(unitid)
+		if err != nil {
+			return nil, err
+		}
+		status := unit.Status()
+		err = c.processSignature(status.WorkType, signature, connIsUnix)
 		if err != nil {
 			return nil, err
 		}

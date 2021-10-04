@@ -27,6 +27,10 @@ type sockControl struct {
 	conn net.Conn
 }
 
+func (s *sockControl) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
+}
+
 // BridgeConn bridges the socket to another socket.
 func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error {
 	if message != "" {

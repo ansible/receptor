@@ -299,7 +299,7 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
 				t.Fatal(err)
@@ -337,7 +337,7 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
 				t.Fatal(err)
@@ -372,7 +372,7 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
 			err = controllers["node1"].AssertWorkCancelled(ctx, unitID)
 			if err != nil {
 				t.Fatal(err)
@@ -601,7 +601,7 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
 				t.Fatal(err)
@@ -737,7 +737,7 @@ func TestWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
 			err = controllers["node2"].AssertWorkCancelled(ctx, unitID)
 			if err != nil {
 				t.Fatal(err)

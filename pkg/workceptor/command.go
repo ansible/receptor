@@ -33,13 +33,19 @@ type commandExtraData struct {
 	Params string
 }
 
-func termThenKill(cmd *exec.Cmd) {
+func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 	if cmd.Process == nil {
 		return
 	}
 	_ = cmd.Process.Signal(os.Interrupt)
-	time.Sleep(1 * time.Second)
+	select {
+	case <-doneChan:
+		return
+	case <-time.After(10 * time.Second):
+		logger.Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
+	}
 	if cmd.Process != nil {
+		logger.Info("sending SIGKILL to pid %d", cmd.Process.Pid)
 		_ = cmd.Process.Kill()
 	}
 }
@@ -87,7 +93,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	doneChan := make(chan bool)
+	doneChan := make(chan bool, 1)
 	go cmdWaiter(cmd, doneChan)
 loop:
 	for {
@@ -95,7 +101,7 @@ loop:
 		case <-doneChan:
 			break loop
 		case <-termChan:
-			termThenKill(cmd)
+			termThenKill(cmd, doneChan)
 			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
 			if err != nil {
 				logger.Error("Error updating status file %s: %s", statusFilename, err)

@@ -1,6 +1,7 @@
 package controlsvc
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ansible/receptor/internal/version"
@@ -46,7 +47,7 @@ func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (Control
 	return c, nil
 }
 
-func (c *statusCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *statusCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	status := nc.Status()
 	statusGetters := make(map[string]func() interface{})
 	statusGetters["Version"] = func() interface{} { return version.Version }

@@ -62,12 +62,12 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	ctxChild, _ := context.WithTimeout(ctx, 5*time.Second)
 	hello, err := utils.ReadStringContext(ctxChild, reader, '\n')
 	if err != nil {
-		conn.Close()
+		conn.CloseConnection()
 
 		return nil, nil, err
 	}
 	if !strings.Contains(hello, red.RemoteNode) {
-		conn.Close()
+		conn.CloseConnection()
 
 		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", red.RemoteNode,
 			strings.TrimRight(hello, "\n"))
@@ -148,7 +148,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	doClose := func() error {
 		var err error
 		closeOnce.Do(func() {
-			err = conn.Close()
+			err = conn.(interface{ CloseConnection() error }).CloseConnection()
 		})
 
 		return err
@@ -184,8 +184,6 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
-		conn.Close()
-
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	submitIDRegex := regexp.MustCompile(`with ID ([a-zA-Z0-9]+)\.`)
@@ -206,14 +204,12 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("error sending stdin file: %s", err)
 	}
-	err = doClose()
+	err = conn.Close()
 	if err != nil {
 		return fmt.Errorf("error closing stdin file: %s", err)
 	}
 	response, err = utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
-		conn.Close()
-
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	resultErrorRegex := regexp.MustCompile("ERROR: (.*)")
@@ -232,7 +228,9 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 // cancelOrReleaseRemoteUnit makes a single attempt to cancel or release a remote unit.
 func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader,
 	release bool, force bool) error {
-	defer conn.Close()
+	defer func() {
+		conn.(interface{ CloseConnection() error }).CloseConnection()
+	}()
 	red := rw.Status().ExtraData.(*remoteExtraData)
 	var workCmd string
 	if release {
@@ -262,8 +260,6 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	}
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
-		conn.Close()
-
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
 	if response[:5] == "ERROR" {
@@ -289,9 +285,15 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
 	conn, reader := rw.getConnection(mw)
+	defer func() {
+		if conn != nil {
+			conn.(interface{ CloseConnection() error }).CloseConnection()
+		}
+	}()
 	if conn == nil {
 		return
 	}
+	writeStatusFailures := 0
 	for {
 		if conn == nil {
 			conn, reader = rw.getConnection(mw)
@@ -302,7 +304,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
 		if err != nil {
 			logger.Debug("Write error sending to %s: %s\n", remoteUnitID, err)
-			_ = conn.Close()
+			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
 			conn = nil
 
 			continue
@@ -310,7 +312,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
 			logger.Debug("Read error reading from %s: %s\n", remoteNode, err)
-			_ = conn.Close()
+			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
 			conn = nil
 
 			continue
@@ -339,6 +341,16 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			return
 		}
 		rw.UpdateBasicStatus(si.State, si.Detail, si.StdoutSize)
+		if rw.LastUpdateError() != nil {
+			writeStatusFailures++
+			if writeStatusFailures > 3 {
+				logger.Error("Exceeded retries for updating status file for work unit %s", rw.unitID)
+
+				return
+			}
+		} else {
+			writeStatusFailures = 0
+		}
 		if err != nil {
 			logger.Error("Error saving local status file: %s\n", err)
 
@@ -393,10 +405,18 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		status := rw.Status()
 		diskStdoutSize := stdoutSize(rw.UnitDir())
 		remoteStdoutSize := status.StdoutSize
+		if status.State == WorkStateFailed {
+			return
+		}
 		if IsComplete(status.State) && diskStdoutSize >= remoteStdoutSize {
 			return
 		} else if diskStdoutSize < remoteStdoutSize {
 			conn, reader := rw.getConnection(mw)
+			defer func() {
+				if conn != nil {
+					_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+				}
+			}()
 			if conn == nil {
 				return
 			}
@@ -454,7 +474,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					if ok {
 						cr.CancelRead()
 					}
-					_ = conn.Close()
+					_ = conn.(interface{ CloseConnection() error }).CloseConnection()
 
 					return
 				}
@@ -649,7 +669,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	}
 	rw.topJC.NewJob(rw.w.ctx, 1, false)
 
-	return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	return rw.runAndMonitor(rw.topJC, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release, false)
 	})
 }

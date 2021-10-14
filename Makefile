@@ -48,8 +48,15 @@ else
 	TAGPARAM=--tags $(TAGS)
 endif
 
+DEBUG ?=
+ifeq ($(DEBUG),1)
+	DEBUGFLAGS=-gcflags=all="-N -l"
+else
+	DEBUGFLAGS=
+endif
+
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 go build -o receptor -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
 
 lint:
 	@golint cmd/... pkg/... example/...

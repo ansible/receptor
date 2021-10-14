@@ -556,7 +556,8 @@ func TestFirewalling(t *testing.T) {
 	}
 
 	// Subscribe for unreachable messages
-	unreach2chan := pc2.SubscribeUnreachable()
+	doneChan := make(chan struct{})
+	unreach2chan := pc2.SubscribeUnreachable(doneChan)
 
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
@@ -715,7 +716,8 @@ func TestAllowedPeers(t *testing.T) {
 	}
 
 	// Subscribe for unreachable messages
-	unreach2chan := pc2.SubscribeUnreachable()
+	doneChan := make(chan struct{})
+	unreach2chan := pc2.SubscribeUnreachable(doneChan)
 
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification

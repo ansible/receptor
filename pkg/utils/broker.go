@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 )
 
 // Broker code adapted from https://stackoverflow.com/questions/36417199/how-to-broadcast-message-using-channel
@@ -47,24 +48,26 @@ func (b *Broker) start() {
 			subs[msgCh] = struct{}{}
 		case msgCh := <-b.unsubCh:
 			delete(subs, msgCh)
+			close(msgCh)
 		case msg := <-b.publishCh:
+			wg := sync.WaitGroup{}
 			for msgCh := range subs {
+				wg.Add(1)
 				go func(msgCh chan interface{}) {
+					defer wg.Done()
 					select {
 					case msgCh <- msg:
 					case <-b.ctx.Done():
 					}
 				}(msgCh)
 			}
+			wg.Wait()
 		}
 	}
 }
 
 // Subscribe registers to receive messages from the broker.
 func (b *Broker) Subscribe() chan interface{} {
-	if b == nil || b.ctx == nil {
-		fmt.Printf("foo\n")
-	}
 	if b.ctx.Err() == nil {
 		msgCh := make(chan interface{}, 1)
 		b.subCh <- msgCh
@@ -80,7 +83,6 @@ func (b *Broker) Unsubscribe(msgCh chan interface{}) {
 	if b.ctx.Err() == nil {
 		b.unsubCh <- msgCh
 	}
-	close(msgCh)
 }
 
 // Publish sends a message to all subscribers.

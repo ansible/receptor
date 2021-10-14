@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/utils"
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/lucas-clemente/quic-go"
 )
 
@@ -197,7 +197,7 @@ func (li *Listener) acceptLoop() {
 				return
 			}
 			doneChan := make(chan struct{}, 1)
-			cctx, ccancel := utils.ContextWithCancelWithErr(li.s.context)
+			cctx, ccancel := context.WithCancel(li.s.context)
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -296,7 +296,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			_ = pc.Close()
 		})
 	}
-	cctx, ccancel := utils.ContextWithCancelWithErr(ctx)
+	cctx, ccancel := context.WithCancel(ctx)
 	go func() {
 		select {
 		case <-okChan:
@@ -370,8 +370,8 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 
 // monitorUnreachable receives unreachable messages from the underlying PacketConn, and ends the connection
 // if the remote service has gone away.
-func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel utils.CancelWithErrFunc) {
-	msgCh := pc.SubscribeUnreachable()
+func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
+	msgCh := pc.SubscribeUnreachable(doneChan)
 	for {
 		select {
 		case <-pc.context.Done():
@@ -380,7 +380,8 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 			return
 		case msg := <-msgCh:
 			if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-				cancel(fmt.Errorf("remote service unreachable"))
+				logger.Error("remote service unreachable")
+				cancel()
 			}
 		}
 	}
@@ -408,6 +409,16 @@ func (c *Conn) Close() error {
 	})
 
 	return c.qs.Close()
+}
+
+func (c *Conn) CloseConnection() error {
+	c.pc.cancel()
+	c.doneOnce.Do(func() {
+		close(c.doneChan)
+	})
+	logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
+
+	return c.qc.CloseWithError(0, "normal close")
 }
 
 // LocalAddr returns the local address of this connection.

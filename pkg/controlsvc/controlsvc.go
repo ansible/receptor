@@ -125,12 +125,14 @@ func (s *Server) AddControlFunc(name string, cType ControlCommandType) error {
 
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
-	logger.Info("Client connected to control service\n")
+	logger.Info("Client connected to control service %s\n", conn.RemoteAddr().String())
 	defer func() {
-		logger.Info("Client disconnected from control service\n")
-		err := conn.Close()
-		if err != nil {
-			logger.Error("Error closing connection: %s\n", err)
+		logger.Info("Client disconnected from control service %s\n", conn.RemoteAddr().String())
+		if conn != nil {
+			err := conn.Close()
+			if err != nil {
+				logger.Error("Error closing connection: %s\n", err)
+			}
 		}
 	}()
 	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
@@ -224,7 +226,9 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				cc, err = ct.InitFromJSON(jsonData)
 			}
 			if err == nil {
-				cfr, err = cc.ControlFunc(s.nc, cfo)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
 			}
 			if err != nil {
 				logger.Error(err.Error())
@@ -332,33 +336,36 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 						return
 					}
 					if err != nil {
+						if strings.HasSuffix(err.Error(), "normal close") {
+							continue
+						}
+					}
+					if err != nil {
 						logger.Error("Error accepting connection: %s. Closing listener.\n", err)
 						_ = listener.Close()
 
 						return
 					}
 					go func() {
+						defer conn.Close()
 						tlsConn, ok := conn.(*tls.Conn)
 						if ok {
 							// Explicitly run server TLS handshake so we can deal with timeout and errors here
 							err = conn.SetDeadline(time.Now().Add(10 * time.Second))
 							if err != nil {
 								logger.Error("Error setting timeout: %s. Closing socket.\n", err)
-								_ = conn.Close()
 
 								return
 							}
 							err = tlsConn.Handshake()
 							if err != nil {
 								logger.Error("TLS handshake error: %s. Closing socket.\n", err)
-								_ = conn.Close()
 
 								return
 							}
 							err = conn.SetDeadline(time.Time{})
 							if err != nil {
 								logger.Error("Error clearing timeout: %s. Closing socket.\n", err)
-								_ = conn.Close()
 
 								return
 							}

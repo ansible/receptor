@@ -55,7 +55,9 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 		_ = pc.Close()
 	}()
 	pc.SetHopsToLive(hopsToLive)
-	unrCh := pc.SubscribeUnreachable()
+	doneChan := make(chan struct{})
+	unrCh := pc.SubscribeUnreachable(doneChan)
+	defer close(doneChan)
 	type errorResult struct {
 		err      error
 		fromNode string
@@ -111,7 +113,7 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 	}
 }
 
-func (c *pingCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *pingCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	pingTime, pingRemote, err := ping(nc, c.target, nc.MaxForwardingHops())
 	cfr := make(map[string]interface{})
 	if err == nil {

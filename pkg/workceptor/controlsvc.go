@@ -4,6 +4,7 @@
 package workceptor
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -211,7 +212,7 @@ func (c *workceptorCommand) processSignature(workType, signature string, connIsU
 }
 
 // Worker function called by the control service to process a "work" command.
-func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	addr := cfo.RemoteAddr()
 	connIsUnix := false
 	if addr.Network() == "unix" {
@@ -411,11 +412,8 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
-		doneChan := make(chan struct{})
-		defer func() {
-			close(doneChan)
-		}()
-		resultChan, err := c.w.GetResults(unitid, startPos, doneChan)
+
+		resultChan, err := c.w.GetResults(ctx, unitid, startPos)
 		if err != nil {
 			return nil, err
 		}

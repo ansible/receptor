@@ -98,28 +98,35 @@ func (pc *PacketConn) startUnreachable() {
 }
 
 // SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn.
-func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
+func (pc *PacketConn) SubscribeUnreachable(doneChan chan struct{}) chan UnreachableNotification {
 	iChan := pc.unreachableSubs.Subscribe()
 	uChan := make(chan UnreachableNotification)
+	// goroutine 1
+	// if doneChan is selected, this will unsubscribe the channel, which should
+	// eventually close out the go routine 2
+	go func() {
+		select {
+		case <-doneChan:
+			pc.unreachableSubs.Unsubscribe(iChan)
+		case <-pc.context.Done():
+		}
+	}()
+	// goroutine 2
+	// this will exit when either the broker closes iChan, or the broker
+	// returns via pc.context.Done()
 	go func() {
 		for {
-			select {
-			case msgIf, ok := <-iChan:
-				if !ok {
-					close(uChan)
-
-					return
-				}
-				msg, ok := msgIf.(UnreachableNotification)
-				if !ok {
-					continue
-				}
-				uChan <- msg
-			case <-pc.context.Done():
+			msgIf, ok := <-iChan
+			if !ok {
 				close(uChan)
 
 				return
 			}
+			msg, ok := msgIf.(UnreachableNotification)
+			if !ok {
+				continue
+			}
+			uChan <- msg
 		}
 	}()
 
@@ -130,7 +137,11 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	var m *MessageData
 	if pc.readDeadline.IsZero() {
-		m = <-pc.recvChan
+		select {
+		case m = <-pc.recvChan:
+		case <-pc.context.Done():
+			return 0, nil, fmt.Errorf("connection context closed")
+		}
 	} else {
 		select {
 		case m = <-pc.recvChan:

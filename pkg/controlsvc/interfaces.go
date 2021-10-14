@@ -1,6 +1,7 @@
 package controlsvc
 
 import (
+	"context"
 	"io"
 	"net"
 
@@ -15,7 +16,7 @@ type ControlCommandType interface {
 
 // ControlCommand is an instance of a command that is being run from the control service.
 type ControlCommand interface {
-	ControlFunc(*netceptor.Netceptor, ControlFuncOperations) (map[string]interface{}, error)
+	ControlFunc(context.Context, *netceptor.Netceptor, ControlFuncOperations) (map[string]interface{}, error)
 }
 
 // ControlFuncOperations provides callbacks for control services to take actions.

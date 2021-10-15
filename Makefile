@@ -96,6 +96,10 @@ version:
 	@echo $(APPVER) > .VERSION
 	@echo ".VERSION created for $(APPVER)"
 
+RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
+$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && python3 setup.py bdist_wheel
+
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz

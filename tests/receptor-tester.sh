@@ -15,10 +15,10 @@ tests_dirs=$(echo $tests_dirs | sed 's/ /\n/g' | uniq)
 tests_files=$(find . -name *_test.go)
 
 # Switch between podman or docker
-if command -v podman &> /dev/null ; then
-    export CONTAINER_RUN=podman
-elif command -v docker &> /dev/null ; then
+if command -v docker &> /dev/null ; then
     export CONTAINER_RUN=docker
+elif command -v podman &> /dev/null ; then
+    export CONTAINER_RUN=podman
 fi
 
 # Logs. Based on:

@@ -4,13 +4,13 @@
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"strconv"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/tls"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 )
@@ -140,88 +140,4 @@ func init() {
 		"tcp-server", "Listen for TCP and forward via Receptor", tcpProxyInboundCfg{}, cmdline.Section(servicesSection))
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
 		"tcp-client", "Listen on a Receptor service and forward via TCP", tcpProxyOutboundCfg{}, cmdline.Section(servicesSection))
-}
-
-// TCPInProxy exposes an exported tcp port.
-type TCPInProxy struct {
-	// Receptor service name to connect to.
-	RemoteService string `mapstructure:"remote-service"`
-	// Receptor node to connect to.
-	RemoteNode string `mapstructure:"remote-node"`
-	// Address to listen on ("host:port" from net package).
-	Address string `mapstructure:"address"`
-	// TLS client config for the TCP connection.
-	// Leave empty for no TLS.
-	PortTLS *tls.ClientConf `mapstructure:"port-tls"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	MeshTLS *tls.ServerConf `mapstructure:"mesh-tls"`
-}
-
-func (t TCPInProxy) setup(nc *netceptor.Netceptor) error {
-	var err error
-	var tClient, tServer *tls.Config
-	if t.PortTLS != nil {
-		tClient, err = t.PortTLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls client config for tls inbound proxy %s: %w", t.Address, err)
-		}
-	}
-	if t.MeshTLS != nil {
-		tServer, err = t.MeshTLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls server config for tls inbound proxy %s: %w", t.Address, err)
-		}
-	}
-	host, port, err := net.SplitHostPort(t.Address)
-	if err != nil {
-		return fmt.Errorf("address %s for tls inbound proxy is invalid: %w", t.Address, err)
-	}
-	i, err := strconv.Atoi(port)
-	if err != nil {
-		return fmt.Errorf("address %s for tls inbound proxy contains invalid port: %w", t.Address, err)
-	}
-
-	return TCPProxyServiceInbound(
-		nc,
-		host,
-		i,
-		tServer,
-		t.RemoteNode,
-		t.RemoteService,
-		tClient,
-	)
-}
-
-// TCPOutProxy exports a local tcp port.
-type TCPOutProxy struct {
-	// Receptor service name to bind to.
-	Service string `mapstructure:"service"`
-	// Address for outbound TCP connection.
-	Address string `mapstructure:"address"`
-	// TLS client config for the TCP connection.
-	// Leave empty for no TLS.
-	PortTLS *tls.ClientConf `mapstructure:"port-tls"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	MeshTLS *tls.ServerConf `mapstructure:"mesh-tls"`
-}
-
-func (t TCPOutProxy) setup(nc *netceptor.Netceptor) error {
-	var err error
-	var tClient, tServer *tls.Config
-	if t.PortTLS != nil {
-		tClient, err = t.PortTLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls client config for tls outbound proxy %s: %w", t.Address, err)
-		}
-	}
-	if t.MeshTLS != nil {
-		tServer, err = t.MeshTLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls server config for tls outbound proxy %s: %w", t.Address, err)
-		}
-	}
-
-	return TCPProxyServiceOutbound(nc, t.Service, tServer, t.Address, tClient)
 }

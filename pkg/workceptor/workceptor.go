@@ -541,36 +541,3 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 
 	return resultChan, nil
 }
-
-// Workers defines a set of workceptors.
-type Workers struct {
-	// Workers executing a command.
-	Command []Command `mapstructure:"command"`
-	// Workers running a python plugin.
-	Python []Python `mapstructure:"python"`
-	// Workers interfacing with k8s.
-	Kubernetes []Kubernetes `mapstructure:"kubernetes"`
-}
-
-// Setup attaches all its workers to a workceptor.
-func (s *Workers) Setup(wc *Workceptor) error {
-	for _, w := range s.Command {
-		if err := w.setup(wc); err != nil {
-			return fmt.Errorf("could not setup command worker from workers config: %w", err)
-		}
-	}
-
-	for _, w := range s.Python {
-		if err := w.setup(wc); err != nil {
-			return fmt.Errorf("could not setup python worker from workers config: %w", err)
-		}
-	}
-
-	for _, w := range s.Kubernetes {
-		if err := w.setup(wc); err != nil {
-			return fmt.Errorf("could not setup kubernetes worker from workers config: %w", err)
-		}
-	}
-
-	return nil
-}

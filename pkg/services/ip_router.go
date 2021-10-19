@@ -382,21 +382,3 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-ip-router",
 		"ip-router", "Run an IP router using a tun interface", ipRouterCfg{}, cmdline.Section(servicesSection))
 }
-
-// IPRouter routes IP packages through receptor.
-type IPRouter struct {
-	// Name of this network and service.
-	NetworkName string `mapstructure:"network-name"`
-	// Name of the local tun interface.
-	Interface string `mapstructure:"interface"`
-	// Local /30 CIDR address.
-	LocalNet string `mapstructure:"local-net"`
-	// Comma separated list of CIDR subnets to advertise.
-	Routes string `mapstructure:"routes"`
-}
-
-func (s *IPRouter) setup(nc *netceptor.Netceptor) error {
-	_, err := NewIPRouter(nc, s.NetworkName, s.Interface, s.LocalNet, s.Routes)
-
-	return err
-}

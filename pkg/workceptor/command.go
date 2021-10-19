@@ -407,31 +407,3 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"command-runner", "Wrapper around a process invocation", commandRunnerCfg{}, cmdline.Hidden)
 }
-
-// Command runs a process.
-type Command struct {
-	// Name for this worker type.
-	WorkType string `mapstructure:"work-type"`
-	// Command to run to process units of work.
-	Command string `mapstructure:"command"`
-	// Command-line parameters.
-	Params string `mapstructure:"parameters"`
-	// Allow users to add more parameters.
-	AllowRuntimeParams bool `mapstructure:"allow-runtime-parameters"`
-}
-
-func (c Command) setup(wc *Workceptor) error {
-	factory := func(w *Workceptor, unitID string, workType string) WorkUnit {
-		cw := &commandUnit{
-			BaseWorkUnit:       BaseWorkUnit{status: StatusFileData{ExtraData: &commandExtraData{}}},
-			command:            c.Command,
-			baseParams:         c.Params,
-			allowRuntimeParams: c.AllowRuntimeParams,
-		}
-		cw.BaseWorkUnit.Init(w, unitID, workType)
-
-		return cw
-	}
-
-	return wc.RegisterWorker(c.WorkType, factory, false)
-}

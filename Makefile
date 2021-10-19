@@ -64,11 +64,11 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows go build -o receptor.exe ./cmd/receptor-cl && \
-	GOOS=darwin go build -o receptor.app ./cmd/receptor-cl && \
+	GOOS=windows go build -o receptor.exe cmd/receptor.go && \
+	GOOS=darwin go build -o receptor.app cmd/receptor.go && \
 	go build example/*.go && \
-	go build -o receptor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth ./cmd/receptor-cl && \
-	go build -o receptor ./cmd/receptor-cl
+	go build --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth cmd/receptor.go && \
+	go build cmd/receptor.go
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)

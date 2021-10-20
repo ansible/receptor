@@ -30,3 +30,7 @@ class TestCommands:
         ) == set(
             json_output.keys()
         ), "The command returned unexpected keys from json output"
+
+    def test_cmd_work_invalid(self, invoke):
+        result = invoke(commands.work, ["cancel", "foobar"])
+        assert result.exit_code != 0, "The 'work cancel' command should fail, but did not return non-zero exit code"

@@ -130,7 +130,9 @@ receptorctl-test-venv/bin/pytest:
 	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
 
 receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
-	cd receptorctl && ../receptorctl-test-venv/bin/pytest tests/tests.py
+	cd receptorctl && \
+		PATH=$(PATH):$(PWD) \
+		../receptorctl-test-venv/bin/pytest tests/
 
 clean:
 	@rm -fv receptor receptor.exe receptor.app net

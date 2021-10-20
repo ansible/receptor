@@ -8,11 +8,12 @@ GO_FUNCTIONAL_TESTS_DIRS:=$$(find ./functional -type d)
 
 # Generate artifacts
 artifacts: container-image-builder
-	mkdir -p $(PWD)/artifacts
+	mkdir -p $(PWD)/artifacts-output
 	$(CONTAINER_RUN) run --rm \
-		-v $(PWD)/../:/source/:ro \
-		-v $(PWD)/artifacts/:/artifacts/:rw \
+		-v $(PWD)/../:/source/ \
+		-v $(PWD)/artifacts-output/:/artifacts/:rw \
 		-v receptor_go_root_cache:/root/go:rw \
+		-e OUTPUT_UID=$$(id -u) \
 		$(CONTAINER_IMAGE_TAG_builder) \
 		/build-artifacts.sh
 

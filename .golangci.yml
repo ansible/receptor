@@ -3,25 +3,25 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    #- cyclop # TODO: Reduce code complexity.
+    - cyclop
     - deadcode
     - depguard
     - dogsled
-    #- dupl # TODO: Remove duplicates.
+    - dupl
     - durationcheck
-    #- errcheck # TODO: Not all received errors are checked.
-    #- errorlint # TODO: Use errors package.
+    - errcheck
+    - errorlint
     - exportloopref
-    #- forcetypeassert # TODO: always assert types when when casting.
-    #- funlen # TODO: Reduce code complexity.
+    - forcetypeassert
+    - funlen
     - gci
     #- gochecknoglobals # TODO: Reduce number of globals.
     #- gochecknoinits # TODO: Maybe not use init().
-    #- gocognit # TODO: Reduce code complexity.
+    - gocognit
     - gocritic
-    #- gocyclo # TODO: Reduce code complexity.
+    - gocyclo
     - godot
-    #- goerr113 # TODO: Please do not use dynamic errors.
+    - goerr113
     - gofmt
     - gofumpt
     - goheader
@@ -29,7 +29,7 @@ linters:
     - golint
     - gomoddirectives
     - gomodguard
-    # - goprintffuncname # TODO: logging methods are not named like the ones in `fmt` which could lead to problems.
+    - goprintffuncname
     - gosec
     - gosimple
     - govet
@@ -39,12 +39,12 @@ linters:
     - makezero
     - misspell
     - nakedret
-    #- nestif # TODO: Reduce code complexity.
+    - nestif
     - nilerr
     - nlreturn
     - noctx
     - nolintlint
-    #- paralleltest # TODO: missing at some locations
+    - paralleltest
     - prealloc
     - predeclared
     - revive
@@ -53,22 +53,18 @@ linters:
     - staticcheck
     - structcheck
     - stylecheck
-    #- testpackage # TODO: Put tests in their dedicated test packages.
-    #- thelper # TODO: Requires test refactoring.
+    - testpackage
+    - thelper
     - tparallel
     - typecheck
     - unconvert
-    #- unparam # TODO: This breaks something, look at it!
+    - unparam
     - unused
     - varcheck
     - wastedassign
     - whitespace
-    # - wrapcheck # TODO: Errors passed upwards should be wrapped.
+    - wrapcheck
 
 issues:
   exclude:
-    - "lostcancel" # TODO: Context is not canceled on multiple occasions. Needs more detailed work to be fixed.
-    - "SA2002|thelper|testinggoroutine" # TODO: Test interface used outside of its routine, tests need to be rewritten.
-    - "G306" # TODO: Restrict perms of touched files.
-    - "G402|G404" # TODO: Make TLS more secure.
     - "G204" # gosec is throwing a fit, ignore.

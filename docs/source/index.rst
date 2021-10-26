@@ -23,7 +23,7 @@ Terminology and Concepts
 Installation
 ^^^^^^^^^^^^
 
-Compile from source code (Golang 1.15.x required)
+Compile from source code (Golang 1.17.x required)
 
 .. code::
 

@@ -14,7 +14,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -144,16 +143,7 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 
 // startRemoteUnit makes a single attempt to start a remote unit.
 func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
-	closeOnce := sync.Once{}
-	doClose := func() error {
-		var err error
-		closeOnce.Do(func() {
-			err = conn.(interface{ CloseConnection() error }).CloseConnection()
-		})
-
-		return err
-	}
-	defer doClose()
+	defer conn.(interface{ CloseConnection() error }).CloseConnection()
 	red := rw.UnredactedStatus().ExtraData.(*remoteExtraData)
 	workSubmitCmd := make(map[string]interface{})
 	for k, v := range red.RemoteParams {
@@ -228,9 +218,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 // cancelOrReleaseRemoteUnit makes a single attempt to cancel or release a remote unit.
 func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader,
 	release bool, force bool) error {
-	defer func() {
-		conn.(interface{ CloseConnection() error }).CloseConnection()
-	}()
+	defer conn.(interface{ CloseConnection() error }).CloseConnection()
 	red := rw.Status().ExtraData.(*remoteExtraData)
 	var workCmd string
 	if release {

@@ -1,5 +1,5 @@
+-r requirements.txt
 pip
 build
 wheel
-PyYAML
 pre-commit

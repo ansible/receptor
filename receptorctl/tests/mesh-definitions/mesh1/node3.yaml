@@ -1,0 +1,8 @@
+- node:
+    id: node3
+
+- tcp-peer:
+    address: localhost:11121
+
+- control-service:
+    filename: /tmp/receptorctltest/node3.sock

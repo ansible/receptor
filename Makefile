@@ -96,6 +96,10 @@ version:
 	@echo $(APPVER) > .VERSION
 	@echo ".VERSION created for $(APPVER)"
 
+RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
+$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && python3 setup.py bdist_wheel
+
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
@@ -126,7 +130,9 @@ receptorctl-test-venv/bin/pytest:
 	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
 
 receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
-	cd receptorctl && ../receptorctl-test-venv/bin/pytest tests/tests.py
+	cd receptorctl && \
+		PATH=$(PATH):$(PWD) \
+		../receptorctl-test-venv/bin/pytest tests/
 
 clean:
 	@rm -fv receptor receptor.exe receptor.app net

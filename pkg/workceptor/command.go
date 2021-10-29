@@ -95,6 +95,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	}
 	doneChan := make(chan bool, 1)
 	go cmdWaiter(cmd, doneChan)
+	writeStatusFailures := 0
 loop:
 	for {
 		select {
@@ -111,6 +112,13 @@ loop:
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
 				logger.Error("Error updating status file %s: %s", statusFilename, err)
+				writeStatusFailures++
+				if writeStatusFailures > 3 {
+					logger.Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
+					os.Exit(-1)
+				}
+			} else {
+				writeStatusFailures = 0
 			}
 		}
 	}

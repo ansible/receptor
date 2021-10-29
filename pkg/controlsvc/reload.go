@@ -1,6 +1,7 @@
 package controlsvc
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -157,7 +158,7 @@ func handleError(err error, errorcode int) (map[string]interface{}, error) {
 	return cfr, nil
 }
 
-func (c *reloadCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *reloadCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
 	logger.Debug("Reloading")

@@ -1,6 +1,7 @@
 package controlsvc
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -41,7 +42,7 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 	return c, nil
 }
 
-func (c *tracerouteCommand) ControlFunc(nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *tracerouteCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
 	for i := 0; i <= int(nc.MaxForwardingHops()); i++ {
 		thisResult := make(map[string]interface{})

@@ -588,6 +588,8 @@ func (s *Netceptor) Status() Status {
 	}
 	s.knownNodeLock.RUnlock()
 
+	logger.Debug("KnownConnectionCosts %v", s.knownConnectionCosts)
+	logger.Debug("KnownConnectionCosts %v", knownConnectionCosts)
 	return Status{
 		NodeID:               s.nodeID,
 		Connections:          conns,
@@ -1057,7 +1059,6 @@ func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("hash not found")
 	}
-
 	return name, nil
 }
 
@@ -1337,7 +1338,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		s.knownNodeLock.Unlock()
 	} else {
-		logger.Debug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
+		logger.Debug("Received routing update %s from %s via %s. Connections: %v\n", ri.UpdateID, ri.NodeID, recvConn, ri.Connections)
 		s.knownNodeLock.Lock()
 		ni, ok := s.knownNodeInfo[ri.NodeID]
 		if ok {

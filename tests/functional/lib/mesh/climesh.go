@@ -83,11 +83,11 @@ func (n *CLINode) Start() error {
 	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
 	ioutil.WriteFile(nodedefPath, strData, 0o644)
 	n.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
-	stdout, err := os.Create(filepath.Join(n.dir, "stdout"))
+	stdout, err := os.OpenFile(filepath.Join(n.dir, "stdout"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}
-	stderr, err := os.Create(filepath.Join(n.dir, "stderr"))
+	stderr, err := os.OpenFile(filepath.Join(n.dir, "stderr"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}
@@ -654,7 +654,7 @@ func (m *CLIMesh) CheckControlSockets() bool {
 
 // WaitForReady Waits for connections and routes to converge.
 func (m *CLIMesh) WaitForReady(ctx context.Context) error {
-	sleepInterval := 100 * time.Millisecond
+	sleepInterval := 500 * time.Millisecond
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckControlSockets) {
 		return errors.New("timed out while waiting for control sockets")
 	}
@@ -662,7 +662,19 @@ func (m *CLIMesh) WaitForReady(ctx context.Context) error {
 		return errors.New("timed out while waiting for Connections")
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckKnownConnectionCosts) {
-		return errors.New("timed out while checking Connection Costs")
+		meshStatus, err := m.Status()
+		costs := ""
+		nodeNames := []string{}
+		for n := range m.nodes {
+			nodeNames = append(nodeNames, n)
+		}
+		if err == nil {
+			for i, k := range meshStatus {
+				costs += fmt.Sprintf("\n\t%s %v\n\t", nodeNames[i], k.KnownConnectionCosts)
+			}
+		}
+
+		return fmt.Errorf("timed out while checking Connection Costs %s", costs)
 	}
 	if !utils.CheckUntilTimeout(ctx, sleepInterval, m.CheckRoutes) {
 		return errors.New("timed out while waiting for routes to converge")

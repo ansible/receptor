@@ -85,11 +85,11 @@ TESTCMD = -run $(RUNTEST)
 endif
 
 test:
-	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -timeout 3m30s
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
-	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
+	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -timeout 3m30s; do \
 	  i=$$((i+1)); done
 
 kubectl:

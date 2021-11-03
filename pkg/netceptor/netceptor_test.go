@@ -562,13 +562,13 @@ func TestFirewalling(t *testing.T) {
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
 	go func() {
-		for {
-			select {
-			case <-timeout.Done():
-				return
-			case unreach := <-unreach2chan:
-				lastUnreachMsg = &unreach
-			}
+		<-timeout.Done()
+		close(doneChan)
+	}()
+	go func() {
+		for unreach := range unreach2chan {
+			unreach := unreach
+			lastUnreachMsg = &unreach
 		}
 	}()
 
@@ -722,13 +722,13 @@ func TestAllowedPeers(t *testing.T) {
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
 	go func() {
-		for {
-			select {
-			case <-timeout.Done():
-				return
-			case unreach := <-unreach2chan:
-				lastUnreachMsg = &unreach
-			}
+		<-timeout.Done()
+		close(doneChan)
+	}()
+	go func() {
+		for unreach := range unreach2chan {
+			unreach := unreach
+			lastUnreachMsg = &unreach
 		}
 	}()
 

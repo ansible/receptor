@@ -7,9 +7,9 @@ on:
         required: true
         default: 'ansible/receptor'
       ref:
-        description: ''
+        description: 'The ref to build. Can be a branch or any other valid ref.'
         required: true
-        default: 'no'
+        default: 'devel'
 jobs:
   build:
     name: build

@@ -1622,7 +1622,13 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 			return
 		}
 		logger.Debug("Sending initial connection message\n")
-		ci.WriteChan <- ri
+		select {
+		case ci.WriteChan <- ri:
+		case <-ci.Context.Done():
+			return
+		case <-initDoneChan:
+			return
+		}
 		count++
 		if count > 10 {
 			logger.Warning("Giving up on connection initialization\n")
@@ -1643,15 +1649,18 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 	}
 }
 
-func (s *Netceptor) sendRejectMessage(writeChan chan []byte) {
+func (s *Netceptor) sendRejectMessage(ci *connInfo) {
 	rejMsg, err := s.translateStructToNetwork(MsgTypeReject, make([]string, 0))
 	if err != nil {
-		writeChan <- rejMsg
+		select {
+		case <-ci.Context.Done():
+		case ci.WriteChan <- rejMsg:
+		}
 	}
 }
 
 func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connInfo, reason string) error {
-	s.sendRejectMessage(ci.WriteChan)
+	s.sendRejectMessage(ci)
 
 	return fmt.Errorf("rejected connection with node %s because %s", remoteNodeID, reason)
 }

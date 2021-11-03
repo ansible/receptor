@@ -40,6 +40,12 @@ jobs:
 
       - name: build-all target
         run: make build-all
+
+      - name: Archive binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: receptor
+          path: receptor
   test:
     name: test
     runs-on: ubuntu-latest

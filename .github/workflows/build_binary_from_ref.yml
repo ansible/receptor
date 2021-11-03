@@ -1,0 +1,47 @@
+name: "Build binary from arbitratry repo / ref"
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'The receptor repository to build from.'
+        required: true
+        default: 'ansible/receptor'
+      ref:
+        description: ''
+        required: true
+        default: 'no'
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.ref }}
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: build-all target
+        run: make build-all
+
+      - name: Upload binary
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          pip install boto3
+          ansible -i localhost, -c local all -m aws_s3 \
+            -a "bucket=receptor-nightlies object=refs/${{ github.event.inputs.ref }}/receptor src=./receptor mode=put"

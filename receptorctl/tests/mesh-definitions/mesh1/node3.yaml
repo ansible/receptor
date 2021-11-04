@@ -5,4 +5,4 @@
     address: localhost:11121
 
 - control-service:
-    filename: /tmp/receptorctltest/node3.sock
+    filename: /tmp/receptorctltest/mesh1/node3.sock

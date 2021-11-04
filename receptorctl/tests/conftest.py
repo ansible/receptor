@@ -1,149 +1,113 @@
+import receptorctl
+
+import pytest
 import subprocess
 import os
 import shutil
 import time
 import json
-
-import pytest
-import receptorctl
-
+import yaml
 from click.testing import CliRunner
 
-tmpDir = "/tmp/receptorctltest"
+from lib import create_certificate
 
 
 @pytest.fixture(scope="session")
-def create_empty_dir():
-    def check_dependencies():
-        """Check if we have the required dependencies
-        raise an exception if we don't
-        """
-
-        # Check if openssl binary is on the path
-        try:
-            subprocess.check_output(["openssl", "version"])
-        except Exception:
-            raise Exception(
-                "openssl binary not found\n" 'Consider run "sudo dnf install openssl"'
-            )
-
-    check_dependencies()
+def base_tmp_dir():
+    receptor_tmp_dir = "/tmp/receptor"
+    base_tmp_dir = "/tmp/receptorctltest"
 
     # Clean up tmp directory and create a new one
-    if os.path.exists(tmpDir):
-        shutil.rmtree(tmpDir)
-    os.mkdir(tmpDir)
+    if os.path.exists(base_tmp_dir):
+        shutil.rmtree(base_tmp_dir)
+    os.mkdir(base_tmp_dir)
+
+    yield base_tmp_dir
+
+    # Tear-down
+    # if os.path.exists(base_tmp_dir):
+    #     shutil.rmtree(base_tmp_dir)
+
+    if os.path.exists(receptor_tmp_dir):
+        shutil.rmtree(receptor_tmp_dir)
+
+    subprocess.call(["killall", "receptor"])
 
 
-@pytest.fixture(scope="session")
-def create_certificate(create_empty_dir):
-    def generate_cert(name, commonName):
-        keyPath = os.path.join(tmpDir, name + ".key")
-        crtPath = os.path.join(tmpDir, name + ".crt")
-        subprocess.check_output(["openssl", "genrsa", "-out", keyPath, "2048"])
-        subprocess.check_output(
-            [
-                "openssl",
-                "req",
-                "-x509",
-                "-new",
-                "-nodes",
-                "-key",
-                keyPath,
-                "-subj",
-                "/C=/ST=/L=/O=/OU=ReceptorTesting/CN=ca",
-                "-sha256",
-                "-out",
-                crtPath,
-            ]
-        )
-        return keyPath, crtPath
+@pytest.fixture(scope="class")
+def receptor_mesh(base_tmp_dir):
+    class ReceptorMeshSetup:
+        # Relative dir to the receptorctl tests
+        mesh_definitions_dir = "tests/mesh-definitions"
 
-    def generate_cert_with_ca(name, caKeyPath, caCrtPath, commonName):
-        keyPath = os.path.join(tmpDir, name + ".key")
-        crtPath = os.path.join(tmpDir, name + ".crt")
-        csrPath = os.path.join(tmpDir, name + ".csa")
-        extPath = os.path.join(tmpDir, name + ".ext")
+        def __init__(self):
+            # Default vars
+            self.base_tmp_dir = base_tmp_dir
 
-        # create x509 extension
-        with open(extPath, "w") as ext:
-            ext.write("subjectAltName=DNS:" + commonName)
-            ext.close()
-        subprocess.check_output(["openssl", "genrsa", "-out", keyPath, "2048"])
+            # Required dependencies
+            self.__check_dependencies()
 
-        # create cert request
-        subprocess.check_output(
-            [
-                "openssl",
-                "req",
-                "-new",
-                "-sha256",
-                "-key",
-                keyPath,
-                "-subj",
-                "/C=/ST=/L=/O=/OU=ReceptorTesting/CN=" + commonName,
-                "-out",
-                csrPath,
-            ]
-        )
+        def setup(self, mesh_name: str = "mesh1", socket_file_name: str = "node1.sock"):
+            self.mesh_name = mesh_name
+            self.__change_config_files_dir(mesh_name)
+            self.__create_tmp_dir()
+            self.__create_certificates()
+            self.socket_file_name = socket_file_name
 
-        # sign cert request
-        subprocess.check_output(
-            [
-                "openssl",
-                "x509",
-                "-req",
-                "-extfile",
-                extPath,
-                "-in",
-                csrPath,
-                "-CA",
-                caCrtPath,
-                "-CAkey",
-                caKeyPath,
-                "-CAcreateserial",
-                "-out",
-                crtPath,
-                "-sha256",
-            ]
-        )
+            # HACK this should be a dinamic way to select a node socket
+            self.default_socket_unix = "unix://" + os.path.join(
+                self.get_mesh_tmp_dir(), socket_file_name
+            )
 
-        return keyPath, crtPath
+        def default_receptor_controller_unix(self):
+            return receptorctl.ReceptorControl(self.default_socket_unix)
 
-    # Create a new CA
-    caKeyPath, caCrtPath = generate_cert("ca", "ca")
-    clientKeyPath, clientCrtPath = generate_cert_with_ca(
-        "client", caKeyPath, caCrtPath, "localhost"
-    )
-    generate_cert_with_ca("server", caKeyPath, caCrtPath, "localhost")
+        def __change_config_files_dir(self, mesh_name: str):
+            self.config_files_dir = "{}/{}".format(self.mesh_definitions_dir, mesh_name)
+            self.config_files = []
 
-    return {
-        "caKeyPath": caKeyPath,
-        "caCrtPath": caCrtPath,
-        "clientKeyPath": clientKeyPath,
-        "clientCrtPath": clientCrtPath,
-    }
+            # Iterate over all the files in the config_files_dir
+            # and create a list of all files that end with .yaml or .yml
+            for f in os.listdir(self.config_files_dir):
+                if f.endswith(".yaml") or f.endswith(".yml"):
+                    self.config_files.append(os.path.join(self.config_files_dir, f))
+
+        def __create_certificates(self):
+            self.certificate_files = create_certificate(self.get_mesh_tmp_dir())
+
+        def get_mesh_name(self):
+            return self.config_files_dir.split("/")[-1]
+
+        def get_mesh_tmp_dir(self):
+            mesh_tmp_dir = "{}/{}".format(self.base_tmp_dir, self.mesh_name)
+            return mesh_tmp_dir
+
+        def __check_dependencies(self):
+            """Check if we have the required dependencies
+            raise an exception if we don't
+            """
+
+            # Check if openssl binary is on the path
+            try:
+                subprocess.check_output(["openssl2", "version"])
+            except FileNotFoundError:
+                raise Exception(
+                    "openssl binary not found\n"
+                    'Consider run "sudo dnf install openssl"'
+                )
+
+        def __create_tmp_dir(self):
+            mesh_tmp_dir_path = self.get_mesh_tmp_dir()
+
+            # Clean up tmp directory and create a new one
+            if os.path.exists(mesh_tmp_dir_path):
+                shutil.rmtree(mesh_tmp_dir_path)
+            os.mkdir(mesh_tmp_dir_path)
+
+    return ReceptorMeshSetup()
 
 
-@pytest.fixture(scope="session")
-def certificate_files(create_certificate):
-    """Returns a dict with the certificate files
-
-    The dict contains the following keys:
-        caKeyPath
-        caCrtPath
-        clientKeyPath
-        clientCrtPath
-    """
-    return create_certificate
-
-
-@pytest.fixture(scope="session")
-def prepare_environment(certificate_files):
-    pass
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="class")
 def receptor_bin_path():
     """Returns the path to the receptor binary
 
@@ -162,7 +126,17 @@ def receptor_bin_path():
     # the path to the binary if it is found.
     receptor_bin_path_from_test_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../../tests/artifacts-output",
+        "../../tests/artifacts-output/",
+        "receptor",
+    )
+    if os.path.exists(receptor_bin_path_from_test_dir):
+        return receptor_bin_path_from_test_dir
+
+    # Check if the receptor binary is in '../../' and returns
+    # the path to the binary if it is found.
+    receptor_bin_path_from_test_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "../../",
         "receptor",
     )
     if os.path.exists(receptor_bin_path_from_test_dir):
@@ -176,16 +150,6 @@ def receptor_bin_path():
         raise Exception(
             "Receptor binary not found in $PATH or in '../../tests/artifacts-output'"
         )
-
-
-@pytest.fixture(scope="class")
-def default_socket_unix():
-    return "unix://" + os.path.join(tmpDir, "node1.sock")
-
-
-@pytest.fixture(scope="class")
-def default_receptor_controller_unix(default_socket_unix):
-    return receptorctl.ReceptorControl(default_socket_unix)
 
 
 @pytest.fixture(scope="class")
@@ -217,48 +181,149 @@ def default_receptor_controller_tcp_tls(default_socket_tcp, certificate_files):
 
 
 @pytest.fixture(scope="class")
-def receptor_mesh(
-    prepare_environment, receptor_bin_path, default_receptor_controller_unix
-):
+def receptor_nodes():
+    class ReceptorNodes:
+        nodes = []
+        log_files = []
 
-    node1 = subprocess.Popen(
-        [receptor_bin_path, "-c", "tests/mesh-definitions/mesh1/node1.yaml"]
-    )
-    node2 = subprocess.Popen(
-        [receptor_bin_path, "-c", "tests/mesh-definitions/mesh1/node2.yaml"]
-    )
-    node3 = subprocess.Popen(
-        [receptor_bin_path, "-c", "tests/mesh-definitions/mesh1/node3.yaml"]
-    )
+    return ReceptorNodes()
 
+
+def receptor_nodes_kill(nodes):
+    for node in nodes:
+        node.kill()
+
+    for node in nodes:
+        node.wait(3)
+
+
+def import_config_from_node(node):
+    """Receive a node and return the config file as a dict"""
+    stream = open(node.args[2], "r")
+    try:
+        config_unflatten = yaml.safe_load(stream)
+    except yaml.YAMLError as e:
+        raise e
+    stream.close()
+
+    config = {}
+    for c in config_unflatten:
+        config.update(c)
+
+    return config
+
+
+def receptor_mesh_wait_until_ready(nodes, receptor_controller):
     time.sleep(0.5)
-    node1_controller = default_receptor_controller_unix
 
+    # Try up to 6 times
+    tries = 0
     while True:
-        status = node1_controller.simple_command("status")
-        if status["RoutingTable"] == {"node2": "node2", "node3": "node2"}:
+        status = receptor_controller.simple_command("status")
+        # Check if it has three known nodes
+        if len(status["KnownConnectionCosts"]) == 3:
             break
-        time.sleep(0.5)
+        tries += 1
+        if tries > 6:
+            raise Exception("Receptor Mesh did not start up")
+        time.sleep(1)
 
-    node1_controller.close()
+    receptor_controller.close()
 
-    # Debug mesh data
-    print("# Mesh nodes: {}".format(str(status["KnownConnectionCosts"].keys())))
+
+@pytest.fixture(scope="class")
+def certificate_files(receptor_mesh):
+    return receptor_mesh.certificate_files
+
+
+@pytest.fixture(scope="class")
+def default_receptor_controller_unix(receptor_mesh):
+    return receptor_mesh.default_receptor_controller_unix()
+
+
+def start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path):
+    for i, config_file in enumerate(receptor_mesh.config_files):
+        log_file_name = (
+            config_file.split("/")[-1].replace(".yaml", ".log").replace(".yml", ".log")
+        )
+        receptor_nodes.log_files.append(
+            open(
+                os.path.join(receptor_mesh.get_mesh_tmp_dir(), log_file_name),
+                "w",
+            )
+        )
+        receptor_nodes.nodes.append(
+            subprocess.Popen(
+                [receptor_bin_path, "-c", config_file],
+                stdout=receptor_nodes.log_files[i],
+                stderr=receptor_nodes.log_files[i],
+            )
+        )
+
+
+@pytest.fixture(scope="class")
+def receptor_mesh_mesh1(
+    receptor_bin_path,
+    receptor_nodes,
+    receptor_mesh,
+):
+    # Set custom config files dir
+    receptor_mesh.setup("mesh1")
+
+    # Start the receptor nodes processes
+    start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path)
+
+    receptor_mesh_wait_until_ready(
+        receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix()
+    )
 
     yield
 
-    node1.kill()
-    node2.kill()
-    node1.wait()
-    node2.wait()
-    node3.kill()
-    node3.wait()
+    receptor_nodes_kill(receptor_nodes.nodes)
+
+
+@pytest.fixture(scope="class")
+def receptor_mesh_access_control(
+    receptor_bin_path,
+    receptor_nodes,
+    receptor_mesh,
+):
+    # Set custom config files dir
+    receptor_mesh.setup("access_control", "node2.sock")
+
+    # Create PEM key for signed work
+    key_path = os.path.join(receptor_mesh.get_mesh_tmp_dir(), "signwork_key")
+    subprocess.check_output(
+        [
+            "ssh-keygen",
+            "-b",
+            "2048",
+            "-t",
+            "rsa",
+            "-f",
+            key_path,
+            "-q",
+            "-N",
+            "",
+        ]
+    )
+
+    # Start the receptor nodes processes
+    start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path)
+
+    receptor_mesh_wait_until_ready(
+        receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix()
+    )
+
+    yield
+
+    receptor_nodes_kill(receptor_nodes.nodes)
 
 
 @pytest.fixture(scope="function")
-def receptor_control_args():
+def receptor_control_args(receptor_mesh):
     args = {
-        "--socket": "/tmp/receptorctltest/node1.sock",
+        "--socket": f"{receptor_mesh.get_mesh_tmp_dir()}/{receptor_mesh.socket_file_name}",
         "--config": None,
         "--tls": None,
         "--rootcas": None,

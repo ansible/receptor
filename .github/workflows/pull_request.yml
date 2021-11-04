@@ -108,7 +108,7 @@ jobs:
 
       - name: Remove sockets for artifacting
         if: ${{ failure() }}
-        run: "find /tmp/receptor-testing -type s -exec /bin/rm {} \\;"
+        run: "find /tmp/receptor-testing -type s -exec /bin/rm -f {} \\;"
 
       - name: get k8s logs
         if: ${{ failure() }}

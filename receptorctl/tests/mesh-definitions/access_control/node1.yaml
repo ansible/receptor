@@ -1,0 +1,28 @@
+- node:
+    id: node1
+
+- log-level: debug
+
+- tcp-listener:
+    port: 12111
+
+- control-service:
+    filename: /tmp/receptorctltest/access_control/node1.sock
+
+- work-signing: 
+    privatekey: /tmp/receptorctltest/access_control/signwork_key
+    tokenexpiration: 10h30m
+
+- work-verification:
+    publickey: /tmp/receptorctltest/access_control/signwork_key.pub
+
+- work-command:
+    worktype: signed-echo
+    command: bash
+    params: "-c \"for w in {1..4}; do echo ${line^^}; sleep 1; done\""
+    verifysignature: true
+
+- work-command:
+    workType: unsigned-echo
+    command: bash
+    params: "-c \"for w in {1..4}; do echo ${line^^}; sleep 1; done\""

@@ -1,7 +1,7 @@
 import pytest
 
 
-@pytest.mark.usefixtures("receptor_mesh")
+@pytest.mark.usefixtures("receptor_mesh_mesh1")
 class TestReceptorCtlConnection:
     def test_connect_to_service(self, default_receptor_controller_unix):
         node1_controller = default_receptor_controller_unix

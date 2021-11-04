@@ -1,0 +1,13 @@
+- node:
+    id: node2
+
+- log-level: debug
+
+- tcp-peer:
+    address: localhost:12111
+
+- tcp-listener:
+    port: 12121
+
+- control-service:
+    filename: /tmp/receptorctltest/access_control/node2.sock

@@ -524,9 +524,6 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 				return
 			}
 			for {
-				if unit.Status().State == WorkStateFailed {
-					return
-				}
 				select {
 				case <-ctx.Done():
 					return

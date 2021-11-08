@@ -120,6 +120,7 @@ def status(ctx, printjson):
             last_seen = f"{time:%Y-%m-%d %H:%M:%S}"
             print(f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}")
 
+
     def print_worktypes(header, isSecure):
         printOnce = True
         seen_nodes = []
@@ -397,15 +398,21 @@ def cancel(ctx, unit_ids):
 
 @work.command(help="Release (delete) one or more units of work.")
 @click.option('--force', help="Delete locally even if we can't reach the remote node", is_flag=True)
+@click.option('--all', help="Delete all work units", is_flag=True)
 @click.argument('unit_ids', nargs=-1)
 @click.pass_context
-def release(ctx, force, unit_ids):
-    if len(unit_ids) == 0:
+def release(ctx, force, all, unit_ids):
+    if len(unit_ids) == 0 and not all:
         print("No unit IDs supplied: Not doing anything")
         return
     op = "release" if not force else "force-release"
     print("Released:")
-    op_on_unit_ids(ctx, op, unit_ids)
+    if all:
+        rc = get_rc(ctx)
+        work = rc.simple_command("work list")
+        op_on_unit_ids(ctx, op, work.keys())
+    else:
+        op_on_unit_ids(ctx, op, unit_ids)
 
 
 def run():

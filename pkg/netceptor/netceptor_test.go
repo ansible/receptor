@@ -782,3 +782,25 @@ func TestAllowedPeers(t *testing.T) {
 	n1.BackendWait()
 	n2.BackendWait()
 }
+
+func TestConnTypeString(t *testing.T) {
+	lw := &logWriter{
+		t: t,
+	}
+	log.SetOutput(lw)
+	logger.SetShowTrace(true)
+	defer func() {
+		log.SetOutput(os.Stdout)
+		logger.SetShowTrace(false)
+	}()
+
+	n1 := New(context.Background(), "node1")
+	if ConnTypeStrings[ConnTypeDatagram] != n1.GetConnectionTypeAsString(0) {
+		t.Fatal("Datagram should be the first entry in ConnTypeStrings")
+	}
+	if "Unknown" != n1.GetConnectionTypeAsString(254) {
+		t.Fatal("Either we now have 254 ConnTypes or GetConnectionTypeAsString did not properly return Unknown")
+	}
+	// Shutdown the network
+	n1.Shutdown()
+}

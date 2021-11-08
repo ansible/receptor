@@ -372,17 +372,16 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 // if the remote service has gone away.
 func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
 	msgCh := pc.SubscribeUnreachable(doneChan)
-	for {
-		select {
-		case <-pc.context.Done():
-			return
-		case <-doneChan:
-			return
-		case msg := <-msgCh:
-			if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-				logger.Error("remote service unreachable")
-				cancel()
-			}
+	if msgCh == nil {
+		cancel()
+
+		return
+	}
+	// read from channel until closed
+	for msg := range msgCh {
+		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
+			logger.Error("remote service unreachable")
+			cancel()
 		}
 	}
 }

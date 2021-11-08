@@ -64,10 +64,7 @@ func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duratio
 	}
 	errorChan := make(chan errorResult)
 	go func() {
-		select {
-		case <-ctx.Done():
-			return
-		case msg := <-unrCh:
+		for msg := range unrCh {
 			errorChan <- errorResult{
 				err:      fmt.Errorf(msg.Problem),
 				fromNode: msg.ReceivedFromNode,

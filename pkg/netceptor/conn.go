@@ -373,6 +373,8 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
 	msgCh := pc.SubscribeUnreachable(doneChan)
 	if msgCh == nil {
+		cancel()
+
 		return
 	}
 	// read from channel until closed

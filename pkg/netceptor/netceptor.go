@@ -218,16 +218,23 @@ type routingUpdate struct {
 }
 
 const (
-	// If adding/changing an ConnType, make sure to change ConnTypeStrings as well. These are friendly strings printed out in a status command
+	// If adding/changing an ConnType, make sure to change ConnTypeStrings as well.
+	//    These are friendly strings printed out in a status command.
 	// ConnTypeDatagram indicates a packetconn (datagram) service listener.
 	ConnTypeDatagram = 0
 	// ConnTypeStream indicates a conn (stream) service listener, without a user-defined TLS.
 	ConnTypeStream = 1
 	// ConnTypeStreamTLS indicates the service listens on a packetconn connection, with a user-defined TLS.
 	ConnTypeStreamTLS = 2
+	// Default Label for an unknown connection type.
+	UnknownConnTypeStr = "Unknown"
 )
 
-var ConnTypeStrings = [...]string{"Datagram", "Stream", "StreamTLS"}
+var ConnTypeStrings = map[byte]string{
+	ConnTypeDatagram:  "Datagram",
+	ConnTypeStream:    "Stream",
+	ConnTypeStreamTLS: "StreamTLS",
+}
 
 // WorkCommand tracks available work types and whether they verify work submissions.
 type WorkCommand struct {
@@ -444,11 +451,12 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 // Convert the connection type to a string.
 func (s *Netceptor) GetConnectionTypeAsString(connectionType byte) string {
 	// A byte can't be < 0 so we don't need to check the lower bounds
-	if connectionType < byte(len(ConnTypeStrings)) {
-		return ConnTypeStrings[connectionType]
+	connTypeString, ok := ConnTypeStrings[connectionType]
+	if !ok {
+		connTypeString = UnknownConnTypeStr
 	}
 
-	return "Unknown"
+	return connTypeString
 }
 
 type backendInfo struct {

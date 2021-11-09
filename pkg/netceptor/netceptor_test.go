@@ -795,11 +795,11 @@ func TestConnTypeString(t *testing.T) {
 	}()
 
 	n1 := New(context.Background(), "node1")
-	if ConnTypeStrings[ConnTypeDatagram] != n1.GetConnectionTypeAsString(0) {
-		t.Fatal("Datagram should be the first entry in ConnTypeStrings")
+	if ConnTypeStrings[ConnTypeDatagram] != n1.GetConnectionTypeAsString(ConnTypeDatagram) {
+		t.Fatal("The function did not properly return the constant for a datagram type")
 	}
-	if n1.GetConnectionTypeAsString(254) != "Unknown" {
-		t.Fatal("Either we now have 254 ConnTypes or GetConnectionTypeAsString did not properly return Unknown")
+	if n1.GetConnectionTypeAsString(254) != UnknownConnTypeStr {
+		t.Fatal("Either we now have 254 ConnTypes or GetConnectionTypeAsString did not properly return the string constant")
 	}
 	// Shutdown the network
 	n1.Shutdown()

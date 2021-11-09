@@ -443,10 +443,11 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 
 // Convert the connection type to a string.
 func (s *Netceptor) GetConnectionTypeAsString(connectionType byte) string {
-        // A byte can't be < 0 so we don't need to check the lower bounds
+	// A byte can't be < 0 so we don't need to check the lower bounds
 	if connectionType < byte(len(ConnTypeStrings)) {
 		return ConnTypeStrings[connectionType]
 	}
+
 	return "Unknown"
 }
 

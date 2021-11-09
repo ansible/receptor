@@ -798,7 +798,7 @@ func TestConnTypeString(t *testing.T) {
 	if ConnTypeStrings[ConnTypeDatagram] != n1.GetConnectionTypeAsString(0) {
 		t.Fatal("Datagram should be the first entry in ConnTypeStrings")
 	}
-	if "Unknown" != n1.GetConnectionTypeAsString(254) {
+	if n1.GetConnectionTypeAsString(254) != "Unknown" {
 		t.Fatal("Either we now have 254 ConnTypes or GetConnectionTypeAsString did not properly return Unknown")
 	}
 	// Shutdown the network

@@ -2,6 +2,7 @@ package randstr
 
 import (
 	"crypto/rand"
+	"fmt"
 	"math/big"
 )
 
@@ -15,4 +16,8 @@ func RandomString(length int) string {
 	}
 
 	return string(randbytes)
+}
+
+func RandomStringWithPrefixAndSuffix(prefix string, length int, suffix string) string {
+	return fmt.Sprintf("%s%s%s", prefix, RandomString(length), suffix)
 }

@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/ansible/receptor/pkg/backends"
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/services"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ansible/receptor/pkg/workceptor"
 )
 
@@ -51,14 +50,7 @@ func (r Receptor) Serve(ctx context.Context) error {
 	var id string
 	var err error
 	if r.ID == nil {
-		id, err = os.Hostname()
-		if err != nil {
-			return fmt.Errorf("node id is not set in serve config and could not get hostname: %w", err)
-		}
-		lchost := strings.ToLower(id)
-		if lchost == "localhost" || strings.HasPrefix(lchost, "localhost.") {
-			return fmt.Errorf("node id is not set in serve config and hostname is invalid (don't use localhost please): %w", err)
-		}
+		id = utils.GenerateHostID()
 	} else {
 		id = *r.ID
 	}

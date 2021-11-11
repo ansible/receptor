@@ -14,6 +14,7 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	_ "github.com/ansible/receptor/pkg/services"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ghjm/cmdline"
 )
@@ -27,15 +28,7 @@ type nodeCfg struct {
 func (cfg nodeCfg) Init() error {
 	var err error
 	if cfg.ID == "" {
-		host, err := os.Hostname()
-		if err != nil {
-			return err
-		}
-		lchost := strings.ToLower(host)
-		if lchost == "localhost" || strings.HasPrefix(lchost, "localhost.") {
-			return fmt.Errorf("no node ID specified and local host name is localhost")
-		}
-		cfg.ID = host
+		cfg.ID = utils.GenerateHostID()
 	}
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")

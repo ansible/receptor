@@ -209,6 +209,9 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		ctxPodReady, _ = context.WithTimeout(kw.ctx, kw.podPendingTimeout)
 	}
 	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady)
+	if ev == nil || ev.Object == nil {
+		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
+	}
 	var ok bool
 	kw.pod, ok = ev.Object.(*corev1.Pod)
 	if !ok {
@@ -233,9 +236,6 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		}
 
 		return err
-	}
-	if ev == nil {
-		return fmt.Errorf("pod disappeared during watch")
 	}
 
 	return nil

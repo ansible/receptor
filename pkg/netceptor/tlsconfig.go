@@ -6,6 +6,7 @@ package netceptor
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 
@@ -37,6 +38,10 @@ func (cfg tlsServerCfg) Prepare() error {
 		PreferServerCipherSuites: true,
 	}
 
+	if cfg.Cert == "" || cfg.Key == "" {
+		return fmt.Errorf("server cert and key must both be supplied")
+	}
+
 	certbytes, err := ioutil.ReadFile(cfg.Cert)
 	if err != nil {
 		return err
@@ -50,8 +55,6 @@ func (cfg tlsServerCfg) Prepare() error {
 		return err
 	}
 
-	tlscfg.Certificates = []tls.Certificate{cert}
-
 	if cfg.ClientCAs != "" {
 		bytes, err := ioutil.ReadFile(cfg.ClientCAs)
 		if err != nil {
@@ -59,6 +62,18 @@ func (cfg tlsServerCfg) Prepare() error {
 		}
 		clientCAs := x509.NewCertPool()
 		clientCAs.AppendCertsFromPEM(bytes)
+
+		// verify that the provided CA recognizes the provided certs - server side
+		opts := x509.VerifyOptions{
+			Roots:     clientCAs,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		}
+
+		err = verifyCertAgainstCA(certbytes, opts)
+		if err != nil {
+			return err
+		}
+
 		tlscfg.ClientCAs = clientCAs
 	}
 
@@ -70,6 +85,8 @@ func (cfg tlsServerCfg) Prepare() error {
 	default:
 		tlscfg.ClientAuth = tls.NoClientCert
 	}
+
+	tlscfg.Certificates = []tls.Certificate{cert}
 
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
@@ -90,23 +107,21 @@ func (cfg tlsClientConfig) Prepare() error {
 		PreferServerCipherSuites: true,
 	}
 
-	if cfg.Cert != "" || cfg.Key != "" {
-		if cfg.Cert == "" || cfg.Key == "" {
-			return fmt.Errorf("cert and key must both be supplied or neither")
-		}
-		certbytes, err := ioutil.ReadFile(cfg.Cert)
-		if err != nil {
-			return err
-		}
-		keybytes, err := ioutil.ReadFile(cfg.Key)
-		if err != nil {
-			return err
-		}
-		cert, err := tls.X509KeyPair(certbytes, keybytes)
-		if err != nil {
-			return err
-		}
-		tlscfg.Certificates = []tls.Certificate{cert}
+	if cfg.Cert == "" || cfg.Key == "" {
+		return fmt.Errorf("client cert and key must both be supplied")
+	}
+
+	certbytes, err := ioutil.ReadFile(cfg.Cert)
+	if err != nil {
+		return err
+	}
+	keybytes, err := ioutil.ReadFile(cfg.Key)
+	if err != nil {
+		return err
+	}
+	cert, err := tls.X509KeyPair(certbytes, keybytes)
+	if err != nil {
+		return err
 	}
 
 	if cfg.RootCAs != "" {
@@ -117,10 +132,23 @@ func (cfg tlsClientConfig) Prepare() error {
 
 		rootCAs := x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(bytes)
+
+		// verify that the provided CA recognizes the provided certs - client side
+		opts := x509.VerifyOptions{
+			Roots:     rootCAs,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		}
+
+		err = verifyCertAgainstCA(certbytes, opts)
+		if err != nil {
+			return err
+		}
+
 		tlscfg.RootCAs = rootCAs
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
+	tlscfg.Certificates = []tls.Certificate{cert}
 
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
 }
@@ -130,4 +158,17 @@ func init() {
 		"tls-server", "Define a TLS server configuration", tlsServerCfg{}, cmdline.Section(configSection))
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
 		"tls-client", "Define a TLS client configuration", tlsClientConfig{}, cmdline.Section(configSection))
+}
+
+func verifyCertAgainstCA(certPEM []byte, opts x509.VerifyOptions) error {
+	block, _ := pem.Decode(certPEM)
+	leafCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+	_, err = leafCert.Verify(opts)
+	if err != nil {
+		return err
+	}
+	return nil
 }

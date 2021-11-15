@@ -170,5 +170,6 @@ func verifyCertAgainstCA(certPEM []byte, opts x509.VerifyOptions) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

@@ -7,7 +7,6 @@ import tty
 import termios
 import click
 import json
-from pprint import pprint
 from functools import partial
 import dateutil.parser
 import pkg_resources
@@ -27,6 +26,17 @@ class IgnoreRequiredWithHelp(click.Group):
             for param in self.params:
                 param.required = False
             return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
+
+def pprint(json_data):
+    click.echo(json.dumps(json_data, indent=4, sort_keys=True))
+
+def printWarning(message):
+    click.echo(click.style(f"Warning: {message}", fg='magenta'), err=True)
+
+def printError(message, exitCode=None):
+    click.echo(click.style(f"ERROR: {message}", fg='red'), err=True)
+    if exitCode:
+        sys.exit(exitCode)
 
 
 @click.group(cls=IgnoreRequiredWithHelp)
@@ -93,7 +103,7 @@ def status(ctx, printjson):
     rc = get_rc(ctx)
     status = rc.simple_command("status")
     if printjson:
-        print(json.dumps(status))
+        pprint(status)
         return
     node_id = status.pop("NodeID")
     print(f"Node ID: {node_id}")
@@ -127,21 +137,21 @@ def status(ctx, printjson):
         print()
         print(f"{'Connection':<{longest_node}} Cost")
         for conn in connections:
-            print(f"{conn['NodeID']:<{longest_node}} {conn['Cost']}")
+            click.echo(f"{conn['NodeID']:<{longest_node}} {conn['Cost']}")
 
     if costs:
-        print()
-        print(f"{'Known Node':<{longest_node}} Known Connections")
+        click.echo()
+        click.echo(f"{'Known Node':<{longest_node}} Known Connections")
         for node in costs:
-            print(f"{node:<{longest_node}} ", end="")
+            click.echo(f"{node:<{longest_node}} ", nl=False)
             pprint(costs[node])
 
     routes = status.pop("RoutingTable", None)
     if routes:
-        print()
-        print(f"{'Route':<{longest_node}} Via")
+        click.echo()
+        click.echo(f"{'Route':<{longest_node}} Via")
         for node in routes:
-            print(f"{node:<{longest_node}} {routes[node]}")
+            click.echo(f"{node:<{longest_node}} {routes[node]}")
 
     ads = status.pop("Advertisements", None)
     if ads:
@@ -183,8 +193,8 @@ def status(ctx, printjson):
                 seen_nodes.append(node)
             workTypes = ", ".join(workTypes)
             if printOnce:
-                print()
-                print(f"{'Node':<{longest_node}} {header}")
+                click.echo()
+                click.echo(f"{'Node':<{longest_node}}  {header}")
                 printOnce = False
             print(f"{ad['NodeID']:<{longest_node}} ", end="")
             print(workTypes)
@@ -194,7 +204,7 @@ def status(ctx, printjson):
         print_worktypes("Secure Work Types", True)
 
     if status:
-        print("Additional data returned from Receptor:")
+        click.echo("Additional data returned from Receptor:")
         pprint(status)
 
 
@@ -211,7 +221,7 @@ def ping(ctx, node, count, delay):
     for i in range(count):
         results = rc.simple_command(f"ping {node}")
         if "Success" in results and results["Success"]:
-            print(f"Reply from {results['From']} in {results['TimeStr']}")
+            click.echo(f"Reply from {results['From']} in {results['TimeStr']}")
         else:
             ping_error = True
             if "From" in results and "TimeStr" in results:
@@ -240,7 +250,7 @@ def reload(ctx):
         elif "ERRORCODE 4" in results["Error"]:
             sys.exit(4)
         else:
-            sys.exit(4)
+            sys.exit(5)
 
 
 @cli.command(help="Do a traceroute to a Receptor node.")
@@ -256,7 +266,7 @@ def traceroute(ctx, node):
                 f"{resno}: Error {resval['Error']} from {resval['From']} in {resval['TimeStr']}"
             )
         else:
-            print(f"{resno}: {resval['From']} in {resval['TimeStr']}")
+            click.echo(f"{resno}: {resval['From']} in {resval['TimeStr']}")
 
 
 @cli.command(help="Connect the local terminal to a Receptor service on a remote node.")
@@ -303,7 +313,7 @@ def connect(ctx, node, service, raw, tlsclient):
                     rc._socket.send(data.encode())
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, stdin_tattrs)
-        print()
+        click.echo()
 
 
 @cli.group(help="Commands related to unit-of-work processing")
@@ -322,9 +332,7 @@ def version(ctx):
     delim = ""
     if receptorVersion != receptorctlVersion:
         delim = "\t"
-        print(
-            "Warning: receptorctl and receptor are different versions, they may not be compatible"
-        )
+        printWarning("receptorctl and receptor are different versions, they may not be compatible")
     print(f"{delim}receptorctl  {receptorctlVersion}")
     print(f"{delim}receptor     {receptorVersion}")
 
@@ -362,7 +370,7 @@ def list_units(ctx, unit_id, node, tlsclient, quiet):
     work = rc.simple_command("work list" + unit_id)
     if quiet:
         for k in work.keys():
-            print(k)
+            click.echo(k)
     else:
         pprint(work)
 
@@ -439,15 +447,12 @@ def submit(
     if payload_literal:
         pcmds += 1
     if pcmds < 1:
-        print("Must provide one of --payload, --no-payload or --payload-literal.")
-        sys.exit(1)
+        printError("Must provide one of --payload, --no-payload or --payload-literal.", 1)
     if pcmds > 1:
-        print(
-            "Cannot provide more than one of --payload, --no-payload and --payload-literal."
-        )
+        printError("Cannot provide more than one of --payload, --no-payload and --payload-literal.")
         sys.exit(1)
     if rm and not follow:
-        print("Warning: using --rm without --follow. Unit results will never be seen.")
+        printWarning("using --rm without --follow. Unit results will never be seen.")
     if payload_literal:
         payload_data = f"{payload_literal}\n".encode()
     elif no_payload:
@@ -456,7 +461,10 @@ def submit(
         if payload == "-":
             payload_data = sys.stdin.buffer
         else:
-            payload_data = open(payload, "rb")
+            try:
+                payload_data = open(payload, 'rb')
+            except Exception as e:
+                printError(f"Failed to load payload file: {e}", 1)
     unitid = None
     try:
         params = dict(s.split("=", 1) for s in param)
@@ -483,8 +491,10 @@ def submit(
         if follow:
             ctx.invoke(results, unit_id=unitid)
         else:
-            print("Result: ", result)
-            print("Unit ID:", unitid)
+            click.echo("Result: ", result)
+            click.echo("Unit ID:", unitid)
+    except Exception as e:
+        printError(e, 101)
     finally:
         if rm and unitid:
             op_on_unit_ids(ctx, "release", [unitid])
@@ -504,8 +514,7 @@ def results(ctx, unit_id):
     state = status.pop("State", 0)
     if state == 3:  # Failed
         detail = status.pop("Detail", "Unknown")
-        sys.stderr.write(f"Remote unit failed: {detail}\n")
-        sys.exit(1)
+        printError(f"Remote unit failed: {detail}\n", 1)
 
 
 def op_on_unit_ids(ctx, op, unit_ids):
@@ -513,10 +522,9 @@ def op_on_unit_ids(ctx, op, unit_ids):
     for unit_id in unit_ids:
         try:
             res = list(rc.simple_command(f"work {op} {unit_id}").items())[0]
-            print(f"({res[1]}, {res[0]})")
+            click.echo(f"({res[1]}, {res[0]})")
         except Exception as e:
-            print(f"{unit_id}: ERROR: {e}")
-            sys.exit(1)
+            printError(f"{unit_id}: ERROR: {e}", 1)
 
 
 @work.command(help="Cancel (kill) one or more units of work.")
@@ -524,9 +532,9 @@ def op_on_unit_ids(ctx, op, unit_ids):
 @click.pass_context
 def cancel(ctx, unit_ids):
     if len(unit_ids) == 0:
-        print("No unit IDs supplied: Not doing anything")
+        printWarning("No unit IDs supplied: Not doing anything")
         return
-    print("Cancelled:")
+    click.echo("Cancelled:")
     op_on_unit_ids(ctx, "cancel", unit_ids)
 
 
@@ -541,7 +549,7 @@ def cancel(ctx, unit_ids):
 @click.pass_context
 def release(ctx, force, all, unit_ids):
     if len(unit_ids) == 0 and not all:
-        print("No unit IDs supplied: Not doing anything")
+        printWarning("No unit IDs supplied: Not doing anything")
         return
     op = "release" if not force else "force-release"
     print("Released:")
@@ -559,6 +567,6 @@ def run():
     except click.exceptions.Abort:
         pass
     except Exception as e:
-        print("Error:", e)
-        sys.exit(1)
+        print("e is ", e)
+        printError(e, 1)
     sys.exit(0)

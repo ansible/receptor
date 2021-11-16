@@ -66,6 +66,7 @@ linters:
     # - wrapcheck # TODO: Errors passed upwards should be wrapped.
 
 issues:
+  fix: true
   exclude:
     - "lostcancel" # TODO: Context is not canceled on multiple occasions. Needs more detailed work to be fixed.
     - "SA2002|thelper|testinggoroutine" # TODO: Test interface used outside of its routine, tests need to be rewritten.

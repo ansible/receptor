@@ -556,18 +556,19 @@ func TestFirewalling(t *testing.T) {
 	}
 
 	// Subscribe for unreachable messages
-	unreach2chan := pc2.SubscribeUnreachable()
+	doneChan := make(chan struct{})
+	unreach2chan := pc2.SubscribeUnreachable(doneChan)
 
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
 	go func() {
-		for {
-			select {
-			case <-timeout.Done():
-				return
-			case unreach := <-unreach2chan:
-				lastUnreachMsg = &unreach
-			}
+		<-timeout.Done()
+		close(doneChan)
+	}()
+	go func() {
+		for unreach := range unreach2chan {
+			unreach := unreach
+			lastUnreachMsg = &unreach
 		}
 	}()
 
@@ -715,18 +716,19 @@ func TestAllowedPeers(t *testing.T) {
 	}
 
 	// Subscribe for unreachable messages
-	unreach2chan := pc2.SubscribeUnreachable()
+	doneChan := make(chan struct{})
+	unreach2chan := pc2.SubscribeUnreachable(doneChan)
 
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
 	go func() {
-		for {
-			select {
-			case <-timeout.Done():
-				return
-			case unreach := <-unreach2chan:
-				lastUnreachMsg = &unreach
-			}
+		<-timeout.Done()
+		close(doneChan)
+	}()
+	go func() {
+		for unreach := range unreach2chan {
+			unreach := unreach
+			lastUnreachMsg = &unreach
 		}
 	}()
 

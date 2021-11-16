@@ -445,29 +445,44 @@ func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 }
 
 // GetResults returns a live stream of the results of a unit.
-func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan struct{}) (chan []byte, error) {
+func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int64) (chan []byte, error) {
 	unit, err := w.findUnit(unitID)
 	if err != nil {
 		return nil, err
 	}
 	resultChan := make(chan []byte)
+	closeOnce := sync.Once{}
+	resultClose := func() {
+		closeOnce.Do(func() {
+			close(resultChan)
+		})
+	}
+	unitdir := path.Join(w.dataDir, unitID)
+	stdoutFilename := path.Join(unitdir, "stdout")
+	var stdout *os.File
+	ctxChild, cancel := context.WithCancel(ctx)
 	go func() {
-		unitdir := path.Join(w.dataDir, unitID)
-		stdoutFilename := path.Join(unitdir, "stdout")
+		defer func() {
+			err = stdout.Close()
+			if err != nil {
+				logger.Error("Error closing stdout %s", stdoutFilename)
+			}
+			resultClose()
+			cancel()
+		}()
+
 		// Wait for stdout file to exist
 		for {
-			_, err := os.Stat(stdoutFilename)
-
+			stdout, err = os.Open(stdoutFilename)
 			switch {
 			case err == nil:
 			case os.IsNotExist(err):
 				if IsComplete(unit.Status().State) {
-					close(resultChan)
 					logger.Warning("Unit completed without producing any stdout\n")
 
 					return
 				}
-				if sleepOrDone(doneChan, 250*time.Millisecond) {
+				if sleepOrDone(ctx.Done(), 500*time.Millisecond) {
 					return
 				}
 
@@ -480,57 +495,76 @@ func (w *Workceptor) GetResults(unitID string, startPos int64, doneChan chan str
 
 			break
 		}
-		var stdout *os.File
-		var err error
 		filePos := startPos
+		statChan := make(chan struct{}, 1)
+		go func() {
+			failures := 0
+			for {
+				select {
+				case <-ctxChild.Done():
+					return
+				case <-time.After(1 * time.Second):
+					_, err := os.Stat(stdoutFilename)
+					if os.IsNotExist(err) {
+						failures++
+						if failures > 3 {
+							logger.Error("Exceeded retries for reading stdout %s", stdoutFilename)
+							statChan <- struct{}{}
+
+							return
+						}
+					} else {
+						failures = 0
+					}
+				}
+			}
+		}()
 		for {
-			if sleepOrDone(doneChan, 250*time.Millisecond) {
+			if sleepOrDone(ctx.Done(), 250*time.Millisecond) {
 				return
 			}
-			if stdout == nil {
-				stdout, err = os.Open(stdoutFilename)
-				if err != nil {
-					continue
-				}
-			}
-			for err == nil {
-				var newPos int64
-				newPos, err = stdout.Seek(filePos, 0)
-				if err != nil {
-					logger.Warning("Seek error processing stdout: %s\n", err)
-
+			for {
+				select {
+				case <-ctx.Done():
 					return
-				}
-				if newPos != filePos {
-					logger.Warning("Seek error processing stdout\n")
-
+				case <-statChan:
 					return
+				default:
+					var newPos int64
+					newPos, err = stdout.Seek(filePos, 0)
+					if err != nil {
+						logger.Warning("Seek error processing stdout: %s\n", err)
+
+						return
+					}
+					if newPos != filePos {
+						logger.Warning("Seek error processing stdout\n")
+
+						return
+					}
+					var n int
+					buf := make([]byte, utils.NormalBufferSize)
+					n, err = stdout.Read(buf)
+					if n > 0 {
+						filePos += int64(n)
+						select {
+						case <-ctx.Done():
+							return
+						case resultChan <- buf[:n]:
+						}
+					}
 				}
-				var n int
-				buf := make([]byte, utils.NormalBufferSize)
-				n, err = stdout.Read(buf)
-				if n > 0 {
-					filePos += int64(n)
-					resultChan <- buf[:n]
+				if err != nil {
+					break
 				}
 			}
 			if err == io.EOF {
-				err = stdout.Close()
-				if err != nil {
-					logger.Error("Error closing stdout\n")
-
-					return
-				}
-				stdout = nil
 				stdoutSize := stdoutSize(unitdir)
 				if IsComplete(unit.Status().State) && stdoutSize >= unit.Status().StdoutSize {
-					close(resultChan)
 					logger.Info("Stdout complete - closing channel for: %s \n", unitID)
 
 					return
 				}
-
-				continue
 			} else if err != nil {
 				logger.Error("Error reading stdout: %s\n", err)
 

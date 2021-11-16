@@ -12,18 +12,17 @@ import (
 
 // PacketConn implements the net.PacketConn interface via the Receptor network.
 type PacketConn struct {
-	s                  *Netceptor
-	localService       string
-	recvChan           chan *MessageData
-	readDeadline       time.Time
-	advertise          bool
-	adTags             map[string]string
-	connType           byte
-	hopsToLive         byte
-	unreachableMsgChan chan interface{}
-	unreachableSubs    *utils.Broker
-	context            context.Context
-	cancel             context.CancelFunc
+	s               *Netceptor
+	localService    string
+	recvChan        chan *MessageData
+	readDeadline    time.Time
+	advertise       bool
+	adTags          map[string]string
+	connType        byte
+	hopsToLive      byte
+	unreachableSubs *utils.Broker
+	context         context.Context
+	cancel          context.CancelFunc
 }
 
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
@@ -76,50 +75,59 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 func (pc *PacketConn) startUnreachable() {
 	pc.context, pc.cancel = context.WithCancel(pc.s.context)
 	pc.unreachableSubs = utils.NewBroker(pc.context, reflect.TypeOf(UnreachableNotification{}))
-	pc.unreachableMsgChan = pc.s.unreachableBroker.Subscribe()
+	iChan := pc.s.unreachableBroker.Subscribe()
 	go func() {
-		for {
-			select {
-			case <-pc.context.Done():
-				return
-			case msgIf := <-pc.unreachableMsgChan:
-				msg, ok := msgIf.(UnreachableNotification)
-				if !ok {
-					continue
-				}
-				FromNode := msg.FromNode
-				FromService := msg.FromService
-				if FromNode == pc.s.nodeID && FromService == pc.localService {
-					_ = pc.unreachableSubs.Publish(msg)
-				}
+		<-pc.context.Done()
+		pc.s.unreachableBroker.Unsubscribe(iChan)
+	}()
+	go func() {
+		for msgIf := range iChan {
+			msg, ok := msgIf.(UnreachableNotification)
+			if !ok {
+				continue
+			}
+			FromNode := msg.FromNode
+			FromService := msg.FromService
+			if FromNode == pc.s.nodeID && FromService == pc.localService {
+				_ = pc.unreachableSubs.Publish(msg)
 			}
 		}
 	}()
 }
 
 // SubscribeUnreachable subscribes for unreachable messages relevant to this PacketConn.
-func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
+func (pc *PacketConn) SubscribeUnreachable(doneChan chan struct{}) chan UnreachableNotification {
 	iChan := pc.unreachableSubs.Subscribe()
+	if iChan == nil {
+		return nil
+	}
 	uChan := make(chan UnreachableNotification)
+	// goroutine 1
+	// if doneChan is selected, this will unsubscribe the channel, which should
+	// eventually close out the go routine 2
+	go func() {
+		select {
+		case <-doneChan:
+			pc.unreachableSubs.Unsubscribe(iChan)
+		case <-pc.context.Done():
+		}
+	}()
+	// goroutine 2
+	// this will exit when either the broker closes iChan, or the broker
+	// returns via pc.context.Done()
 	go func() {
 		for {
-			select {
-			case msgIf, ok := <-iChan:
-				if !ok {
-					close(uChan)
-
-					return
-				}
-				msg, ok := msgIf.(UnreachableNotification)
-				if !ok {
-					continue
-				}
-				uChan <- msg
-			case <-pc.context.Done():
+			msgIf, ok := <-iChan
+			if !ok {
 				close(uChan)
 
 				return
 			}
+			msg, ok := msgIf.(UnreachableNotification)
+			if !ok {
+				continue
+			}
+			uChan <- msg
 		}
 	}()
 
@@ -130,7 +138,11 @@ func (pc *PacketConn) SubscribeUnreachable() chan UnreachableNotification {
 func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	var m *MessageData
 	if pc.readDeadline.IsZero() {
-		m = <-pc.recvChan
+		select {
+		case m = <-pc.recvChan:
+		case <-pc.context.Done():
+			return 0, nil, fmt.Errorf("connection context closed")
+		}
 	} else {
 		select {
 		case m = <-pc.recvChan:

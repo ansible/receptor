@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 )
 
 // Broker code adapted from https://stackoverflow.com/questions/36417199/how-to-broadcast-message-using-channel
@@ -23,7 +24,7 @@ func NewBroker(ctx context.Context, msgType reflect.Type) *Broker {
 	b := &Broker{
 		ctx:       ctx,
 		msgType:   msgType,
-		publishCh: make(chan interface{}, 1),
+		publishCh: make(chan interface{}),
 		subCh:     make(chan chan interface{}),
 		unsubCh:   make(chan chan interface{}),
 	}
@@ -47,40 +48,41 @@ func (b *Broker) start() {
 			subs[msgCh] = struct{}{}
 		case msgCh := <-b.unsubCh:
 			delete(subs, msgCh)
+			close(msgCh)
 		case msg := <-b.publishCh:
+			wg := sync.WaitGroup{}
 			for msgCh := range subs {
+				wg.Add(1)
 				go func(msgCh chan interface{}) {
+					defer wg.Done()
 					select {
 					case msgCh <- msg:
 					case <-b.ctx.Done():
 					}
 				}(msgCh)
 			}
+			wg.Wait()
 		}
 	}
 }
 
 // Subscribe registers to receive messages from the broker.
 func (b *Broker) Subscribe() chan interface{} {
-	if b == nil || b.ctx == nil {
-		fmt.Printf("foo\n")
-	}
-	if b.ctx.Err() == nil {
-		msgCh := make(chan interface{}, 1)
-		b.subCh <- msgCh
-
+	msgCh := make(chan interface{})
+	select {
+	case <-b.ctx.Done():
+		return nil
+	case b.subCh <- msgCh:
 		return msgCh
 	}
-
-	return nil
 }
 
 // Unsubscribe de-registers a message receiver.
 func (b *Broker) Unsubscribe(msgCh chan interface{}) {
-	if b.ctx.Err() == nil {
-		b.unsubCh <- msgCh
+	select {
+	case <-b.ctx.Done():
+	case b.unsubCh <- msgCh:
 	}
-	close(msgCh)
 }
 
 // Publish sends a message to all subscribers.
@@ -88,8 +90,9 @@ func (b *Broker) Publish(msg interface{}) error {
 	if reflect.TypeOf(msg) != b.msgType {
 		return fmt.Errorf("messages to broker must be of type %s", b.msgType.String())
 	}
-	if b.ctx.Err() == nil {
-		b.publishCh <- msg
+	select {
+	case <-b.ctx.Done():
+	case b.publishCh <- msg:
 	}
 
 	return nil

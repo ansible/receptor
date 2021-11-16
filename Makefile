@@ -12,6 +12,7 @@ RELEASE := 1
 OFFICIAL := yes
 APPVER := $(VERSION)
 endif
+SKIP_KUBE=0
 
 # Container command can be docker or podman
 CONTAINERCMD ?= podman
@@ -84,8 +85,14 @@ else
 TESTCMD = -run $(RUNTEST)
 endif
 
+test_skip_kube: SKIP_KUBE=1
+test_skip_kube: test
+
 test:
-	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+	@export PATH=$(PATH):$(PWD); \
+		export SKIP_KUBE=$(SKIP_KUBE); \
+		echo "Testing with receptor binary from: `which receptor 2>/dev/null`"; \
+		go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
@@ -108,6 +115,11 @@ $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find re
 	@cd receptorctl && python3 setup.py bdist_wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
+
+# Build and install receptorctl into your python environment
+receptorctl_install: $(RECEPTORCTL_WHEEL)
+	pip uninstall -y receptorctl
+	pip install $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
 $(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')

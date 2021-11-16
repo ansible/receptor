@@ -195,13 +195,13 @@ func TestWork(t *testing.T) {
 
 			m, err := mesh.NewCLIMeshFromYaml(data, testName)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			nodes := m.Nodes()
@@ -210,7 +210,7 @@ func TestWork(t *testing.T) {
 				controller := receptorcontrol.New()
 				err = controller.Connect(nodes[k].ControlSocket())
 				if err != nil {
-					t.Fatal(err)
+					t.Fatal(err, m.Dir())
 				}
 				controllers[k] = controller
 			}
@@ -264,12 +264,12 @@ func TestWork(t *testing.T) {
 			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":"", "ttl":"10h"}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 
@@ -288,26 +288,26 @@ func TestWork(t *testing.T) {
 			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclientwrongCN","node":"node2","params":""}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkFailed(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 
@@ -326,26 +326,26 @@ func TestWork(t *testing.T) {
 			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":"","ttl":"5s"}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkTimedOut(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 
@@ -361,25 +361,25 @@ func TestWork(t *testing.T) {
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			_, err = controllers["node1"].WorkCancel(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkCancelled(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			workStatus, err := controllers["node1"].GetWorkStatus(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
 			if remoteUnitID == "" {
@@ -389,39 +389,39 @@ func TestWork(t *testing.T) {
 			nodes["node1"].WaitForShutdown()
 			err = nodes["node1"].Start()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].Close()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].Reconnect()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = assertFilesReleased(ctx, nodes["node3"].Dir(), "node3", remoteUnitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 
@@ -438,27 +438,27 @@ func TestWork(t *testing.T) {
 			nodes["node3"].WaitForShutdown()
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleepshort")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkPending(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = nodes["node3"].Start()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			// Wait for node3 to join the mesh again
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 
@@ -473,44 +473,44 @@ func TestWork(t *testing.T) {
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 1)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults[:1])
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			nodes["node2"].Shutdown()
 			nodes["node2"].WaitForShutdown()
 			nodes["node2"].Start()
 			// Wait for node2 to join the mesh again
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 		t.Run(testGroup+"/results on restarted node", func(t *testing.T) {
@@ -524,33 +524,33 @@ func TestWork(t *testing.T) {
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			nodes["node3"].Shutdown()
 			nodes["node3"].WaitForShutdown()
 			err = nodes["node3"].Start()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			// Wait for node3 to join the mesh again
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 		t.Run(testGroup+"/work submit and release to non-existent node", func(t *testing.T) {
@@ -566,45 +566,45 @@ func TestWork(t *testing.T) {
 			// node999 was never initialised
 			unitID, err := controllers["node1"].WorkSubmit("node999", "echosleeplong")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// wait for 10 seconds, and check if the work is in pending state
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkPending(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			nodes["node1"].Shutdown()
 			nodes["node1"].WaitForShutdown()
 			err = nodes["node1"].Start()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].Close()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 			err = controllers["node1"].Reconnect()
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// release the work on node1
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 		t.Run(testGroup+"/reload backends while streaming work results", func(t *testing.T) {
@@ -618,14 +618,14 @@ func TestWork(t *testing.T) {
 			// submit work from node 2 to node 3
 			unitID, err := controllers["node2"].WorkSubmit("node3", "echosleeplong50")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// wait for 10 seconds, and check if the work is in pending state
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node2"].AssertWorkPending(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// declare a new mesh with no connection between nodes
@@ -644,14 +644,14 @@ func TestWork(t *testing.T) {
 			// modify the existing mesh
 			err = mesh.ModifyCLIMeshFromYaml(modifiedData, *m)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// reload the entire mesh
 			for k := range controllers {
 				err = controllers[k].Reload()
 				if err != nil {
-					t.Fatal(err)
+					t.Fatal(err, m.Dir())
 				}
 			}
 
@@ -664,7 +664,7 @@ func TestWork(t *testing.T) {
 			// read the work status
 			workStatus, err := controllers["node2"].GetWorkStatus(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// modify the mesh to have connection again
@@ -690,34 +690,34 @@ func TestWork(t *testing.T) {
 
 			err = mesh.ModifyCLIMeshFromYaml(withConnectionData, *m)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// reload the entire mesh
 			for k := range controllers {
 				err = controllers[k].Reload()
 				if err != nil {
-					t.Fatal(err)
+					t.Fatal(err, m.Dir())
 				}
 			}
 
 			// wait for mesh to become ready again
-			ctx, _ = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// ping should be successful in the mesh with connections
 			_, err = controllers["node1"].Ping("node3")
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
-			ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node2"].AssertWorkSizeIncreasing(ctx, unitID, workStatus.StdoutSize)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			// it takes some time for the streaming to start again
@@ -725,7 +725,7 @@ func TestWork(t *testing.T) {
 
 			newWorkStatus, err := controllers["node2"].GetWorkStatus(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 
 			if newWorkStatus.StdoutSize <= workStatus.StdoutSize {
@@ -735,12 +735,12 @@ func TestWork(t *testing.T) {
 			// cancel the work so that it doesnt run after the test ends
 			_, err = controllers["node2"].WorkCancel(unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node2"].AssertWorkCancelled(ctx, unitID)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(err, m.Dir())
 			}
 		})
 	}
@@ -770,13 +770,13 @@ func TestRuntimeParams(t *testing.T) {
 
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	nodes := m.Nodes()
 	controllers := make(map[string]*receptorcontrol.ReceptorControl)
@@ -784,21 +784,21 @@ func TestRuntimeParams(t *testing.T) {
 	controllers["node0"] = receptorcontrol.New()
 	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
 	unitID, err := controllers["node0"].WorkSubmitJSON(command)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
 	err = controllers["node0"].AssertWorkResults(unitID, []byte("it worked!"))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 }
 
@@ -837,12 +837,12 @@ func TestKubeRuntimeParams(t *testing.T) {
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	nodes := m.Nodes()
 	controllers := make(map[string]*receptorcontrol.ReceptorControl)
@@ -850,20 +850,20 @@ func TestKubeRuntimeParams(t *testing.T) {
 	controllers["node0"] = receptorcontrol.New()
 	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_pod": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
 	unitID, err := controllers["node0"].WorkSubmitJSON(command)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	err = controllers["node0"].AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 }
 
@@ -891,13 +891,13 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	nodes := m.Nodes()
 	controllers := make(map[string]*receptorcontrol.ReceptorControl)
@@ -905,7 +905,7 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	controllers["node0"] = receptorcontrol.New()
 	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
 	_, err = controllers["node0"].WorkSubmitJSON(command)
@@ -941,13 +941,13 @@ func TestKubeContainerFailure(t *testing.T) {
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	nodes := m.Nodes()
 	controllers := make(map[string]*receptorcontrol.ReceptorControl)
@@ -955,14 +955,14 @@ func TestKubeContainerFailure(t *testing.T) {
 	controllers["node0"] = receptorcontrol.New()
 	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	job := `{"command":"work","subcommand":"submit","worktype":"kubejob","node":"node0"}`
 	unitID, err := controllers["node0"].WorkSubmitJSON(job)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
-	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 	err = controllers["node0"].AssertWorkFailed(ctx, unitID)
 	if err != nil {
 		t.Fatal("Expected work to fail but it succeeded")
@@ -1030,13 +1030,13 @@ func TestSignedWorkVerification(t *testing.T) {
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 	nodes := m.Nodes()
 	controllers := make(map[string]*receptorcontrol.ReceptorControl)
@@ -1044,18 +1044,18 @@ func TestSignedWorkVerification(t *testing.T) {
 	controllers["node0"] = receptorcontrol.New()
 	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
 	job := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node1", "signwork":"true"}`
 	unitID, err := controllers["node0"].WorkSubmitJSON(job)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
-	ctx, _ = context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, m.Dir())
 	}
 
 	// node2 has the wrong public key to verify work signatures, so the work submission should fail

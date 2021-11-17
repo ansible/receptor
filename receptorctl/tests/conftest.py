@@ -1,15 +1,12 @@
-import sys
-
-sys.path.append("../receptorctl")
-
-import receptorctl
-
-import pytest
 import subprocess
 import os
 import shutil
 import time
 import json
+
+import pytest
+import receptorctl
+
 from click.testing import CliRunner
 
 tmpDir = "/tmp/receptorctltest"
@@ -254,6 +251,8 @@ def receptor_mesh(
     node2.kill()
     node1.wait()
     node2.wait()
+    node3.kill()
+    node3.wait()
 
 
 @pytest.fixture(scope="function")

@@ -5,7 +5,7 @@
     port: 11111
 
 - control-service:
-    filename: /tmp/receptorctltest/node1.sock
+    filename: /tmp/receptorctltest/mesh1/node1.sock
 
 - tcp-server:
     port: 11112
@@ -14,10 +14,10 @@
 
 - tls-server:
     name: tlsserver
-    key: /tmp/receptorctltest/server.key
-    cert: /tmp/receptorctltest/server.crt
+    key: /tmp/receptorctltest/mesh1/server.key
+    cert: /tmp/receptorctltest/mesh1/server.crt
     requireclientcert: true
-    clientcas: /tmp/receptorctltest/ca.crt
+    clientcas: /tmp/receptorctltest/mesh1/ca.crt
 
 - control-service:
     service: ctltls

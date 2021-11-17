@@ -122,7 +122,8 @@ class ReceptorControl:
                     try:
                         if protocol == "tls":
                             context = ssl.create_default_context(
-                                purpose=ssl.Purpose.SERVER_AUTH, cafile=self._rootcas
+                                purpose=ssl.Purpose.SERVER_AUTH,
+                                cafile=self._rootcas,
                             )
                             if self._key and self._cert:
                                 context.load_cert_chain(

@@ -6,7 +6,7 @@ from receptorctl import cli as commands
 import pytest
 
 
-@pytest.mark.usefixtures("receptor_mesh")
+@pytest.mark.usefixtures("receptor_mesh_mesh1")
 class TestCommands:
     def test_cmd_status(self, invoke_as_json):
         result, json_output = invoke_as_json(commands.status, [])

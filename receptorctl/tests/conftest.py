@@ -89,7 +89,7 @@ def receptor_mesh(base_tmp_dir):
 
             # Check if openssl binary is on the path
             try:
-                subprocess.check_output(["openssl2", "version"])
+                subprocess.check_output(["openssl", "version"])
             except FileNotFoundError:
                 raise Exception(
                     "openssl binary not found\n"

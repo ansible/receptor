@@ -393,9 +393,6 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		status := rw.Status()
 		diskStdoutSize := stdoutSize(rw.UnitDir())
 		remoteStdoutSize := status.StdoutSize
-		if status.State == WorkStateFailed {
-			return
-		}
 		if IsComplete(status.State) && diskStdoutSize >= remoteStdoutSize {
 			return
 		} else if diskStdoutSize < remoteStdoutSize {

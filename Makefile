@@ -61,6 +61,9 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 lint:
 	@golint cmd/... pkg/... example/...
 
+receptorctl-lint:
+	@cd receptorctl && tox -e lint
+
 format:
 	@find cmd/ pkg/ -type f -name '*.go' -exec go fmt {} \;
 
@@ -86,6 +89,9 @@ endif
 
 test:
 	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+
+receptorctl-test:
+	@cd receptorctl && tox -e py3
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
@@ -130,16 +136,6 @@ container: .container-flag-$(VERSION)
 tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
-
-receptorctl-test-venv/bin/pytest:
-	virtualenv receptorctl-test-venv -p python3
-	receptorctl-test-venv/bin/pip install -e receptorctl
-	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
-
-receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
-	cd receptorctl && \
-		PATH=$(PATH):$(PWD) \
-		../receptorctl-test-venv/bin/pytest tests/
 
 clean:
 	@rm -fv receptor receptor.exe receptor.app net

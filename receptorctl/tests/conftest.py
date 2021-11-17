@@ -1,15 +1,12 @@
-import sys
-
-sys.path.append("../receptorctl")
-
-import receptorctl
-
-import pytest
 import subprocess
 import os
 import shutil
 import time
 import json
+
+import pytest
+import receptorctl
+
 from click.testing import CliRunner
 
 tmpDir = "/tmp/receptorctltest"
@@ -25,7 +22,7 @@ def create_empty_dir():
         # Check if openssl binary is on the path
         try:
             subprocess.check_output(["openssl", "version"])
-        except:
+        except Exception:
             raise Exception(
                 "openssl binary not found\n" 'Consider run "sudo dnf install openssl"'
             )
@@ -203,7 +200,6 @@ def default_receptor_controller_tcp(default_socket_tcp):
 
 @pytest.fixture(scope="class")
 def default_receptor_controller_tcp_tls(default_socket_tcp, certificate_files):
-    socketaddress = default_socket_tcp
     rootcas = certificate_files["caCrtPath"]
     key = certificate_files["clientKeyPath"]
     cert = certificate_files["clientCrtPath"]
@@ -255,6 +251,8 @@ def receptor_mesh(
     node2.kill()
     node1.wait()
     node2.wait()
+    node3.kill()
+    node3.wait()
 
 
 @pytest.fixture(scope="function")

@@ -1,9 +1,4 @@
-import sys
-
-sys.path.append("../receptorctl")
-
 from receptorctl import cli as commands
-import receptorctl
 
 # The goal is to write tests following the click documentation:
 # https://click.palletsprojects.com/en/8.0.x/testing/

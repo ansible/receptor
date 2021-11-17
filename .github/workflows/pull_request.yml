@@ -6,8 +6,8 @@ on:
   push:
 
 jobs:
-  lint:
-    name: lint
+  lint-receptor:
+    name: lint-receptor
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,6 +17,21 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
+  lint-receptorctl:
+    name: lint-receptorctl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup up python
+        uses: actions/setup-python@v2
+
+      - name: Install tox
+        run:  sudo apt-get install tox
+
+      - name: Run receptorctl linters
+        run: make receptorctl-lint
   build:
     name: build
     runs-on: ubuntu-latest
@@ -50,10 +65,19 @@ jobs:
     name: test
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.15
+
+      - name: Setup up python
+        uses: actions/setup-python@v2
+
+      - name: Install tox (for python tests)
+        run:  sudo apt-get install tox
 
       - uses: actions/cache@v2
         with:
@@ -63,15 +87,6 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-
-      - name: Setup up python
-        uses: actions/setup-python@v2
-
-      - name: Install python packages
-        run:  sudo apt-get install python3-wheel python3-virtualenv
-
-      - name: Checkout
-        uses: actions/checkout@v2
 
       - name: install receptor
         run: go build -o $GOROOT/bin/receptor ./cmd/receptor-cl
@@ -85,11 +100,11 @@ jobs:
       - name: Interact with the cluster
         run: kubectl get nodes
 
-      - name: test target
-        run: make test
+      - name: Run receptorctl tests
+        run: make receptorctl-test
 
-      - name: receptorctl-tests target
-        run: make receptorctl-tests
+      - name: Run receptor tests
+        run: make test
 
       - name: Remove sockets for artifacting
         if: ${{ failure() }}

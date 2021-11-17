@@ -1,4 +1,3 @@
-import sys
 import os
 import re
 import io
@@ -7,7 +6,6 @@ import shutil
 import json
 import ssl
 import yaml
-import pkg_resources
 
 
 def shutdown_write(sock):
@@ -208,7 +206,7 @@ class ReceptorControl:
                         try:
                             with open(fname, "r") as f:
                                 v_contents = f.read()
-                        except:
+                        except Exception:
                             raise OSError("could not read from file {}".format(fname))
                         commandMap[k] = v_contents
                     else:

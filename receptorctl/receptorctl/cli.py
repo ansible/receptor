@@ -19,7 +19,7 @@ class IgnoreRequiredWithHelp(click.Group):
     def parse_args(self, ctx, args):
         try:
             return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
-        except click.MissingParameter as exc:
+        except click.MissingParameter:
             if "--help" not in args:
                 raise
 
@@ -36,7 +36,7 @@ class IgnoreRequiredWithHelp(click.Group):
     envvar="RECEPTORCTL_SOCKET",
     required=True,
     show_envvar=True,
-    help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)",
+    help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)",  # noqa: E501
 )
 @click.option(
     "--config",
@@ -109,9 +109,9 @@ def status(ctx, printjson):
     connections = status.pop("Connections", None)
     if connections:
         for conn in connections:
-            l = len(conn["NodeID"])
-            if l > longest_node:
-                longest_node = l
+            length = len(conn["NodeID"])
+            if length > longest_node:
+                longest_node = length
 
     costs = status.pop("KnownConnectionCosts", None)
     if costs:
@@ -121,9 +121,9 @@ def status(ctx, printjson):
 
     if connections:
         for conn in connections:
-            l = len(conn["NodeID"])
-            if l > longest_node:
-                longest_node = l
+            length = len(conn["NodeID"])
+            if length > longest_node:
+                longest_node = length
         print()
         print(f"{'Connection':<{longest_node}} Cost")
         for conn in connections:
@@ -159,7 +159,7 @@ def status(ctx, printjson):
                 conn_type = "StreamTLS"
             last_seen = f"{time:%Y-%m-%d %H:%M:%S}"
             print(
-                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}"
+                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}"  # noqa: E501
             )
 
     def print_worktypes(header, isSecure):
@@ -230,9 +230,9 @@ def ping(ctx, node, count, delay):
 @click.pass_context
 def reload(ctx):
     rc = get_rc(ctx)
-    results = rc.simple_command(f"reload")
+    results = rc.simple_command("reload")
     if "Success" in results and results["Success"]:
-        print(f"Reload successful")
+        print("Reload successful")
     else:
         print(f"Error: {results['Error']}")
         if "ERRORCODE 3" in results["Error"]:

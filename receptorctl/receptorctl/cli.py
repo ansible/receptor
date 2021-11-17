@@ -475,7 +475,7 @@ def submit(
                 payload_data = open(payload, "rb")
             except Exception as e:
                 print_error(f"Failed to load payload file: {e}")
-                sys_exit(1)
+                sys.exit(1)
     unitid = None
     try:
         params = dict(s.split("=", 1) for s in param)

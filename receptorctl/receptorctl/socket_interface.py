@@ -9,14 +9,25 @@ import ssl
 import yaml
 import pkg_resources
 
+
 def shutdown_write(sock):
     if isinstance(sock, ssl.SSLSocket):
         super(ssl.SSLSocket, sock).shutdown(socket.SHUT_WR)
     else:
         sock.shutdown(socket.SHUT_WR)
 
+
 class ReceptorControl:
-    def __init__(self, socketaddress, config=None, tlsclient=None, rootcas=None, key=None, cert=None, insecureskipverify=False):
+    def __init__(
+        self,
+        socketaddress,
+        config=None,
+        tlsclient=None,
+        rootcas=None,
+        key=None,
+        cert=None,
+        insecureskipverify=False,
+    ):
         if config and any((rootcas, key, cert)):
             raise RuntimeError("Cannot specify both config and rootcas, key, cert")
         if config and not tlsclient:
@@ -63,7 +74,9 @@ class ReceptorControl:
                     self._rootcas = key.get("rootcas", self._rootcas)
                     self._key = key.get("key", self._key)
                     self._cert = key.get("cert", self._cert)
-                    self._insecureskipverify = key.get("insecureskipverify", self._insecureskipverify)
+                    self._insecureskipverify = key.get(
+                        "insecureskipverify", self._insecureskipverify
+                    )
                     break
 
     def simple_command(self, command):
@@ -74,7 +87,9 @@ class ReceptorControl:
     def connect(self):
         if self._socket is not None:
             return
-        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-.:]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(self._socketaddress)
+        m = re.compile(
+            "(tcp|tls):(//)?([a-zA-Z0-9-.:]+):([0-9]+)|(unix:(//)?)?([^:]+)"
+        ).fullmatch(self._socketaddress)
         if m:
             unixsocket = m[7]
             host = m[3]
@@ -86,12 +101,19 @@ class ReceptorControl:
                     raise ValueError(f"Socket path does not exist: {path}")
                 self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self._socket.connect(path)
-                self._sockfile = self._socket.makefile('rwb')
+                self._sockfile = self._socket.makefile("rwb")
                 self.handshake()
                 return
             elif host and port:
                 self._socket = None
-                addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)
+                addrs = socket.getaddrinfo(
+                    host,
+                    port,
+                    socket.AF_UNSPEC,
+                    socket.SOCK_STREAM,
+                    0,
+                    socket.AI_PASSIVE,
+                )
                 for addr in addrs:
                     family, type, proto, canonname, sockaddr = addr
                     try:
@@ -101,18 +123,24 @@ class ReceptorControl:
                         continue
                     try:
                         if protocol == "tls":
-                            context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=self._rootcas)
+                            context = ssl.create_default_context(
+                                purpose=ssl.Purpose.SERVER_AUTH, cafile=self._rootcas
+                            )
                             if self._key and self._cert:
-                                context.load_cert_chain(certfile=self._cert, keyfile=self._key)
+                                context.load_cert_chain(
+                                    certfile=self._cert, keyfile=self._key
+                                )
                             if self._insecureskipverify:
                                 context.check_hostname = False
-                            self._socket = context.wrap_socket(self._socket, server_hostname=host)
+                            self._socket = context.wrap_socket(
+                                self._socket, server_hostname=host
+                            )
                         self._socket.connect(sockaddr)
                     except OSError:
                         self._socket.close()
                         self._socket = None
                         continue
-                    self._sockfile = self._socket.makefile('rwb')
+                    self._sockfile = self._socket.makefile("rwb")
                     break
                 if self._socket is None:
                     raise ValueError(f"Could not connect to host {host} port {port}")
@@ -140,7 +168,16 @@ class ReceptorControl:
         if not str.startswith(text, "Connecting"):
             raise RuntimeError(text)
 
-    def submit_work(self, worktype, payload, node=None, tlsclient=None, ttl=None, signwork=False, params=None):
+    def submit_work(
+        self,
+        worktype,
+        payload,
+        node=None,
+        tlsclient=None,
+        ttl=None,
+        signwork=False,
+        params=None,
+    ):
         self.connect()
         if node is None:
             node = "localhost"
@@ -153,23 +190,23 @@ class ReceptorControl:
         }
 
         if tlsclient:
-            commandMap['tlsclient'] = tlsclient
+            commandMap["tlsclient"] = tlsclient
 
         if ttl:
-            commandMap['ttl'] = ttl
+            commandMap["ttl"] = ttl
 
         if signwork:
-            commandMap['signwork'] = "true"
+            commandMap["signwork"] = "true"
 
         if params:
-            for k,v in params.items():
+            for k, v in params.items():
                 if k not in commandMap:
-                    if v[0] == '@' and v[:2] != '@@':
+                    if v[0] == "@" and v[:2] != "@@":
                         fname = v[1:]
                         if not os.path.exists(fname):
                             raise FileNotFoundError("{} does not exist".format(fname))
                         try:
-                            with open(fname, 'r') as f:
+                            with open(fname, "r") as f:
                                 v_contents = f.read()
                         except:
                             raise OSError("could not read from file {}".format(fname))
@@ -182,7 +219,9 @@ class ReceptorControl:
         command = f"{commandJson}\n"
         self.writestr(command)
         text = self.readstr()
-        m = re.compile("Work unit created with ID (.+). Send stdin data and EOF.").fullmatch(text)
+        m = re.compile(
+            "Work unit created with ID (.+). Send stdin data and EOF."
+        ).fullmatch(text)
         if not m:
             errmsg = "Failed to start work unit"
             if str.startswith(text, "ERROR: "):

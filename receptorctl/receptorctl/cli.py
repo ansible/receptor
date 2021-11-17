@@ -27,17 +27,21 @@ class IgnoreRequiredWithHelp(click.Group):
                 param.required = False
             return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
 
+
 def print_json(json_data):
     click.echo(json.dumps(json_data, indent=4, sort_keys=True))
+
 
 def print_message(message="", nl=True):
     click.echo(message, nl=nl)
 
+
 def print_warning(message, nl=True):
-    click.echo(click.style(f"Warning: {message}", fg='magenta'), err=True, nl=nl)
+    click.echo(click.style(f"Warning: {message}", fg="magenta"), err=True, nl=nl)
+
 
 def print_error(message, nl=True):
-    click.echo(click.style(f"ERROR: {message}", fg='red'), err=True, nl=nl)
+    click.echo(click.style(f"ERROR: {message}", fg="red"), err=True, nl=nl)
 
 
 @click.group(cls=IgnoreRequiredWithHelp)
@@ -333,7 +337,9 @@ def version(ctx):
     delim = ""
     if receptorVersion != receptorctlVersion:
         delim = "\t"
-        print_warning("receptorctl and receptor are different versions, they may not be compatible")
+        print_warning(
+            "receptorctl and receptor are different versions, they may not be compatible"
+        )
     print_message(f"{delim}receptorctl  {receptorctlVersion}")
     print_message(f"{delim}receptor     {receptorVersion}")
 
@@ -451,7 +457,9 @@ def submit(
         print_error("Must provide one of --payload, --no-payload or --payload-literal.")
         sys.exit(1)
     if pcmds > 1:
-        print_error("Cannot provide more than one of --payload, --no-payload and --payload-literal.")
+        print_error(
+            "Cannot provide more than one of --payload, --no-payload and --payload-literal."
+        )
         sys.exit(1)
     if rm and not follow:
         print_warning("using --rm without --follow. Unit results will never be seen.")
@@ -464,7 +472,7 @@ def submit(
             payload_data = sys.stdin.buffer
         else:
             try:
-                payload_data = open(payload, 'rb')
+                payload_data = open(payload, "rb")
             except Exception as e:
                 print_error(f"Failed to load payload file: {e}")
                 sys_exit(1)

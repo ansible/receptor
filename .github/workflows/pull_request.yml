@@ -6,8 +6,8 @@ on:
   push:
 
 jobs:
-  lint:
-    name: lint
+  lint-receptor:
+    name: lint-receptor
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,6 +17,21 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
+  lint-receptorctl:
+    name: lint-receptorctl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup up python
+        uses: actions/setup-python@v2
+
+      - name: Install tox
+        run:  sudo apt-get install tox
+
+      - name: Run receptorctl linters
+        run: make receptorctl-lint
   build:
     name: build
     runs-on: ubuntu-latest

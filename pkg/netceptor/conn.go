@@ -20,6 +20,15 @@ import (
 	"github.com/lucas-clemente/quic-go"
 )
 
+// MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
+// This value is set on both Dial and Listen connections as the quic library would take the smallest of either connection.
+var MaxIdleTimeoutForQuicConnections = 30 * time.Second
+
+// KeepAliveForQuicConnections is variablized to enable testing of the timeout.
+// If you are doing a heartbeat your connection wont timeout without severing the connection i.e. firewall.
+// Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
+var KeepAliveForQuicConnections = true
+
 type acceptResult struct {
 	conn net.Conn
 	err  error
@@ -79,7 +88,10 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
-	ql, err := quic.Listen(pc, tlscfg, nil)
+	cfg := &quic.Config{
+		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
+	}
+	ql, err := quic.Listen(pc, tlscfg, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +293,8 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
 		HandshakeTimeout: 15 * time.Second,
-		KeepAlive:        true,
+		MaxIdleTimeout:   MaxIdleTimeoutForQuicConnections,
+		KeepAlive:        KeepAliveForQuicConnections,
 	}
 	if tlscfg == nil {
 		tlscfg = generateClientTLSConfig()

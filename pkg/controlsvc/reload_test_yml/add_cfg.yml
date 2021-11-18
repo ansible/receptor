@@ -18,7 +18,7 @@
     command: bash
     params: "-c \"echo hello\""
 
-- work-command: # not reloadable
+- work-command: # added, not reloadable
     workType: hello2
     command: bash
     params: "-c \"echo hello2\""

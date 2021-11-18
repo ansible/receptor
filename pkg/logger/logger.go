@@ -143,8 +143,25 @@ func (cfg traceCfg) Prepare() error {
 	return nil
 }
 
-func init() {
+func (cfg loglevelCfg) ReloadLogger() error {
+	return cfg.Init()
+}
+
+func InitLogger() {
 	logLevel = InfoLevel
+}
+
+func (cfg loglevelCfg) PreReload() error {
+	_, err := GetLogLevelByName(cfg.Level)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func init() {
+	InitLogger()
 	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)

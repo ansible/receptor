@@ -356,11 +356,11 @@ func (cfg udpListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg udpDialerCfg) Reload() error {
+func (cfg udpDialerCfg) ReloadBackend() error {
 	return cfg.Run()
 }
 
-func (cfg udpListenerCfg) Reload() error {
+func (cfg udpListenerCfg) ReloadBackend() error {
 	return cfg.Run()
 }
 

@@ -324,11 +324,11 @@ func (cfg tcpListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg tcpDialerCfg) Reload() error {
+func (cfg tcpDialerCfg) ReloadBackend() error {
 	return cfg.Run()
 }
 
-func (cfg tcpListenerCfg) Reload() error {
+func (cfg tcpListenerCfg) ReloadBackend() error {
 	return cfg.Run()
 }
 

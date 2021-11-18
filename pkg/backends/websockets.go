@@ -355,11 +355,11 @@ func (cfg websocketListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg websocketDialerCfg) Reload() error {
+func (cfg websocketDialerCfg) ReloadBackend() error {
 	return cfg.Run()
 }
 
-func (cfg websocketListenerCfg) Reload() error {
+func (cfg websocketListenerCfg) ReloadBackend() error {
 	return cfg.Run()
 }
 

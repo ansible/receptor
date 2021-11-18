@@ -201,7 +201,7 @@ def status(ctx, printjson):
                 print_message()
                 print_message(f"{'Node':<{longest_node}}  {header}")
                 printOnce = False
-            print_message(f"{ad['NodeID']:<{longest_node}} ", end="")
+            print_message(f"{ad['NodeID']:<{longest_node}} ", nl=False)
             print_message(workTypes)
 
     if ads:
@@ -502,8 +502,8 @@ def submit(
         if follow:
             ctx.invoke(results, unit_id=unitid)
         else:
-            print_message("Result: ", result)
-            print_message("Unit ID:", unitid)
+            print_message(f"Result: {result}")
+            print_message(f"Unit ID: {unitid}")
     except Exception as e:
         print_error(e)
         sys.exit(101)

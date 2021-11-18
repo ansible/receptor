@@ -356,7 +356,8 @@ def invoke(receptor_control_args):
                     arg_list.append(str(v))
             return arg_list
 
-        runner = CliRunner()
+        # Since we may log errors/warnings on stderr we want to split stdout and stderr
+        runner = CliRunner(mix_stderr=False)
 
         out = runner.invoke(
             receptorctl.cli.cli,
@@ -381,7 +382,8 @@ def invoke_as_json(invoke):
         """
         result = invoke(command, ["--json"] + args)
         try:
-            json_output = json.loads(result.output)
+            # JSON data should only be on stdout
+            json_output = json.loads(result.stdout)
         except json.decoder.JSONDecodeError:
             pytest.fail("The command is not in json format")
         return result, json_output

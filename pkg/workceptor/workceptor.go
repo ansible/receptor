@@ -19,7 +19,6 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/randstr"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -134,7 +133,7 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 	}
 	var ident string
 	for {
-		ident = randstr.RandomString(8)
+		ident = utils.RandomString(8)
 		_, ok := w.activeUnits[ident]
 		if !ok {
 			unitdir := path.Join(w.dataDir, ident)

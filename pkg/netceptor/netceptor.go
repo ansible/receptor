@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
-	"github.com/ansible/receptor/pkg/randstr"
 	"github.com/ansible/receptor/pkg/tickrunner"
 	"github.com/ansible/receptor/pkg/utils"
 	priorityQueue "github.com/jupp0r/go-priority-queue"
@@ -1197,7 +1196,7 @@ func (s *Netceptor) getEphemeralService() string {
 	s.listenerLock.RLock()
 	defer s.listenerLock.RUnlock()
 	for {
-		service := randstr.RandomString(ServiceSizeinBytes)
+		service := utils.RandomString(ServiceSizeinBytes)
 		_, ok := s.reservedServices[service]
 		if ok {
 			continue
@@ -1245,7 +1244,7 @@ func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate 
 	s.connLock.RUnlock()
 	update := &routingUpdate{
 		NodeID:             s.nodeID,
-		UpdateID:           randstr.RandomString(8),
+		UpdateID:           utils.RandomString(8),
 		UpdateEpoch:        s.epoch,
 		UpdateSequence:     s.sequence,
 		Connections:        conns,

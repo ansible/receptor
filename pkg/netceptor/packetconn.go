@@ -28,7 +28,7 @@ type PacketConn struct {
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
-	if len(service) > 8 {
+	if len(service) > ServiceSizeinBytes {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
 	if service == "" {

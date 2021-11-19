@@ -42,6 +42,9 @@ const defaultMaxForwardingHops = 30
 // defaultMaxConnectionIdleTime is the maximum time a connection can go without data before we consider it failed.
 const defaultMaxConnectionIdleTime = 2*defaultRouteUpdateTime + 1*time.Second
 
+// The size of bytes in a service name.
+const ServiceSizeinBytes = 8
+
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function.
 var MainInstance *Netceptor
 
@@ -1095,15 +1098,15 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*MessageData, error) {
 	if err != nil {
 		return nil, err
 	}
-	fromService := stringFromFixedLenBytes(data[20:28])
-	toService := stringFromFixedLenBytes(data[28:36])
+	fromService := stringFromFixedLenBytes(data[20:(20 + ServiceSizeinBytes)])
+	toService := stringFromFixedLenBytes(data[(20 + ServiceSizeinBytes):(20 + (2 * ServiceSizeinBytes))])
 	md := &MessageData{
 		FromNode:    fromNode,
 		FromService: fromService,
 		ToNode:      toNode,
 		ToService:   toService,
 		HopsToLive:  data[1],
-		Data:        data[36:],
+		Data:        data[(20 + (2 * ServiceSizeinBytes)):],
 	}
 
 	return md, nil
@@ -1111,14 +1114,14 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*MessageData, error) {
 
 // Translates an outgoing message from a MessageData object to wire protocol.
 func (s *Netceptor) translateDataFromMessage(msg *MessageData) ([]byte, error) {
-	data := make([]byte, 36+len(msg.Data))
+	data := make([]byte, 20+(ServiceSizeinBytes*2)+len(msg.Data))
 	data[0] = MsgTypeData
 	data[1] = msg.HopsToLive
 	binary.BigEndian.PutUint64(data[4:12], s.addNameHash(msg.FromNode))
 	binary.BigEndian.PutUint64(data[12:20], s.addNameHash(msg.ToNode))
-	copy(data[20:28], fixedLenBytesFromString(msg.FromService, 8))
-	copy(data[28:36], fixedLenBytesFromString(msg.ToService, 8))
-	copy(data[36:], msg.Data)
+	copy(data[20:(20+ServiceSizeinBytes)], fixedLenBytesFromString(msg.FromService, ServiceSizeinBytes))
+	copy(data[(20+ServiceSizeinBytes):(20+(2*ServiceSizeinBytes))], fixedLenBytesFromString(msg.ToService, ServiceSizeinBytes))
+	copy(data[(20+(2*ServiceSizeinBytes)):], msg.Data)
 
 	return data, nil
 }
@@ -1164,7 +1167,7 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 
 // Generates and sends a message over the Receptor network, specifying HopsToLive.
 func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
-	if len(fromService) > 8 || len(toService) > 8 {
+	if len(fromService) > ServiceSizeinBytes || len(toService) > ServiceSizeinBytes {
 		return fmt.Errorf("service name too long")
 	}
 	if strings.EqualFold(toNode, "localhost") {
@@ -1194,7 +1197,7 @@ func (s *Netceptor) getEphemeralService() string {
 	s.listenerLock.RLock()
 	defer s.listenerLock.RUnlock()
 	for {
-		service := randstr.RandomString(8)
+		service := randstr.RandomString(ServiceSizeinBytes)
 		_, ok := s.reservedServices[service]
 		if ok {
 			continue

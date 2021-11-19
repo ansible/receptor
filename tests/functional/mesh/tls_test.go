@@ -1,12 +1,9 @@
 package mesh
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/ansible/receptor/tests/functional/lib/mesh"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
 	"github.com/ansible/receptor/tests/functional/lib/utils"
 	_ "github.com/fortytw2/leaktest"
 )
@@ -112,33 +109,9 @@ func TestTCPSSLConnections(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Test that each Node can ping each Node
-			for _, nodeSender := range m.Nodes() {
-				controller := receptorcontrol.New()
-				err = controller.Connect(nodeSender.ControlSocket())
-				if err != nil {
-					t.Fatal(err)
-				}
-				for nodeIDResponder := range m.Nodes() {
-					response, err := controller.Ping(nodeIDResponder)
-					if err != nil {
-						t.Error(err)
-					}
-					t.Logf("%v", response)
-				}
-				controller.Close()
+			_, err = mesh.NewCLIMeshFromYaml(data, t.Name())
+			if err == nil {
+				t.Fatal("this should have failed, because we are sending empty certs/key values to node3 in receptor")
 			}
 		})
 	}
@@ -212,17 +185,9 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
+			_, err = mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err == nil {
-				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+				t.Fatal("this should have failed, because we are sending empty certs/key values to node2 in receptor")
 			}
 		})
 	}
@@ -301,17 +266,9 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
+			_, err = mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err == nil {
-				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+				t.Fatal("this should have failed, because we are sending bad cert keys to receptor")
 			}
 		})
 	}
@@ -374,17 +331,10 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
+			_, err = mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err == nil {
-				t.Fatal("Receptor server auth was expected to fail but it succeeded")
+				t.Fatal("this should have failed, because we are sending no cert keys to receptor")
 			}
 		})
 	}
@@ -461,17 +411,9 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 					},
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
+			_, err = mesh.NewCLIMeshFromYaml(data, t.Name())
 			if err == nil {
-				t.Fatal("Receptor server auth was expected to fail but it succeeded")
+				t.Fatal("this should have failed, because we are sending bad cert keys to receptor")
 			}
 		})
 	}

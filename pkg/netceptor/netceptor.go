@@ -42,7 +42,10 @@ const defaultMaxForwardingHops = 30
 const defaultMaxConnectionIdleTime = 2*defaultRouteUpdateTime + 1*time.Second
 
 // The size of bytes in a service name.
-const ServiceSizeinBytes = 8
+const (
+	ServicePrefix      = "svc-"
+	ServiceSizeinBytes = 8 + len(ServicePrefix)
+)
 
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function.
 var MainInstance *Netceptor
@@ -1196,7 +1199,7 @@ func (s *Netceptor) getEphemeralService() string {
 	s.listenerLock.RLock()
 	defer s.listenerLock.RUnlock()
 	for {
-		service := utils.RandomString(ServiceSizeinBytes)
+		service := utils.RandomStringWithPrefix(ServicePrefix, ServiceSizeinBytes-len(ServicePrefix))
 		_, ok := s.reservedServices[service]
 		if ok {
 			continue
@@ -1244,7 +1247,7 @@ func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate 
 	s.connLock.RUnlock()
 	update := &routingUpdate{
 		NodeID:             s.nodeID,
-		UpdateID:           utils.RandomString(8),
+		UpdateID:           utils.RandomStringWithPrefix("ru-", 8),
 		UpdateEpoch:        s.epoch,
 		UpdateSequence:     s.sequence,
 		Connections:        conns,

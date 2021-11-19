@@ -23,6 +23,11 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+const (
+	WorkUnitPrefix = "wu-"
+	WorkUnitSize   = 8
+)
+
 // Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
 	ctx               context.Context
@@ -133,7 +138,7 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 	}
 	var ident string
 	for {
-		ident = utils.RandomString(8)
+		ident = utils.RandomStringWithPrefix(WorkUnitPrefix, WorkUnitSize)
 		_, ok := w.activeUnits[ident]
 		if !ok {
 			unitdir := path.Join(w.dataDir, ident)

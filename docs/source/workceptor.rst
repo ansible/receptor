@@ -152,6 +152,47 @@ Payloads can be passed into receptor using the "--payload" option.
 Note: "-f" instructs receptorctl to follow the work unit immediately, i.e. stream results to stdout. One could also use "work results" to stream the results.
 
 
+Runtime Parameters
+^^^^^^^^^^^^^^^^^^
+
+Work commands can be configured to allow parameters to be passed to commands when work is submitted:
+
+.. code-block:: yaml
+
+  - work-command:
+      workType: listcontents
+      command: ls
+      allowruntimeparams: true
+
+The ``allowruntimeparams`` option will allow parameters to be passed to the work command by the
+client submitting the work. The contents of a specific directory can be listed by passing the paths
+to the receptor command as positional arguments immediately after the ``workType``:
+
+.. code::
+
+    receptorctl --socket /tmp/foo.sock work submit --node bar --no-payload -f listcontents /root/ /bin/
+    /bin/:
+    bash
+    sh
+
+    /root/:
+    helloworld.sh
+
+Passing options or flags to the work command needs to be done using the ``--param`` parameter to
+override the ``params`` work command setting. The ``--all`` flag can be passed to the work command this way:
+
+.. code::
+
+    receptorctl --socket /tmp/foo.sock work submit --node bar --no-payload -f --param params='--all' listcontents /root/
+    .
+    ..
+    .bash_logout
+    .bash_profile
+    .bashrc
+    .cache
+    helloworld.sh
+
+
 Work list
 ^^^^^^^^^
 "work list" returns information about all work units that have ran on this receptor node. The following shows two work units, ``12L8s8h2`` and ``T0oN0CAp``

@@ -90,13 +90,13 @@ Container image
 
 .. code::
 
-    podman pull quay.io/project-receptor/receptor
+    podman pull quay.io/ansible/receptor
 
 Start a container, which automatically runs receptor with the default config located at ``/etc/receptor/receptor.conf``
 
 .. code::
 
-    podman run -it --rm --name receptor quay.io/project-receptor/receptor
+    podman run -it --rm --name receptor quay.io/ansible/receptor
 
 In another terminal, issue a basic "status" command to the running receptor process
 

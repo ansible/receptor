@@ -229,7 +229,9 @@ func (cw *commandUnit) Start() error {
 	level := logger.GetLogLevel()
 	levelName, _ := logger.LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
-	cmd := exec.Command(os.Args[0], "--log-level", levelName, "--command-runner",
+	cmd := exec.Command(os.Args[0], "--node", "id=worker",
+		"--log-level", levelName,
+		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
 		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*commandExtraData).Params),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"strings"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
@@ -15,10 +14,14 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
+	"github.com/google/shlex"
 )
 
 func runCommand(qc net.Conn, command string) error {
-	args := strings.Split(command, " ")
+	args, err := shlex.Split(command)
+	if err != nil {
+		return err
+	}
 	cmd := exec.Command(args[0], args[1:]...)
 	tty, err := pty.Start(cmd)
 	if err != nil {

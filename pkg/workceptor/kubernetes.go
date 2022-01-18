@@ -65,31 +65,51 @@ type kubeExtraData struct {
 // ErrPodCompleted is returned when pod has already completed before we could attach.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
-// podRunningAndReady is a completion criterion for pod ready to be attached to.
-func podRunningAndReady(event watch.Event) (bool, error) {
-	if event.Type == watch.Deleted {
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
-	}
+// ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
+var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
-	if t, ok := event.Object.(*corev1.Pod); ok {
-		switch t.Status.Phase {
-		case corev1.PodFailed, corev1.PodSucceeded:
-			return false, ErrPodCompleted
-		case corev1.PodRunning:
-			conditions := t.Status.Conditions
-			if conditions == nil {
-				return false, nil
-			}
-			for i := range conditions {
-				if conditions[i].Type == corev1.PodReady &&
-					conditions[i].Status == corev1.ConditionTrue {
-					return true, nil
+
+// podRunningAndReady is a completion criterion for pod ready to be attached to.
+func podRunningAndReady() func(event watch.Event) (bool, error){
+	imagePullBackOffRetries := 3
+	inner := func(event watch.Event) (bool, error) {
+		if event.Type == watch.Deleted {
+			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+		}
+		if t, ok := event.Object.(*corev1.Pod); ok {
+			switch t.Status.Phase {
+			case corev1.PodFailed, corev1.PodSucceeded:
+				return false, ErrPodCompleted
+			case corev1.PodRunning, corev1.PodPending:
+				conditions := t.Status.Conditions
+				if conditions == nil {
+					return false, nil
+				}
+				for i := range conditions {
+					if conditions[i].Type == corev1.PodReady &&
+						conditions[i].Status == corev1.ConditionTrue {
+						return true, nil
+					}
+					if conditions[i].Type == corev1.ContainersReady &&
+						conditions[i].Status == corev1.ConditionFalse {
+							statuses := t.Status.ContainerStatuses
+							for j := range statuses {
+								if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
+									if imagePullBackOffRetries == 0 {
+										return false, ErrImagePullBackOff
+									}
+									imagePullBackOffRetries--
+								}
+						}
+					}
 				}
 			}
 		}
+
+		return false, nil
 	}
 
-	return false, nil
+	return inner
 }
 
 func (kw *kubeUnit) createPod(env map[string]string) error {
@@ -208,7 +228,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if kw.podPendingTimeout != time.Duration(0) {
 		ctxPodReady, _ = context.WithTimeout(kw.ctx, kw.podPendingTimeout)
 	}
-	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady)
+	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}

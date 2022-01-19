@@ -195,7 +195,11 @@ func TestWork(t *testing.T) {
 
 			m, err := mesh.NewCLIMeshFromYaml(data, testName)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				if m != nil {
+					t.Fatal(err, m.Dir())
+				} else {
+					t.Fatal(err)
+				}
 			}
 
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
@@ -770,7 +774,11 @@ func TestRuntimeParams(t *testing.T) {
 
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		if m != nil {
+			t.Fatal(err, m.Dir())
+		} else {
+			t.Fatal(err)
+		}
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
@@ -837,7 +845,11 @@ func TestKubeRuntimeParams(t *testing.T) {
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		if m != nil {
+			t.Fatal(err, m.Dir())
+		} else {
+			t.Fatal(err)
+		}
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
@@ -891,7 +903,11 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		if m != nil {
+			t.Fatal(err, m.Dir())
+		} else {
+			t.Fatal(err)
+		}
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
@@ -941,7 +957,11 @@ func TestKubeContainerFailure(t *testing.T) {
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		if m != nil {
+			t.Fatal(err, m.Dir())
+		} else {
+			t.Fatal(err)
+		}
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
@@ -1030,7 +1050,11 @@ func TestSignedWorkVerification(t *testing.T) {
 	}
 	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		if m != nil {
+			t.Fatal(err, m.Dir())
+		} else {
+			t.Fatal(err)
+		}
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)

@@ -18,9 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15
-          repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.ref }}
+          go-version: 1.16
 
       - uses: actions/cache@v2
         with:
@@ -34,6 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
+          repository: ${{ github.event.inputs.repository }}
           ref: ${{ github.event.inputs.ref }}
 
       - name: build-all target

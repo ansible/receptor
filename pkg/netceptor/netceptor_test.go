@@ -588,7 +588,7 @@ func TestFirewalling(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(buf[:n]) != "good" {
-		t.Fatal("incorrect message received")
+		t.Fatalf("incorrect message received: '%s'", string(buf[:n]))
 	}
 	time.Sleep(100 * time.Millisecond)
 	if lastUnreachMsg != nil {

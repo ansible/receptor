@@ -147,7 +147,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(buf[:n]) != "hello" {
-		t.Fatal("Wrong message received")
+		t.Fatalf("Wrong message received: '%s'", string(buf[:n]))
 	}
 
 	// Shut down the nodes

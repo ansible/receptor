@@ -87,8 +87,9 @@ else
 TESTCMD = -run $(RUNTEST)
 endif
 
-test:
-	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+test: receptor
+	PATH=${PWD}:${PATH} \
+	go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
 
 receptorctl-test:
 	@cd receptorctl && tox -e py3

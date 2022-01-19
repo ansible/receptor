@@ -123,21 +123,27 @@ func (s *Server) AddControlFunc(name string, cType ControlCommandType) error {
 	return nil
 }
 
+func errorNormal(err error) bool {
+	return strings.HasSuffix(err.Error(), "normal close")
+}
+
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
-	logger.Info("Client connected to control service %s\n", conn.RemoteAddr().String())
+	logger.Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
 	defer func() {
-		logger.Info("Client disconnected from control service %s\n", conn.RemoteAddr().String())
+		logger.Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
 		if conn != nil {
 			err := conn.Close()
 			if err != nil {
-				logger.Error("Error closing connection: %s\n", err)
+				logger.Warning("Could not close connection: %s\n", err)
 			}
 		}
 	}()
 	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
 	if err != nil {
-		logger.Error("Write error in control service: %s\n", err)
+		if !errorNormal(err) {
+			logger.Error("Could not write in control service: %s\n", err)
+		}
 
 		return
 	}
@@ -150,12 +156,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		for {
 			n, err := conn.Read(buf)
 			if err == io.EOF {
-				logger.Info("Control service closed\n")
+				logger.Debug("Control service closed\n")
 				done = true
 
 				break
 			} else if err != nil {
-				logger.Error("Read error in control service: %s\n", err)
+				if !errorNormal(err) {
+					logger.Warning("Could not read in control service: %s\n", err)
+				}
 
 				return
 			}
@@ -190,7 +198,9 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			if err != nil {
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
-					logger.Error("Write error in control service: %s\n", err)
+					if !errorNormal(err) {
+						logger.Error("Write error in control service: %s\n", err)
+					}
 
 					return
 				}
@@ -231,10 +241,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
 			}
 			if err != nil {
-				logger.Error(err.Error())
+				if !errorNormal(err) {
+					logger.Error(err.Error())
+				}
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
-					logger.Error("Write error in control service: %s\n", err)
+					if !errorNormal(err) {
+						logger.Error("Write error in control service: %s\n", err)
+					}
 
 					return
 				}
@@ -243,7 +257,9 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				if err != nil {
 					_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
 					if err != nil {
-						logger.Error("Write error in control service: %s\n", err)
+						if !errorNormal(err) {
+							logger.Error("Write error in control service: %s\n", err)
+						}
 
 						return
 					}
@@ -251,7 +267,9 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				rbytes = append(rbytes, '\n')
 				_, err = conn.Write(rbytes)
 				if err != nil {
-					logger.Error("Write error in control service: %s\n", err)
+					if !errorNormal(err) {
+						logger.Error("Write error in control service: %s\n", err)
+					}
 
 					return
 				}
@@ -259,7 +277,9 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		} else {
 			_, err = conn.Write([]byte("ERROR: Unknown command\n"))
 			if err != nil {
-				logger.Error("Write error in control service: %s\n", err)
+				if !errorNormal(err) {
+					logger.Error("Write error in control service: %s\n", err)
+				}
 
 				return
 			}

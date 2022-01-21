@@ -68,9 +68,8 @@ var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
-
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
-func podRunningAndReady() func(event watch.Event) (bool, error){
+func podRunningAndReady() func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
@@ -92,14 +91,14 @@ func podRunningAndReady() func(event watch.Event) (bool, error){
 					}
 					if conditions[i].Type == corev1.ContainersReady &&
 						conditions[i].Status == corev1.ConditionFalse {
-							statuses := t.Status.ContainerStatuses
-							for j := range statuses {
-								if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
-									if imagePullBackOffRetries == 0 {
-										return false, ErrImagePullBackOff
-									}
-									imagePullBackOffRetries--
+						statuses := t.Status.ContainerStatuses
+						for j := range statuses {
+							if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
+								if imagePullBackOffRetries == 0 {
+									return false, ErrImagePullBackOff
 								}
+								imagePullBackOffRetries--
+							}
 						}
 					}
 				}

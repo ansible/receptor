@@ -218,6 +218,7 @@ type routingUpdate struct {
 }
 
 const (
+	// If adding/changing an ConnType, make sure to change ConnTypeStrings as well. These are friendly strings printed out in a status command
 	// ConnTypeDatagram indicates a packetconn (datagram) service listener.
 	ConnTypeDatagram = 0
 	// ConnTypeStream indicates a conn (stream) service listener, without a user-defined TLS.
@@ -225,6 +226,8 @@ const (
 	// ConnTypeStreamTLS indicates the service listens on a packetconn connection, with a user-defined TLS.
 	ConnTypeStreamTLS = 2
 )
+
+var ConnTypeStrings = [...]string{"Datagram", "Stream", "StreamTLS"}
 
 // WorkCommand tracks available work types and whether they verify work submissions.
 type WorkCommand struct {
@@ -235,12 +238,13 @@ type WorkCommand struct {
 
 // ServiceAdvertisement is the data associated with a service advertisement.
 type ServiceAdvertisement struct {
-	NodeID       string
-	Service      string
-	Time         time.Time
-	ConnType     byte
-	Tags         map[string]string
-	WorkCommands []WorkCommand
+	NodeID        string
+	Service       string
+	Time          time.Time
+	ConnType      byte
+	ConnTypeLabel string
+	Tags          map[string]string
+	WorkCommands  []WorkCommand
 }
 
 // serviceAdvertisementFull is the whole message from the network.
@@ -437,6 +441,11 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
 }
 
+// Convert the connection type to a string.
+func (s *Netceptor) GetConnectionTypeAsString(connectionType byte) string {
+	return ConnTypeStrings[connectionType]
+}
+
 type backendInfo struct {
 	connectionCost float64
 	nodeCost       map[string]float64
@@ -579,6 +588,7 @@ func (s *Netceptor) Status() Status {
 					adCopy.WorkCommands = s.workCommands
 				}
 			}
+			adCopy.ConnTypeLabel = s.GetConnectionTypeAsString(adCopy.ConnType)
 			serviceAds = append(serviceAds, &adCopy)
 		}
 	}

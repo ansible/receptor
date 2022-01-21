@@ -85,12 +85,12 @@ def print_error(message, nl=True):
 )
 def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
     ctx.obj = {
-        'rc': None,
-        'receptorctlVersion': pkg_resources.get_distribution('receptorctl').version,
-        'receptorVersion': "Unknown",
+        "rc": None,
+        "receptorctlVersion": pkg_resources.get_distribution("receptorctl").version,
+        "receptorVersion": "Unknown",
     }
     # If we got a socket parameter we can make a ReceptorControl object
-    if ctx.params.get("socket", None) != None:
+    if ctx.params.get("socket", None) is not None:
         ctx.obj["rc"] = ReceptorControl(
             socket,
             config=config,
@@ -101,10 +101,19 @@ def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
             insecureskipverify=insecureskipverify,
         )
         # Load and stash the versions
-        ctx.obj['receptorVersion'] = ctx.obj['rc'].simple_command('{"command":"status","requested_fields":["Version"]}')["Version"]
+        ctx.obj["receptorVersion"] = ctx.obj["rc"].simple_command(
+            '{"command":"status","requested_fields":["Version"]}'
+        )["Version"]
         # If they mismatch throw a stderr warning
-        if ctx.obj['receptorVersion'] != ctx.obj['receptorctlVersion']:
-            click.echo(click.style("Warning: receptorctl and receptor are different versions, they may not be compatible", fg='magenta'), err=True)
+        if ctx.obj["receptorVersion"] != ctx.obj["receptorctlVersion"]:
+            click.echo(
+                click.style(
+                    "Warning: receptorctl and receptor are different versions, they may not be compatible",  # noqa E501
+                    fg="magenta",
+                ),
+                err=True,
+            )
+
 
 def get_rc(ctx):
     return ctx.obj["rc"]

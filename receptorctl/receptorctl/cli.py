@@ -27,6 +27,7 @@ class IgnoreRequiredWithHelp(click.Group):
                 param.required = False
             return super(IgnoreRequiredWithHelp, self).parse_args(ctx, args)
 
+
 def print_json(json_data):
     click.echo(json.dumps(json_data, indent=4, sort_keys=True))
 

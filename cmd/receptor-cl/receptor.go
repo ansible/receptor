@@ -98,6 +98,8 @@ func main() {
 	cl.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
 
+	panic("receptor_exception_from_branch_confirmed")
+
 	// Add registered config types from imported modules
 	for _, appName := range []string{
 		"receptor-version",

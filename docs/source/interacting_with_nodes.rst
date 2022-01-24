@@ -176,6 +176,7 @@ However, the action items pertaining to receptor backend connections can be relo
     udp-peer
     udp-listener
     local-only
+    log-level
 
 Changes can include modifying, adding, or removing these items from the configuration file.
 
@@ -185,6 +186,6 @@ After saving the configuration file to disk, connect to a control service and is
 
     receptorctl --socket /tmp/foo.sock reload
 
-This command will cancel all running backend connections and sessions, re-parse the configuration file, and start the backends once more.
+This command works in two different ways. If only 'log-level' has been modified, the backends are not cancelled while reloading. However, if any other configuration is modified the reload command will cancel all running backend connections and sessions, re-parse the configuration file, and start the backends once more.
 
 This allows users to add or remove backend connections without disrupting ongoing receptor operations. For example, sending payloads or getting work results will only momentarily pause after a reload and will resume once the connections are reestablished.

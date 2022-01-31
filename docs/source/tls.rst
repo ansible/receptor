@@ -77,6 +77,42 @@ makecerts.sh
 
 The above script will create a CA, and for each node `foo` and `bar`, create a certificate request and sign it with the CA. These certs and keys can then be used to create ``tls-server`` and ``tls-client`` definitions in the receptor config files.
 
+Pinned Certificates
+^^^^^^^^^^^^^^^^^^^
+
+In a case where a TLS connection is only ever going to be made between two well-known nodes, it may be preferable to
+require a specific certificate rather than accepting any certificate signed by a CA.  Receptor supports certificate
+pinning for this purpose.  Here is an example of a pinned certificate configuration:
+
+.. code-block:: yaml
+
+    ---
+    - node:
+        id: foo
+
+    - tls-server:
+        name: myserver
+        cert: /full/path/foo.crt
+        key: /full/path/foo.key
+        requireclientcert: true
+        clientcas: /full/path/ca.crt
+        pinnedclientcert:
+          - E6:9B:98:A7:A5:DB:17:D6:E4:2C:DE:76:45:42:A8:79:A3:0A:C5:6D:10:42:7A:6A:C4:54:57:83:F1:0F:E2:95
+
+    - tcp-listener:
+        port: 2222
+        tls: myserver
+
+Certificate pinning is an added requirement, and does not eliminate the need to meet other stated requirements.  In the above example, the client certificate must both be signed by a CA in the `ca.crt` bundle, and also have the listed fingerprint.  Multiple fingerprints may be specified, in which case a certificate matching any one of them will be accepted.
+
+To find the fingerprint of a given certificate, use the following OpenSSL command:
+
+.. code::
+
+   openssl x509 -in my-cert.pem -noout -fingerprint -sha256
+
+SHA256 and SHA512 fingerprints are supported.  SHA1 fingerprints are not supported due to the insecurity of the SHA1 algorithm.
+
 Above the mesh TLS
 ^^^^^^^^^^^^^^^^^^
 

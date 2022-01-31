@@ -44,19 +44,18 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 
 func (c *tracerouteCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
-	for i := 0; i <= int(nc.MaxForwardingHops()); i++ {
+	results := nc.Traceroute(ctx, c.target)
+	i := 0
+	for res := range results {
 		thisResult := make(map[string]interface{})
-		pingTime, pingRemote, err := ping(nc, c.target, byte(i))
-		thisResult["From"] = pingRemote
-		thisResult["Time"] = pingTime
-		thisResult["TimeStr"] = fmt.Sprint(pingTime)
-		if err != nil && err.Error() != netceptor.ProblemExpiredInTransit {
-			thisResult["Error"] = err.Error()
+		thisResult["From"] = res.From
+		thisResult["Time"] = res.Time
+		thisResult["TimeStr"] = fmt.Sprint(res.Time)
+		if res.Err != nil {
+			thisResult["Error"] = res.Err.Error()
 		}
 		cfr[strconv.Itoa(i)] = thisResult
-		if err == nil || err.Error() != netceptor.ProblemExpiredInTransit {
-			break
-		}
+		i++
 	}
 
 	return cfr, nil

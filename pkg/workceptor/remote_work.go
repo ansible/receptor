@@ -176,7 +176,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
-	submitIDRegex := regexp.MustCompile(fmt.Sprintf(`with ID (%s[a-zA-Z0-9]{%d})\.`, WorkUnitPrefix, WorkUnitSize))
+	submitIDRegex := regexp.MustCompile(`with ID ([a-zA-Z0-9]+)\.`)
 	match := submitIDRegex.FindSubmatch([]byte(response))
 	if match == nil || len(match) != 2 {
 		return fmt.Errorf("could not parse response: %s", strings.TrimRight(response, "\n"))

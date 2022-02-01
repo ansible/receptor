@@ -83,7 +83,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		if err == nil {
 			return conn, reader
 		}
-		logger.Warning("Connection to %s failed with error: %s",
+		logger.Debug("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {
@@ -467,7 +467,13 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			_, err = io.Copy(stdout, conn)
 			close(doneChan)
 			if err != nil {
-				logger.Warning("Error copying to stdout file %s: %s\n", rw.stdoutFileName, err)
+				var errmsg string
+				if strings.HasSuffix(err.Error(), "error code 499") {
+					errmsg = "read operation cancelled"
+				} else {
+					errmsg = err.Error()
+				}
+				logger.Warning("Could not copy to stdout file %s: %s\n", rw.stdoutFileName, errmsg)
 
 				continue
 			}

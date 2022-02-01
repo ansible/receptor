@@ -36,7 +36,7 @@ type Receptor struct {
 	Controllers *controlsvc.Controllers `mapstructure:"controllers"`
 }
 
-// Serve launches an receptor instance and blocks until canceled or failed.
+// Serve launches an receptor instance and blocks until cancelled or failed.
 func (r Receptor) Serve(ctx context.Context) error {
 	logger.SetShowTrace(r.EnableTracing)
 

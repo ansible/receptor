@@ -421,6 +421,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 		if err != nil {
 			return nil, err
 		}
+
 		err = cfo.Close()
 		if err != nil {
 			return nil, err

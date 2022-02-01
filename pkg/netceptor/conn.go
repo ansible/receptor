@@ -46,7 +46,7 @@ type Listener struct {
 
 // Internal implementation of Listen and ListenAndAdvertise.
 func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
-	if len(service) > ServiceSizeinBytes {
+	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
 	if service == "" {

@@ -1,4 +1,4 @@
-FROM centos:8 as builder
+FROM quay.io/centos/centos:stream8 as builder
 
 RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel
 
@@ -6,7 +6,7 @@ ADD source.tar.gz /source
 WORKDIR /source
 RUN make
 
-FROM centos:8
+FROM quay.io/centos/centos:stream8
 ARG VERSION
 
 LABEL license="ASL2"

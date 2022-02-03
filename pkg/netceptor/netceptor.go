@@ -925,8 +925,8 @@ const (
 	VerifyClient = 2
 )
 
-// receptorVerifyFunc generates a function that verifies a Receptor node ID.
-func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
+// GetNodeVerifyFunc generates a function that verifies a Receptor node ID.
+func (s *Netceptor) GetNodeVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
 	verifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		certs := make([]*x509.Certificate, len(rawCerts))
@@ -1010,7 +1010,7 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 		// noop
 	case expectedHostNameType == "receptor":
 		tlscfg.InsecureSkipVerify = true
-		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, VerifyServer)
+		tlscfg.VerifyPeerCertificate = s.GetNodeVerifyFunc(tlscfg, expectedHostName, VerifyServer)
 	default:
 		tlscfg.ServerName = expectedHostName
 	}

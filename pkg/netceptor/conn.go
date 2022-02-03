@@ -71,7 +71,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
-				tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, remoteNode, VerifyClient)
+				tlscfg.VerifyPeerCertificate = s.GetNodeVerifyFunc(tlscfg, remoteNode, VerifyClient)
 
 				return tlscfg, nil
 			}

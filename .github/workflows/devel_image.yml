@@ -16,6 +16,9 @@ jobs:
         run: |
           TAG=receptor:devel make container
 
+      - name: Test Image
+        run: podman run --rm receptor:devel receptor --version
+
       - name: Push To Quay
         uses: redhat-actions/push-to-registry@v2.1.1
         with:

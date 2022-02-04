@@ -85,16 +85,35 @@ def print_error(message, nl=True):
     show_default=True,
 )
 def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
-    ctx.obj = dict()
-    ctx.obj["rc"] = ReceptorControl(
-        socket,
-        config=config,
-        tlsclient=tlsclient,
-        rootcas=rootcas,
-        key=key,
-        cert=cert,
-        insecureskipverify=insecureskipverify,
-    )
+    ctx.obj = {
+        "rc": None,
+        "receptorctlVersion": pkg_resources.get_distribution("receptorctl").version,
+        "receptorVersion": "Unknown",
+    }
+    # If we got a socket parameter we can make a ReceptorControl object
+    if ctx.params.get("socket", None) is not None:
+        ctx.obj["rc"] = ReceptorControl(
+            socket,
+            config=config,
+            tlsclient=tlsclient,
+            rootcas=rootcas,
+            key=key,
+            cert=cert,
+            insecureskipverify=insecureskipverify,
+        )
+        # Load and stash the versions
+        ctx.obj["receptorVersion"] = ctx.obj["rc"].simple_command(
+            '{"command":"status","requested_fields":["Version"]}'
+        )["Version"]
+        # If they mismatch throw a stderr warning
+        if ctx.obj["receptorVersion"] != ctx.obj["receptorctlVersion"]:
+            click.echo(
+                click.style(
+                    "Warning: receptorctl and receptor are different versions, they may not be compatible",  # noqa E501
+                    fg="magenta",
+                ),
+                err=True,
+            )
 
 
 def get_rc(ctx):
@@ -329,19 +348,8 @@ def work():
 @cli.command(help="Show version information for receptorctl and the receptor node")
 @click.pass_context
 def version(ctx):
-    rc = get_rc(ctx)
-    receptorVersion = rc.simple_command(
-        '{"command":"status","requested_fields":["Version"]}'
-    )["Version"]
-    receptorctlVersion = pkg_resources.get_distribution("receptorctl").version
-    delim = ""
-    if receptorVersion != receptorctlVersion:
-        delim = "\t"
-        print_warning(
-            "receptorctl and receptor are different versions, they may not be compatible"
-        )
-    print_message(f"{delim}receptorctl  {receptorctlVersion}")
-    print_message(f"{delim}receptor     {receptorVersion}")
+    print_message(f"receptorctl  {ctx.obj['receptorctlVersion']}")
+    print_message(f"receptor     {ctx.obj['receptorVersion']}")
 
 
 @work.command(name="list", help="List known units of work.")

@@ -928,7 +928,15 @@ const (
 // receptorVerifyFunc generates a function that verifies a Receptor node ID.
 func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
 	verifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	oldVerifyFunc := tlscfg.VerifyPeerCertificate
+
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		if oldVerifyFunc != nil {
+			err := oldVerifyFunc(rawCerts, verifiedChains)
+			if err != nil {
+				return err
+			}
+		}
 		certs := make([]*x509.Certificate, len(rawCerts))
 		for i, asn1Data := range rawCerts {
 			cert, err := x509.ParseCertificate(asn1Data)

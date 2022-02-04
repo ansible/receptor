@@ -152,7 +152,6 @@ func (li *Listener) sendResult(conn net.Conn, err error) {
 		err:  err,
 	}:
 	case <-li.doneChan:
-	case <-li.doneChan:
 	}
 }
 

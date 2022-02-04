@@ -291,7 +291,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
-		HandshakeTimeout: 15 * time.Second,
+		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:   MaxIdleTimeoutForQuicConnections,
 		KeepAlive:        KeepAliveForQuicConnections,
 	}

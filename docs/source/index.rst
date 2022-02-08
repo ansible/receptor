@@ -51,7 +51,7 @@ Run the following command in a terminal to start a node called `foo`,
 
 .. code::
 
-    receptor --node id=foo --local-only -- log-level Debug
+    receptor --node id=foo --local-only --log-level Debug
 
 The log shows the receptor node started successfully
 

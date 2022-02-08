@@ -168,7 +168,9 @@ def status(ctx, printjson):
         print_message(f"{'Known Node':<{longest_node}} Known Connections")
         for node in costs:
             print_message(f"{node:<{longest_node}} ", nl=False)
-            print_json(costs[node])
+            for peer, cost in costs[node].items():
+                print_message(f"{peer}: {cost} ", nl=False)
+            print_message()
 
     routes = status.pop("RoutingTable", None)
     if routes:
@@ -218,7 +220,7 @@ def status(ctx, printjson):
             workTypes = ", ".join(workTypes)
             if printOnce:
                 print_message()
-                print_message(f"{'Node':<{longest_node}}  {header}")
+                print_message(f"{'Node':<{longest_node}} {header}")
                 printOnce = False
             print_message(f"{ad['NodeID']:<{longest_node}} ", nl=False)
             print_message(workTypes)

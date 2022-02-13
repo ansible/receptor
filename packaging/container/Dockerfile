@@ -1,14 +1,9 @@
 FROM quay.io/centos/centos:stream8 as builder
 
-RUN dnf -y update && dnf install -y make python3 python3-pip python3-wheel
-
-RUN curl -LO https://go.dev/dl/go1.16.13.linux-amd64.tar.gz
-
-RUN tar -C /usr/local -xzf go1.16.13.linux-amd64.tar.gz
+RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel
 
 ADD source.tar.gz /source
 WORKDIR /source
-ENV PATH=/usr/local/go/bin:$PATH 
 RUN make
 
 FROM quay.io/centos/centos:stream8

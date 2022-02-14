@@ -66,7 +66,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 					done = true
 				} else if err != nil {
 					// Is ok if we got a 'NO_ERROR: No recent network activity' error but anything else is a test failure.
-					if strings.Contains(err.Error(), "No recent network activity") {
+					if strings.Contains(err.Error(), "no recent network activity") {
 						t.Log("Successfully got the desired timeout error")
 					} else {
 						t.Fatal(fmt.Sprintf("Read error in Receptor listener: %s\n", err))

@@ -1165,7 +1165,12 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 	// decrement HopsToLive
 	message[1]--
 	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
-	c.WriteChan <- message
+
+	select {
+	case c.WriteChan <- message:
+	case <-time.After(1 * time.Second):
+		logger.Error("Unable to send message to WriteChan for %s.", nextHop)
+	}
 
 	return nil
 }
@@ -1699,8 +1704,15 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 			default:
 			}
 			if !done {
-				s.updateRoutingTableChan <- 0
-				s.sendRouteFloodChan <- 0
+				select {
+				case s.updateRoutingTableChan <- 0:
+				case <-s.context.Done():
+				}
+
+				select {
+				case s.sendRouteFloodChan <- 0:
+				case <-s.context.Done():
+				}
 			}
 		}
 	}()

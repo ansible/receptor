@@ -851,17 +851,18 @@ func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
 // Forwards a message to all neighbors, possibly excluding one.
 func (s *Netceptor) flood(message []byte, excludeConn string) {
 	s.connLock.RLock()
-	writeChans := make([]chan []byte, 0)
-	for conn, connInfo := range s.connections {
+	for conn, ci := range s.connections {
 		if conn != excludeConn {
-			writeChans = append(writeChans, connInfo.WriteChan)
+			go func(ci *connInfo) {
+				select {
+				case ci.WriteChan <- message:
+				case <- ci.Context.Done():
+					logger.Debug("connInfo cancelled during flood write")
+				}
+			}(ci)
 		}
 	}
 	s.connLock.RUnlock()
-	for i := range writeChans {
-		i := i
-		go func() { writeChans[i] <- message }()
-	}
 }
 
 // GetServerTLSConfig retrieves a server TLS config by name.
@@ -1165,7 +1166,11 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 	// decrement HopsToLive
 	message[1]--
 	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
-	c.WriteChan <- message
+	select {
+	case <- c.Context.Done():
+		return fmt.Errorf("connInfo cancelled while forwarding message")
+	case c.WriteChan <- message:
+	}
 
 	return nil
 }
@@ -1360,7 +1365,11 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 				return
 			}
 		} else {
-			s.sendRouteFloodChan <- 0
+			select {
+			case <- s.context.Done():
+				return
+			case s.sendRouteFloodChan <- 0:
+			}
 			ni = &nodeInfo{}
 		}
 		ni.Epoch = ri.UpdateEpoch
@@ -1391,7 +1400,11 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		s.knownNodeLock.Unlock()
 		if changed {
-			s.updateRoutingTableChan <- 100 * time.Millisecond
+			select {
+			case <- s.context.Done():
+				return
+			case s.updateRoutingTableChan <- 100 * time.Millisecond:
+			}
 		}
 	}
 	ri.ForwardingNode = s.nodeID
@@ -1575,11 +1588,6 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv(1 * time.Second)
-		select {
-		case <-ci.Context.Done():
-			return
-		default:
-		}
 		if err == ErrTimeout {
 			continue
 		}
@@ -1592,7 +1600,11 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 			return
 		}
 		ci.lastReceivedData = time.Now()
-		ci.ReadChan <- buf
+		select {
+		case <-ci.Context.Done():
+			return
+		case ci.ReadChan <- buf:
+		}
 	}
 }
 
@@ -1692,15 +1704,16 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
 			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
 			s.knownNodeLock.Unlock()
-			done := false
+
 			select {
-			case <-ctx.Done():
-				done = true
-			default:
+			case s.sendRouteFloodChan <- 0:
+			case <-ctx.Done(): 	// ctx is a child of s.context
+				return
 			}
-			if !done {
-				s.updateRoutingTableChan <- 0
-				s.sendRouteFloodChan <- 0
+			select {
+			case s.updateRoutingTableChan <- 0:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()

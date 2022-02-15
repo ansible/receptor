@@ -1706,12 +1706,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 			if !done {
 				select {
 				case s.updateRoutingTableChan <- 0:
-				case <-s.context.Done():
+				default:
 				}
 
 				select {
 				case s.sendRouteFloodChan <- 0:
-				case <-s.context.Done():
+				default:
 				}
 			}
 		}

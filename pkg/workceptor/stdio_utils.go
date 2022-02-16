@@ -73,16 +73,16 @@ var errFileSizeZero error
 // newStdinReader allocates a new stdinReader, which reads from a stdin file and provides a Done function.
 func newStdinReader(unitdir string) (*stdinReader, error) {
 	stdinpath := path.Join(unitdir, "stdin")
-	reader, err := os.Open(stdinpath)
-	if err != nil {
-		return nil, err
-	}
 	stat, err := os.Stat(stdinpath)
 	if err != nil {
 		return nil, err
 	}
 	if stat.Size() == 0 {
 		return nil, errFileSizeZero
+	}
+	reader, err := os.Open(stdinpath)
+	if err != nil {
+		return nil, err
 	}
 
 	return &stdinReader{

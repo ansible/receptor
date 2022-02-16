@@ -383,6 +383,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				}
 			}
 		}()
+	} else {
+		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 	}
 
 	// Actually run the streams.  This blocks until the pod finishes.

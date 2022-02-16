@@ -990,7 +990,7 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 			}
 		}
 		if !found {
-			logger.Error("RVF ReceptorNameError: %s", err)
+			logger.Error("RVF ReceptorNameError: expected %s but found %s", expectedNodeID, strings.Join(receptorNames, ", "))
 
 			return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedNodeID}
 		}

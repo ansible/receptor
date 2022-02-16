@@ -339,7 +339,9 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	var stdin *stdinReader
 	if !skipStdin {
 		stdin, err = newStdinReader(kw.UnitDir())
-		if err != nil {
+		if err == errFileSizeZero {
+			skipStdin = true
+		} else if err != nil {
 			errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
 			logger.Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -381,6 +383,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				}
 			}
 		}()
+	} else {
+		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 	}
 
 	// Actually run the streams.  This blocks until the pod finishes.

@@ -241,7 +241,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it.
 func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, ttl string, signWork bool, params map[string]string) (WorkUnit, error) {
 	if tlsClient != "" {
-		_, err := w.nc.GetClientTLSConfig(tlsClient, "testhost", "receptor")
+		_, err := w.nc.GetClientTLSConfig(tlsClient, "testhost", netceptor.ExpectedHostnameTypeReceptor)
 		if err != nil {
 			return nil, err
 		}

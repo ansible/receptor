@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ansible/receptor/pkg/netceptor"
 	"io"
 	"net"
 	"os"
@@ -49,7 +50,7 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	if !ok {
 		return nil, nil, fmt.Errorf("remote ExtraData missing")
 	}
-	tlsConfig, err := rw.w.nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, "receptor")
+	tlsConfig, err := rw.w.nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return nil, nil, err
 	}

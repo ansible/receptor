@@ -89,7 +89,7 @@ type unixProxyInboundCfg struct {
 // Run runs the action.
 func (cfg unixProxyInboundCfg) Run() error {
 	logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
-	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, "receptor")
+	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return err
 	}

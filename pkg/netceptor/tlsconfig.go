@@ -4,9 +4,6 @@
 package netceptor
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -24,6 +21,22 @@ import (
 var configSection = &cmdline.ConfigSection{
 	Description: "Commands that configure resources used by other commands:",
 	Order:       5,
+}
+
+func decodeFingerprints(fingerprints []string) ([][]byte, error) {
+	fingerprintBytes := make([][]byte, 0, len(fingerprints))
+	for _, fingStr := range fingerprints {
+		fingBytes, err := hex.DecodeString(strings.ReplaceAll(fingStr, ":", ""))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding fingerprint")
+		}
+		if len(fingBytes) != 32 && len(fingBytes) != 64 {
+			return nil, fmt.Errorf("fingerprints must be 32 or 64 bytes for sha256 or sha512")
+		}
+		fingerprintBytes = append(fingerprintBytes, fingBytes)
+	}
+
+	return fingerprintBytes, nil
 }
 
 // tlsServerCfg stores the configuration options for a TLS server.
@@ -68,13 +81,6 @@ func (cfg tlsServerCfg) Prepare() error {
 		tlscfg.ClientCAs = clientCAs
 	}
 
-	if len(cfg.PinnedClientCert) > 0 {
-		tlscfg.VerifyPeerCertificate, err = GetPeerCertificatePinVerifier(cfg.PinnedClientCert)
-		if err != nil {
-			return err
-		}
-	}
-
 	switch {
 	case cfg.RequireClientCert:
 		tlscfg.ClientAuth = tls.RequireAndVerifyClientCert
@@ -82,6 +88,17 @@ func (cfg tlsServerCfg) Prepare() error {
 		tlscfg.ClientAuth = tls.VerifyClientCertIfGiven
 	default:
 		tlscfg.ClientAuth = tls.NoClientCert
+	}
+
+	var pinnedFingerprints [][]byte
+	pinnedFingerprints, err = decodeFingerprints(cfg.PinnedClientCert)
+	if err != nil {
+		return fmt.Errorf("error decoding fingerprints: %s", err)
+	}
+
+	if tlscfg.ClientAuth != tls.NoClientCert {
+		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints,
+			"", ExpectedHostnameTypeDNS, VerifyClient)
 	}
 
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
@@ -134,66 +151,14 @@ func (cfg tlsClientConfig) Prepare() error {
 		tlscfg.RootCAs = rootCAs
 	}
 
-	if len(cfg.PinnedServerCert) > 0 {
-		var err error
-		tlscfg.VerifyPeerCertificate, err = GetPeerCertificatePinVerifier(cfg.PinnedServerCert)
-		if err != nil {
-			return err
-		}
+	pinnedFingerprints, err := decodeFingerprints(cfg.PinnedServerCert)
+	if err != nil {
+		return fmt.Errorf("error decoding fingerprints: %s", err)
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
 
-	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg)
-}
-
-func GetPeerCertificatePinVerifier(pinnedFingerprints []string) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
-	fingerprintBytes := make([][]byte, 0, len(pinnedFingerprints))
-	for _, fingStr := range pinnedFingerprints {
-		fingBytes, err := hex.DecodeString(strings.ReplaceAll(fingStr, ":", ""))
-		if err != nil {
-			return nil, fmt.Errorf("error decoding fingerprint")
-		}
-		if len(fingBytes) != 32 && len(fingBytes) != 64 {
-			return nil, fmt.Errorf("fingerprints must be 32 or 64 bytes for sha256 or sha512")
-		}
-		fingerprintBytes = append(fingerprintBytes, fingBytes)
-	}
-	verifier := func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		if len(rawCerts) == 0 {
-			return fmt.Errorf("peer certificate missing")
-		}
-		cert, err := x509.ParseCertificate(rawCerts[0])
-		if err != nil {
-			return fmt.Errorf("error parsing certificate: %w", err)
-		}
-		var sha256sum []byte
-		var sha512sum []byte
-		for _, fing := range fingerprintBytes {
-			switch len(fing) {
-			case 32:
-				if sha256sum == nil {
-					sum := sha256.Sum256(cert.Raw)
-					sha256sum = sum[:]
-				}
-				if bytes.Equal(fing, sha256sum) {
-					return nil
-				}
-			case 64:
-				if sha512sum == nil {
-					sum := sha512.Sum512(cert.Raw)
-					sha512sum = sum[:]
-				}
-				if bytes.Equal(fing, sha256sum) {
-					return nil
-				}
-			}
-		}
-		
-		return fmt.Errorf("peer certificate did not match any pinned fingerprint")
-	}
-
-	return verifier, nil
+	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg, pinnedFingerprints)
 }
 
 func init() {

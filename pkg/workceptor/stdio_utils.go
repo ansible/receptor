@@ -3,6 +3,7 @@
 package workceptor
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -68,7 +69,7 @@ type stdinReader struct {
 	doneOnce sync.Once
 }
 
-var errFileSizeZero error
+var errFileSizeZero = errors.New("file is empty")
 
 // newStdinReader allocates a new stdinReader, which reads from a stdin file and provides a Done function.
 func newStdinReader(unitdir string) (*stdinReader, error) {

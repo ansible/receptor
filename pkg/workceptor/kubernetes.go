@@ -5,6 +5,7 @@ package workceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,7 +19,7 @@ import (
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,13 +69,12 @@ var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
-
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
-func podRunningAndReady() func(event watch.Event) (bool, error){
+func podRunningAndReady() func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
-			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		if t, ok := event.Object.(*corev1.Pod); ok {
 			switch t.Status.Phase {
@@ -92,14 +92,14 @@ func podRunningAndReady() func(event watch.Event) (bool, error){
 					}
 					if conditions[i].Type == corev1.ContainersReady &&
 						conditions[i].Status == corev1.ConditionFalse {
-							statuses := t.Status.ContainerStatuses
-							for j := range statuses {
-								if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
-									if imagePullBackOffRetries == 0 {
-										return false, ErrImagePullBackOff
-									}
-									imagePullBackOffRetries--
+						statuses := t.Status.ContainerStatuses
+						for j := range statuses {
+							if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
+								if imagePullBackOffRetries == 0 {
+									return false, ErrImagePullBackOff
 								}
+								imagePullBackOffRetries--
+							}
 						}
 					}
 				}
@@ -339,7 +339,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	var stdin *stdinReader
 	if !skipStdin {
 		stdin, err = newStdinReader(kw.UnitDir())
-		if err == errFileSizeZero {
+		if errors.Is(err, errFileSizeZero) {
 			skipStdin = true
 		} else if err != nil {
 			errMsg := fmt.Sprintf("Error opening stdin file: %s", err)

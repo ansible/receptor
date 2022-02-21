@@ -49,25 +49,40 @@ func TestMeshStartup(t *testing.T) {
 			t.Logf("waiting for mesh")
 			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = m.WaitForReady(ctx)
+			t.Logf("Mesh ready")
 			if err != nil {
 				t.Fatal(err)
 			}
 			// Test that each Node can ping each Node
-			for _, nodeSender := range m.Nodes() {
+			for nodeName, nodeSender := range m.Nodes() {
+				t.Logf("Pinging nodes from %s (%s)", nodeName, nodeSender.Dir())
 				controller := receptorcontrol.New()
 				t.Logf("connecting to %s", nodeSender.ControlSocket())
 				err = controller.Connect(nodeSender.ControlSocket())
 				if err != nil {
-					t.Fatal(err)
+					t.Fatalf("Error connecting to controller: %s", err)
 				}
 				for nodeIDResponder := range m.Nodes() {
 					t.Logf("pinging %s", nodeIDResponder)
-					response, err := controller.Ping(nodeIDResponder)
-					if err != nil {
-						t.Error(err)
+				retryloop:
+					for i := 30; i > 0; i-- {
+						response, err := controller.Ping(nodeIDResponder)
+						switch {
+						case err == nil:
+							t.Logf("%v", response)
+
+							break retryloop
+						case i != 1:
+							t.Logf("Error pinging %s: %s. Retrying", nodeIDResponder, err)
+
+							continue
+						default:
+							t.Fatalf("Error pinging %s: %s", nodeIDResponder, err)
+						}
 					}
-					t.Logf("%v", response)
+
 				}
+				t.Logf("All nodes connected")
 				controller.Close()
 			}
 		})
@@ -211,6 +226,8 @@ func TestTraceroute(t *testing.T) {
 					t.Fatal(fmt.Sprintf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr))
 				}
 			}
+
+			t.Logf("Finished %s\n", t.Name())
 		})
 	}
 }

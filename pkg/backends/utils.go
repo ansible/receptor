@@ -42,8 +42,6 @@ func dialerSession(ctx context.Context, wg *sync.WaitGroup, redial bool, redialD
 				case <-closeChan:
 					// continue
 				case <-ctx.Done():
-					_ = sess.Close()
-
 					return
 				}
 			}

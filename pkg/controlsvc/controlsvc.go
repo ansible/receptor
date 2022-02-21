@@ -356,15 +356,11 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 						return
 					}
 					if err != nil {
-						if strings.HasSuffix(err.Error(), "normal close") {
-							continue
+						if !strings.HasSuffix(err.Error(), "normal close") {
+							logger.Error("Error accepting connection: %s\n", err)
 						}
-					}
-					if err != nil {
-						logger.Error("Error accepting connection: %s. Closing listener.\n", err)
-						_ = listener.Close()
 
-						return
+						continue
 					}
 					go func() {
 						defer conn.Close()

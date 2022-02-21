@@ -72,7 +72,7 @@ func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan n
 			if resp.Body.Close(); err != nil {
 				return nil, err
 			}
-			ns := newWebsocketSession(conn, closeChan)
+			ns := newWebsocketSession(ctx, conn, closeChan)
 
 			return ns, nil
 		})
@@ -132,7 +132,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 
 			return
 		}
-		ws := newWebsocketSession(conn, nil)
+		ws := newWebsocketSession(ctx, conn, nil)
 		sessChan <- ws
 	})
 	b.li, err = net.Listen("tcp", b.address)
@@ -140,13 +140,13 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 		return nil, err
 	}
 	wg.Add(1)
+	b.server = &http.Server{
+		Addr:    b.address,
+		Handler: mux,
+	}
 	go func() {
 		defer wg.Done()
 		var err error
-		b.server = &http.Server{
-			Addr:    b.address,
-			Handler: mux,
-		}
 		if b.tlscfg == nil {
 			err = b.server.Serve(b.li)
 		} else {
@@ -169,6 +169,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener.
 type WebsocketSession struct {
 	conn            *websocket.Conn
+	context         context.Context
 	recvChan        chan *recvResult
 	closeChan       chan struct{}
 	closeChanCloser sync.Once
@@ -179,9 +180,10 @@ type recvResult struct {
 	err  error
 }
 
-func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *WebsocketSession {
+func newWebsocketSession(ctx context.Context, conn *websocket.Conn, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
+		context:         ctx,
 		recvChan:        make(chan *recvResult),
 		closeChan:       closeChan,
 		closeChanCloser: sync.Once{},
@@ -195,9 +197,13 @@ func newWebsocketSession(conn *websocket.Conn, closeChan chan struct{}) *Websock
 func (ns *WebsocketSession) recvChannelizer() {
 	for {
 		_, data, err := ns.conn.ReadMessage()
-		ns.recvChan <- &recvResult{
+		select {
+		case <-ns.context.Done():
+			return
+		case ns.recvChan <- &recvResult{
 			data: data,
 			err:  err,
+		}:
 		}
 		if err != nil {
 			return

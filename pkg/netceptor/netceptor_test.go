@@ -137,7 +137,10 @@ func TestHopCountLimit(t *testing.T) {
 		if !ok {
 			t.Fatal("node2 disappeared from node1's connections")
 		}
-		if time.Since(c.lastReceivedData) > 250*time.Millisecond {
+		c.lastReceivedLock.RLock()
+		lastReceivedData := c.lastReceivedData
+		c.lastReceivedLock.RUnlock()
+		if time.Since(lastReceivedData) > 250*time.Millisecond {
 			break
 		}
 		select {
@@ -446,7 +449,7 @@ func TestDuplicateNodeDetection(t *testing.T) {
 		}()
 		select {
 		case <-backendCloseChan:
-		case <-time.After(60 * time.Second):
+		case <-time.After(120 * time.Second):
 			t.Fatal("timed out waiting for duplicate node to terminate")
 		}
 

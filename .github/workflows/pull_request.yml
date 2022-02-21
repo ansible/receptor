@@ -3,7 +3,6 @@ name: CI
 
 on:
   pull_request:
-  push:
 
 jobs:
   lint-receptor:
@@ -36,6 +35,7 @@ jobs:
     name: receptor (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         go-version: [1.16, 1.17]
     steps:
@@ -76,6 +76,10 @@ jobs:
       - name: get k8s logs
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh
+      
+      - name: remove sockets before archiving logs
+        if: ${{ failure() }}
+        run: find /tmp/receptor-testing -name controlsock -delete
 
       - name: Artifact receptor data
         uses: actions/upload-artifact@v2

@@ -148,7 +148,7 @@ func TestNegativeCost(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			cmd.Process.Kill()
-			cmd.Process.Wait()
+			cmd.Wait()
 			if receptorStdOut.String() != "Error: connection cost must be positive\n" {
 				t.Fatalf("Expected stdout: Error: connection cost must be positive, actual stdout: %s", receptorStdOut.String())
 			}

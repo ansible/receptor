@@ -106,6 +106,7 @@ type Netceptor struct {
 	maxForwardingHops      byte
 	maxConnectionIdleTime  time.Duration
 	workCommands           []WorkCommand
+	workCommandsLock       *sync.RWMutex
 	epoch                  uint64
 	sequence               uint64
 	connLock               *sync.RWMutex
@@ -195,6 +196,7 @@ type connInfo struct {
 	CancelFunc       context.CancelFunc
 	Cost             float64
 	lastReceivedData time.Time
+	lastReceivedLock *sync.RWMutex
 }
 
 type nodeInfo struct {
@@ -329,6 +331,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		clientTLSConfigs:       make(map[string]*tls.Config),
 		serverTLSConfigs:       make(map[string]*tls.Config),
 		firewallLock:           &sync.RWMutex{},
+		workCommandsLock:       &sync.RWMutex{},
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
@@ -570,9 +573,11 @@ func (s *Netceptor) Status() Status {
 			adCopy := *ad
 			if adCopy.NodeID == s.nodeID {
 				adCopy.Time = time.Now()
+				s.workCommandsLock.RLock()
 				if len(s.workCommands) > 0 {
 					adCopy.WorkCommands = s.workCommands
 				}
+				s.workCommandsLock.RUnlock()
 			}
 			serviceAds = append(serviceAds, &adCopy)
 		}
@@ -623,7 +628,6 @@ func (s *Netceptor) AddFirewallRules(rules []FirewallRuleFunc, clearExisting boo
 
 func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
 	s.serviceAdsLock.Lock()
-	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
 	if !ok {
 		n = make(map[string]*ServiceAdvertisement)
@@ -636,7 +640,13 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 		ConnType: connType,
 		Tags:     tags,
 	}
-	s.sendServiceAdsChan <- 0
+	s.serviceAdsLock.Unlock()
+	select {
+	case <-s.context.Done():
+		return
+	case s.sendServiceAdsChan <- 0:
+	default:
+	}
 }
 
 func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
@@ -697,9 +707,11 @@ func (s *Netceptor) sendServiceAds() {
 			}
 			if svcType, ok := sa.Tags["type"]; ok {
 				if svcType == "Control Service" {
+					s.workCommandsLock.RLock()
 					if len(s.workCommands) > 0 {
 						sa.WorkCommands = s.workCommands
 					}
+					s.workCommandsLock.RUnlock()
 				}
 			}
 			ads = append(ads, sa)
@@ -722,9 +734,12 @@ func (s *Netceptor) monitorConnectionAging() {
 			timedOut := make([]context.CancelFunc, 0)
 			s.connLock.RLock()
 			for i := range s.connections {
-				if time.Since(s.connections[i].lastReceivedData) > s.maxConnectionIdleTime {
+				conn := s.connections[i]
+				conn.lastReceivedLock.RLock()
+				if time.Since(conn.lastReceivedData) > s.maxConnectionIdleTime {
 					timedOut = append(timedOut, s.connections[i].CancelFunc)
 				}
+				conn.lastReceivedLock.RUnlock()
 			}
 			s.connLock.RUnlock()
 			for i := range timedOut {
@@ -851,17 +866,18 @@ func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
 // Forwards a message to all neighbors, possibly excluding one.
 func (s *Netceptor) flood(message []byte, excludeConn string) {
 	s.connLock.RLock()
-	writeChans := make([]chan []byte, 0)
-	for conn, connInfo := range s.connections {
+	for conn, ci := range s.connections {
 		if conn != excludeConn {
-			writeChans = append(writeChans, connInfo.WriteChan)
+			go func(ci *connInfo) {
+				select {
+				case ci.WriteChan <- message:
+				case <-ci.Context.Done():
+					logger.Debug("connInfo cancelled during flood write")
+				}
+			}(ci)
 		}
 	}
 	s.connLock.RUnlock()
-	for i := range writeChans {
-		i := i
-		go func() { writeChans[i] <- message }()
-	}
 }
 
 // GetServerTLSConfig retrieves a server TLS config by name.
@@ -883,6 +899,8 @@ func (s *Netceptor) AddWorkCommand(command string, secure bool) error {
 		return fmt.Errorf("must provide a name")
 	}
 	wC := WorkCommand{WorkType: command, Secure: secure}
+	s.workCommandsLock.Lock()
+	defer s.workCommandsLock.Unlock()
 	s.workCommands = append(s.workCommands, wC)
 
 	return nil
@@ -1165,7 +1183,11 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 	// decrement HopsToLive
 	message[1]--
 	logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
-	c.WriteChan <- message
+	select {
+	case <-c.Context.Done():
+		return fmt.Errorf("connInfo cancelled while forwarding message")
+	case c.WriteChan <- message:
+	}
 
 	return nil
 }
@@ -1241,13 +1263,13 @@ func (s *Netceptor) printRoutingTable() {
 
 // Constructs a routing update message.
 func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate {
+	s.connLock.Lock()
+	defer s.connLock.Unlock()
 	s.sequence++
-	s.connLock.RLock()
 	conns := make(map[string]float64)
 	for conn := range s.connections {
 		conns[conn] = s.connections[conn].Cost
 	}
-	s.connLock.RUnlock()
 	update := &routingUpdate{
 		NodeID:             s.nodeID,
 		UpdateID:           randstr.RandomString(8),
@@ -1276,7 +1298,10 @@ func (s *Netceptor) translateStructToNetwork(messageType byte, content interface
 
 // Sends a routing update to all neighbors.
 func (s *Netceptor) sendRoutingUpdate(suspectedDuplicate uint64) {
-	if len(s.connections) == 0 {
+	s.connLock.RLock()
+	connCount := len(s.connections)
+	s.connLock.RUnlock()
+	if connCount == 0 {
 		return
 	}
 	ru := s.makeRoutingUpdate(suspectedDuplicate)
@@ -1360,7 +1385,11 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 				return
 			}
 		} else {
-			s.sendRouteFloodChan <- 0
+			select {
+			case <-s.context.Done():
+				return
+			case s.sendRouteFloodChan <- 0:
+			}
 			ni = &nodeInfo{}
 		}
 		ni.Epoch = ri.UpdateEpoch
@@ -1391,7 +1420,11 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		s.knownNodeLock.Unlock()
 		if changed {
-			s.updateRoutingTableChan <- 100 * time.Millisecond
+			select {
+			case <-s.context.Done():
+				return
+			case s.updateRoutingTableChan <- 100 * time.Millisecond:
+			}
 		}
 	}
 	ri.ForwardingNode = s.nodeID
@@ -1575,11 +1608,6 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 func (ci *connInfo) protoReader(sess BackendSession) {
 	for {
 		buf, err := sess.Recv(1 * time.Second)
-		select {
-		case <-ci.Context.Done():
-			return
-		default:
-		}
 		if err == ErrTimeout {
 			continue
 		}
@@ -1591,8 +1619,14 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 
 			return
 		}
+		ci.lastReceivedLock.Lock()
 		ci.lastReceivedData = time.Now()
-		ci.ReadChan <- buf
+		ci.lastReceivedLock.Unlock()
+		select {
+		case <-ci.Context.Done():
+			return
+		case ci.ReadChan <- buf:
+		}
 	}
 }
 
@@ -1692,22 +1726,24 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
 			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
 			s.knownNodeLock.Unlock()
-			done := false
+
 			select {
-			case <-ctx.Done():
-				done = true
-			default:
+			case s.sendRouteFloodChan <- 0:
+			case <-ctx.Done(): // ctx is a child of s.context
+				return
 			}
-			if !done {
-				s.updateRoutingTableChan <- 0
-				s.sendRouteFloodChan <- 0
+			select {
+			case s.updateRoutingTableChan <- 0:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
 	ci := &connInfo{
-		ReadChan:  make(chan []byte),
-		WriteChan: make(chan []byte),
-		Cost:      connectionCost,
+		ReadChan:         make(chan []byte),
+		WriteChan:        make(chan []byte),
+		Cost:             connectionCost,
+		lastReceivedLock: &sync.RWMutex{},
 	}
 	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
 	go ci.protoReader(sess)

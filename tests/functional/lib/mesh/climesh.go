@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/netceptor"
@@ -18,10 +19,24 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type Cmd struct {
+	*exec.Cmd
+	waitLock *sync.Mutex
+}
+
+func (c *Cmd) WaitTS() error {
+	c.waitLock.Lock()
+	defer c.waitLock.Unlock()
+
+	err := c.Wait()
+
+	return err
+}
+
 // CLINode holds a Netceptor, this layer of abstraction might be unnecessary and
 // go away later.
 type CLINode struct {
-	receptorCmd   *exec.Cmd
+	receptorCmd   Cmd
 	dir           string
 	yamlConfig    []interface{}
 	controlSocket string
@@ -37,7 +52,6 @@ type CLIMesh struct {
 // NewCLINode builds a node with the name passed as the argument.
 func NewCLINode(name string) *CLINode {
 	return &CLINode{
-		receptorCmd:   nil,
 		controlSocket: "",
 	}
 }
@@ -82,7 +96,7 @@ func (n *CLINode) Start() error {
 	}
 	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
 	ioutil.WriteFile(nodedefPath, strData, 0o644)
-	n.receptorCmd = exec.Command("receptor", "--config", nodedefPath)
+	n.receptorCmd = Cmd{exec.Command("receptor", "--config", nodedefPath), &sync.Mutex{}}
 	stdout, err := os.OpenFile(filepath.Join(n.dir, "stdout"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
@@ -103,7 +117,7 @@ func (n *CLINode) Start() error {
 func (n *CLINode) Destroy() {
 	n.Shutdown()
 	go func() {
-		n.receptorCmd.Wait()
+		n.receptorCmd.WaitTS()
 		for _, i := range n.yamlConfig {
 			m, ok := i.(map[interface{}]interface{})
 			if !ok {
@@ -132,7 +146,7 @@ func (n *CLINode) Destroy() {
 
 // WaitForShutdown Waits for the receptor process to finish.
 func (n *CLINode) WaitForShutdown() {
-	n.receptorCmd.Wait()
+	n.receptorCmd.WaitTS()
 }
 
 // Dir returns the basedir which contains all of the mesh data.

@@ -140,13 +140,13 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 		return nil, err
 	}
 	wg.Add(1)
+	b.server = &http.Server{
+		Addr:    b.address,
+		Handler: mux,
+	}
 	go func() {
 		defer wg.Done()
 		var err error
-		b.server = &http.Server{
-			Addr:    b.address,
-			Handler: mux,
-		}
 		if b.tlscfg == nil {
 			err = b.server.Serve(b.li)
 		} else {

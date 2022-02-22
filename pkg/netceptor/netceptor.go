@@ -2,7 +2,10 @@
 package netceptor
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
@@ -98,49 +101,50 @@ const (
 
 // Netceptor is the main object of the Receptor mesh network protocol.
 type Netceptor struct {
-	nodeID                 string
-	mtu                    int
-	routeUpdateTime        time.Duration
-	serviceAdTime          time.Duration
-	seenUpdateExpireTime   time.Duration
-	maxForwardingHops      byte
-	maxConnectionIdleTime  time.Duration
-	workCommands           []WorkCommand
-	workCommandsLock       *sync.RWMutex
-	epoch                  uint64
-	sequence               uint64
-	connLock               *sync.RWMutex
-	connections            map[string]*connInfo
-	knownNodeLock          *sync.RWMutex
-	knownNodeInfo          map[string]*nodeInfo
-	seenUpdatesLock        *sync.RWMutex
-	seenUpdates            map[string]time.Time
-	knownConnectionCosts   map[string]map[string]float64
-	routingTableLock       *sync.RWMutex
-	routingTable           map[string]string
-	routingPathCosts       map[string]float64
-	listenerLock           *sync.RWMutex
-	listenerRegistry       map[string]*PacketConn
-	sendRouteFloodChan     chan time.Duration
-	updateRoutingTableChan chan time.Duration
-	context                context.Context
-	cancelFunc             context.CancelFunc
-	hashLock               *sync.RWMutex
-	nameHashes             map[uint64]string
-	reservedServices       map[string]func(*MessageData) error
-	serviceAdsLock         *sync.RWMutex
-	serviceAdsReceived     map[string]map[string]*ServiceAdvertisement
-	sendServiceAdsChan     chan time.Duration
-	backendWaitGroup       sync.WaitGroup
-	backendCount           int
-	backendCancel          []context.CancelFunc
-	networkName            string
-	serverTLSConfigs       map[string]*tls.Config
-	clientTLSConfigs       map[string]*tls.Config
-	unreachableBroker      *utils.Broker
-	routingUpdateBroker    *utils.Broker
-	firewallLock           *sync.RWMutex
-	firewallRules          []FirewallRuleFunc
+	nodeID                   string
+	mtu                      int
+	routeUpdateTime          time.Duration
+	serviceAdTime            time.Duration
+	seenUpdateExpireTime     time.Duration
+	maxForwardingHops        byte
+	maxConnectionIdleTime    time.Duration
+	workCommands             []WorkCommand
+	workCommandsLock         *sync.RWMutex
+	epoch                    uint64
+	sequence                 uint64
+	connLock                 *sync.RWMutex
+	connections              map[string]*connInfo
+	knownNodeLock            *sync.RWMutex
+	knownNodeInfo            map[string]*nodeInfo
+	seenUpdatesLock          *sync.RWMutex
+	seenUpdates              map[string]time.Time
+	knownConnectionCosts     map[string]map[string]float64
+	routingTableLock         *sync.RWMutex
+	routingTable             map[string]string
+	routingPathCosts         map[string]float64
+	listenerLock             *sync.RWMutex
+	listenerRegistry         map[string]*PacketConn
+	sendRouteFloodChan       chan time.Duration
+	updateRoutingTableChan   chan time.Duration
+	context                  context.Context
+	cancelFunc               context.CancelFunc
+	hashLock                 *sync.RWMutex
+	nameHashes               map[uint64]string
+	reservedServices         map[string]func(*MessageData) error
+	serviceAdsLock           *sync.RWMutex
+	serviceAdsReceived       map[string]map[string]*ServiceAdvertisement
+	sendServiceAdsChan       chan time.Duration
+	backendWaitGroup         sync.WaitGroup
+	backendCount             int
+	backendCancel            []context.CancelFunc
+	networkName              string
+	serverTLSConfigs         map[string]*tls.Config
+	clientTLSConfigs         map[string]*tls.Config
+	clientPinnedFingerprints map[string][][]byte
+	unreachableBroker        *utils.Broker
+	routingUpdateBroker      *utils.Broker
+	firewallLock             *sync.RWMutex
+	firewallRules            []FirewallRuleFunc
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -296,42 +300,43 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
 	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
 	s := Netceptor{
-		nodeID:                 nodeID,
-		mtu:                    mtu,
-		routeUpdateTime:        routeUpdateTime,
-		serviceAdTime:          serviceAdTime,
-		seenUpdateExpireTime:   seenUpdateExpireTime,
-		maxForwardingHops:      maxForwardingHops,
-		maxConnectionIdleTime:  maxConnectionIdleTime,
-		epoch:                  uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
-		sequence:               0,
-		connLock:               &sync.RWMutex{},
-		connections:            make(map[string]*connInfo),
-		knownNodeLock:          &sync.RWMutex{},
-		knownNodeInfo:          make(map[string]*nodeInfo),
-		seenUpdatesLock:        &sync.RWMutex{},
-		seenUpdates:            make(map[string]time.Time),
-		knownConnectionCosts:   make(map[string]map[string]float64),
-		routingTableLock:       &sync.RWMutex{},
-		routingTable:           make(map[string]string),
-		routingPathCosts:       make(map[string]float64),
-		listenerLock:           &sync.RWMutex{},
-		listenerRegistry:       make(map[string]*PacketConn),
-		sendRouteFloodChan:     nil,
-		updateRoutingTableChan: nil,
-		hashLock:               &sync.RWMutex{},
-		nameHashes:             make(map[uint64]string),
-		serviceAdsLock:         &sync.RWMutex{},
-		serviceAdsReceived:     make(map[string]map[string]*ServiceAdvertisement),
-		sendServiceAdsChan:     nil,
-		backendWaitGroup:       sync.WaitGroup{},
-		backendCount:           0,
-		backendCancel:          nil,
-		networkName:            makeNetworkName(nodeID),
-		clientTLSConfigs:       make(map[string]*tls.Config),
-		serverTLSConfigs:       make(map[string]*tls.Config),
-		firewallLock:           &sync.RWMutex{},
-		workCommandsLock:       &sync.RWMutex{},
+		nodeID:                   nodeID,
+		mtu:                      mtu,
+		routeUpdateTime:          routeUpdateTime,
+		serviceAdTime:            serviceAdTime,
+		seenUpdateExpireTime:     seenUpdateExpireTime,
+		maxForwardingHops:        maxForwardingHops,
+		maxConnectionIdleTime:    maxConnectionIdleTime,
+		epoch:                    uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
+		sequence:                 0,
+		connLock:                 &sync.RWMutex{},
+		connections:              make(map[string]*connInfo),
+		knownNodeLock:            &sync.RWMutex{},
+		knownNodeInfo:            make(map[string]*nodeInfo),
+		seenUpdatesLock:          &sync.RWMutex{},
+		seenUpdates:              make(map[string]time.Time),
+		knownConnectionCosts:     make(map[string]map[string]float64),
+		routingTableLock:         &sync.RWMutex{},
+		routingTable:             make(map[string]string),
+		routingPathCosts:         make(map[string]float64),
+		listenerLock:             &sync.RWMutex{},
+		listenerRegistry:         make(map[string]*PacketConn),
+		sendRouteFloodChan:       nil,
+		updateRoutingTableChan:   nil,
+		hashLock:                 &sync.RWMutex{},
+		nameHashes:               make(map[uint64]string),
+		serviceAdsLock:           &sync.RWMutex{},
+		serviceAdsReceived:       make(map[string]map[string]*ServiceAdvertisement),
+		sendServiceAdsChan:       nil,
+		backendWaitGroup:         sync.WaitGroup{},
+		backendCount:             0,
+		backendCancel:            nil,
+		networkName:              makeNetworkName(nodeID),
+		clientTLSConfigs:         make(map[string]*tls.Config),
+		clientPinnedFingerprints: make(map[string][][]byte),
+		serverTLSConfigs:         make(map[string]*tls.Config),
+		firewallLock:             &sync.RWMutex{},
+		workCommandsLock:         &sync.RWMutex{},
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
@@ -936,24 +941,34 @@ func (rce ReceptorCertNameError) Error() string {
 		plural, strings.Join(rce.ValidNodes, ", "), rce.ExpectedNode)
 }
 
+// VerifyType indicates whether we are verifying a server or client.
+type VerifyType int
+
 const (
 	// VerifyServer indicates we are the client, verifying a server.
-	VerifyServer = 1
+	VerifyServer VerifyType = 1
 	// VerifyClient indicates we are the server, verifying a client.
 	VerifyClient = 2
 )
 
-// receptorVerifyFunc generates a function that verifies a Receptor node ID.
-func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string,
-	verifyType int) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	oldVerifyFunc := tlscfg.VerifyPeerCertificate
+// ExpectedHostnameType indicates whether we are connecting to a DNS hostname or a Receptor Node ID.
+type ExpectedHostnameType int
 
+const (
+	// ExpectedHostnameTypeDNS indicates we are expecting a DNS style hostname.
+	ExpectedHostnameTypeDNS ExpectedHostnameType = 1
+	// ExpectedHostnameTypeReceptor indicates we are expecting a Receptor node ID.
+	ExpectedHostnameTypeReceptor = 2
+)
+
+// ReceptorVerifyFunc generates a function that verifies a Receptor node ID.
+func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expectedHostname string,
+	expectedHostnameType ExpectedHostnameType, verifyType VerifyType) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		if oldVerifyFunc != nil {
-			err := oldVerifyFunc(rawCerts, verifiedChains)
-			if err != nil {
-				return err
-			}
+		if len(rawCerts) == 0 {
+			logger.Error("RVF failed: peer certificate missing")
+
+			return fmt.Errorf("RVF failed: peer certificate missing")
 		}
 		certs := make([]*x509.Certificate, len(rawCerts))
 		for i, asn1Data := range rawCerts {
@@ -974,6 +989,9 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 				CurrentTime:   time.Now(),
 				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 			}
+			if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
+				opts.DNSName = expectedHostname
+			}
 		case VerifyClient:
 			opts = x509.VerifyOptions{
 				Intermediates: x509.NewCertPool(),
@@ -981,8 +999,72 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 				CurrentTime:   time.Now(),
 				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			}
+			if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
+				opts.DNSName = expectedHostname
+			}
 		default:
-			return fmt.Errorf("invalid verification type: must be client or server")
+			logger.Error("RVF failed: invalid verification type: must be client or server")
+
+			return fmt.Errorf("RVF failed: invalid verification type: must be client or server")
+		}
+
+		if len(pinnedFingerprints) > 0 {
+			var sha224sum []byte
+			var sha256sum []byte
+			var sha384sum []byte
+			var sha512sum []byte
+			fingerprintOK := false
+			for _, fing := range pinnedFingerprints {
+				fingLenFound := false
+				for _, s := range []struct {
+					len     int
+					sum     *[]byte
+					sumFunc func(data []byte) []byte
+				}{
+					{28, &sha224sum, func(data []byte) []byte {
+						sum := sha256.Sum224(data)
+
+						return sum[:]
+					}},
+					{32, &sha256sum, func(data []byte) []byte {
+						sum := sha256.Sum256(data)
+
+						return sum[:]
+					}},
+					{48, &sha384sum, func(data []byte) []byte {
+						sum := sha512.Sum384(data)
+
+						return sum[:]
+					}},
+					{64, &sha512sum, func(data []byte) []byte {
+						sum := sha512.Sum512(data)
+
+						return sum[:]
+					}},
+				} {
+					if len(fing) == s.len {
+						fingLenFound = true
+						if *s.sum == nil {
+							*s.sum = s.sumFunc(certs[0].Raw)
+						}
+						if bytes.Equal(fing, *s.sum) {
+							fingerprintOK = true
+
+							break
+						}
+					}
+				}
+				if !fingLenFound {
+					logger.Error("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
+
+					return fmt.Errorf("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
+				}
+			}
+			if !fingerprintOK {
+				logger.Error("RVF failed: presented certificate does not match any pinned fingerprint")
+
+				return fmt.Errorf("RVF failed: presented certificate does not match any pinned fingerprint")
+			}
 		}
 
 		for _, cert := range certs[1:] {
@@ -995,25 +1077,28 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 
 			return err
 		}
-		var receptorNames []string
-		receptorNames, err = utils.ReceptorNames(certs[0].Extensions)
-		if err != nil {
-			logger.Error("RVF failed to get ReceptorNames: %s", err)
 
-			return err
-		}
-		found := false
-		for _, receptorName := range receptorNames {
-			if receptorName == expectedNodeID {
-				found = true
+		if expectedHostnameType == ExpectedHostnameTypeReceptor {
+			var receptorNames []string
+			receptorNames, err = utils.ReceptorNames(certs[0].Extensions)
+			if err != nil {
+				logger.Error("RVF failed to get ReceptorNames: %s", err)
 
-				break
+				return err
 			}
-		}
-		if !found {
-			logger.Error("RVF ReceptorNameError: expected %s but found %s", expectedNodeID, strings.Join(receptorNames, ", "))
+			found := false
+			for _, receptorName := range receptorNames {
+				if receptorName == expectedHostname {
+					found = true
 
-			return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedNodeID}
+					break
+				}
+			}
+			if !found {
+				logger.Error("RVF ReceptorNameError: expected %s but found %s", expectedHostname, strings.Join(receptorNames, ", "))
+
+				return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedHostname}
+			}
 		}
 
 		return nil
@@ -1022,7 +1107,7 @@ func (s *Netceptor) receptorVerifyFunc(tlscfg *tls.Config, expectedNodeID string
 
 // GetClientTLSConfig retrieves a client TLS config by name.  Supported host name types
 // are dns and receptor.
-func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType string) (*tls.Config, error) {
+func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType ExpectedHostnameType) (*tls.Config, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -1030,26 +1115,32 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 	if !ok {
 		return nil, fmt.Errorf("unknown TLS config %s", name)
 	}
+	var pinnedFingerprints [][]byte
+	pinnedFingerprints, ok = s.clientPinnedFingerprints[name]
+	if !ok {
+		return nil, fmt.Errorf("pinned fingerprints missing for %s", name)
+	}
 	tlscfg = tlscfg.Clone()
-	switch {
-	case tlscfg.InsecureSkipVerify:
-		// noop
-	case expectedHostNameType == "receptor":
-		tlscfg.InsecureSkipVerify = true
-		tlscfg.VerifyPeerCertificate = s.receptorVerifyFunc(tlscfg, expectedHostName, VerifyServer)
-	default:
-		tlscfg.ServerName = expectedHostName
+	if !tlscfg.InsecureSkipVerify {
+		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer)
+		switch expectedHostNameType {
+		case ExpectedHostnameTypeDNS:
+			tlscfg.ServerName = expectedHostName
+		case ExpectedHostnameTypeReceptor:
+			tlscfg.InsecureSkipVerify = true
+		}
 	}
 
 	return tlscfg, nil
 }
 
 // SetClientTLSConfig stores a client TLS config by name.
-func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config) error {
+func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config, pinnedFingerprints [][]byte) error {
 	if name == "" {
 		return fmt.Errorf("must provide a name")
 	}
 	s.clientTLSConfigs[name] = config
+	s.clientPinnedFingerprints[name] = pinnedFingerprints
 
 	return nil
 }

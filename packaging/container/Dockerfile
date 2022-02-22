@@ -1,6 +1,6 @@
 FROM quay.io/centos/centos:stream8 as builder
 
-RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel
+RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel git
 
 ADD source.tar.gz /source
 WORKDIR /source

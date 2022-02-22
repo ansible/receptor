@@ -1,6 +1,6 @@
 FROM quay.io/centos/centos:stream8 as builder
 
-RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel
+RUN dnf -y update && dnf install -y golang make python3 python3-pip python3-wheel git
 
 ADD source.tar.gz /source
 WORKDIR /source
@@ -16,7 +16,7 @@ LABEL version="${VERSION}"
 
 RUN dnf -y update && \
     dnf -y install epel-release && \
-    dnf -y install tini python3-click python3-pyyaml python3-dateutil python3-pip python3-wheel && \
+    dnf -y install tini python3-pip python3-wheel && \
     dnf clean all
 
 COPY receptorctl-${VERSION}-py3-none-any.whl /tmp

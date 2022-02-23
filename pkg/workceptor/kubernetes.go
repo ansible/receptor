@@ -697,7 +697,6 @@ func readFileToString(filename string) (string, error) {
 }
 
 // SetFromParams sets the in-memory state from parameters.
-//nolint:ifshort // Method to magical for linter
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	ked := kw.status.ExtraData.(*kubeExtraData)
 	type value struct {

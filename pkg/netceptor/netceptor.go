@@ -1158,8 +1158,8 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 	hv := h.Sum64()
 	s.hashLock.Lock()
 	defer s.hashLock.Unlock()
-	_, ok := s.nameHashes[hv]
-	if !ok {
+
+	if _, ok := s.nameHashes[hv]; !ok {
 		s.nameHashes[hv] = name
 	}
 

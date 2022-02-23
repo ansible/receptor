@@ -113,6 +113,6 @@ func (s *Netceptor) Traceroute(ctx context.Context, target string) <-chan *Trace
 			}
 		}
 	}()
-	
+
 	return results
 }

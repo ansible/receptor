@@ -80,7 +80,6 @@ func TestMeshStartup(t *testing.T) {
 							t.Fatalf("Error pinging %s: %s", nodeIDResponder, err)
 						}
 					}
-
 				}
 				t.Logf("All nodes connected")
 				controller.Close()

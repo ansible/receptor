@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ansible/receptor/pkg/netceptor"
 	"io"
 	"net"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 )
 

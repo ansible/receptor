@@ -1,3 +1,4 @@
+//go:build !no_cert_auth
 // +build !no_cert_auth
 
 package certificates

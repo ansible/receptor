@@ -14,6 +14,6 @@
     allowruntimeparams: true
 
 - work-command:
-    workType: echopayload
+    workType: echo-uppercase
     command: bash
-    params: "-c \"while read -r line; do echo ${line^^}; sleep 5; echo 👾; done\""
+    params: "-c \"read PAYLOAD; echo ${PAYLOAD^^}\""

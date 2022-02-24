@@ -1,5 +1,4 @@
 -r build-requirements.txt
--e .
 pytest==7.0.1
 urllib3
 black

@@ -158,6 +158,16 @@ def default_socket_tcp():
 
 
 @pytest.fixture(scope="class")
+def default_socket_file(receptor_mesh):
+    return receptor_mesh.get_mesh_tmp_dir() + "/node1.sock"
+
+
+@pytest.fixture(scope="class")
+def default_receptor_controller_socket_file(default_socket_file):
+    return receptorctl.ReceptorControl(default_socket_file)
+
+
+@pytest.fixture(scope="class")
 def default_receptor_controller_tcp(default_socket_tcp):
     return receptorctl.ReceptorControl(default_socket_tcp)
 

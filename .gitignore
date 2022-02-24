@@ -14,5 +14,6 @@ kubectl
 /receptorctl/ChangeLog
 /receptor-python-worker/ChangeLog
 /receptor-python-worker/AUTHORS
+/receptorctl/venv/
 .vagrant/
 /docs/build

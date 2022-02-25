@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
 	github.com/lucas-clemente/quic-go v0.25.0
-	github.com/minio/highwayhash v1.0.0
+	github.com/minio/highwayhash v1.0.2
 	github.com/pbnjay/memory v0.0.0-20190104145345-974d429e7ae4
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
 	github.com/rogpeppe/go-internal v1.8.1

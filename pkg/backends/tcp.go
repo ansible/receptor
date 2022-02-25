@@ -5,6 +5,7 @@ package backends
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -14,7 +15,6 @@ import (
 	"github.com/ansible/receptor/pkg/framer"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/tls"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 )
@@ -337,82 +337,4 @@ func init() {
 		"tcp-listener", "Run a backend listener on a TCP port", tcpListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"tcp-peer", "Make an outbound backend connection to a TCP peer", tcpDialerCfg{}, cmdline.Section(backendSection))
-}
-
-// TCPListen for incoming connections.
-type TCPListen struct {
-	// TLS configuration for listening. Leave empty for no TLS at all.
-	TLS *tls.ServerConf `mapstructure:"tls"`
-	// Address to listen on ("host:port" from net package).
-	Address string `mapstructure:"address"`
-	// Path cost for this connection. Defaults to 1.0, may not be <= 0.0.`
-	Cost *float64 `mapstructure:"cost"`
-	// Extra costs for specific nodes connecting.
-	NodeCosts map[string]float64 `mapstructure:"node-costs"`
-}
-
-func (c TCPListen) setup(nc *netceptor.Netceptor) error {
-	var tlsConf *tls.Config
-	var err error
-	if c.TLS != nil {
-		tlsConf, err = c.TLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls config for tcp listener %s: %w", c.Address, err)
-		}
-	}
-
-	b, err := NewTCPListener(c.Address, tlsConf)
-	if err != nil {
-		return fmt.Errorf("could not create tcp listener %s from config: %w", c.Address, err)
-	}
-
-	cost, nodeCosts, err := validateListenerCost(c.Cost, c.NodeCosts)
-	if err != nil {
-		return fmt.Errorf("invalid tcp listener config for %s: %w", c.Address, err)
-	}
-
-	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), netceptor.BackendNodeCost(nodeCosts)); err != nil {
-		return fmt.Errorf("error creating backend for tcp listener %s: %w", c.Address, err)
-	}
-
-	return nil
-}
-
-// TCPDial to a remote host.
-type TCPDial struct {
-	// TLS configuration for listening. Leave empty for no TLS at all.
-	TLS *tls.ServerConf `mapstructure:"tls"`
-	// Address to connect to ("host:port" from net package).
-	Address string `mapstructure:"address"`
-	// Path cost for this connection. Defaults to 1.0, may not be <= 0.0.`
-	Cost *float64 `mapstructure:"cost"`
-	// Do not keep redialing on lost connection.
-	NoRedial bool `mapstructure:"no-redial"`
-}
-
-func (c TCPDial) setup(nc *netceptor.Netceptor) error {
-	var tlsConf *tls.Config
-	var err error
-	if c.TLS != nil {
-		tlsConf, err = c.TLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls config for tcp dial %s: %w", c.Address, err)
-		}
-	}
-
-	b, err := NewTCPDialer(c.Address, !c.NoRedial, tlsConf)
-	if err != nil {
-		return fmt.Errorf("could not create tcp dial %s from config: %w", c.Address, err)
-	}
-
-	cost, err := validateDialCost(c.Cost)
-	if err != nil {
-		return fmt.Errorf("invalid cost for tcp dial %s: %w", c.Address, err)
-	}
-
-	if err := nc.AddBackend(b, netceptor.BackendConnectionCost(cost), nil); err != nil {
-		return fmt.Errorf("error creating backend for tcp dial %s: %w", c.Address, err)
-	}
-
-	return nil
 }

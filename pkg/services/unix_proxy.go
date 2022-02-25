@@ -4,6 +4,7 @@
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"os"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/tls"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 )
@@ -123,60 +123,4 @@ func init() {
 		cmdline.RegisterConfigTypeForApp("receptor-proxies",
 			"unix-socket-client", "Listen via Receptor and forward to a Unix socket", unixProxyOutboundCfg{}, cmdline.Section(servicesSection))
 	}
-}
-
-// UnixInProxy exposes an exported unix socket.
-type UnixInProxy struct {
-	// Socket filename, which will be overwritten.
-	File string `mapstructure:"file"`
-	// Socket file permissions.
-	Permissions *int `mapstructure:"permissions"`
-	// Receptor node to connect to.
-	RemoteNode string `mapstructure:"remote-node"`
-	// Receptor service name to connect to.
-	RemoteService string `mapstructure:"remote-service"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	TLS tls.ClientConf `mapstructure:"tls"`
-}
-
-func (p *UnixInProxy) setup(nc *netceptor.Netceptor) error {
-	perms := 0o600
-	if p.Permissions != nil {
-		perms = *p.Permissions
-	}
-
-	t, err := p.TLS.TLSConfig()
-	if err != nil {
-		return fmt.Errorf("could not create tls config for unix inbound proxy %s: %w", p.File, err)
-	}
-
-	return UnixProxyServiceInbound(
-		nc,
-		p.File,
-		os.FileMode(perms),
-		p.RemoteNode,
-		p.RemoteService,
-		t,
-	)
-}
-
-// UnixOutProxy exports a local unix socket.
-type UnixOutProxy struct {
-	// Receptor service name to bind to.
-	Service string `mapstructure:"service"`
-	// Socket filename, which must already exist.
-	File string `mapstructure:"file"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	TLS tls.ServerConf `mapstructure:"tls"`
-}
-
-func (p *UnixOutProxy) setup(nc *netceptor.Netceptor) error {
-	t, err := p.TLS.TLSConfig()
-	if err != nil {
-		return fmt.Errorf("could not create tls config for unix outbound proxy %s: %w", p.File, err)
-	}
-
-	return UnixProxyServiceOutbound(nc, p.Service, t, p.File)
 }

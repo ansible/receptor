@@ -6,7 +6,6 @@ package services
 import (
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
@@ -207,38 +206,4 @@ func init() {
 		"udp-server", "Listen for UDP and forward via Receptor", udpProxyInboundCfg{}, cmdline.Section(servicesSection))
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
 		"udp-client", "Listen on a Receptor service and forward via UDP", udpProxyOutboundCfg{}, cmdline.Section(servicesSection))
-}
-
-// UDPInProxy exposes an exported udp port.
-type UDPInProxy struct {
-	Address string `mapstructure:"address"`
-	// Receptor node to connect to.
-	RemoteNode string `mapstructure:"remote-node"`
-	// Receptor service name to connect to.
-	RemoteService string `mapstructure:"remote-service"`
-}
-
-func (p *UDPInProxy) setup(nc *netceptor.Netceptor) error {
-	host, port, err := net.SplitHostPort(p.Address)
-	if err != nil {
-		return fmt.Errorf("address %s for udp inbound proxy is invalid: %w", p.Address, err)
-	}
-	i, err := strconv.Atoi(port)
-	if err != nil {
-		return fmt.Errorf("address %s for udp inbound proxy contains invalid port: %w", p.Address, err)
-	}
-
-	return UDPProxyServiceInbound(nc, host, i, p.RemoteNode, p.RemoteService)
-}
-
-// UDPOutProxy exports a local unix socket.
-type UDPOutProxy struct {
-	// Receptor service name to bind to.
-	Service string `mapstructure:"service"`
-	// Address for outbound UDP connection.
-	Address string `mapstructure:"address"`
-}
-
-func (p *UDPOutProxy) setup(nc *netceptor.Netceptor) error {
-	return UDPProxyServiceOutbound(nc, p.Service, p.Address)
 }

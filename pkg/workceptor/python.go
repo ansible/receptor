@@ -79,33 +79,3 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-python", "Run a worker using a Python plugin", workPythonCfg{}, cmdline.Section(workersSection))
 }
-
-// Python executes python code.
-type Python struct {
-	// Name for this worker type.
-	WorkType string `mapstructure:"work-type"`
-	// Python module name of the worker plugin.
-	Plugin string `mapstructure:"plugin"`
-	// Receptor-exported function to call.
-	Function string `mapstructure:"function"`
-	// Plugin-specific configuration.
-	Config map[string]interface{} `mapstructure:"config"`
-}
-
-func (p Python) setup(wc *Workceptor) error {
-	factory := func(w *Workceptor, unitID string, workType string) WorkUnit {
-		cw := &pythonUnit{
-			commandUnit: commandUnit{
-				BaseWorkUnit: BaseWorkUnit{status: StatusFileData{ExtraData: &commandExtraData{}}},
-			},
-			plugin:   p.Plugin,
-			function: p.Function,
-			config:   p.Config,
-		}
-		cw.BaseWorkUnit.Init(w, unitID, workType)
-
-		return cw
-	}
-
-	return wc.RegisterWorker(p.WorkType, factory, false)
-}

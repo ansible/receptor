@@ -15,7 +15,7 @@ require (
 	github.com/minio/highwayhash v1.0.0
 	github.com/pbnjay/memory v0.0.0-20190104145345-974d429e7ae4
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
-	github.com/rogpeppe/go-internal v1.6.1
+	github.com/rogpeppe/go-internal v1.8.1
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1

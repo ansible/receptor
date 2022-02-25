@@ -154,9 +154,9 @@ func (w *Workceptor) createSignature(nodeID string) (string, error) {
 	}
 	exp := time.Now().Add(w.signingExpiration)
 
-	claims := &jwt.StandardClaims{
-		ExpiresAt: exp.Unix(),
-		Audience:  nodeID,
+	claims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(exp),
+		Audience:  []string{nodeID},
 	}
 	rsaPrivateKey, err := certificates.LoadPrivateKey(w.signingKey)
 	if err != nil {
@@ -193,7 +193,7 @@ func (w *Workceptor) VerifySignature(signature string) error {
 	if err != nil {
 		return fmt.Errorf("could not load verifying key file: %s", err.Error())
 	}
-	token, err := jwt.ParseWithClaims(signature, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(signature, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return rsaPublicKey, nil
 	})
 	if err != nil {
@@ -202,7 +202,7 @@ func (w *Workceptor) VerifySignature(signature string) error {
 	if !token.Valid {
 		return fmt.Errorf("token not valid")
 	}
-	claims := token.Claims.(*jwt.StandardClaims)
+	claims := token.Claims.(*jwt.RegisteredClaims)
 	ok := claims.VerifyAudience(w.nc.NodeID(), true)
 	if !ok {
 		return fmt.Errorf("token audience did not match node ID")

@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/creack/pty v1.1.17
 	github.com/fortytw2/leaktest v1.3.0
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify v1.5.1
 	github.com/ghjm/cmdline v0.1.2
 	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510

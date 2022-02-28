@@ -134,7 +134,7 @@ func boolFromMap(config map[string]interface{}, name string) (bool, error) {
 		return false, nil
 	}
 
-	return false, fmt.Errorf("field %s value %s is not convertible to an bool", name, value)
+	return false, fmt.Errorf("field %s value %s is not convertible to a bool", name, value)
 }
 
 func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (controlsvc.ControlCommand, error) {

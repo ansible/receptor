@@ -196,8 +196,8 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 	return c, nil
 }
 
-func (c *workceptorCommand) processSignature(workType, signature string, connIsUnix bool) error {
-	shouldVerifySignature := c.w.ShouldVerifySignature(workType)
+func (c *workceptorCommand) processSignature(workType, signature string, connIsUnix, signWork bool) error {
+	shouldVerifySignature := c.w.ShouldVerifySignature(workType, signWork)
 	if !shouldVerifySignature && signature != "" {
 		return fmt.Errorf("work type did not expect a signature")
 	}
@@ -209,6 +209,15 @@ func (c *workceptorCommand) processSignature(workType, signature string, connIsU
 	}
 
 	return nil
+}
+
+func getSignWorkFromStatus(status *StatusFileData) bool {
+	red, ok := status.ExtraData.(*remoteExtraData)
+	if ok {
+		return red.SignWork
+	}
+
+	return false
 }
 
 // Worker function called by the control service to process a "work" command.
@@ -265,7 +274,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 			}
 			workParams[k] = vStr
 		}
-		err = c.processSignature(workType, signature, connIsUnix)
+		err = c.processSignature(workType, signature, connIsUnix, signWork)
 		if err != nil {
 			return nil, err
 		}
@@ -371,7 +380,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 			return cfr, err
 		}
 		status := unit.Status()
-		err = c.processSignature(status.WorkType, signature, connIsUnix)
+		signWork := getSignWorkFromStatus(status)
+		err = c.processSignature(status.WorkType, signature, connIsUnix, signWork)
 		if err != nil {
 			return nil, err
 		}
@@ -408,7 +418,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 			return nil, err
 		}
 		status := unit.Status()
-		err = c.processSignature(status.WorkType, signature, connIsUnix)
+		signWork := getSignWorkFromStatus(status)
+		err = c.processSignature(status.WorkType, signature, connIsUnix, signWork)
 		if err != nil {
 			return nil, err
 		}

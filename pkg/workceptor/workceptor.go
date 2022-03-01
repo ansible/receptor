@@ -62,7 +62,7 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 		signingExpiration: 5 * time.Minute,
 		verifyingKey:      "",
 	}
-	err := w.RegisterWorker("remote", newRemoteWorker, true)
+	err := w.RegisterWorker("remote", newRemoteWorker, false)
 	if err != nil {
 		return nil, fmt.Errorf("could not register remote worker function: %s", err)
 	}
@@ -171,7 +171,12 @@ func (w *Workceptor) createSignature(nodeID string) (string, error) {
 	return tokenString, nil
 }
 
-func (w *Workceptor) ShouldVerifySignature(workType string) bool {
+func (w *Workceptor) ShouldVerifySignature(workType string, signWork bool) bool {
+	// if work unit is remote, just get the signWork boolean from the
+	// remote extra data field
+	if workType == "remote" {
+		return signWork
+	}
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workType]
 	w.workTypesLock.RUnlock()

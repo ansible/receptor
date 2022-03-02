@@ -35,7 +35,7 @@ func TestStatusFileLock(t *testing.T) {
 		totalWaitTime += waitTime
 		go func(iter int, waitTime time.Duration) {
 			sfd := StatusFileData{}
-			err = sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
+			sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
 				time.Sleep(waitTime)
 				status.State = iter
 				status.StdoutSize = int64(iter)

@@ -89,7 +89,7 @@ endif
 
 test: receptor
 	PATH=${PWD}:${PATH} \
-	go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+	go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -race
 
 receptorctl-test:
 	@cd receptorctl && tox -e py3

@@ -17,7 +17,9 @@ import (
 type logWriter struct {
 	t          *testing.T
 	node1count int
+	node1Lock  sync.RWMutex
 	node2count int
+	node2Lock  sync.RWMutex
 }
 
 func (lw *logWriter) Write(p []byte) (n int, err error) {
@@ -31,9 +33,13 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 		}
 	} else if strings.HasPrefix(s, "TRACE") {
 		if strings.Contains(s, "via node1") {
+			lw.node1Lock.Lock()
 			lw.node1count++
+			lw.node1Lock.Unlock()
 		} else if strings.Contains(s, "via node2") {
+			lw.node2Lock.Lock()
 			lw.node2count++
+			lw.node2Lock.Unlock()
 		}
 	}
 	lw.t.Log(s)
@@ -151,7 +157,13 @@ func TestHopCountLimit(t *testing.T) {
 	}
 
 	// Make sure we actually succeeded in creating a routing loop
-	if lw.node1count < 10 || lw.node2count < 10 {
+	lw.node1Lock.RLock()
+	node1Count := lw.node1count
+	lw.node1Lock.RUnlock()
+	lw.node2Lock.RLock()
+	node2Count := lw.node2count
+	lw.node2Lock.RUnlock()
+	if node1Count < 10 || node2Count < 10 {
 		t.Fatal("test did not create a routing loop")
 	}
 
@@ -222,8 +234,10 @@ func TestLotsOfPings(t *testing.T) {
 	}
 
 	responses := make([][]bool, len(nodes))
+	responseLocks := make([][]sync.RWMutex, len(nodes))
 	for i := range nodes {
 		responses[i] = make([]bool, len(nodes))
+		responseLocks[i] = make([]sync.RWMutex, len(nodes))
 	}
 
 	errorChan := make(chan error)
@@ -231,6 +245,9 @@ func TestLotsOfPings(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for i := range nodes {
 		for j := range nodes {
+			// Need to make copies of these variables to avoid a data race
+			i2 := i
+			j2 := j
 			wg.Add(2)
 			go func(sender *Netceptor, recipient *Netceptor, response *bool) {
 				pc, err := sender.ListenPacket("")
@@ -268,7 +285,9 @@ func TestLotsOfPings(t *testing.T) {
 							return
 						}
 						t.Logf("%s received response from %s", sender.nodeID, recipient.nodeID)
+						responseLocks[i2][j2].Lock()
 						*response = true
+						responseLocks[i2][j2].Unlock()
 					}
 				}()
 				go func() {
@@ -282,7 +301,10 @@ func TestLotsOfPings(t *testing.T) {
 							return
 						case <-time.After(100 * time.Millisecond):
 						}
-						if *response {
+						responseLocks[i2][j2].RLock()
+						r := *response
+						responseLocks[i2][j2].RUnlock()
+						if r {
 							return
 						}
 					}
@@ -298,7 +320,10 @@ func TestLotsOfPings(t *testing.T) {
 			good := true
 			for i := range nodes {
 				for j := range nodes {
-					if !responses[i][j] {
+					responseLocks[i][j].RLock()
+					r := responses[i][j]
+					responseLocks[i][j].RUnlock()
+					if !r {
 						good = false
 
 						break
@@ -564,6 +589,7 @@ func TestFirewalling(t *testing.T) {
 
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
+	lastUnreachLock := sync.RWMutex{}
 	go func() {
 		<-timeout.Done()
 		close(doneChan)
@@ -571,7 +597,9 @@ func TestFirewalling(t *testing.T) {
 	go func() {
 		for unreach := range unreach2chan {
 			unreach := unreach
+			lastUnreachLock.Lock()
 			lastUnreachMsg = &unreach
+			lastUnreachLock.Unlock()
 		}
 	}()
 
@@ -615,7 +643,10 @@ func TestFirewalling(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	if lastUnreachMsg == nil {
+	lastUnreachLock.RLock()
+	lum := lastUnreachMsg //nolint:ifshort
+	lastUnreachLock.RUnlock()
+	if lum == nil {
 		t.Fatal("did not receive expected unreachable message")
 	}
 
@@ -724,6 +755,7 @@ func TestAllowedPeers(t *testing.T) {
 
 	// Save received unreachable messages to a variable
 	var lastUnreachMsg *UnreachableNotification
+	lastUnreachLock := sync.RWMutex{}
 	go func() {
 		<-timeout.Done()
 		close(doneChan)
@@ -731,7 +763,9 @@ func TestAllowedPeers(t *testing.T) {
 	go func() {
 		for unreach := range unreach2chan {
 			unreach := unreach
+			lastUnreachLock.Lock()
 			lastUnreachMsg = &unreach
+			lastUnreachLock.Unlock()
 		}
 	}()
 
@@ -775,7 +809,10 @@ func TestAllowedPeers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	if lastUnreachMsg == nil {
+	lastUnreachLock.RLock()
+	lum := lastUnreachMsg //nolint:ifshort
+	lastUnreachLock.RUnlock()
+	if lum == nil {
 		t.Fatal("did not receive expected unreachable message")
 	}
 

@@ -53,6 +53,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		service = s.getEphemeralService()
 	}
 	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
 	_, isReserved := s.reservedServices[service]
 	_, isListening := s.listenerRegistry[service]
 	if isReserved || isListening {
@@ -88,7 +89,6 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
-	s.listenerLock.Unlock()
 	cfg := &quic.Config{
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
 	}

@@ -1628,8 +1628,12 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 
 			return nil
 		}
-		pc.recvChan <- md
 		s.listenerLock.RUnlock()
+		select {
+		case <-pc.context.Done():
+			return nil
+		case pc.recvChan <- md:
+		}
 
 		return nil
 	}

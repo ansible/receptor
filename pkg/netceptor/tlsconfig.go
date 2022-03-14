@@ -71,7 +71,7 @@ func (cfg tlsServerCfg) Prepare() error {
 		return err
 	}
 
-	block, _ := pem.Decode([]byte(certbytes))
+	block, _ := pem.Decode(certbytes)
 	if block == nil {
 		return fmt.Errorf("failed to parse certificate PEM")
 	}

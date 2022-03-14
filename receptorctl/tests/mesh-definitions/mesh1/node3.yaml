@@ -6,3 +6,14 @@
 
 - control-service:
     filename: /tmp/receptorctltest/mesh1/node3.sock
+
+- work-command:
+    worktype: sleep
+    command: bash
+    params: "-c \"read N_ITER; for i in `seq 1 $N_ITER`; do echo $((${N_ITER}-${i}+1)) 'remaining'; sleep 1; done\""
+    allowruntimeparams: true
+
+- work-command:
+    workType: echo-uppercase
+    command: bash
+    params: "-c \"read PAYLOAD; echo ${PAYLOAD^^}\""

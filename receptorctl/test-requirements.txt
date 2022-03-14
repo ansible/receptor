@@ -1,6 +1,7 @@
 -r build-requirements.txt
-pytest==6.1.1
+pytest==7.0.1
 urllib3
 black
 tox
 pylama
+pytest-github

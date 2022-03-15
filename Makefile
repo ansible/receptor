@@ -1,21 +1,4 @@
-# Calculate version number
-# - If we are on an exact Git tag, then this is official and gets a -1 release
-# - If we are not, then this is unofficial and gets a -0.date.gitref release
-OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
 VERSION := $(shell cd receptorctl && python3 setup.py --version)
-ifeq ($(OFFICIAL_VERSION),)
-RELEASE := 0.git$(shell date +'%Y%m%d').$(shell git rev-parse --short HEAD)
-OFFICIAL :=
-APPVER := $(VERSION)-$(RELEASE)
-else
-RELEASE := 1
-OFFICIAL := yes
-APPVER := $(VERSION)
-endif
-
-# Container command can be docker or podman
-CONTAINERCMD ?= podman
-TAG ?= receptor:latest
 
 # When building Receptor, tags can be used to remove undesired
 # features.  This is primarily used for deploying Receptor in a
@@ -56,7 +39,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -107,31 +90,41 @@ kubetest: kubectl
 	./kubectl get nodes
 
 version:
-	@echo $(APPVER) > .VERSION
-	@echo ".VERSION created for $(APPVER)"
+	@echo $(VERSION) > .VERSION
+	@echo ".VERSION created for $(VERSION)"
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
 $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 setup.py bdist_wheel
+	@cd receptorctl && PBR_VERSION=$(VERSION) python3 setup.py bdist_wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
 $(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 setup.py sdist
+	@cd receptorctl && PBR_VERSION=$(VERSION) python3 setup.py sdist
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION)-py3-none-any.whl
 $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
-	@cd receptor-python-worker && python3 setup.py bdist_wheel
+	@cd receptor-python-worker && PBR_VERSION=$(VERSION) python3 setup.py bdist_wheel
+
+# Container command can be docker or podman
+CONTAINERCMD := podman
+
+# Repo without tag
+REPO := quay.io/ansible/receptor
+# Override image tag
+TAG := v$(VERSION)
+# Will tag image as :latest in addition to :$(VERSION)
+LATEST :=
 
 container: .container-flag-$(VERSION)
 .container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t $(TAG) $(if $(OFFICIAL),-t receptor:$(VERSION),)
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
 	@touch .container-flag-$(VERSION)
 
 tc-image: container

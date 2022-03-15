@@ -74,7 +74,7 @@ jobs:
       - name: get k8s logs
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh
-      
+
       - name: remove sockets before archiving logs
         if: ${{ failure() }}
         run: find /tmp/receptor-testing -name controlsock -delete
@@ -131,7 +131,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Build container
-        run: make container
+        run: make container REPO=receptor LATEST=yes
 
       - name: Write out basic config
         run: |
@@ -160,5 +160,5 @@ jobs:
           echo $output
           if [[ "$output" != "hello world" ]]; then
             echo "Output did not contain expected value"
-            exit 1  
+            exit 1
           fi

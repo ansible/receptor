@@ -1,0 +1,20 @@
+---
+- hosts: localhost
+  connection: local
+  vars:
+    payload:
+      name: "v{{ version }}"
+      tag_name: "v{{ version }}"
+      draft: true
+  tasks:
+    - name: Publish draft Release
+      uri:
+        url: "https://api.github.com/repos/{{ repo }}/releases"
+        method: "POST"
+        headers:
+          Accept: "application/vnd.github.v3+json"
+          Authorization: "Bearer {{ github_token }}"
+        body: "{{ payload | to_json }}"
+        status_code:
+          - 200
+          - 201

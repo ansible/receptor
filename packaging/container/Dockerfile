@@ -1,11 +1,12 @@
 FROM quay.io/centos/centos:stream9 as builder
+ARG VERSION
 
 RUN dnf -y update && dnf install -y golang make python3 python3-pip git
 RUN pip install wheel
 
 ADD source.tar.gz /source
 WORKDIR /source
-RUN make
+RUN make VERSION=${VERSION}
 
 FROM quay.io/centos/centos:stream9
 ARG VERSION

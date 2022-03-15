@@ -125,3 +125,4 @@ Note: the config file does not specify a node ID, so the hostname (on the contai
    tls
    firewall
    developer_guide
+   release_process

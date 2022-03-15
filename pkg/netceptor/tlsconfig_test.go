@@ -9,6 +9,7 @@ import (
 	"github.com/ansible/receptor/tests/functional/lib/utils"
 )
 
+// setup handle using hardcoded PEMs.
 func setupSuite(t *testing.T) (*os.File, *os.File, *os.File, func(t *testing.T)) {
 	tempCertFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -151,6 +152,24 @@ FdaOLykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m
 	}
 }
 
+// another setup handle using Receptor-like cert-generation.
+func useUtilsSetupSuite(t *testing.T, name string) (string, string, string, func(t *testing.T)) {
+	_, ca, err := utils.GenerateCA(name, name)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	certKey, cert, err := utils.GenerateCert(name, name, []string{name}, []string{name})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	return ca, certKey, cert, func(t *testing.T) {
+		defer os.Remove(ca)
+		defer os.Remove(certKey)
+		defer os.Remove(cert)
+	}
+}
+
 func TestPrepareGoodTlsServerCfg(t *testing.T) {
 	tempCertFile, tempCertKey, tempCA, teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
@@ -190,26 +209,39 @@ func TestNodeIDMismatch(t *testing.T) {
 }
 
 func TestNodeIDWithUtilsGenerateCert(t *testing.T) {
-	_, ca, err := utils.GenerateCA("foobar", "foobar")
-	if err != nil {
-		t.Error(err.Error())
-	}
-	certKey, cert, err := utils.GenerateCert("foobar", "foobar", []string{"foobar"}, []string{"foobar"})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	tempCa, tempCertKey, tempCert, tearDownSuite := useUtilsSetupSuite(t, "foobar")
+	defer tearDownSuite(t)
 
 	cfg := tlsServerCfg{
 		Name:              "foobar",
-		Cert:              cert,
-		Key:               certKey,
+		Cert:              tempCert,
+		Key:               tempCertKey,
 		RequireClientCert: false,
-		ClientCAs:         ca,
+		ClientCAs:         tempCa,
 	}
 
 	MainInstance = New(context.Background(), "foobar")
 
 	if err := cfg.Prepare(); err != nil {
 		t.Errorf("nodeId=%s; ReceptorName=foobar; this shouldn't have failed", MainInstance.nodeID)
+	}
+}
+
+func TestBadNodeIDWithUtilsGenerateCert(t *testing.T) {
+	tempCa, tempCertKey, tempCert, tearDownSuite := useUtilsSetupSuite(t, "foobar")
+	defer tearDownSuite(t)
+
+	cfg := tlsServerCfg{
+		Name:              "foobar",
+		Cert:              tempCert,
+		Key:               tempCertKey,
+		RequireClientCert: false,
+		ClientCAs:         tempCa,
+	}
+
+	MainInstance = New(context.Background(), "barfoo")
+
+	if err := cfg.Prepare(); err == nil {
+		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have failed", MainInstance.nodeID)
 	}
 }

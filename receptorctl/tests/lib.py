@@ -1,12 +1,15 @@
 import os
 import subprocess
 
+__OIDReceptorName = "1.3.6.1.4.1.2312.19.1"
+__OIDReceptorNameFormat = "UTF8"
+
 
 def __init__():
     pass
 
 
-def create_certificate(tmp_dir: str):
+def create_certificate(tmp_dir: str, commonName: str = "localhost"):
     def generate_cert(name, commonName):
         keyPath = os.path.join(tmp_dir, name + ".key")
         crtPath = os.path.join(tmp_dir, name + ".crt")
@@ -37,7 +40,17 @@ def create_certificate(tmp_dir: str):
 
         # create x509 extension
         with open(extPath, "w") as ext:
+            # DNSName to SAN
             ext.write("subjectAltName=DNS:" + commonName)
+            # Receptor NodeID (otherName) to SAN
+            ext.write(
+                ",otherName:"
+                + __OIDReceptorName
+                + ";"
+                + __OIDReceptorNameFormat
+                + ":"
+                + commonName
+            )
             ext.close()
         subprocess.check_output(["openssl", "genrsa", "-out", keyPath, "2048"])
 
@@ -83,9 +96,9 @@ def create_certificate(tmp_dir: str):
     # Create a new CA
     caKeyPath, caCrtPath = generate_cert("ca", "ca")
     clientKeyPath, clientCrtPath = generate_cert_with_ca(
-        "client", caKeyPath, caCrtPath, "localhost"
+        "client", caKeyPath, caCrtPath, commonName
     )
-    generate_cert_with_ca("server", caKeyPath, caCrtPath, "localhost")
+    generate_cert_with_ca("server", caKeyPath, caCrtPath, commonName)
 
     return {
         "caKeyPath": caKeyPath,

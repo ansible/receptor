@@ -7,10 +7,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"strings"
 
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 )
 
@@ -67,6 +69,33 @@ func (cfg tlsServerCfg) Prepare() error {
 	cert, err := tls.X509KeyPair(certbytes, keybytes)
 	if err != nil {
 		return err
+	}
+
+	block, _ := pem.Decode(certbytes)
+	if block == nil {
+		return fmt.Errorf("failed to parse certificate PEM")
+	}
+
+	parsedCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	s, err := utils.ReceptorNames(parsedCert.Extensions)
+	if err != nil {
+		return err
+	}
+
+	found := false
+
+	for _, name := range s {
+		if MainInstance.nodeID == name {
+			found = true
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("nodeID=%s not found in certificate name(s); cfg section=%s; server cert=%s", MainInstance.nodeID, cfg.Name, cfg.Cert)
 	}
 
 	tlscfg.Certificates = []tls.Certificate{cert}

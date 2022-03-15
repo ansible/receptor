@@ -86,7 +86,7 @@ func TestSSLListeners(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 
-			key, crt, err := utils.GenerateCert("test", "localhost", []string{"localhost"}, nil)
+			key, crt, err := utils.GenerateCert("test", "test", []string{"test"}, []string{"test"})
 			if err != nil {
 				t.Fatal(err)
 			}

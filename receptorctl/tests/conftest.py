@@ -73,7 +73,9 @@ def receptor_mesh(base_tmp_dir):
                     self.config_files.append(os.path.join(self.config_files_dir, f))
 
         def __create_certificates(self):
-            self.certificate_files = create_certificate(self.get_mesh_tmp_dir())
+            self.certificate_files = create_certificate(
+                self.get_mesh_tmp_dir(), "node1"
+            )
 
         def get_mesh_name(self):
             return self.config_files_dir.split("/")[-1]

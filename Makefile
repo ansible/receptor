@@ -1,4 +1,12 @@
-VERSION := $(shell cd receptorctl && python3 setup.py --version)
+# If the current commit has been tagged, use that as the version.
+# Otherwise include short commit hash.
+OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
+ifeq ($(OFFICIAL_VERSION),)
+VERSION := $(shell git describe --tags | cut -d - -f -1)+g$(shell git rev-parse --short HEAD)
+else
+VERSION := $(OFFICIAL_VERSION)
+endif
+
 
 # When building Receptor, tags can be used to remove undesired
 # features.  This is primarily used for deploying Receptor in a
@@ -93,30 +101,36 @@ version:
 	@echo $(VERSION) > .VERSION
 	@echo ".VERSION created for $(VERSION)"
 
-RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
-$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && PBR_VERSION=$(VERSION) python3 setup.py bdist_wheel
+receptorctl/.VERSION:
+	echo $(VERSION) > $@
+
+RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
+$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/.VERSION $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && python3 -m build --wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
-RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
-$(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && PBR_VERSION=$(VERSION) python3 setup.py sdist
+RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION:v%=%).tar.gz
+$(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/.VERSION $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && python3 -m build --sdist
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION)-py3-none-any.whl
-$(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
-	@cd receptor-python-worker && PBR_VERSION=$(VERSION) python3 setup.py bdist_wheel
+receptor-python-worker/.VERSION:
+	echo $(VERSION) > $@
+
+RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION:v%=%)-py3-none-any.whl
+$(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/.VERSION $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
+	@cd receptor-python-worker && python3 -m build --wheel
 
 # Container command can be docker or podman
 CONTAINERCMD := podman
 
 # Repo without tag
 REPO := quay.io/ansible/receptor
-# Override image tag
-TAG := v$(VERSION)
-# Will tag image as :latest in addition to :$(VERSION)
+# TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
+TAG := $(subst +,-,$(VERSION))
+# Set this to tag image as :latest in addition to :$(VERSION)
 LATEST :=
 
 container: .container-flag-$(VERSION)
@@ -124,7 +138,7 @@ container: .container-flag-$(VERSION)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
 	@touch .container-flag-$(VERSION)
 
 tc-image: container
@@ -143,4 +157,4 @@ clean:
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest receptorctl/.VERSION receptor-python-worker/.VERSION

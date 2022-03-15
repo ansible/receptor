@@ -37,13 +37,20 @@ jobs:
       - name: Checkout receptor
         uses: actions/checkout@v2
 
+      - name: Install python
+        uses: actions/setup-python@v2
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install build
+
       - name: Log in to registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build container image
         run: |
-          make container CONTAINERCMD=docker REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=${{ github.event.inputs.version }} LATEST=yes
+          make container CONTAINERCMD=docker REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
 
       - name: Stage container image
         run: |

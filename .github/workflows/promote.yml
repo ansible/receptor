@@ -16,7 +16,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 -m pip install wheel twine
+          python3 -m pip install twine build
 
       - name: Set official pypi info
         run: echo pypi_repo=pypi >> $GITHUB_ENV

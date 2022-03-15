@@ -1,1 +1,6 @@
-include requirements.txt # Needs manual inclusion due to PBR bug
+recursive-include receptorctl *.py
+include .VERSION
+exclude .gitignore
+exclude tox.ini
+exclude build-requirements.txt
+exclude test-requirements.txt

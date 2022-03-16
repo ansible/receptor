@@ -7,6 +7,10 @@ on:
         description: 'Version to release. (x.y.z) Will create a tag / draft release.'
         required: true
         default: ''
+      ref:
+        description: 'The ref to tag. Can be a branch name / SHA / etc.'
+        required: true
+        default: ''
       confirm:
         description: 'Are you sure? Set this to yes.'
         required: true
@@ -36,6 +40,8 @@ jobs:
 
       - name: Checkout receptor
         uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Install python
         uses: actions/setup-python@v2
@@ -62,4 +68,5 @@ jobs:
           ansible-playbook tools/ansible/stage.yml \
             -e version=${{ github.event.inputs.version }} \
             -e repo=${{ github.repository_owner }}/receptor \
-            -e github_token=${{ secrets.GITHUB_TOKEN }}
+            -e github_token=${{ secrets.GITHUB_TOKEN }} \
+            -e target_commitish=${{ github.event.inputs.ref }}

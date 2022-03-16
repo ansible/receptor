@@ -5,6 +5,7 @@
     payload:
       name: "v{{ version }}"
       tag_name: "v{{ version }}"
+      target_commitish: "{{ target_commitish }}"
       draft: true
   tasks:
     - name: Publish draft Release

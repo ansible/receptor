@@ -12,9 +12,12 @@ jobs:
     name: Push devel image
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Build Image
         run: |
-          TAG=receptor:devel make container
+          make container REPO=receptor TAG=devel
 
       - name: Test Image
         run: podman run --rm receptor:devel receptor --version

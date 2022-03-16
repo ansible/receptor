@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
@@ -20,12 +22,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Setup up python
         uses: actions/setup-python@v2
 
       - name: Install tox
-        run:  sudo apt-get install tox
+        run: pip install tox
 
       - name: Run receptorctl linters
         run: make receptorctl-lint
@@ -39,6 +43,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -102,6 +108,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Download receptor
         uses: actions/download-artifact@v2
@@ -118,7 +126,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install tox
-        run:  sudo apt-get install tox
+        run: pip install tox
 
       - name: Run receptorctl tests
         run: make receptorctl-test
@@ -129,6 +137,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+
+      - name: Install python dependencies
+        run: pip install build
 
       - name: Build container
         run: make container REPO=receptor LATEST=yes

@@ -52,7 +52,7 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 lint:
 	@golint cmd/... pkg/... example/...
 
-receptorctl-lint:
+receptorctl-lint: receptorctl/.VERSION
 	@cd receptorctl && tox -e lint
 
 format:
@@ -82,7 +82,7 @@ test: receptor
 	PATH=${PWD}:${PATH} \
 	go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -race
 
-receptorctl-test:
+receptorctl-test: receptorctl/.VERSION
 	@cd receptorctl && tox -e py3
 
 testloop: receptor

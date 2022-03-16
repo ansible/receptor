@@ -32,11 +32,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
+          fetch-depth: 0
           repository: ${{ github.event.inputs.repository }}
           ref: ${{ github.event.inputs.ref }}
 
       - name: build-all target
-        run: make build-all
+        run: make receptor
 
       - name: Upload binary
         env:

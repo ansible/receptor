@@ -10,8 +10,10 @@ receptorctl-test-venv/
 .container-flag*
 .VERSION
 kubectl
+/receptorctl/.VERSION
 /receptorctl/AUTHORS
 /receptorctl/ChangeLog
+/receptor-python-worker/.VERSION
 /receptor-python-worker/ChangeLog
 /receptor-python-worker/AUTHORS
 /receptorctl/venv/

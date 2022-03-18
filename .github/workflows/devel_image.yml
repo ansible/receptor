@@ -15,6 +15,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install build dependencies
+        run: |
+          pip install build
+
       - name: Build Image
         run: |
           make container REPO=receptor TAG=devel

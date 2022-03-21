@@ -18,7 +18,8 @@ import (
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network.
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
-	node string, rservice string, tlscfg *tls.Config) error {
+	node string, rservice string, tlscfg *tls.Config,
+) error {
 	uli, lock, err := utils.UnixSocketListen(filename, permissions)
 	if err != nil {
 		return fmt.Errorf("error opening Unix socket: %s", err)

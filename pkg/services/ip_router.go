@@ -47,7 +47,8 @@ type IPRouterService struct {
 
 // NewIPRouter creates a new IP router service.
 func NewIPRouter(nc *netceptor.Netceptor, networkName string, tunInterface string,
-	localNet string, routes string) (*IPRouterService, error) {
+	localNet string, routes string,
+) (*IPRouterService, error) {
 	ipr := &IPRouterService{
 		nc:              nc,
 		networkName:     networkName,

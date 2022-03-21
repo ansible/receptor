@@ -17,7 +17,8 @@ import (
 
 // TCPProxyServiceInbound listens on a TCP port and forwards the connection over the Receptor network.
 func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsServer *tls.Config,
-	node string, rservice string, tlsClient *tls.Config) error {
+	node string, rservice string, tlsClient *tls.Config,
+) error {
 	tli, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if tlsServer != nil {
 		tli = tls.NewListener(tli, tlsServer)
@@ -48,7 +49,8 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 
 // TCPProxyServiceOutbound listens on the Receptor network and forwards the connection via TCP.
 func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *tls.Config,
-	address string, tlsClient *tls.Config) error {
+	address string, tlsClient *tls.Config,
+) error {
 	qli, err := s.ListenAndAdvertise(service, tlsServer, map[string]string{
 		"type":    "TCP Proxy",
 		"address": address,

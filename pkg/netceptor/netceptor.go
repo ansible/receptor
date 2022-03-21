@@ -298,7 +298,8 @@ func makeNetworkName(nodeID string) string {
 // NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants.
 func NewWithConsts(ctx context.Context, nodeID string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
-	maxForwardingHops byte, maxConnectionIdleTime time.Duration) *Netceptor {
+	maxForwardingHops byte, maxConnectionIdleTime time.Duration,
+) *Netceptor {
 	s := Netceptor{
 		nodeID:                   nodeID,
 		mtu:                      mtu,
@@ -963,7 +964,8 @@ const (
 
 // ReceptorVerifyFunc generates a function that verifies a Receptor node ID.
 func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expectedHostname string,
-	expectedHostnameType ExpectedHostnameType, verifyType VerifyType) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	expectedHostnameType ExpectedHostnameType, verifyType VerifyType,
+) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		if len(rawCerts) == 0 {
 			logger.Error("RVF failed: peer certificate missing")

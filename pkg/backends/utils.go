@@ -18,7 +18,8 @@ type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
 // dialerSession is a convenience function for backends that use dial/retry logic.
 func dialerSession(ctx context.Context, wg *sync.WaitGroup, redial bool, redialDelay time.Duration,
-	df dialerFunc) (chan netceptor.BackendSession, error) {
+	df dialerFunc,
+) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
 	wg.Add(1)
 	go func() {

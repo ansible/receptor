@@ -171,11 +171,12 @@ func TestWork(t *testing.T) {
 					},
 					map[interface{}]interface{}{
 						"tls-client": map[interface{}]interface{}{
-							"name":               "tlsclientwrongCN",
-							"rootcas":            caCrt,
-							"insecureskipverify": false,
-							"cert":               crt3,
-							"key":                key3,
+							"name":                   "tlsclientwrongCN",
+							"rootcas":                caCrt,
+							"insecureskipverify":     false,
+							"cert":                   crt3,
+							"key":                    key3,
+							"skipreceptornamescheck": true,
 						},
 					},
 				},

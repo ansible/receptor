@@ -334,7 +334,8 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			key1, crt1, err := utils.GenerateCert("node1", "localhost", []string{"localhost"}, []string{"node1"})
+			// receptorName needs to be "node2" here because this cert is consumed by netceptor.MainInstance.nodeID=Node2 below
+			key1, crt1, err := utils.GenerateCert("node2", "localhost", []string{"localhost"}, []string{"node2"})
 			if err != nil {
 				t.Fatal(err)
 			}

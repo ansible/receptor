@@ -170,6 +170,24 @@ func useUtilsSetupSuite(t *testing.T, name string) (string, string, string, func
 	}
 }
 
+func useUtilsSetupSuiteWithGenerateWithCA(t *testing.T, name string) (string, string, string, func(t *testing.T)) {
+	caKey, caCert, err := utils.GenerateCA(name, name)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	certKey, cert, err := utils.GenerateCertWithCA(name, caKey, caCert, name, nil, []string{"foobar"})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	return caCert, cert, certKey, func(t *testing.T) {
+		defer os.Remove(caCert)
+		defer os.Remove(caKey)
+		defer os.Remove(certKey)
+		defer os.Remove(cert)
+	}
+}
+
 func TestPrepareGoodTlsServerCfg(t *testing.T) {
 	tempCertFile, tempCertKey, tempCA, teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
@@ -243,5 +261,24 @@ func TestBadNodeIDWithUtilsGenerateCert(t *testing.T) {
 
 	if err := cfg.Prepare(); err == nil {
 		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have failed", MainInstance.nodeID)
+	}
+}
+
+func TestNodeIDWithUtilsGenerateCertWithCA(t *testing.T) {
+	caCert, tempCert, tempCertKey, tearDownSuite := useUtilsSetupSuiteWithGenerateWithCA(t, "foobar")
+	defer tearDownSuite(t)
+
+	cfg := &tlsClientConfig{
+		Name:               "foobar",
+		Cert:               tempCert,
+		Key:                tempCertKey,
+		RootCAs:            caCert,
+		InsecureSkipVerify: false,
+	}
+
+	MainInstance = New(context.Background(), "foobar")
+
+	if err := cfg.Prepare(); err != nil {
+		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have not failed", MainInstance.nodeID)
 	}
 }

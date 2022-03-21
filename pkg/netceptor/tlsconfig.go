@@ -41,14 +41,39 @@ func decodeFingerprints(fingerprints []string) ([][]byte, error) {
 	return fingerprintBytes, nil
 }
 
+func checkCertificatesMatchNodeID(certbytes []byte, n *Netceptor, certName string, certPath string) error {
+	block, _ := pem.Decode(certbytes)
+
+	if block == nil {
+		return fmt.Errorf("failed to parse certfifcate PEM")
+	}
+
+	parsedCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	found, receptorNames, err := utils.ParseReceptorNamesFromCert(parsedCert, n.nodeID)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("MainInstance.nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s", MainInstance.nodeID, fmt.Sprint(receptorNames), certName, certPath)
+	}
+
+	return nil
+}
+
 // tlsServerCfg stores the configuration options for a TLS server.
 type tlsServerCfg struct {
-	Name              string   `required:"true" description:"Name of this TLS server configuration"`
-	Cert              string   `required:"true" description:"Server certificate filename"`
-	Key               string   `required:"true" description:"Server private key filename"`
-	RequireClientCert bool     `description:"Require client certificates" default:"false"`
-	ClientCAs         string   `description:"Filename of CA bundle to verify client certs with"`
-	PinnedClientCert  []string `description:"Pinned fingerprint of required client certificate"`
+	Name                   string   `required:"true" description:"Name of this TLS server configuration"`
+	Cert                   string   `required:"true" description:"Server certificate filename"`
+	Key                    string   `required:"true" description:"Server private key filename"`
+	RequireClientCert      bool     `required:"false" description:"Require client certificates" default:"false"`
+	ClientCAs              string   `required:"false" description:"Filename of CA bundle to verify client certs with"`
+	PinnedClientCert       []string `required:"false" description:"Pinned fingerprint of required client certificate"`
+	SkipReceptorNamesCheck bool     `required:"false" description:"if enabled, validate cert using ReceptorNames OID in Certificate"`
 }
 
 // Prepare creates the tls.config and stores it in the global map.
@@ -58,7 +83,7 @@ func (cfg tlsServerCfg) Prepare() error {
 		MinVersion:               tls.VersionTLS12,
 	}
 
-	certbytes, err := ioutil.ReadFile(cfg.Cert)
+	certBytes, err := ioutil.ReadFile(cfg.Cert)
 	if err != nil {
 		return err
 	}
@@ -66,36 +91,15 @@ func (cfg tlsServerCfg) Prepare() error {
 	if err != nil {
 		return err
 	}
-	cert, err := tls.X509KeyPair(certbytes, keybytes)
+	cert, err := tls.X509KeyPair(certBytes, keybytes)
 	if err != nil {
 		return err
 	}
-
-	block, _ := pem.Decode(certbytes)
-	if block == nil {
-		return fmt.Errorf("failed to parse certificate PEM")
-	}
-
-	parsedCert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return err
-	}
-
-	s, err := utils.ReceptorNames(parsedCert.Extensions)
-	if err != nil {
-		return err
-	}
-
-	found := false
-
-	for _, name := range s {
-		if MainInstance.nodeID == name {
-			found = true
+	// check server crt to ensure that the receptor NodeID is in the client certificate as an OID
+	if !cfg.SkipReceptorNamesCheck {
+		if err := checkCertificatesMatchNodeID(certBytes, MainInstance, cfg.Name, cfg.Cert); err != nil {
+			return err
 		}
-	}
-
-	if !found {
-		return fmt.Errorf("nodeID=%s not found in certificate name(s); cfg section=%s; server cert=%s", MainInstance.nodeID, cfg.Name, cfg.Cert)
 	}
 
 	tlscfg.Certificates = []tls.Certificate{cert}
@@ -135,12 +139,13 @@ func (cfg tlsServerCfg) Prepare() error {
 
 // tlsClientConfig stores the configuration options for a TLS client.
 type tlsClientConfig struct {
-	Name               string   `required:"true" description:"Name of this TLS client configuration"`
-	Cert               string   `required:"false" description:"Client certificate filename"`
-	Key                string   `required:"false" description:"Client private key filename"`
-	RootCAs            string   `required:"false" description:"Root CA bundle to use instead of system trust"`
-	InsecureSkipVerify bool     `required:"false" description:"Accept any server cert" default:"false"`
-	PinnedServerCert   []string `required:"false" description:"Pinned fingerprint of required server certificate"`
+	Name                   string   `required:"true" description:"Name of this TLS client configuration"`
+	Cert                   string   `required:"false" description:"Client certificate filename"`
+	Key                    string   `required:"false" description:"Client private key filename"`
+	RootCAs                string   `required:"false" description:"Root CA bundle to use instead of system trust"`
+	InsecureSkipVerify     bool     `required:"false" description:"Accept any server cert" default:"false"`
+	PinnedServerCert       []string `required:"false" description:"Pinned fingerprint of required server certificate"`
+	SkipReceptorNamesCheck bool     `required:"false" description:"if enabled, validate cert using ReceptorNames OID in Certificate"`
 }
 
 // Prepare creates the tls.config and stores it in the global map.
@@ -165,6 +170,13 @@ func (cfg tlsClientConfig) Prepare() error {
 		cert, err := tls.X509KeyPair(certBytes, keyBytes)
 		if err != nil {
 			return err
+		}
+
+		// check client crt to ensure that the receptor NodeID is in the client certificate as an OID
+		if !cfg.SkipReceptorNamesCheck {
+			if err := checkCertificatesMatchNodeID(certBytes, MainInstance, cfg.Name, cfg.Cert); err != nil {
+				return err
+			}
 		}
 		tlscfg.Certificates = []tls.Certificate{cert}
 	}

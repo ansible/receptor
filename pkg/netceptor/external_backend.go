@@ -16,7 +16,6 @@ import (
 // is initiating connections, outside the control of a Receptor-managed accept loop.
 type ExternalBackend struct {
 	ctx      context.Context
-	cancel   context.CancelFunc
 	sessChan chan BackendSession
 }
 
@@ -152,8 +151,7 @@ func NewExternalBackend() (*ExternalBackend, error) {
 }
 
 // Start launches the backend from Receptor's point of view, and waits for connections to happen.
-func (b *ExternalBackend) Start(ctx context.Context, wg *sync.WaitGroup) (chan BackendSession, error) {
-	b.ctx, b.cancel = context.WithCancel(ctx)
+func (b *ExternalBackend) Start(ctx context.Context, _ *sync.WaitGroup) (chan BackendSession, error) {
 	b.ctx = ctx
 	b.sessChan = make(chan BackendSession)
 
@@ -165,32 +163,40 @@ type ExternalSession struct {
 	eb          *ExternalBackend
 	conn        MessageConn
 	shouldClose bool
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // NewConnection is called by the external code when a new connection is available.  The
-// connection will be closed when the session ends if closeConnWithSession is true.
-func (b *ExternalBackend) NewConnection(conn MessageConn, closeConnWithSession bool) {
+// connection will be closed when the session ends if closeConnWithSession is true. The
+// returned context will be cancelled after the connection closes.
+func (b *ExternalBackend) NewConnection(conn MessageConn, closeConnWithSession bool) context.Context {
+	ctx, cancel := context.WithCancel(b.ctx)
 	ebs := &ExternalSession{
 		eb:          b,
 		conn:        conn,
 		shouldClose: closeConnWithSession,
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 	b.sessChan <- ebs
+
+	return ctx
 }
 
 // Send sends data over the session.
 func (es *ExternalSession) Send(data []byte) error {
-	return es.conn.WriteMessage(es.eb.ctx, data)
+	return es.conn.WriteMessage(es.ctx, data)
 }
 
 // Recv receives data via the session.
 func (es *ExternalSession) Recv(timeout time.Duration) ([]byte, error) {
-	return es.conn.ReadMessage(es.eb.ctx, timeout)
+	return es.conn.ReadMessage(es.ctx, timeout)
 }
 
 // Close closes the session.
 func (es *ExternalSession) Close() error {
-	es.eb.cancel()
+	es.cancel()
 	var err error
 	if es.shouldClose {
 		err = es.conn.Close()

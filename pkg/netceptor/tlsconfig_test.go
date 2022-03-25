@@ -282,3 +282,35 @@ func TestNodeIDWithUtilsGenerateCertWithCA(t *testing.T) {
 		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have not failed", MainInstance.nodeID)
 	}
 }
+
+func TestNodeIDWIthSkipReceptorNamesCheckTrue(t *testing.T) {
+	caCert, tempCert, tempCertKey, tearDownSuite := useUtilsSetupSuiteWithGenerateWithCA(t, "foobaz")
+	defer tearDownSuite(t)
+
+	clientCfg := &tlsClientConfig{
+		Name:                   "foobaz-client",
+		Cert:                   tempCert,
+		Key:                    tempCertKey,
+		RootCAs:                caCert,
+		InsecureSkipVerify:     false,
+		SkipReceptorNamesCheck: true,
+	}
+
+	serverCfg := &tlsServerCfg{
+		Name:                   "foobaz-server",
+		Cert:                   tempCert,
+		Key:                    tempCertKey,
+		RequireClientCert:      false,
+		ClientCAs:              caCert,
+		SkipReceptorNamesCheck: true,
+	}
+
+	MainInstance = New(context.Background(), "foobar")
+
+	if err := clientCfg.Prepare(); err != nil {
+		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have not failed", MainInstance.nodeID)
+	}
+	if err := serverCfg.Prepare(); err != nil {
+		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have not failed", MainInstance.nodeID)
+	}
+}

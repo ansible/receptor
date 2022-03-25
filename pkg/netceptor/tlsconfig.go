@@ -73,7 +73,7 @@ type tlsServerCfg struct {
 	RequireClientCert      bool     `required:"false" description:"Require client certificates" default:"false"`
 	ClientCAs              string   `required:"false" description:"Filename of CA bundle to verify client certs with"`
 	PinnedClientCert       []string `required:"false" description:"Pinned fingerprint of required client certificate"`
-	SkipReceptorNamesCheck bool     `required:"false" description:"if enabled, validate cert using ReceptorNames OID in Certificate"`
+	SkipReceptorNamesCheck bool     `required:"false" description:"Skip verifying ReceptorNames OIDs in certificate at startup" default:"false"`
 }
 
 // Prepare creates the tls.config and stores it in the global map.
@@ -145,7 +145,7 @@ type tlsClientConfig struct {
 	RootCAs                string   `required:"false" description:"Root CA bundle to use instead of system trust"`
 	InsecureSkipVerify     bool     `required:"false" description:"Accept any server cert" default:"false"`
 	PinnedServerCert       []string `required:"false" description:"Pinned fingerprint of required server certificate"`
-	SkipReceptorNamesCheck bool     `required:"false" description:"if enabled, validate cert using ReceptorNames OID in Certificate"`
+	SkipReceptorNamesCheck bool     `required:"false" description:"if enabled, skip verifying ReceptorNames OIDs in certificate at startup"`
 }
 
 // Prepare creates the tls.config and stores it in the global map.

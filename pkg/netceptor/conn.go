@@ -92,6 +92,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	cfg := &quic.Config{
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
 	}
+	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
 	ql, err := quic.Listen(pc, tlscfg, cfg)
 	if err != nil {
 		return nil, err
@@ -322,6 +323,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}()
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
+	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
 	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
 	if err != nil {
 		close(okChan)

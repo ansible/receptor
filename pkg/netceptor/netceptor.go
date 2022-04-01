@@ -1081,20 +1081,9 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		}
 
 		if expectedHostnameType == ExpectedHostnameTypeReceptor {
-			var receptorNames []string
-			receptorNames, err = utils.ReceptorNames(certs[0].Extensions)
+			found, receptorNames, err := utils.ParseReceptorNamesFromCert(certs[0], expectedHostname)
 			if err != nil {
-				logger.Error("RVF failed to get ReceptorNames: %s", err)
-
 				return err
-			}
-			found := false
-			for _, receptorName := range receptorNames {
-				if receptorName == expectedHostname {
-					found = true
-
-					break
-				}
 			}
 			if !found {
 				logger.Error("RVF ReceptorNameError: expected %s but found %s", expectedHostname, strings.Join(receptorNames, ", "))

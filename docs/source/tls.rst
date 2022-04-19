@@ -4,6 +4,8 @@ TLS support
 Receptor supports mutual TLS authentication and encryption for above and below the
 mesh connections.
 
+If you decide to consume TLS authentication in your mesh, the certificates OIDs (1.3.6.1.4.1.2312.19.1) will be verified against the `node.id` specified in the configuration file. If there is no match, the receptor binary will hard exit. You can `Skip Certificate Validation`_ as well.
+
 Configuring TLS
 ^^^^^^^^^^^^^^^
 
@@ -112,6 +114,43 @@ To find the fingerprint of a given certificate, use the following OpenSSL comman
    openssl x509 -in my-cert.pem -noout -fingerprint -sha256
 
 SHA256 and SHA512 fingerprints are supported.  SHA1 fingerprints are not supported due to the insecurity of the SHA1 algorithm.
+
+Skip Certificate Validation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you are in a development environment and need to turn off certificate validation, you can add a `SkipReceptorNamesCheck` key-value pair in your configuration file for `tls-server`, `tls-config`, or both.
+THIS IS NOT RECOMMENDED IN PRODUCTION.
+
+.. code-block:: yaml
+
+    ---
+    - node:
+        id: bar
+
+    - log-level:
+        level: Debug
+
+    - tls-client:
+        name: myclient
+        rootcas: /full/path/ca.crt
+        insecureskipverify: false
+        cert: /full/path/bar.crt
+        key: /full/path/bar.key
+        skipreceptornamescheck: true
+
+    - tls-server:
+        name: myserver
+        cert: /full/path/foo.crt
+        key: /full/path/foo.key
+        requireclientcert: true
+        clientcas: /full/path/ca.crt
+        pinnedclientcert:
+          - E6:9B:98:A7:A5:DB:17:D6:E4:2C:DE:76:45:42:A8:79:A3:0A:C5:6D:10:42:7A:6A:C4:54:57:83:F1:0F:E2:95
+        skipreceptornamescheck: true
+
+    - tcp-peer:
+        address: localhost:2222
+        tls: myclient
 
 Above the mesh TLS
 ^^^^^^^^^^^^^^^^^^

@@ -564,8 +564,8 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 				}
 			}
 			if err == io.EOF {
-				stdoutSize := stdoutSize(unitdir)
-				if IsComplete(unit.Status().State) && stdoutSize >= unit.Status().StdoutSize {
+				unitStatus := unit.Status()
+				if IsComplete(unitStatus.State) && filePos >= unitStatus.StdoutSize {
 					logger.Debug("Stdout complete - closing channel for: %s \n", unitID)
 
 					return

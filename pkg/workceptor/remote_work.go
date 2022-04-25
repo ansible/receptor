@@ -466,7 +466,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					return
 				}
 			}()
-			_, err = io.Copy(stdout, conn)
+			_, err = io.Copy(stdout, reader)
 			close(doneChan)
 			if err != nil {
 				var errmsg string

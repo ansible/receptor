@@ -187,15 +187,9 @@ def status(ctx, printjson):
         )
         for ad in ads:
             time = dateutil.parser.parse(ad["Time"])
-            if ad["ConnType"] == 0:
-                conn_type = "Datagram"
-            elif ad["ConnType"] == 1:
-                conn_type = "Stream"
-            elif ad["ConnType"] == 2:
-                conn_type = "StreamTLS"
             last_seen = f"{time:%Y-%m-%d %H:%M:%S}"
             print_message(
-                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {conn_type:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}"  # noqa: E501
+                f"{ad['NodeID']:<{longest_node}} {ad['Service']:<9} {ad['ConnTypeLabel']:<10} {last_seen:<21} {'-' if (ad['Tags'] is None) else str(ad['Tags']):<16}"  # noqa: E501
             )
 
     def print_worktypes(header, isSecure):

@@ -65,6 +65,28 @@ func checkCertificatesMatchNodeID(certbytes []byte, n *Netceptor, certName strin
 	return nil
 }
 
+func baseTLS(minTLS13 bool) *tls.Config {
+	var tlscfg *tls.Config
+	if minTLS13 {
+		tlscfg = &tls.Config{
+			PreferServerCipherSuites: true,
+			MinVersion:               tls.VersionTLS13,
+		}
+	} else {
+		tlscfg = &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+			},
+		}
+	}
+
+	return tlscfg
+}
+
 // tlsServerCfg stores the configuration options for a TLS server.
 type tlsServerCfg struct {
 	Name                   string   `required:"true" description:"Name of this TLS server configuration"`
@@ -74,15 +96,12 @@ type tlsServerCfg struct {
 	ClientCAs              string   `required:"false" description:"Filename of CA bundle to verify client certs with"`
 	PinnedClientCert       []string `required:"false" description:"Pinned fingerprint of required client certificate"`
 	SkipReceptorNamesCheck bool     `required:"false" description:"Skip verifying ReceptorNames OIDs in certificate at startup" default:"false"`
+	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"false"`
 }
 
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsServerCfg) Prepare() error {
-	tlscfg := &tls.Config{
-		PreferServerCipherSuites: true,
-		MinVersion:               tls.VersionTLS12,
-	}
-
+	tlscfg := baseTLS(cfg.MinTLS13)
 	certBytes, err := ioutil.ReadFile(cfg.Cert)
 	if err != nil {
 		return err
@@ -145,16 +164,13 @@ type tlsClientConfig struct {
 	RootCAs                string   `required:"false" description:"Root CA bundle to use instead of system trust"`
 	InsecureSkipVerify     bool     `required:"false" description:"Accept any server cert" default:"false"`
 	PinnedServerCert       []string `required:"false" description:"Pinned fingerprint of required server certificate"`
-	SkipReceptorNamesCheck bool     `required:"false" description:"if enabled, skip verifying ReceptorNames OIDs in certificate at startup"`
+	SkipReceptorNamesCheck bool     `required:"false" description:"if true, skip verifying ReceptorNames OIDs in certificate at startup"`
+	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"false"`
 }
 
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsClientConfig) Prepare() error {
-	tlscfg := &tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-	}
-
+	tlscfg := baseTLS(cfg.MinTLS13)
 	if cfg.Cert != "" || cfg.Key != "" {
 		if cfg.Cert == "" || cfg.Key == "" {
 			return fmt.Errorf("cert and key must both be supplied or neither")

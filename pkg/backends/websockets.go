@@ -278,6 +278,10 @@ func (cfg websocketListenerCfg) Run() error {
 	if err != nil {
 		return err
 	}
+	// websockets requires at least the following cipher at the top of the list
+	if tlscfg != nil && len(tlscfg.CipherSuites) > 0 {
+		tlscfg.CipherSuites = append([]uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}, tlscfg.CipherSuites...)
+	}
 	b, err := NewWebsocketListener(address, tlscfg)
 	if err != nil {
 		logger.Error("Error creating listener %s: %s\n", address, err)

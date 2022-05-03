@@ -822,3 +822,37 @@ func TestAllowedPeers(t *testing.T) {
 	n1.BackendWait()
 	n2.BackendWait()
 }
+
+func TestSetMaxConnectionIdleTime(t *testing.T) {
+	t.Parallel()
+	node := New(context.Background(), "node1")
+	defer node.Shutdown()
+	err := node.SetMaxConnectionIdleTime("60s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	time, _ := time.ParseDuration("60s")
+	if node.MaxConnectionIdleTime() != time {
+		t.Fatal("setter behaved incorrectly")
+	}
+}
+
+func TestSetBadMaxConnectionIdleTime(t *testing.T) {
+	t.Parallel()
+	node := New(context.Background(), "node1")
+	defer node.Shutdown()
+	err := node.SetMaxConnectionIdleTime("60d")
+	if err == nil {
+		t.Fatal("this should have failed out, as we're passing in an invalid date-string to SetMaxConnectionIdleTime")
+	}
+}
+
+func TestTooShortSetMaxConnectionIdleTime(t *testing.T) {
+	t.Parallel()
+	node := New(context.Background(), "node1")
+	defer node.Shutdown()
+	err := node.SetMaxConnectionIdleTime("60us")
+	if err == nil {
+		t.Fatal("this should have failed out, as we're passing in an invalid time object that violates the logic in SetMaxConnectionIdleTime")
+	}
+}

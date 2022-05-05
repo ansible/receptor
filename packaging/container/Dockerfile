@@ -22,7 +22,9 @@ COPY receptor.conf /etc/receptor/receptor.conf
 
 RUN dnf -y update && \
     dnf -y install python3-pip && \
+    dnf -y install podman-remote && \
     dnf clean all && \
+    ln -s /usr/bin/podman-remote /usr/bin/podman && \
     pip install --no-cache-dir wheel dumb-init && \
     pip install --no-cache-dir /tmp/*.whl && \
     rm /tmp/*.whl

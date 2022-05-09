@@ -26,33 +26,33 @@ func TestQuicConnectTimeout(t *testing.T) {
 	// Start a TCP listener on the first node
 	b1, err := backends.NewTCPListener("localhost:3333", nil)
 	if err != nil {
-		t.Fatal(fmt.Sprintf("Error listening on TCP: %s\n", err))
+		t.Fatalf(fmt.Sprintf("Error listening on TCP: %s\n", err))
 	}
 	err = n1.AddBackend(b1)
 	if err != nil {
-		t.Fatal(fmt.Sprintf("Error starting backend: %s\n", err))
+		t.Fatalf(fmt.Sprintf("Error starting backend: %s\n", err))
 	}
 
 	// Start a TCP dialer on the second node - this will connect to the listener we just started
 	b2, err := backends.NewTCPDialer("localhost:3333", false, nil)
 	if err != nil {
-		t.Fatal(fmt.Sprintf("Error dialing on TCP: %s\n", err))
+		t.Fatalf(fmt.Sprintf("Error dialing on TCP: %s\n", err))
 	}
 	err = n2.AddBackend(b2)
 	if err != nil {
-		t.Fatal(fmt.Sprintf("Error starting backend: %s\n", err))
+		t.Fatalf(fmt.Sprintf("Error starting backend: %s\n", err))
 	}
 
 	// Start an echo server on node 1
 	l1, err := n1.Listen("echo", nil)
 	if err != nil {
-		t.Fatal(fmt.Sprintf("Error listening on Receptor network: %s\n", err))
+		t.Fatalf(fmt.Sprintf("Error listening on Receptor network: %s\n", err))
 	}
 	go func() {
 		// Accept an incoming connection - note that conn is just a regular net.Conn
 		conn, err := l1.Accept()
 		if err != nil {
-			t.Fatal(fmt.Sprintf("Error accepting connection: %s\n", err))
+			t.Fatalf(fmt.Sprintf("Error accepting connection: %s\n", err))
 
 			return
 		}
@@ -69,7 +69,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 					if strings.Contains(err.Error(), "no recent network activity") {
 						t.Log("Successfully got the desired timeout error")
 					} else {
-						t.Fatal(fmt.Sprintf("Read error in Receptor listener: %s\n", err))
+						t.Fatalf(fmt.Sprintf("Read error in Receptor listener: %s\n", err))
 					}
 
 					return
@@ -77,7 +77,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 				if n > 0 {
 					_, err := conn.Write(buf[:n])
 					if err != nil {
-						t.Fatal(fmt.Sprintf("Write error in Receptor listener: %s\n", err))
+						t.Fatalf(fmt.Sprintf("Write error in Receptor listener: %s\n", err))
 
 						return
 					}

@@ -189,7 +189,7 @@ func TestTraceroute(t *testing.T) {
 				}
 				_, ok = valMap["Error"]
 				if ok {
-					t.Fatal(fmt.Sprintf("traceroute returned error: %s", valMap["Error"]))
+					t.Fatalf(fmt.Sprintf("traceroute returned error: %s", valMap["Error"]))
 				}
 			}
 			expectedHops := []struct {
@@ -219,10 +219,10 @@ func TestTraceroute(t *testing.T) {
 					}
 				}
 				if !ok {
-					t.Fatal(fmt.Sprintf("hop %s not in result data or not in expected format", eh.key))
+					t.Fatalf(fmt.Sprintf("hop %s not in result data or not in expected format", eh.key))
 				}
 				if fromStr != eh.from {
-					t.Fatal(fmt.Sprintf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr))
+					t.Fatalf(fmt.Sprintf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr))
 				}
 			}
 

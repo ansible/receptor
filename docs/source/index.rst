@@ -124,6 +124,5 @@ Note: the config file does not specify a node ID, so the hostname (on the contai
    k8s
    tls
    firewall
-   edge_networks
    developer_guide
    release_process

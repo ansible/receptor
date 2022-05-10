@@ -19,10 +19,9 @@ import (
 )
 
 type nodeCfg struct {
-	ID                       string                       `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
-	DataDir                  string                       `description:"Directory in which to store node data"`
-	FirewallRules            []netceptor.FirewallRuleData `description:"Firewall Rules (see documentation for syntax)"`
-	MaxIdleConnectionTimeout string                       `description:"Max duration with no traffic before a backend connection is timed out and refreshed."`
+	ID            string                       `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
+	DataDir       string                       `description:"Directory in which to store node data"`
+	FirewallRules []netceptor.FirewallRuleData `description:"Firewall Rules (see documentation for syntax)"`
 }
 
 func (cfg nodeCfg) Init() error {
@@ -41,7 +40,6 @@ func (cfg nodeCfg) Init() error {
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
-
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
 
 	if len(cfg.FirewallRules) > 0 {
@@ -50,16 +48,6 @@ func (cfg nodeCfg) Init() error {
 			return err
 		}
 		err = netceptor.MainInstance.AddFirewallRules(rules, true)
-		if err != nil {
-			return err
-		}
-	}
-
-	// update netceptor.MainInstance with the MaxIdleConnectionTimeout from the nodeCfg struct
-	// this is a fall-forward mechanism. If the user didn't provide a value for MaxIdleConnectionTimeout in their configuration file,
-	// we will apply the default timeout of 30s to netceptor.maxConnectionIdleTime
-	if cfg.MaxIdleConnectionTimeout != "" {
-		err = netceptor.MainInstance.SetMaxConnectionIdleTime(cfg.MaxIdleConnectionTimeout)
 		if err != nil {
 			return err
 		}

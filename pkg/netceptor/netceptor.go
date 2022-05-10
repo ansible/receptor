@@ -441,23 +441,6 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
 }
 
-// Sets the MaxConnectionIdleTime object on the Netceptor instance.
-func (s *Netceptor) SetMaxConnectionIdleTime(userDefinedMaxIdleConnectionTimeout string) error {
-	// before we instantiate a new instance of Netceptor, let's verify that the user defined maxidleconnectiontimeout value is parseable
-	duration, err := time.ParseDuration(userDefinedMaxIdleConnectionTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to parse MaxIdleConnectionTimeout from configuration file -- valid examples include '1.5h', '30m', '30m10s'")
-	}
-	// we don't want the user defined timeout to be less than the defaultMaxConnectionIdleTime constant
-	if duration < defaultMaxConnectionIdleTime {
-		return fmt.Errorf("user defined maxIdleConnectionTimeout [%d] is less than the default default timeout [%d]", duration, defaultMaxConnectionIdleTime)
-	}
-
-	s.maxConnectionIdleTime = duration
-
-	return nil
-}
-
 type backendInfo struct {
 	connectionCost float64
 	nodeCost       map[string]float64

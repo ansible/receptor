@@ -3,7 +3,6 @@ package mesh
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -189,7 +188,7 @@ func TestTraceroute(t *testing.T) {
 				}
 				_, ok = valMap["Error"]
 				if ok {
-					t.Fatalf(fmt.Sprintf("traceroute returned error: %s", valMap["Error"]))
+					t.Fatalf("traceroute returned error: %s", valMap["Error"])
 				}
 			}
 			expectedHops := []struct {
@@ -219,10 +218,10 @@ func TestTraceroute(t *testing.T) {
 					}
 				}
 				if !ok {
-					t.Fatalf(fmt.Sprintf("hop %s not in result data or not in expected format", eh.key))
+					t.Fatalf("hop %s not in result data or not in expected format", eh.key)
 				}
 				if fromStr != eh.from {
-					t.Fatalf(fmt.Sprintf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr))
+					t.Fatalf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr)
 				}
 			}
 

@@ -94,11 +94,13 @@ func podRunningAndReady() func(event watch.Event) (bool, error) {
 						conditions[i].Status == corev1.ConditionFalse {
 						statuses := t.Status.ContainerStatuses
 						for j := range statuses {
-							if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
-								if imagePullBackOffRetries == 0 {
-									return false, ErrImagePullBackOff
+							if statuses[j].State.Waiting != nil {
+								if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
+									if imagePullBackOffRetries == 0 {
+										return false, ErrImagePullBackOff
+									}
+									imagePullBackOffRetries--
 								}
-								imagePullBackOffRetries--
 							}
 						}
 					}

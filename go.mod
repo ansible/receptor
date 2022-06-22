@@ -9,7 +9,7 @@ require (
 	github.com/ghjm/cmdline v0.1.2
 	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.0
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
 	github.com/lucas-clemente/quic-go v0.26.0
 	github.com/minio/highwayhash v1.0.2

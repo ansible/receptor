@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/creack/pty v1.1.17
 	github.com/fortytw2/leaktest v1.3.0
-	github.com/fsnotify/fsnotify v1.5.1
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/ghjm/cmdline v0.1.2
 	github.com/golang-jwt/jwt/v4 v4.4.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
@@ -52,7 +52,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	golang.org/x/tools v0.1.2 // indirect

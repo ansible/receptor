@@ -63,15 +63,15 @@ func TestStatusFileLock(t *testing.T) {
 				}
 				fileHasExisted = true
 				if err != nil {
-					t.Fatal(fmt.Sprintf("Error loading status file: %s", err))
+					t.Fatalf("Error loading status file: %s", err)
 				}
 				detailIter, err := strconv.Atoi(sfd.Detail)
 				if err != nil {
-					t.Fatal(fmt.Sprintf("Error converting status detail to int: %s", err))
+					t.Fatalf("Error converting status detail to int: %s", err)
 				}
 				if detailIter >= 0 {
 					if int64(sfd.State) != sfd.StdoutSize || sfd.State != detailIter {
-						t.Fatal("Mismatched data in struct")
+						t.Fatalf("Mismatched data in struct")
 					}
 				}
 			}

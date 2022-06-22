@@ -3,7 +3,7 @@ module github.com/ansible/receptor
 go 1.17
 
 require (
-	github.com/creack/pty v1.1.17
+	github.com/creack/pty v1.1.18
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/ghjm/cmdline v0.1.2

@@ -16,6 +16,7 @@ func BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2
 	go bridgeHalf(c1, c1Name, c2, c2Name, doneChan)
 	go bridgeHalf(c2, c2Name, c1, c1Name, doneChan)
 	<-doneChan
+	<-doneChan
 }
 
 // BridgeHalf bridges the read side of c1 to the write side of c2.

@@ -49,6 +49,13 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install build
+      
+      # setup qemu and buildx
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2  
 
       - name: Log in to registry
         run: |
@@ -56,7 +63,7 @@ jobs:
 
       - name: Build container image
         run: |
-          make container CONTAINERCMD=docker REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
+          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le --push" REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
 
       - name: Stage container image
         run: |

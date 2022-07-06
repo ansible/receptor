@@ -295,8 +295,12 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	cfg := &quic.Config{
 		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
-		KeepAlive:            KeepAliveForQuicConnections,
 	}
+
+	if KeepAliveForQuicConnections {
+		cfg.KeepAlivePeriod = MaxIdleTimeoutForQuicConnections / 2
+	}
+
 	if tlscfg == nil {
 		tlscfg = generateClientTLSConfig()
 	} else {

@@ -271,7 +271,7 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
-	qc       quic.Session
+	qc       quic.Connection
 	qs       quic.Stream
 	doneChan chan struct{}
 	doneOnce *sync.Once

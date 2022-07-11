@@ -76,8 +76,17 @@ var logLevelMap = map[string]int{
 	"debug":   DebugLevel,
 }
 
+type MessageFunc func(level int, format string, v ...interface{})
+
+var logger MessageFunc
+
 // Log sends a log message at a given level.
 func Log(level int, format string, v ...interface{}) {
+	if logger != nil {
+		logger(level, format, v...)
+
+		return
+	}
 	var prefix string
 	logLevelName, err := LogLevelToName(level)
 	if err != nil {
@@ -90,6 +99,11 @@ func Log(level int, format string, v ...interface{}) {
 		log.SetPrefix(prefix)
 		log.Printf(format, v...)
 	}
+}
+
+// RegisterLogger registers a function for log delivery.
+func RegisterLogger(msgFunc MessageFunc) {
+	logger = msgFunc
 }
 
 // Error reports unexpected behavior, likely to result in termination.

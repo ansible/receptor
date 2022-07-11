@@ -411,8 +411,8 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	return c.qs.Write(b)
 }
 
-// Close closes the writer side of the connection.
-func (c *Conn) Close() error {
+// CloseWrite closes the writer side of the connection.
+func (c *Conn) CloseWrite() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
@@ -420,7 +420,7 @@ func (c *Conn) Close() error {
 	return c.qs.Close()
 }
 
-func (c *Conn) CloseConnection() error {
+func (c *Conn) Close() error {
 	c.pc.cancel()
 	c.doneOnce.Do(func() {
 		close(c.doneChan)

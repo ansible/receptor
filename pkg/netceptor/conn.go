@@ -271,7 +271,7 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
-	qc       quic.Session
+	qc       quic.Connection
 	qs       quic.Stream
 	doneChan chan struct{}
 	doneOnce *sync.Once
@@ -292,11 +292,16 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	rAddr := s.NewAddr(node, service)
+
 	cfg := &quic.Config{
 		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
-		KeepAlive:            KeepAliveForQuicConnections,
 	}
+
+	if KeepAliveForQuicConnections {
+		cfg.KeepAlivePeriod = MaxIdleTimeoutForQuicConnections / 2
+	}
+
 	if tlscfg == nil {
 		tlscfg = generateClientTLSConfig()
 	} else {

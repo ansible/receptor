@@ -29,7 +29,7 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - golint
+    # - golint # Deprecated.
     - gomoddirectives
     - gomodguard
     # - goprintffuncname # TODO: logging methods are not named like the ones in `fmt` which could lead to problems.

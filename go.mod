@@ -22,7 +22,7 @@ require (
 	golang.org/x/net v0.0.0-20220630215102-69896b714898
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.24.2
-	k8s.io/apimachinery v0.24.2
+	k8s.io/apimachinery v0.24.3
 	k8s.io/client-go v0.24.2
 )
 

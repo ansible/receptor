@@ -1129,14 +1129,10 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 		return nil, fmt.Errorf("pinned fingerprints missing for %s", name)
 	}
 	tlscfg = tlscfg.Clone()
-	if !tlscfg.InsecureSkipVerify {
-		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer)
-		switch expectedHostNameType {
-		case ExpectedHostnameTypeDNS:
-			tlscfg.ServerName = expectedHostName
-		case ExpectedHostnameTypeReceptor:
-			tlscfg.InsecureSkipVerify = true
-		}
+	tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer)
+	switch expectedHostNameType {
+	case ExpectedHostnameTypeDNS:
+		tlscfg.ServerName = expectedHostName
 	}
 
 	return tlscfg, nil

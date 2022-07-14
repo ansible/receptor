@@ -515,7 +515,6 @@ func verifyServerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certifi
 
 func generateClientTLSConfig() *tls.Config {
 	return &tls.Config{
-		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
 		ServerName:            insecureCommonName,

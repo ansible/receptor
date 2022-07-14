@@ -125,6 +125,8 @@ class ReceptorControl:
                                 purpose=ssl.Purpose.SERVER_AUTH,
                                 cafile=self._rootcas,
                             )
+                            context.minimum_version = ssl.TLSVersion.TLSv1_2
+
                             if self._key and self._cert:
                                 context.load_cert_chain(
                                     certfile=self._cert, keyfile=self._key

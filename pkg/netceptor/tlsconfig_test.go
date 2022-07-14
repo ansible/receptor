@@ -273,7 +273,6 @@ func TestNodeIDWithUtilsGenerateCertWithCA(t *testing.T) {
 		Cert:               tempCert,
 		Key:                tempCertKey,
 		RootCAs:            caCert,
-		InsecureSkipVerify: false,
 	}
 
 	MainInstance = New(context.Background(), "foobar")
@@ -292,7 +291,6 @@ func TestNodeIDWIthSkipReceptorNamesCheckTrue(t *testing.T) {
 		Cert:                   tempCert,
 		Key:                    tempCertKey,
 		RootCAs:                caCert,
-		InsecureSkipVerify:     false,
 		SkipReceptorNamesCheck: true,
 	}
 

@@ -162,7 +162,6 @@ type tlsClientConfig struct {
 	Cert                   string   `required:"false" description:"Client certificate filename"`
 	Key                    string   `required:"false" description:"Client private key filename"`
 	RootCAs                string   `required:"false" description:"Root CA bundle to use instead of system trust"`
-	InsecureSkipVerify     bool     `required:"false" description:"Accept any server cert" default:"false"`
 	PinnedServerCert       []string `required:"false" description:"Pinned fingerprint of required server certificate"`
 	SkipReceptorNamesCheck bool     `required:"false" description:"if true, skip verifying ReceptorNames OIDs in certificate at startup"`
 	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"false"`
@@ -212,8 +211,6 @@ func (cfg tlsClientConfig) Prepare() error {
 	if err != nil {
 		return fmt.Errorf("error decoding fingerprints: %s", err)
 	}
-
-	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
 
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg, pinnedFingerprints)
 }

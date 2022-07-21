@@ -1236,16 +1236,17 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*MessageData, error) {
 
 // Translates an outgoing message from a MessageData object to wire protocol.
 func (s *Netceptor) translateDataFromMessage(msg *MessageData) ([]byte, error) {
-	data := make([]byte, 36+len(msg.Data))
-	data[0] = MsgTypeData
-	data[1] = msg.HopsToLive
-	binary.BigEndian.PutUint64(data[4:12], s.addNameHash(msg.FromNode))
-	binary.BigEndian.PutUint64(data[12:20], s.addNameHash(msg.ToNode))
-	copy(data[20:28], fixedLenBytesFromString(msg.FromService, 8))
-	copy(data[28:36], fixedLenBytesFromString(msg.ToService, 8))
-	copy(data[36:], msg.Data)
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{MsgTypeData, msg.HopsToLive, 0, 0})
 
-	return data, nil
+	binary.Write(buf, binary.BigEndian, s.addNameHash(msg.FromNode))
+	binary.Write(buf, binary.BigEndian, s.addNameHash(msg.ToNode))
+
+	buf.Write(fixedLenBytesFromString(msg.FromService, 8))
+	buf.Write(fixedLenBytesFromString(msg.ToService, 8))
+	buf.Write(msg.Data)
+
+	return buf.Bytes(), nil
 }
 
 // Forwards a message to its next hop.
@@ -1388,11 +1389,8 @@ func (s *Netceptor) translateStructToNetwork(messageType byte, content interface
 	if err != nil {
 		return nil, err
 	}
-	data := make([]byte, len(contentBytes)+1)
-	data[0] = messageType
-	copy(data[1:], contentBytes)
 
-	return data, nil
+	return append([]byte{messageType}, contentBytes...), nil
 }
 
 // Sends a routing update to all neighbors.

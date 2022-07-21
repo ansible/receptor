@@ -125,6 +125,8 @@ class ReceptorControl:
                                 purpose=ssl.Purpose.SERVER_AUTH,
                                 cafile=self._rootcas,
                             )
+                            context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+
                             if self._key and self._cert:
                                 context.load_cert_chain(
                                     certfile=self._cert, keyfile=self._key

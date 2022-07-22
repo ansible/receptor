@@ -203,13 +203,14 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			doneChan := make(chan struct{}, 1)
 			cctx, ccancel := context.WithCancel(li.s.context)
 			conn := &Conn{
-				s:        li.s,
-				pc:       li.pc,
-				qc:       qc,
-				qs:       qs,
-				doneChan: doneChan,
-				doneOnce: &sync.Once{},
-				ctx:      cctx,
+				s:            li.s,
+				pc:           li.pc,
+				qc:           qc,
+				qs:           qs,
+				doneChan:     doneChan,
+				doneOnce:     &sync.Once{},
+				ctx:          cctx,
+				fromListener: true,
 			}
 			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
@@ -260,13 +261,14 @@ func (li *Listener) Addr() net.Addr {
 
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
-	s        *Netceptor
-	pc       *PacketConn
-	qc       quic.Connection
-	qs       quic.Stream
-	doneChan chan struct{}
-	doneOnce *sync.Once
-	ctx      context.Context
+	s            *Netceptor
+	pc           *PacketConn
+	qc           quic.Connection
+	qs           quic.Stream
+	doneChan     chan struct{}
+	doneOnce     *sync.Once
+	ctx          context.Context
+	fromListener bool
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -420,8 +422,11 @@ func (c *Conn) CloseWrite() error {
 	return c.qs.Close()
 }
 
+// Close closes the connection.
 func (c *Conn) Close() error {
-	c.pc.cancel()
+	if !c.fromListener {
+		c.pc.cancel()
+	}
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})

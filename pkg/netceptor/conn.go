@@ -400,7 +400,12 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 
 // Read reads data from the connection.
 func (c *Conn) Read(b []byte) (n int, err error) {
-	return c.qs.Read(b)
+	n, err = c.qs.Read(b)
+	aerr, ok := err.(*quic.ApplicationError)
+	if ok && aerr.ErrorMessage == "normal close" {
+		err = nil
+	}
+	return
 }
 
 // CancelRead cancels a pending read operation.
@@ -432,7 +437,12 @@ func (c *Conn) Close() error {
 	})
 	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
 
-	return c.qc.CloseWithError(0, "normal close")
+	go func() {
+		time.Sleep(time.Second) // https://github.com/lucas-clemente/quic-go/issues/3291
+		_ = c.qc.CloseWithError(0, "normal close")
+	}()
+
+	return c.qs.Close()
 }
 
 // LocalAddr returns the local address of this connection.

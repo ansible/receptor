@@ -30,7 +30,8 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 	for {
 		n, err := c1.Read(buf)
 		if err != nil {
-			if err.Error() != "EOF" && !strings.Contains(err.Error(), "use of closed network connection") {
+			if err.Error() != "EOF" && !strings.Contains(err.Error(), "use of closed network connection") &&
+				!strings.Contains(err.Error(), "normal close") {
 				logger.Error("Connection read error: %s\n", err)
 			}
 			shouldClose = true

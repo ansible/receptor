@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -399,13 +400,13 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 }
 
 // Read reads data from the connection.
-func (c *Conn) Read(b []byte) (n int, err error) {
-	n, err = c.qs.Read(b)
+func (c *Conn) Read(b []byte) (int, error) {
+	n, err := c.qs.Read(b)
 	aerr, ok := err.(*quic.ApplicationError)
 	if ok && aerr.ErrorMessage == "normal close" {
-		err = nil
+		err = io.EOF
 	}
-	return
+	return n, err
 }
 
 // CancelRead cancels a pending read operation.
@@ -414,8 +415,13 @@ func (c *Conn) CancelRead() {
 }
 
 // Write writes data to the connection.
-func (c *Conn) Write(b []byte) (n int, err error) {
-	return c.qs.Write(b)
+func (c *Conn) Write(b []byte) (int, error) {
+	n, err := c.qs.Write(b)
+	aerr, ok := err.(*quic.ApplicationError)
+	if ok && aerr.ErrorMessage == "normal close" {
+		err = net.ErrClosed
+	}
+	return n, err
 }
 
 // CloseWrite closes the writer side of the connection.

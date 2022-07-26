@@ -446,7 +446,15 @@ func (c *Conn) Close() error {
 	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
 
 	go func() {
-		time.Sleep(time.Second) // https://github.com/lucas-clemente/quic-go/issues/3291
+		// Add a delay to allow outgoing data to be transmitted before killing QUIC connection
+		// See: https://github.com/lucas-clemente/quic-go/issues/3291
+		t := time.NewTimer(time.Second)
+		select {
+		case <-c.ctx.Done():
+			t.Stop()
+		case <-t.C:
+		}
+		time.Sleep(time.Second)
 		_ = c.qc.CloseWithError(0, "normal close")
 	}()
 

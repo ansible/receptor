@@ -86,7 +86,6 @@ func TestWebsocketExternalInterop(t *testing.T) {
 			MinVersion:               tls.VersionTLS12,
 			PreferServerCipherSuites: true,
 		},
-		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
 		err := server.ServeTLS(li, "", "")

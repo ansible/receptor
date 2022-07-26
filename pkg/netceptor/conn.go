@@ -406,6 +406,7 @@ func (c *Conn) Read(b []byte) (int, error) {
 	if ok && aerr.ErrorMessage == "normal close" {
 		err = io.EOF
 	}
+
 	return n, err
 }
 
@@ -421,6 +422,7 @@ func (c *Conn) Write(b []byte) (int, error) {
 	if ok && aerr.ErrorMessage == "normal close" {
 		err = net.ErrClosed
 	}
+
 	return n, err
 }
 

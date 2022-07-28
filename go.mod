@@ -11,7 +11,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.5.0
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
-	github.com/lucas-clemente/quic-go v0.28.0
+	github.com/lucas-clemente/quic-go v0.28.1
 	github.com/minio/highwayhash v1.0.2
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2

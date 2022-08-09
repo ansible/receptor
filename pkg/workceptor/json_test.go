@@ -5,7 +5,6 @@ package workceptor
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -29,7 +28,7 @@ func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 }
 
 func TestWorkceptorJson(t *testing.T) {
-	tmpdir, err := ioutil.TempDir(os.TempDir(), "receptor-test-*")
+	tmpdir, err := os.MkdirTemp(os.TempDir(), "receptor-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}

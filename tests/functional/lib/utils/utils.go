@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -151,7 +150,7 @@ func FreeUDPPort(portNum int) {
 
 // GenerateCA generates a CA certificate and key.
 func GenerateCA(name, commonName string) (string, string, error) {
-	dir, err := ioutil.TempDir(CertBaseDir, "")
+	dir, err := os.MkdirTemp(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}
@@ -177,7 +176,7 @@ func GenerateCA(name, commonName string) (string, string, error) {
 
 // GenerateCert generates a private and public key for testing in the directory specified.
 func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, string, error) {
-	dir, err := ioutil.TempDir(CertBaseDir, "")
+	dir, err := os.MkdirTemp(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}
@@ -222,7 +221,7 @@ func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, 
 // GenerateCertWithCA generates a private and public key for testing in the directory
 // specified using the ca specified.
 func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames, nodeIDs []string) (string, string, error) {
-	dir, err := ioutil.TempDir(CertBaseDir, "")
+	dir, err := os.MkdirTemp(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}
@@ -268,7 +267,7 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 }
 
 func GenerateRSAPair() (string, string, error) {
-	dir, err := ioutil.TempDir(CertBaseDir, "")
+	dir, err := os.MkdirTemp(CertBaseDir, "")
 	if err != nil {
 		return "", "", err
 	}

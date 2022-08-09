@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -103,7 +102,7 @@ func (n *ContainerNode) Start() error {
 		return err
 	}
 	nodedefPath := filepath.Join(n.dir, "receptor.conf")
-	ioutil.WriteFile(nodedefPath, strData, 0o644)
+	os.WriteFile(nodedefPath, strData, 0o644)
 	Cmd := exec.Command(containerRunner, "start", n.containerName)
 	output, err := Cmd.CombinedOutput()
 	if err != nil {
@@ -227,7 +226,7 @@ func (m *ContainerMesh) Nodes() map[string]Node {
 // NewContainerMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it.
 func NewContainerMeshFromFile(filename, dirSuffix string) (Mesh, error) {
-	yamlDat, err := ioutil.ReadFile(filename)
+	yamlDat, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +257,7 @@ func NewContainerMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*Conta
 	if err != nil {
 		return nil, err
 	}
-	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
+	tempdir, err := os.MkdirTemp(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +297,7 @@ done`
 	for k := range meshDefinition.Nodes {
 		node := NewContainerNode(k)
 		node.TCRules = meshDefinition.Nodes[k].TCRules
-		tempdir, err = ioutil.TempDir(mesh.dir, k+"-")
+		tempdir, err = os.MkdirTemp(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}
@@ -464,7 +463,7 @@ done`
 
 	// Setup the controlsvc and sockets
 	for k, node := range nodes {
-		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
+		tempdir, err := os.MkdirTemp(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}
@@ -483,7 +482,7 @@ done`
 		return nil, err
 	}
 	nodedefPath := filepath.Join(mesh.dir, "docker-compose.yaml")
-	ioutil.WriteFile(nodedefPath, containerComposeDataStr, 0o644)
+	os.WriteFile(nodedefPath, containerComposeDataStr, 0o644)
 
 	containerCompose := exec.Command(containerComposeRunner, "up", "--no-start")
 	// Add COMPOSE_PARALLEL_LIMIT=500 to our environment because of

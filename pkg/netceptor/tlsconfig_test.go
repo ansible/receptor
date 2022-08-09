@@ -2,7 +2,6 @@ package netceptor
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -11,7 +10,7 @@ import (
 
 // setup handle using hardcoded PEMs.
 func setupSuite(t *testing.T) (*os.File, *os.File, *os.File, func(t *testing.T)) {
-	tempCertFile, err := ioutil.TempFile("", "")
+	tempCertFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -49,7 +48,7 @@ Bdt96MbGrC0=
 -----END CERTIFICATE-----
 `))
 
-	tempCertKey, err := ioutil.TempFile("", "")
+	tempCertKey, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -107,7 +106,7 @@ rydzkVNNVeMVX2TER9yc8AdFqkRlaBWHmO61rYmV+N1quLM0uMVsu55ZNCY=
 -----END RSA PRIVATE KEY-----
 `))
 
-	tempCA, err := ioutil.TempFile("", "")
+	tempCA, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Error(err.Error())
 	}

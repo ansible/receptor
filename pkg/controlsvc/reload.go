@@ -3,7 +3,7 @@ package controlsvc
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -73,7 +73,7 @@ func parseConfigForReload(filename string, checkReload bool) error {
 	// Finally, cfgAbsent() will loop through the map and check for any remaining
 	// items that are still false. This means the original item is missing from
 	// the config, and an error will be thrown
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}

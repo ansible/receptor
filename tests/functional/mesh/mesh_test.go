@@ -3,7 +3,6 @@ package mesh
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -113,7 +112,7 @@ func TestMeshConnections(t *testing.T) {
 			}
 			defer m.WaitForShutdown()
 			defer m.Destroy()
-			yamlDat, err := ioutil.ReadFile(filename)
+			yamlDat, err := os.ReadFile(filename)
 			if err != nil {
 				t.Fatal(err)
 			}

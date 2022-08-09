@@ -8,12 +8,13 @@ import (
 
 // JobContext is a synchronization object that combines the functions of a Context and a WaitGroup.
 // The expected lifecycle is:
-//     - Caller calls JobContext.NewJob() with a parent context and a count of workers expected.
-//     - Caller launches the given number of workers, passing the JobContext to them.
-//     - Workers can check for termination by using the JobContext as a context.Context.
-//     - Workers can cancel the overall job by calling JobContext.Cancel().
-//     - Workers must call JobContext.WorkerDone() when they complete, like sync.WaitGroup.Done().
-//     - The caller, or other goroutines. can call JobContext.Wait() to wait for job completion.
+//   - Caller calls JobContext.NewJob() with a parent context and a count of workers expected.
+//   - Caller launches the given number of workers, passing the JobContext to them.
+//   - Workers can check for termination by using the JobContext as a context.Context.
+//   - Workers can cancel the overall job by calling JobContext.Cancel().
+//   - Workers must call JobContext.WorkerDone() when they complete, like sync.WaitGroup.Done().
+//   - The caller, or other goroutines. can call JobContext.Wait() to wait for job completion.
+//
 // A single JobContext can only run one job at a time.  If JobContext.NewJob() is called while a job
 // is already running, that job will be cancelled and waited on prior to starting the new job.
 type JobContext struct {

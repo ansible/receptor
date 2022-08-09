@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -95,7 +94,7 @@ func (n *CLINode) Start() error {
 		return err
 	}
 	nodedefPath := filepath.Join(n.dir, "nodedef.yaml")
-	ioutil.WriteFile(nodedefPath, strData, 0o644)
+	os.WriteFile(nodedefPath, strData, 0o644)
 	n.receptorCmd = Cmd{exec.Command("receptor", "--config", nodedefPath), &sync.Mutex{}}
 	stdout, err := os.OpenFile(filepath.Join(n.dir, "stdout"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
@@ -272,7 +271,7 @@ func createNodedefConnections(meshDefinition *YamlData, existingMesh *CLIMesh) e
 // NewCLIMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it.
 func NewCLIMeshFromFile(filename, dirSuffix string) (Mesh, error) {
-	yamlDat, err := ioutil.ReadFile(filename)
+	yamlDat, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +299,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	if err != nil {
 		return nil, err
 	}
-	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
+	tempdir, err := os.MkdirTemp(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +312,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 	// there's something to dial into
 	for k := range meshDefinition.Nodes {
 		node := NewCLINode(k)
-		tempdir, err = ioutil.TempDir(mesh.dir, k+"-")
+		tempdir, err = os.MkdirTemp(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}
@@ -399,7 +398,7 @@ func NewCLIMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*CLIMesh, er
 				}
 			}
 		}
-		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
+		tempdir, err := os.MkdirTemp(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}
@@ -501,7 +500,7 @@ func ModifyCLIMeshFromYaml(meshDefinition YamlData, existingMesh CLIMesh) error 
 			return err
 		}
 		nodedefPath := filepath.Join(node.dir, "nodedef.yaml")
-		err = ioutil.WriteFile(nodedefPath, strData, 0o644)
+		err = os.WriteFile(nodedefPath, strData, 0o644)
 		if err != nil {
 			return err
 		}

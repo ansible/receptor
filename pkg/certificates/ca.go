@@ -11,9 +11,9 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -38,7 +38,7 @@ type CertOptions struct {
 
 // LoadFromPEMFile loads certificate data from a PEM file.
 func LoadFromPEMFile(filename string) ([]interface{}, error) {
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 		}
 	}
 
-	return ioutil.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
+	return os.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
 // LoadCertificate loads a single certificate from a file.

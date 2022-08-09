@@ -6,7 +6,6 @@ package workceptor
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -20,7 +19,7 @@ func TestStatusFileLock(t *testing.T) {
 	numReaderThreads := 8
 	baseWaitTime := 200 * time.Millisecond
 
-	tmpdir, err := ioutil.TempDir(os.TempDir(), "receptor-test-*")
+	tmpdir, err := os.MkdirTemp(os.TempDir(), "receptor-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}

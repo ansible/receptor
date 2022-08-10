@@ -48,5 +48,5 @@ jobs:
       - name: Build Multiarch Image & Push To Quay
         run: |
           export  CONTAINERCMD="docker buildx"
-          export EXTRA_OPTS="--platform linux/amd64,linux/ppc64le --push"
+          export EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push"
           make container REPO=quay.io/ansible/receptor TAG=devel    

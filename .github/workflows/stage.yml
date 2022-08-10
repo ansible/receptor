@@ -63,7 +63,7 @@ jobs:
 
       - name: Build container image
         run: |
-          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le --push" REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
+          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
 
       - name: Stage container image
         run: |

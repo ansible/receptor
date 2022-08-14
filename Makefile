@@ -159,4 +159,4 @@ clean:
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest receptorctl/.VERSION receptor-python-worker/.VERSION
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest

@@ -3,7 +3,7 @@ package mesh
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -819,7 +819,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buf, err := ioutil.ReadAll(reader)
+	buf, err := io.ReadAll(reader)
 	if err != nil {
 		t.Fatal(err)
 	}

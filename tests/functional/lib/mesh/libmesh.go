@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -185,7 +184,7 @@ func (m *LibMesh) Dir() string {
 // NewLibMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it.
 func NewLibMeshFromFile(filename, dirSuffix string) (Mesh, error) {
-	yamlDat, err := ioutil.ReadFile(filename)
+	yamlDat, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +213,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	if err != nil {
 		return nil, err
 	}
-	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
+	tempdir, err := os.MkdirTemp(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +224,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	// there's something to dial into
 	for k := range meshDefinition.Nodes {
 		node := NewLibNode(k)
-		node.dir, err = ioutil.TempDir(mesh.dir, k+"-")
+		node.dir, err = os.MkdirTemp(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}
@@ -245,11 +244,11 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						if vMap["cert"] == "" || vMap["key"] == "" {
 							return nil, fmt.Errorf("cert and key must both be supplied or neither")
 						}
-						certbytes, err := ioutil.ReadFile(vMap["cert"].(string))
+						certbytes, err := os.ReadFile(vMap["cert"].(string))
 						if err != nil {
 							return nil, err
 						}
-						keybytes, err := ioutil.ReadFile(vMap["key"].(string))
+						keybytes, err := os.ReadFile(vMap["key"].(string))
 						if err != nil {
 							return nil, err
 						}
@@ -261,7 +260,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					}
 
 					if vMap["rootcas"] != "" {
-						bytes, err := ioutil.ReadFile(vMap["rootcas"].(string))
+						bytes, err := os.ReadFile(vMap["rootcas"].(string))
 						if err != nil {
 							return nil, fmt.Errorf("error reading root CAs file: %s", err)
 						}
@@ -282,11 +281,11 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						PreferServerCipherSuites: true,
 					}
 
-					certbytes, err := ioutil.ReadFile(vMap["cert"].(string))
+					certbytes, err := os.ReadFile(vMap["cert"].(string))
 					if err != nil {
 						return nil, err
 					}
-					keybytes, err := ioutil.ReadFile(vMap["key"].(string))
+					keybytes, err := os.ReadFile(vMap["key"].(string))
 					if err != nil {
 						return nil, err
 					}
@@ -298,7 +297,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					tlscfg.Certificates = []tls.Certificate{cert}
 
 					if vMap["clientcas"] != nil {
-						bytes, err := ioutil.ReadFile(vMap["clientcas"].(string))
+						bytes, err := os.ReadFile(vMap["clientcas"].(string))
 						if err != nil {
 							return nil, fmt.Errorf("error reading client CAs file: %s", err)
 						}
@@ -490,7 +489,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		ctx, canceller := context.WithCancel(context.Background())
 		node.controlServerCanceller = canceller
 
-		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
+		tempdir, err := os.MkdirTemp(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}

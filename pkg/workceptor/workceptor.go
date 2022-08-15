@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -343,7 +342,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 }
 
 func (w *Workceptor) scanForUnits() {
-	files, err := ioutil.ReadDir(w.dataDir)
+	files, err := os.ReadDir(w.dataDir)
 	if err != nil {
 		return
 	}

@@ -1,6 +1,6 @@
 ---
 
-name: Publish quay.io/ansible/receptor:devel
+name: Publish devel image
 
 on:
   push:
@@ -15,22 +15,38 @@ jobs:
         with:
           fetch-depth: 0
 
+      # setup qemu and buildx
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Install build dependencies
         run: |
           pip install build
 
+       # we will first build the image for x86 and load it on the host for testing
       - name: Build Image
         run: |
-          make container REPO=receptor TAG=devel
+          export CONTAINERCMD="docker buildx"
+          export EXTRA_OPTS="--platform linux/amd64 --load"
+          make container REPO=quay.io/${{ github.repository }} TAG=devel
 
       - name: Test Image
-        run: podman run --rm receptor:devel receptor --version
+        run: docker run --rm quay.io/${{ github.repository }}:devel receptor --version
 
-      - name: Push To Quay
-        uses: redhat-actions/push-to-registry@v2.1.1
+      - name: Login To Quay
+        uses: docker/login-action@v2
         with:
-          image: receptor
-          tags: devel
-          registry: quay.io/ansible/
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
+          registry: quay.io/${{ github.repository }}
+
+      # Since x86 image is built in previous step
+      # buildx will use cached image, hence overall time will not be affected
+      - name: Build Multiarch Image & Push To Quay
+        run: |
+          export  CONTAINERCMD="docker buildx"
+          export EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push"
+          make container REPO=quay.io/${{ github.repository }} TAG=devel

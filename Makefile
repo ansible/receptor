@@ -135,13 +135,15 @@ LATEST :=
 
 EXTRA_OPTS ?=
 
-container: .container-flag-$(VERSION)
-.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+space := $(subst ,, )
+CONTAINER_FLAG_FILE = .container-flag-$(VERSION)$(subst $(space),,$(subst /,,$(EXTRA_OPTS)))
+container: $(CONTAINER_FLAG_FILE)
+$(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
 	$(CONTAINERCMD) build $(EXTRA_OPTS) packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
-	@touch .container-flag-$(VERSION)
+	touch $@
 
 tc-image: container
 	@cp receptor packaging/tc-image/

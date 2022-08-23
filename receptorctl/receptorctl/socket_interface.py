@@ -267,7 +267,7 @@ class ReceptorControl:
             if not return_socket:
                 self._socket.close()
             if not return_sockfile:
-                self.sockfile.close()
+                self._sockfile.close()
         finally:
             self._socket = None
             self._sockfile = None

@@ -15,7 +15,7 @@ require (
 	github.com/minio/highwayhash v1.0.2
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
-	github.com/rogpeppe/go-internal v1.8.1
+	github.com/rogpeppe/go-internal v1.9.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.8.0
 	github.com/vishvananda/netlink v1.1.0

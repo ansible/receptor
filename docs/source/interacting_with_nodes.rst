@@ -42,7 +42,7 @@ If ``filename`` is set, receptor will create a unix domain socket. Use receptorc
 
 The "status" command will display helpful information about mesh, including known connections, routing tables, control services, and work types.
 
-.. code::
+.. code-block:: console
 
     $ receptorctl --socket /tmp/foo.sock status
     Node ID: foo
@@ -83,7 +83,7 @@ Connect to control service
 
 Use the "connect" command to connect to any receptor control service running on the mesh. From here, issue a series of commands and examine the output, without disconnecting.
 
-.. code::
+.. code-block:: console
 
     $ receptorctl --socket /tmp/foo.sock connect bar control
     Receptor Control, node bar
@@ -92,7 +92,7 @@ This will result in a bridged connection between the local domain socket on `foo
 
 One can also connect to the locally running control service in a similar manner
 
-.. code::
+.. code-block:: console
 
     $ receptorctl --socket /tmp/foo.sock connect localhost control
     Receptor Control, node foo
@@ -110,11 +110,20 @@ A ``control-service`` can accept commands in two formats; a space-delimited stri
 
 String example:
 
-``work submit bar echoint``
+.. code-block:: console
+
+    work submit bar echoint
 
 JSON example:
 
-``{"command":"work","subcommand":"submit","node":"bar","worktype":"echoint"}``
+.. code-block:: json
+  
+    {
+      "command":"work",
+      "subcommand":"submit",
+      "node":"bar",
+      "worktype":"echoint"
+    }
 
 For 2-word commands like ``work submit`` the first word is the "command", and the second word is the "subcommand"
 
@@ -181,7 +190,7 @@ Changes can include modifying, adding, or removing these items from the configur
 
 After saving the configuration file to disk, connect to a control service and issue a ``reload`` command for the new changes to take effect.
 
-.. code::
+.. code-block:: console
 
     receptorctl --socket /tmp/foo.sock reload
 

@@ -295,7 +295,16 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		Container: "worker",
 		Follow:    true,
 	})
-	logStream, err := logreq.Stream(kw.ctx)
+	var logStream io.ReadCloser
+	for retries := 5; retries > 0; retries-- {
+		logStream, err = logreq.Stream(kw.ctx)
+		if err != nil {
+			logger.Warning("Problem opening stdout from pod %s, unit %s. Retrying.", kw.pod.Name, kw.unitID)
+			time.Sleep(time.Second * 5)
+		} else {
+			break
+		}
+	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening pod stream: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -397,10 +406,18 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		streamWait.Done()
 	} else {
 		go func() {
-			errStdin = exec.Stream(remotecommand.StreamOptions{
-				Stdin: stdin,
-				Tty:   false,
-			})
+			for retries := 5; retries > 0; retries-- {
+				errStdin = exec.Stream(remotecommand.StreamOptions{
+					Stdin: stdin,
+					Tty:   false,
+				})
+				if errStdin != nil {
+					logger.Warning("Problem opening stdin to pod %s, unit %s. Retrying.", kw.pod.Name, kw.unitID)
+					time.Sleep(time.Second * 5)
+				} else {
+					break
+				}
+			}
 			if errStdin != nil {
 				logStream.Close()
 			}

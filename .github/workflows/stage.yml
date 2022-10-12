@@ -65,11 +65,6 @@ jobs:
         run: |
           make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
 
-      - name: Stage container image
-        run: |
-          docker push ghcr.io/${{ github.repository_owner }}/receptor:v${{ github.event.inputs.version }}
-          docker push ghcr.io/${{ github.repository_owner }}/receptor:latest
-
       - name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \

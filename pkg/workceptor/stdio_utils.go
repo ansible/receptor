@@ -24,7 +24,7 @@ func saveStdoutSize(unitdir string, stdoutSize int64) error {
 // stdoutWriter writes to a stdout file while also updating the status file.
 type stdoutWriter struct {
 	unitdir      string
-	writer       io.Writer
+	writer       io.WriteCloser
 	bytesWritten int64
 }
 
@@ -64,7 +64,7 @@ func (sw *stdoutWriter) Size() int64 {
 
 // stdinReader reads from a stdin file and provides a Done function.
 type stdinReader struct {
-	reader   io.Reader
+	reader   io.ReadCloser
 	lasterr  error
 	doneChan chan struct{}
 	doneOnce sync.Once

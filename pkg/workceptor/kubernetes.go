@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -29,8 +30,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/tools/remotecommand"
 	watch2 "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/transport/spdy"
 )
 
 // kubeUnit implements the WorkUnit interface.
@@ -260,6 +263,228 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 
 	return nil
+}
+
+func (kw *kubeUnit) portForward(localPort int, podPort int, stopChan <-chan struct{}, readyChan chan struct{}, errChan chan error) {
+	req := kw.clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(kw.pod.Name).
+		Namespace(kw.pod.Namespace).
+		SubResource("portforward")
+
+	transport, upgrader, err := spdy.RoundTripperFor(kw.config)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	ports := fmt.Sprintf("%d:%d", localPort, podPort)
+
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+	fw, err := portforward.NewOnAddresses(dialer, []string{"localhost"}, []string{ports}, stopChan, readyChan, nil, nil)
+	if err != nil {
+		errChan <- err
+		return
+	}
+	err = fw.ForwardPorts()
+
+	if err != nil {
+		errChan <- err
+		return
+	}
+}
+
+func GetFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+func (kw *kubeUnit) runWorkUsingPortForward() {
+	// Create the pod
+
+	err := kw.createPod(nil)
+	if err != nil {
+		errMsg := fmt.Sprintf("Error creating pod: %s", err)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+		logger.Error(errMsg)
+
+		return
+	}
+
+	// Attach stdin stream to the pod
+	skipStdin := false
+	var exec remotecommand.Executor
+	if !skipStdin {
+		req := kw.clientset.CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(kw.pod.Name).
+			Namespace(kw.pod.Namespace).
+			SubResource("attach")
+		req.VersionedParams(&corev1.PodExecOptions{
+			Container: "worker",
+			Stdin:     true,
+			Stdout:    false,
+			Stderr:    false,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+		exec, err = remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
+		if err != nil {
+			kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error attaching to pod: %s", err), 0)
+
+			return
+		}
+	}
+
+	localPort, err := GetFreePort()
+	podPort := 9999
+
+	if err != nil {
+		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error allocating local port: %s", err), 0)
+
+		return
+	}
+
+	stopChan := make(chan struct{}, 1)
+	readyChan := make(chan struct{})
+	errChan := make(chan error)
+
+	go kw.portForward(localPort, podPort, stopChan, readyChan, errChan)
+
+	select {
+	case <-readyChan:
+		break
+	case err := <-errChan:
+		errMsg := fmt.Sprintf("Error forwarding port: %s", err)
+		logger.Error(errMsg)
+
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+		return
+	}
+
+	// Check if we were cancelled before starting the streams
+	select {
+	case <-kw.ctx.Done():
+		kw.UpdateBasicStatus(WorkStateFailed, "Cancelled", 0)
+
+		return
+	default:
+	}
+
+	// Open stdin reader
+	var stdin *stdinReader
+	stdin, err = newStdinReader(kw.UnitDir())
+	if errors.Is(err, errFileSizeZero) {
+		skipStdin = true
+	} else if err != nil {
+		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
+		logger.Error(errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+		return
+	}
+
+	// Open stdout writer
+	stdout, err := newStdoutWriter(kw.UnitDir())
+	if err != nil {
+		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
+		logger.Error(errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+		return
+	}
+
+	// Goroutine to update status when stdin is fully sent to the pod, which is when we
+	// update from WorkStatePending to WorkStateRunning.
+	finishedChan := make(chan struct{})
+	if !skipStdin {
+		kw.UpdateFullStatus(func(status *StatusFileData) {
+			status.State = WorkStatePending
+			status.Detail = "Sending stdin to pod"
+		})
+		go func() {
+			select {
+			case <-kw.ctx.Done():
+				return
+			case <-finishedChan:
+				return
+			case <-stdin.Done():
+				err := stdin.Error()
+				if err == io.EOF {
+					kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+				} else {
+					kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", err), stdout.Size())
+				}
+			}
+		}()
+	} else {
+		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+	}
+
+	// Actually run the streams.  This blocks until the pod finishes.
+	var errStdin error
+	var errStdout error
+	streamWait := sync.WaitGroup{}
+	streamWait.Add(2)
+	if skipStdin {
+		streamWait.Done()
+	} else {
+		go func() {
+			for retries := 5; retries > 0; retries-- {
+				errStdin = exec.Stream(remotecommand.StreamOptions{
+					Stdin: stdin,
+					Tty:   false,
+				})
+				if errStdin != nil {
+					logger.Warning("Problem opening stdin to pod %s, unit %s. Retrying.", kw.pod.Name, kw.unitID)
+					time.Sleep(time.Second * 5)
+				} else {
+					break
+				}
+			}
+			if errStdin != nil {
+				close(stopChan)
+			}
+			streamWait.Done()
+		}()
+	}
+	conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", localPort))
+	if err != nil {
+		fmt.Println("dial error:", err)
+		return
+	}
+	go func() {
+		_, errStdout = io.Copy(stdout, conn)
+		streamWait.Done()
+	}()
+	streamWait.Wait()
+	close(stopChan)
+	close(finishedChan)
+	if errStdin != nil || errStdout != nil {
+		var errDetail string
+		switch {
+		case errStdin == nil:
+			errDetail = fmt.Sprintf("%s", errStdout)
+		case errStdout == nil:
+			errDetail = fmt.Sprintf("%s", errStdin)
+		default:
+			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", errStdin, errStdout)
+		}
+		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
+
+		return
+	}
+	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+
 }
 
 func (kw *kubeUnit) runWorkUsingLogger() {
@@ -837,6 +1062,8 @@ func (kw *kubeUnit) startOrRestart() error {
 	// Launch runner process
 	if kw.streamMethod == "tcp" {
 		go kw.runWorkUsingTCP()
+	} else if kw.streamMethod == "portforward" {
+		go kw.runWorkUsingPortForward()
 	} else {
 		go kw.runWorkUsingLogger()
 	}
@@ -985,7 +1212,7 @@ func (cfg workKubeCfg) Prepare() error {
 		return fmt.Errorf("must specify a container image to run")
 	}
 	method := strings.ToLower(cfg.StreamMethod)
-	if method != "logger" && method != "tcp" {
+	if method != "logger" && method != "tcp" && method != "portforward" {
 		return fmt.Errorf("stream mode must be logger or tcp")
 	}
 

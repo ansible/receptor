@@ -49,7 +49,7 @@ fish.yml
 
 If we start the backends for each of these configurations, this will form a three-node mesh. Notice `bar` and `fish` are not directly connected to each other. However, the mesh allows traffic from `bar` to pass through `foo` to reach `fish`, as if `bar` and `fish` were directly connected.
 
-From three terminals we can start this example by using the docker container we provide on quay.io
+From three terminals we can start this example by using the container we provide on quay.io
 
 .. code::
 

@@ -17,7 +17,7 @@ require (
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
 	github.com/rogpeppe/go-internal v1.9.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/net v0.0.0-20220630215102-69896b714898
 	gopkg.in/yaml.v2 v2.4.0

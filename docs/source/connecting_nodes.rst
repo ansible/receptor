@@ -52,14 +52,17 @@ If we start the backends for each of these configurations, this will form a thre
 From three terminals we can start this example by using the docker container we provide on quay.io
 
 .. code::
+
 podman run -it --rm --network host --name foo -v${PWD}/foo.yml:/etc/receptor/receptor.conf quay.io/ansible/receptor
 
 
 .. code::
+
 podman run -it --rm --network host --name bar -v${PWD}/bar.yml:/etc/receptor/receptor.conf quay.io/ansible/receptor
 
 
 .. code::
+
 podman run -it --rm --network host --name fish -v${PWD}/fish.yml:/etc/receptor/receptor.conf quay.io/ansible/receptor
 
 

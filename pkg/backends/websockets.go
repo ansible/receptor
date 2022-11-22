@@ -140,8 +140,9 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 	}
 	wg.Add(1)
 	b.server = &http.Server{
-		Addr:    b.address,
-		Handler: mux,
+		Addr:              b.address,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {
 		defer wg.Done()

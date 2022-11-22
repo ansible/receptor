@@ -91,6 +91,30 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 }
 
+// Error logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Error(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	logger.Error(format, v...)
+}
+
+// Warning logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Warning(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	logger.Warning(format, v...)
+}
+
+// Info logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Info(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	logger.Info(format, v...)
+}
+
+// Debug logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Debug(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	logger.Debug(format, v...)
+}
+
 // SetFromParams sets the in-memory state from parameters.
 func (bwu *BaseWorkUnit) SetFromParams(params map[string]string) error {
 	return nil

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -201,7 +200,7 @@ func (bwu *BaseWorkUnit) Save() error {
 
 // loadFromFile loads status from an already open file.
 func (sfd *StatusFileData) loadFromFile(file io.Reader) error {
-	jsonBytes, err := ioutil.ReadAll(file)
+	jsonBytes, err := io.ReadAll(file)
 	if err != nil {
 		return err
 	}

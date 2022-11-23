@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/ghjm/cmdline"
@@ -75,11 +75,11 @@ type tlsServerCfg struct {
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg tlsServerCfg) Prepare() error {
 	tlscfg := baseTLS(cfg.MinTLS13)
-	certbytes, err := ioutil.ReadFile(cfg.Cert)
+	certbytes, err := os.ReadFile(cfg.Cert)
 	if err != nil {
 		return err
 	}
-	keybytes, err := ioutil.ReadFile(cfg.Key)
+	keybytes, err := os.ReadFile(cfg.Key)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (cfg tlsServerCfg) Prepare() error {
 	tlscfg.Certificates = []tls.Certificate{cert}
 
 	if cfg.ClientCAs != "" {
-		caBytes, err := ioutil.ReadFile(cfg.ClientCAs)
+		caBytes, err := os.ReadFile(cfg.ClientCAs)
 		if err != nil {
 			return fmt.Errorf("error reading client CAs file: %s", err)
 		}
@@ -141,11 +141,11 @@ func (cfg tlsClientConfig) Prepare() error {
 		if cfg.Cert == "" || cfg.Key == "" {
 			return fmt.Errorf("cert and key must both be supplied or neither")
 		}
-		certBytes, err := ioutil.ReadFile(cfg.Cert)
+		certBytes, err := os.ReadFile(cfg.Cert)
 		if err != nil {
 			return err
 		}
-		keyBytes, err := ioutil.ReadFile(cfg.Key)
+		keyBytes, err := os.ReadFile(cfg.Key)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func (cfg tlsClientConfig) Prepare() error {
 	}
 
 	if cfg.RootCAs != "" {
-		caBytes, err := ioutil.ReadFile(cfg.RootCAs)
+		caBytes, err := os.ReadFile(cfg.RootCAs)
 		if err != nil {
 			return fmt.Errorf("error reading root CAs file: %s", err)
 		}

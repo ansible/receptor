@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -653,10 +654,147 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 }
 
+func isCompatibleOCP(kw *kubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
+	if err != nil {
+		kw.Warning("could not parse OCP server version %s, not using reconnect support", versionStr)
+
+		return false
+	}
+	// The patch was backported to minor version 10, 11 and 12. We must check z stream
+	// based on the minor version
+	// if minor version == 12, compare with v4.12.0
+	// if minor version == 11, compare with v4.11.16
+	// all other minor versions compare with v4.10.42
+	var compatibleVer string
+	switch semver.Minor() {
+	case 12:
+		compatibleVer = "v4.12.0"
+	case 11:
+		compatibleVer = "v4.11.16"
+	default:
+		compatibleVer = "v4.10.42"
+	}
+
+	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
+		kw.Info("OCP version %s is at least %s, using reconnect support", semver, compatibleVer)
+
+		return true
+	}
+	kw.Warning("OCP version %s not at least %s, not using reconnect support", semver, compatibleVer)
+
+	return false
+}
+
+func shouldUseReconnectOCP(kw *kubeUnit) bool {
+	clientset, err := dynamic.NewForConfig(kw.config)
+	if err != nil {
+		kw.Warning("error getting K8S dynamic clientset: %s", err)
+
+		return false
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1",
+		Resource: "clusteroperators",
+	}
+
+	openshiftAPI, err := clientset.Resource(gvr).Get(context.Background(), "openshift-apiserver", metav1.GetOptions{})
+	if err != nil {
+		kw.Debug("Error while retrieving clusteroperators/openshift-apiserver, assuming not OpenShift: %s", err)
+
+		return false
+	}
+
+	if openshiftAPI == nil {
+		kw.Debug("clusteroperators/openshift-apiserver not found, assuming not OpenShift")
+
+		return false
+	}
+
+	openshiftAPIStatus := openshiftAPI.Object["status"]
+	if openshiftAPIStatus == nil {
+		kw.Debug("openshift-apiserver.status is nil, assuming not compatible")
+
+		return false
+	}
+
+	openshiftAPIVersions := openshiftAPIStatus.(map[string]interface{})["versions"]
+	if openshiftAPIVersions == nil {
+		kw.Debug("openshift-apiserver.status.versions is nil, assuming not compatible")
+
+		return false
+	}
+
+	var ocpVersion string
+	for _, version := range openshiftAPIVersions.([]interface{}) {
+		if version.(map[string]interface{})["name"] == "openshift-apiserver" {
+			tmp := version.(map[string]interface{})["version"]
+			ocpVersion = fmt.Sprintf("%v", tmp)
+		}
+	}
+
+	if ocpVersion == "" {
+		kw.Debug("openshift-apiserver.status.versions does not contain openshift-apiserver version, assuming not compatible")
+
+		return false
+	}
+
+	return isCompatibleOCP(kw, ocpVersion)
+}
+
+func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
+	if err != nil {
+		kw.Warning("could parse Kubernetes server version %s, will not use reconnect support: %s", versionStr, err)
+
+		return false
+	}
+	// The patch was backported to minor version 23, 24 and 25. We must check z stream
+	// based on the minor version
+	// if minor version == 24, compare with v1.24.8
+	// if minor version == 25, compare with v1.25.4
+	// all other minor versions compare with v1.23.14
+	var compatibleVer string
+	switch semver.Minor() {
+	case 24:
+		compatibleVer = "v1.24.8"
+	case 25:
+		compatibleVer = "v1.25.4"
+	default:
+		compatibleVer = "v1.23.14"
+	}
+
+	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
+		kw.Info("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
+
+		return true
+	}
+	kw.Info("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
+
+	return false
+}
+
+func shouldUseReconnectK8S(kw *kubeUnit) bool {
+	serverVerInfo, err := kw.clientset.ServerVersion()
+	if err != nil {
+		kw.Warning("could not detect Kubernetes server version, will not use reconnect support: %s", err)
+
+		return false
+	}
+
+	return isCompatibleK8S(kw, serverVerInfo.String())
+}
+
 func shouldUseReconnect(kw *kubeUnit) bool {
 	// Attempt to detect support for streaming from pod with timestamps based on
-	// Kubernetes server version
-	// In order to use reconnect method, Kubernetes server must be at least
+	// Kubernetes / OpenShift server versions
+	// To use reconnect method, OpenShift server must be at least
+	//   v4.10.42
+	//   v4.11.16
+	//   v4.12.0
+	// If not on OpenShift, Kubernetes server must be at least
 	//   v1.23.14
 	//   v1.24.8
 	//   v1.25.4
@@ -683,43 +821,7 @@ func shouldUseReconnect(kw *kubeUnit) bool {
 		}
 	}
 
-	serverVerInfo, err := kw.clientset.ServerVersion()
-	if err != nil {
-		logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
-
-		return false
-	}
-
-	semver, err := version.ParseSemantic(serverVerInfo.String())
-	if err != nil {
-		logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", serverVerInfo.String())
-
-		return false
-	}
-
-	// The patch was backported to minor version 23, 24 and 25. We must check z stream
-	// based on the minor version
-	// if minor version == 24, compare with v1.24.8
-	// if minor version == 25, compare with v1.25.4
-	// all other minor versions compare with v1.23.14
-	var compatibleVer string
-	switch serverVerInfo.Minor {
-	case "24":
-		compatibleVer = "v1.24.8"
-	case "25":
-		compatibleVer = "v1.25.4"
-	default:
-		compatibleVer = "v1.23.14"
-	}
-
-	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		logger.Debug("Kubernetes version %s is at least %s, using reconnect support", serverVerInfo.GitVersion, compatibleVer)
-
-		return true
-	}
-	logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", serverVerInfo.GitVersion, compatibleVer)
-
-	return false
+	return shouldUseReconnectOCP(kw) || shouldUseReconnectK8S(kw)
 }
 
 func parseTime(s string) *time.Time {

@@ -18,6 +18,7 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -653,36 +655,87 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 }
 
-func shouldUseReconnect(kw *kubeUnit) bool {
-	// Attempt to detect support for streaming from pod with timestamps based on
-	// Kubernetes server version
-	// In order to use reconnect method, Kubernetes server must be at least
-	//   v1.23.14
-	//   v1.24.8
-	//   v1.25.4
-	// These versions contain a critical patch that permits connecting to the
-	// logstream with timestamps enabled.
-	// Without the patch, stdout lines would be split after 4K characters into a
-	// new line, which will cause issues in Receptor.
-	// https://github.com/kubernetes/kubernetes/issues/77603
-	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
-	// accepted values: "enabled", "disabled", "auto" with "auto" being the default
-	// all invalid value will assume to be "auto"
+func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
+	// isOCP should remain false until it is confirmed that OpenShift is being
+	// used
+	isOCP := false
 
-	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
-	if ok {
-		switch env {
-		case "enabled":
-			return true
-		case "disabled":
-			return false
-		case "auto":
-			// continue
-		default:
-			// continue
-		}
+	clientset, err := dynamic.NewForConfig(kw.config)
+	if err != nil {
+		logger.Warning("error getting K8S dynamic clientset")
+
+		return false, isOCP
 	}
 
+	gvr := schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1",
+		Resource: "clusteroperators",
+	}
+
+	resp, err := clientset.Resource(gvr).Get(kw.ctx, "openshift-apiserver", metav1.GetOptions{})
+	if err != nil {
+		logger.Debug("error getting K8s openshift-apiserver")
+
+		return false, isOCP
+	}
+
+	unstructured := resp.UnstructuredContent()
+	var data configv1.ClusterOperator
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured, &data)
+	if err != nil {
+		logger.Debug("cannot unmarshal into ClusterOperator")
+
+		return false, isOCP
+	}
+
+	isOCP = true // have confirmed that OCP is being used
+
+	var ocpVersion string
+	for _, verItem := range data.Status.Versions {
+		if verItem.Name == "openshift-apiserver" {
+			ocpVersion = verItem.Version
+		}
+	}
+	if ocpVersion == "" {
+		logger.Debug("did not find openshift-apiserver")
+
+		return false, isOCP
+	}
+
+	semver, err := version.ParseSemantic(ocpVersion)
+	if err != nil {
+		logger.Warning("could not parse OCP server version %s, not using reconnect support", ocpVersion)
+
+		return false, isOCP
+	}
+
+	// The patch was backported to minor version 10, 11 and 12. We must check z stream
+	// based on the minor version
+	// if minor version == 12, compare with v4.12.0
+	// if minor version == 11, compare with v4.11.16
+	// all other minor versions compare with v4.10.42
+	var compatibleVer string
+	switch semver.Minor() {
+	case 12:
+		compatibleVer = "v4.12.0"
+	case 11:
+		compatibleVer = "v4.11.16"
+	default:
+		compatibleVer = "v4.10.44"
+	}
+
+	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
+		logger.Info("OCP version %s is at least %s, using reconnect support", semver, compatibleVer)
+
+		return true, isOCP
+	}
+	logger.Warning("OCP version %s not at least %s, not using reconnect support", semver, compatibleVer)
+
+	return false, isOCP
+}
+
+func shouldUseReconnectK8S(kw *kubeUnit) bool {
 	serverVerInfo, err := kw.clientset.ServerVersion()
 	if err != nil {
 		logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
@@ -720,6 +773,48 @@ func shouldUseReconnect(kw *kubeUnit) bool {
 	logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", serverVerInfo.GitVersion, compatibleVer)
 
 	return false
+}
+
+func shouldUseReconnect(kw *kubeUnit) bool {
+	// Attempt to detect support for streaming from pod with timestamps based on
+	// Kubernetes / OpenShift server versions
+	// To use reconnect method, OpenShift server must be at least
+	//   v4.10.42
+	//   v4.11.16
+	//   v4.12.0
+	// If not on OpenShift, Kubernetes server must be at least
+	//   v1.23.14
+	//   v1.24.8
+	//   v1.25.4
+	// These versions contain a critical patch that permits connecting to the
+	// logstream with timestamps enabled.
+	// Without the patch, stdout lines would be split after 4K characters into a
+	// new line, which will cause issues in Receptor.
+	// https://github.com/kubernetes/kubernetes/issues/77603
+	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
+	// accepted values: "enabled", "disabled", "auto" with "auto" being the default
+	// all invalid value will assume to be "auto"
+
+	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+	if ok {
+		switch env {
+		case "enabled":
+			return true
+		case "disabled":
+			return false
+		case "auto":
+			// continue
+		default:
+			// continue
+		}
+	}
+
+	shouldReconnect, isOCP := shouldUseReconnectOCP(kw)
+	if isOCP {
+		return shouldReconnect
+	}
+
+	return shouldUseReconnectK8S(kw)
 }
 
 func parseTime(s string) *time.Time {

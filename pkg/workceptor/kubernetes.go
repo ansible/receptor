@@ -655,6 +655,38 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 }
 
+func isCompatibleOCP(kw *kubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
+	if err != nil {
+		kw.Warning("could not parse OCP server version %s, not using reconnect support", versionStr)
+
+		return false
+	}
+	// The patch was backported to minor version 10, 11 and 12. We must check z stream
+	// based on the minor version
+	// if minor version == 12, compare with v4.12.0
+	// if minor version == 11, compare with v4.11.16
+	// all other minor versions compare with v4.10.42
+	var compatibleVer string
+	switch semver.Minor() {
+	case 12:
+		compatibleVer = "v4.12.0"
+	case 11:
+		compatibleVer = "v4.11.16"
+	default:
+		compatibleVer = "v4.10.44"
+	}
+
+	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
+		kw.Info("OCP version %s is at least %s, using reconnect support", semver, compatibleVer)
+
+		return true
+	}
+	kw.Warning("OCP version %s not at least %s, not using reconnect support", semver, compatibleVer)
+
+	return false
+}
+
 func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 	// isOCP should remain false until it is confirmed that OpenShift is being
 	// used
@@ -703,36 +735,41 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 		return false, isOCP
 	}
 
-	semver, err := version.ParseSemantic(ocpVersion)
+	comp := isCompatibleOCP(kw, ocpVersion)
+
+	return comp, isOCP
+}
+
+func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
 	if err != nil {
-		kw.Warning("could not parse OCP server version %s, not using reconnect support", ocpVersion)
+		kw.Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
 
-		return false, isOCP
+		return false
 	}
-
-	// The patch was backported to minor version 10, 11 and 12. We must check z stream
+	// The patch was backported to minor version 23, 24 and 25. We must check z stream
 	// based on the minor version
-	// if minor version == 12, compare with v4.12.0
-	// if minor version == 11, compare with v4.11.16
-	// all other minor versions compare with v4.10.42
+	// if minor version == 24, compare with v1.24.8
+	// if minor version == 25, compare with v1.25.4
+	// all other minor versions compare with v1.23.14
 	var compatibleVer string
 	switch semver.Minor() {
-	case 12:
-		compatibleVer = "v4.12.0"
-	case 11:
-		compatibleVer = "v4.11.16"
+	case 24:
+		compatibleVer = "v1.24.8"
+	case 25:
+		compatibleVer = "v1.25.4"
 	default:
-		compatibleVer = "v4.10.44"
+		compatibleVer = "v1.23.14"
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		kw.Info("OCP version %s is at least %s, using reconnect support", semver, compatibleVer)
+		kw.Info("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
 
-		return true, isOCP
+		return true
 	}
-	kw.Warning("OCP version %s not at least %s, not using reconnect support", semver, compatibleVer)
+	kw.Warning("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
 
-	return false, isOCP
+	return false
 }
 
 func shouldUseReconnectK8S(kw *kubeUnit) bool {
@@ -743,36 +780,7 @@ func shouldUseReconnectK8S(kw *kubeUnit) bool {
 		return false
 	}
 
-	semver, err := version.ParseSemantic(serverVerInfo.String())
-	if err != nil {
-		kw.Warning("could parse Kubernetes server version %s, will not use reconnect support", serverVerInfo.String())
-
-		return false
-	}
-
-	// The patch was backported to minor version 23, 24 and 25. We must check z stream
-	// based on the minor version
-	// if minor version == 24, compare with v1.24.8
-	// if minor version == 25, compare with v1.25.4
-	// all other minor versions compare with v1.23.14
-	var compatibleVer string
-	switch serverVerInfo.Minor {
-	case "24":
-		compatibleVer = "v1.24.8"
-	case "25":
-		compatibleVer = "v1.25.4"
-	default:
-		compatibleVer = "v1.23.14"
-	}
-
-	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		kw.Debug("Kubernetes version %s is at least %s, using reconnect support", serverVerInfo.GitVersion, compatibleVer)
-
-		return true
-	}
-	kw.Debug("Kubernetes version %s not at least %s, not using reconnect support", serverVerInfo.GitVersion, compatibleVer)
-
-	return false
+	return isCompatibleK8S(kw, serverVerInfo.String())
 }
 
 func shouldUseReconnect(kw *kubeUnit) bool {

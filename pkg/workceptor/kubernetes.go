@@ -662,7 +662,7 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 
 	clientset, err := dynamic.NewForConfig(kw.config)
 	if err != nil {
-		logger.Warning("error getting K8S dynamic clientset")
+		kw.Warning("error getting K8S dynamic clientset")
 
 		return false, isOCP
 	}
@@ -675,7 +675,7 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 
 	resp, err := clientset.Resource(gvr).Get(kw.ctx, "openshift-apiserver", metav1.GetOptions{})
 	if err != nil {
-		logger.Debug("error getting K8s openshift-apiserver")
+		kw.Debug("error getting K8s openshift-apiserver")
 
 		return false, isOCP
 	}
@@ -684,7 +684,7 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 	var data configv1.ClusterOperator
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured, &data)
 	if err != nil {
-		logger.Debug("cannot unmarshal into ClusterOperator")
+		kw.Debug("cannot unmarshal into ClusterOperator")
 
 		return false, isOCP
 	}
@@ -698,14 +698,14 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 		}
 	}
 	if ocpVersion == "" {
-		logger.Debug("did not find openshift-apiserver")
+		kw.Debug("did not find openshift-apiserver")
 
 		return false, isOCP
 	}
 
 	semver, err := version.ParseSemantic(ocpVersion)
 	if err != nil {
-		logger.Warning("could not parse OCP server version %s, not using reconnect support", ocpVersion)
+		kw.Warning("could not parse OCP server version %s, not using reconnect support", ocpVersion)
 
 		return false, isOCP
 	}
@@ -726,11 +726,11 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		logger.Info("OCP version %s is at least %s, using reconnect support", semver, compatibleVer)
+		kw.Info("OCP version %s is at least %s, using reconnect support", semver, compatibleVer)
 
 		return true, isOCP
 	}
-	logger.Warning("OCP version %s not at least %s, not using reconnect support", semver, compatibleVer)
+	kw.Warning("OCP version %s not at least %s, not using reconnect support", semver, compatibleVer)
 
 	return false, isOCP
 }
@@ -738,14 +738,14 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 func shouldUseReconnectK8S(kw *kubeUnit) bool {
 	serverVerInfo, err := kw.clientset.ServerVersion()
 	if err != nil {
-		logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
+		kw.Warning("could not detect Kubernetes server version, will not use reconnect support")
 
 		return false
 	}
 
 	semver, err := version.ParseSemantic(serverVerInfo.String())
 	if err != nil {
-		logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", serverVerInfo.String())
+		kw.Warning("could parse Kubernetes server version %s, will not use reconnect support", serverVerInfo.String())
 
 		return false
 	}
@@ -766,11 +766,11 @@ func shouldUseReconnectK8S(kw *kubeUnit) bool {
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		logger.Debug("Kubernetes version %s is at least %s, using reconnect support", serverVerInfo.GitVersion, compatibleVer)
+		kw.Debug("Kubernetes version %s is at least %s, using reconnect support", serverVerInfo.GitVersion, compatibleVer)
 
 		return true
 	}
-	logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", serverVerInfo.GitVersion, compatibleVer)
+	kw.Debug("Kubernetes version %s not at least %s, not using reconnect support", serverVerInfo.GitVersion, compatibleVer)
 
 	return false
 }

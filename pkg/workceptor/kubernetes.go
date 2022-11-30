@@ -18,7 +18,6 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -674,7 +673,7 @@ func isCompatibleOCP(kw *kubeUnit, versionStr string) bool {
 	case 11:
 		compatibleVer = "v4.11.16"
 	default:
-		compatibleVer = "v4.10.44"
+		compatibleVer = "v4.10.42"
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
@@ -688,15 +687,11 @@ func isCompatibleOCP(kw *kubeUnit, versionStr string) bool {
 }
 
 func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
-	// isOCP should remain false until it is confirmed that OpenShift is being
-	// used
-	isOCP := false
-
 	clientset, err := dynamic.NewForConfig(kw.config)
 	if err != nil {
 		kw.Warning("error getting K8S dynamic clientset")
 
-		return false, isOCP
+		return false, false
 	}
 
 	gvr := schema.GroupVersionResource{
@@ -705,39 +700,41 @@ func shouldUseReconnectOCP(kw *kubeUnit) (bool, bool) {
 		Resource: "clusteroperators",
 	}
 
-	resp, err := clientset.Resource(gvr).Get(kw.ctx, "openshift-apiserver", metav1.GetOptions{})
+	openshiftAPI, err := clientset.Resource(gvr).Get(context.Background(), "openshift-apiserver", metav1.GetOptions{})
 	if err != nil {
-		kw.Debug("error getting K8s openshift-apiserver")
+		kw.Debug("Error while retrieving clusteroperators/openshift-apiserver, assuming not OpenShift: %s", err)
 
-		return false, isOCP
+		return false, false
 	}
 
-	unstructured := resp.UnstructuredContent()
-	var data configv1.ClusterOperator
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured, &data)
-	if err != nil {
-		kw.Debug("cannot unmarshal into ClusterOperator")
+	openshiftAPIStatus := openshiftAPI.Object["status"]
+	if openshiftAPIStatus == nil {
+		kw.Warning("openshift-apiserver.status is nil, assuming not compatible")
 
-		return false, isOCP
+		return false, true
 	}
 
-	isOCP = true // have confirmed that OCP is being used
+	openshiftAPIVersions := openshiftAPIStatus.(map[string]interface{})["versions"]
+	if openshiftAPIVersions == nil {
+		kw.Warning("openshift-apiserver.status.versions is nil, assuming not compatible")
+
+		return false, true
+	}
 
 	var ocpVersion string
-	for _, verItem := range data.Status.Versions {
-		if verItem.Name == "openshift-apiserver" {
-			ocpVersion = verItem.Version
+	for _, version := range openshiftAPIVersions.([]interface{}) {
+		if version.(map[string]interface{})["name"] == "openshift-apiserver" {
+			ocpVersion = version.(map[string]string)["version"]
 		}
 	}
-	if ocpVersion == "" {
-		kw.Debug("did not find openshift-apiserver")
 
-		return false, isOCP
+	if ocpVersion == "" {
+		kw.Debug("openshift-apiserver.status.versions does not contain openshift-apiserver version, assuming not compatible")
+
+		return false, true
 	}
 
-	comp := isCompatibleOCP(kw, ocpVersion)
-
-	return comp, isOCP
+	return isCompatibleOCP(kw, ocpVersion), true
 }
 
 func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {

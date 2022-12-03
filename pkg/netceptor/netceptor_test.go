@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/tests/utils"
 	"github.com/prep/socketpair"
 )
 
@@ -373,8 +374,13 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	nodes := make([]*Netceptor, netsize)
 	backends := make([]*ExternalBackend, netsize)
 	routingChans := make([]chan map[string]string, netsize)
+	logWriter := utils.NewTestLogWriter()
+	defer func() {
+		t.Log(logWriter.String())
+	}()
 	for i := 0; i < netsize; i++ {
 		nodes[i] = New(context.Background(), fmt.Sprintf("node%d", i))
+		nodes[i].Logger.SetOutput(logWriter)
 		routingChans[i] = nodes[i].SubscribeRoutingUpdates()
 		var err error
 		backends[i], err = NewExternalBackend()
@@ -448,40 +454,38 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	// Make sure the new node gets a more recent timestamp than the old one
 	time.Sleep(1 * time.Second)
 
-	for i := 0; i < 5; i++ {
-		// Create and connect a new node with a duplicate name
-		n := New(context.Background(), "node0")
-		n.Logger.Info("Duplicate node0 has epoch %d\n", n.epoch)
-		b, err := NewExternalBackend()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = n.AddBackend(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c1, c2, err := socketpair.New("unix")
-		if err != nil {
-			t.Fatal(err)
-		}
-		b.NewConnection(MessageConnFromNetConn(c1), true)
-		backends[netsize/2].NewConnection(MessageConnFromNetConn(c2), true)
-
-		// Wait for duplicate node to self-terminate
-		backendCloseChan := make(chan struct{})
-		go func() {
-			n.BackendWait()
-			close(backendCloseChan)
-		}()
-		select {
-		case <-backendCloseChan:
-		case <-time.After(120 * time.Second):
-			t.Fatal("timed out waiting for duplicate node to terminate")
-		}
-
-		// Force close the connection to the connected node
-		_ = c2.Close()
+	// Create and connect a new node with a duplicate name
+	n := New(context.Background(), "node0")
+	n.Logger.SetOutput(logWriter)
+	n.Logger.Info("Duplicate node0 has epoch %d\n", n.epoch)
+	b, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
 	}
+	err = n.AddBackend(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c1, c2, err := socketpair.New("unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.NewConnection(MessageConnFromNetConn(c1), true)
+	backends[netsize/2].NewConnection(MessageConnFromNetConn(c2), true)
+	// Wait for duplicate node to self-terminate
+	backendCloseChan := make(chan struct{})
+	go func() {
+		n.BackendWait()
+		close(backendCloseChan)
+	}()
+	select {
+	case <-backendCloseChan:
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for duplicate node to terminate")
+	}
+
+	// Force close the connection to the connected node
+	_ = c2.Close()
 
 	// Shut down the rest of the network
 	for i := 0; i < netsize; i++ {
@@ -489,6 +493,10 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	}
 	for i := 0; i < netsize; i++ {
 		nodes[i].BackendWait()
+	}
+
+	if !strings.Contains(logWriter.String(), "We are a duplicate node") {
+		t.Fatalf("Did not find expected log message from duplicate node.")
 	}
 }
 

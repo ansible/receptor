@@ -90,14 +90,6 @@ func NewTCPListener(address string, tls *tls.Config, logger *logger.ReceptorLogg
 }
 
 // Addr returns the network address the listener is listening on.
-func (b *TCPListener) Addr() net.Addr {
-	if b.li == nil {
-		return nil
-	}
-
-	return b.li.Addr()
-}
-
 func (b *TCPListener) GetAddr() string {
 	return b.li.Addr().String()
 }

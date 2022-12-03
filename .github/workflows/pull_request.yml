@@ -97,7 +97,6 @@ jobs:
         with:
           name: receptor
           path: /usr/local/bin/receptor
-
   receptorctl:
     name: receptorctl (Python ${{ matrix.python-version }})
     needs: receptor
@@ -130,7 +129,6 @@ jobs:
 
       - name: Run receptorctl tests
         run: make receptorctl-test
-
   container:
     name: container
     runs-on: ubuntu-latest

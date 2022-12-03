@@ -291,6 +291,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 		if err != nil {
 			return nil, err
 		}
+		cfr := make(map[string]interface{})
+		cfr["unitid"] = worker.ID()
 		stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O_WRONLY, 0o600)
 		if err != nil {
 			return nil, err
@@ -313,10 +315,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 		if err != nil && !IsPending(err) {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error starting worker: %s", err), 0)
 
-			return nil, err
+			return cfr, err
 		}
-		cfr := make(map[string]interface{})
-		cfr["unitid"] = worker.ID()
 		if IsPending(err) {
 			cfr["result"] = "Job Submitted"
 		} else {

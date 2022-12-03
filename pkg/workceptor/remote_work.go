@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 )
@@ -23,7 +24,8 @@ import (
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnit
-	topJC *utils.JobContext
+	topJC  *utils.JobContext
+	logger *logger.ReceptorLogger
 }
 
 // remoteExtraData is the content of the ExtraData JSON field for a remote work unit.
@@ -677,7 +679,7 @@ func (rw *remoteUnit) Release(force bool) error {
 }
 
 func newRemoteWorker(w *Workceptor, unitID, workType string) WorkUnit {
-	rw := &remoteUnit{}
+	rw := &remoteUnit{logger: w.nc.Logger}
 	rw.BaseWorkUnit.Init(w, unitID, workType)
 	red := &remoteExtraData{}
 	red.RemoteParams = make(map[string]string)

@@ -1,4 +1,4 @@
-package receptorcontrol
+package mesh
 
 import (
 	"context"
@@ -12,20 +12,20 @@ import (
 
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/workceptor"
-	"github.com/ansible/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/tests/utils"
 )
 
 // ReceptorControl Connects to a control socket and provides basic commands.
 type ReceptorControl struct {
 	socketConn     *net.UnixConn
-	socketFilename string
+	SocketFilename string
 }
 
 // New Returns an empty ReceptorControl.
-func New() *ReceptorControl {
+func NewReceptorControl() *ReceptorControl {
 	return &ReceptorControl{
 		socketConn:     nil,
-		socketFilename: "",
+		SocketFilename: "",
 	}
 }
 
@@ -47,7 +47,7 @@ func (r *ReceptorControl) Connect(filename string) error {
 	if err != nil {
 		return err
 	}
-	r.socketFilename = filename
+	r.SocketFilename = filename
 
 	return nil
 }
@@ -70,13 +70,13 @@ func (r *ReceptorControl) Reload() error {
 
 // Reconnect to unix socket.
 func (r *ReceptorControl) Reconnect() error {
-	if r.socketFilename != "" {
-		err := r.Connect(r.socketFilename)
+	if r.SocketFilename != "" {
+		err := r.Connect(r.SocketFilename)
 		if err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf("could not reconnect, no socketFilename")
+		return fmt.Errorf("could not reconnect, no SocketFilename")
 	}
 
 	return nil
@@ -211,26 +211,38 @@ func (r *ReceptorControl) Status() (*netceptor.Status, error) {
 }
 
 func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
-	_, err := r.ReadStr() // flush response
+	msg, err := r.ReadStr() // flush getWorkSubmitResponse
+
+	if !strings.Contains(msg, "Send stdin data and EOF.") {
+		return "", fmt.Errorf(msg)
+	}
+
 	if err != nil {
 		return "", err
 	}
+
 	err = r.CloseWrite() // close write half to signal EOF
 	if err != nil {
 		return "", err
 	}
+
+	defer func() {
+		err = r.Close() // since write is closed, we should close the whole socket
+		if err != nil {
+			panic(err)
+		}
+
+		err = r.Reconnect()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	response, err := r.ReadAndParseJSON()
 	if err != nil {
 		return "", err
 	}
-	err = r.Close() // since write is closed, we should close the whole socket
-	if err != nil {
-		return "", err
-	}
-	err = r.Reconnect()
-	if err != nil {
-		return "", err
-	}
+
 	unitID := fmt.Sprintf("%v", response["unitid"])
 
 	return unitID, nil
@@ -397,7 +409,7 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string
 		if err != nil {
 			return false
 		}
-		if workStatus.State != workceptor.WorkStateFailed {
+		if workStatus.State != workceptor.WorkStateCanceled {
 			return false
 		}
 		detail := workStatus.Detail

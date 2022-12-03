@@ -463,36 +463,36 @@ func (s *Netceptor) SetMaxConnectionIdleTime(userDefinedMaxIdleConnectionTimeout
 	return nil
 }
 
-type backendInfo struct {
+type BackendInfo struct {
 	connectionCost float64
 	nodeCost       map[string]float64
 	allowedPeers   []string
 }
 
 // BackendConnectionCost is a modifier for AddBackend, which sets the global connection cost.
-func BackendConnectionCost(cost float64) func(*backendInfo) {
-	return func(bi *backendInfo) {
+func BackendConnectionCost(cost float64) func(*BackendInfo) {
+	return func(bi *BackendInfo) {
 		bi.connectionCost = cost
 	}
 }
 
 // BackendNodeCost is a modifier for AddBackend, which sets the per-node connection costs.
-func BackendNodeCost(nodeCost map[string]float64) func(*backendInfo) {
-	return func(bi *backendInfo) {
+func BackendNodeCost(nodeCost map[string]float64) func(*BackendInfo) {
+	return func(bi *BackendInfo) {
 		bi.nodeCost = nodeCost
 	}
 }
 
 // BackendAllowedPeers is a modifier for AddBackend, which sets the list of peers allowed to connect.
-func BackendAllowedPeers(peers []string) func(*backendInfo) {
-	return func(bi *backendInfo) {
+func BackendAllowedPeers(peers []string) func(*BackendInfo) {
+	return func(bi *BackendInfo) {
 		bi.allowedPeers = peers
 	}
 }
 
 // AddBackend adds a backend to the Netceptor system.
-func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*backendInfo)) error {
-	bi := &backendInfo{
+func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*BackendInfo)) error {
+	bi := &BackendInfo{
 		connectionCost: 1.0,
 		nodeCost:       nil,
 		allowedPeers:   nil,
@@ -1780,8 +1780,6 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 		case ci.WriteChan <- ri:
 		case <-ci.Context.Done():
 			return
-		case <-initDoneChan:
-			return
 		}
 		count++
 		if count > 10 {
@@ -1795,6 +1793,8 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 			return
 		case <-time.After(1 * time.Second):
 			continue
+		case <-ci.Context.Done():
+			return
 		case <-initDoneChan:
 			s.Logger.Debug("Stopping initial updates\n")
 
@@ -1805,7 +1805,7 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 
 func (s *Netceptor) sendRejectMessage(ci *connInfo) {
 	rejMsg, err := s.translateStructToNetwork(MsgTypeReject, make([]string, 0))
-	if err != nil {
+	if err == nil {
 		select {
 		case <-ci.Context.Done():
 		case ci.WriteChan <- rejMsg:
@@ -1816,11 +1816,11 @@ func (s *Netceptor) sendRejectMessage(ci *connInfo) {
 func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connInfo, reason string) error {
 	s.sendRejectMessage(ci)
 
-	return fmt.Errorf("rejected connection with node %s because %s", remoteNodeID, reason)
+	return fmt.Errorf("%s: rejected connection with node %s because %s", s.nodeID, remoteNodeID, reason)
 }
 
 // Main Netceptor protocol loop.
-func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *backendInfo) error {
+func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *BackendInfo) error {
 	if bi.connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}

@@ -3,131 +3,82 @@ package mesh
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/functional/lib/mesh"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/ansible/receptor/pkg/backends"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/tests/utils"
 	_ "github.com/fortytw2/leaktest"
-	"gopkg.in/yaml.v2"
 )
 
 // Test that a mesh starts and that connections are what we expect and that
 // each node's view of the mesh converges.
 func TestMeshStartup(t *testing.T) {
-	testTable := []struct {
-		filename string
-	}{
-		{"mesh-definitions/flat-mesh-tcp.yaml"},
-		{"mesh-definitions/random-mesh-tcp.yaml"},
-		{"mesh-definitions/tree-mesh-tcp.yaml"},
-		{"mesh-definitions/flat-mesh-udp.yaml"},
-		{"mesh-definitions/random-mesh-udp.yaml"},
-		{"mesh-definitions/tree-mesh-udp.yaml"},
-		{"mesh-definitions/flat-mesh-ws.yaml"},
-		{"mesh-definitions/random-mesh-ws.yaml"},
-		{"mesh-definitions/tree-mesh-ws.yaml"},
+	meshDefinitions := map[string]*LibMesh{
+		"tcp": flatMesh("tcp"),
+		"udp": flatMesh("udp"),
+		"ws":  flatMesh("ws"),
 	}
+
 	t.Parallel()
-	for _, data := range testTable {
-		filename := data.filename
-		t.Run(filename, func(t *testing.T) {
+	for protocol, m := range meshDefinitions {
+		m := m
+		protocol := protocol
+
+		testName := protocol + "/" + m.Name
+		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
-			t.Logf("starting mesh")
-			m, err := mesh.NewCLIMeshFromFile(filename, t.Name())
+
+			err := m.Start(t.Name())
+
+			defer func() {
+				m.Destroy()
+				m.WaitForShutdown()
+				t.Log(m.LogWriter.String())
+			}()
+
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-			t.Logf("waiting for mesh")
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+
+			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
 			err = m.WaitForReady(ctx)
-			t.Logf("Mesh ready")
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			// Test that each Node can ping each Node
-			for nodeName, nodeSender := range m.Nodes() {
-				t.Logf("Pinging nodes from %s (%s)", nodeName, nodeSender.Dir())
-				controller := receptorcontrol.New()
-				t.Logf("connecting to %s", nodeSender.ControlSocket())
-				err = controller.Connect(nodeSender.ControlSocket())
+			for _, node := range m.GetNodes() {
+				// t.Logf("Pinging nodes from %s (%s)", node.GetID(), node.GetDataDir())
+				controller := NewReceptorControl()
+				// t.Logf("connecting to %s", node.GetControlSocket())
+				err = controller.Connect(node.GetControlSocket())
 				if err != nil {
 					t.Fatalf("Error connecting to controller: %s", err)
 				}
-				for nodeIDResponder := range m.Nodes() {
-					t.Logf("pinging %s", nodeIDResponder)
+				for _, remoteNode := range m.GetNodes() {
+					// t.Logf("pinging %s", remoteNode.GetID())
 				retryloop:
 					for i := 30; i > 0; i-- {
-						response, err := controller.Ping(nodeIDResponder)
+						_, err := controller.Ping(remoteNode.GetID())
 						switch {
 						case err == nil:
-							t.Logf("%v", response)
+							// t.Logf("%v", response)
 
 							break retryloop
 						case i != 1:
-							t.Logf("Error pinging %s: %s. Retrying", nodeIDResponder, err)
+							t.Logf("Error pinging %s: %s. Retrying", remoteNode.GetID(), err)
 
 							continue
 						default:
-							t.Fatalf("Error pinging %s: %s", nodeIDResponder, err)
+							t.Fatalf("Error pinging %s: %s", remoteNode.GetID(), err)
 						}
 					}
-				}
-				t.Logf("All nodes connected")
-				controller.Close()
-			}
-		})
-	}
-}
-
-// Test that a mesh starts and that connections are what we expect.
-func TestMeshConnections(t *testing.T) {
-	testTable := []struct {
-		filename string
-	}{
-		{"mesh-definitions/flat-mesh-tcp.yaml"},
-		{"mesh-definitions/random-mesh-tcp.yaml"},
-		{"mesh-definitions/tree-mesh-tcp.yaml"},
-		{"mesh-definitions/flat-mesh-udp.yaml"},
-		{"mesh-definitions/random-mesh-udp.yaml"},
-		{"mesh-definitions/tree-mesh-udp.yaml"},
-		{"mesh-definitions/flat-mesh-ws.yaml"},
-		{"mesh-definitions/random-mesh-ws.yaml"},
-		{"mesh-definitions/tree-mesh-ws.yaml"},
-	}
-	t.Parallel()
-	for _, data := range testTable {
-		filename := data.filename
-		t.Run(filename, func(t *testing.T) {
-			t.Parallel()
-			m, err := mesh.NewCLIMeshFromFile(filename, t.Name())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-			yamlDat, err := os.ReadFile(filename)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			data := mesh.YamlData{}
-
-			err = yaml.Unmarshal(yamlDat, &data)
-			if err != nil {
-				t.Fatal(err)
-			}
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-			for connectionsReady := m.CheckConnections(); !connectionsReady; connectionsReady = m.CheckConnections() {
-				time.Sleep(100 * time.Millisecond)
-				if ctx.Err() != nil {
-					t.Error("Timed out while waiting for connections:")
 				}
 			}
 		})
@@ -136,34 +87,41 @@ func TestMeshConnections(t *testing.T) {
 
 // Test that traceroute works.
 func TestTraceroute(t *testing.T) {
-	testTable := []struct {
-		filename string
-	}{
-		{"mesh-definitions/tree-mesh-tcp.yaml"},
-		{"mesh-definitions/tree-mesh-udp.yaml"},
-		{"mesh-definitions/tree-mesh-ws.yaml"},
+	meshDefinitions := map[string]*LibMesh{
+		"tcp": treeMesh("tcp"),
+		"udp": treeMesh("udp"),
+		"ws":  treeMesh("ws"),
 	}
+
 	t.Parallel()
-	for _, data := range testTable {
-		filename := data.filename
-		t.Run(filename, func(t *testing.T) {
+	for protocol, m := range meshDefinitions {
+		m := m
+		protocol := protocol
+
+		testName := protocol + "/" + m.Name
+		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
-			m, err := mesh.NewLibMeshFromFile(filename, t.Name())
+
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+
+			err := m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-			for connectionsReady := m.CheckConnections(); !connectionsReady; connectionsReady = m.CheckConnections() {
-				time.Sleep(100 * time.Millisecond)
-				if ctx.Err() != nil {
-					t.Fatal("Timed out while waiting for connections:")
-				}
+
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			err = m.WaitForReady(ctx)
+			if err != nil {
+				t.Fatal(err)
 			}
-			controlNode := m.Nodes()["controller"]
-			controller := receptorcontrol.New()
-			err = controller.Connect(controlNode.ControlSocket())
+
+			controlNode := m.GetNodes()["controller"]
+			controller := NewReceptorControl()
+			err = controller.Connect(controlNode.GetControlSocket())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -223,51 +181,71 @@ func TestTraceroute(t *testing.T) {
 					t.Fatalf("hop %s should be %s but is actually %s", eh.key, eh.from, fromStr)
 				}
 			}
-
-			t.Logf("Finished %s\n", t.Name())
 		})
 	}
 }
 
 // Test that a mesh starts and that connections are what we expect.
 func TestMeshShutdown(t *testing.T) {
-	// defer leaktest.Check(t)()
-	testTable := []struct {
-		filename string
-	}{
-		{"mesh-definitions/random-mesh-tcp.yaml"},
-		{"mesh-definitions/random-mesh-udp.yaml"},
-		{"mesh-definitions/random-mesh-ws.yaml"},
+
+	// !!!!!!!!!!
+	// This test is intentionally set to not run in parallel with the other tests
+	// since it is checking to see that all ports are appropriately released.
+	// !!!!!!!!!!
+
+	meshDefinitions := map[string]*LibMesh{
+		"tcp": randomMesh("tcp"),
+		"udp": randomMesh("udp"),
+		"ws":  randomMesh("ws"),
 	}
-	for _, data := range testTable {
-		filename := data.filename
-		t.Run(filename, func(t *testing.T) {
-			m, err := mesh.NewLibMeshFromFile(filename, t.Name())
+	for protocol, m := range meshDefinitions {
+		m := m
+		protocol := protocol
+
+		testName := protocol + "/" + m.Name
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			err := m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = m.WaitForReady(ctx)
+
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			m.Destroy()
 			m.WaitForShutdown()
 
+			var lsofProto string
+			switch protocol {
+			case "tcp":
+				lsofProto = "TCP"
+			case "ws":
+				lsofProto = "TCP"
+			case "udp":
+				lsofProto = "UDP"
+			}
+
 			// Check that the connections are closed
 			pid := os.Getpid()
-			pidString := "pid=" + strconv.Itoa(pid)
+			t.Log("Current test pid: %\n", fmt.Sprint(pid))
 			done := false
 			var out bytes.Buffer
 			for timeout := 10 * time.Second; timeout > 0 && !done; {
 				out = bytes.Buffer{}
-				cmd := exec.Command("ss", "-tuanp")
+				cmd := exec.Command("lsof", "-tap", fmt.Sprint(pid), "-i", lsofProto)
 				cmd.Stdout = &out
-				err := cmd.Run()
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !strings.Contains(out.String(), pidString) {
+				cmd.Run()
+				if !strings.Contains(out.String(), fmt.Sprint(pid)) {
 					done = true
 
 					break
@@ -276,7 +254,7 @@ func TestMeshShutdown(t *testing.T) {
 				timeout -= 100 * time.Millisecond
 			}
 			if done == false {
-				t.Errorf("Timed out while waiting for backends to close:\n%s", out.String())
+				t.Errorf("Timed out while waiting for backends to close:%s\n", out.String())
 			}
 		})
 	}
@@ -284,51 +262,30 @@ func TestMeshShutdown(t *testing.T) {
 
 func TestCosts(t *testing.T) {
 	t.Parallel()
-	// Setup our mesh yaml data
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
+	m := NewLibMesh()
 
-	// Generate a mesh where each node n is connected to only n+1 and n-1
-	// if they exist
-	data.Nodes["node1"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{
-					"cost": 4.5,
-					"nodecost": map[interface{}]interface{}{
-						"node2": 2.6,
-						"node3": 3.2,
-					},
-				},
-			},
+	defer func() {
+		t.Log(m.LogWriter.String())
+	}()
+
+	node1 := m.NewLibNode("node1")
+	node1.ListenerCfgs = map[listenerName]ListenerCfg{
+		"tcp": &backends.TCPListenerCfg{
+			BindAddr: "127.0.0.1:0",
+			Cost:     4.5,
+			NodeCost: map[string]float64{"node2": 2.6, "node3": 3.2},
 		},
 	}
-	data.Nodes["node2"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node1": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{},
+
+	for _, i := range []int{2, 3, 4} {
+		nodeID := fmt.Sprintf("node%d", i)
+		node := m.NewLibNode(nodeID)
+		node.Connections = []Connection{
+			{RemoteNode: node1, Protocol: "tcp"},
+		}
 	}
-	data.Nodes["node3"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node1": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{},
-	}
-	data.Nodes["node4"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node1": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{},
-	}
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+
+	err := m.Start(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,13 +298,13 @@ func TestCosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Test that each Node can ping each Node
-	for _, nodeSender := range m.Nodes() {
-		controller := receptorcontrol.New()
-		err = controller.Connect(nodeSender.ControlSocket())
+	for _, nodeSender := range m.GetNodes() {
+		controller := NewReceptorControl()
+		err = controller.Connect(nodeSender.GetControlSocket())
 		if err != nil {
 			t.Fatal(err)
 		}
-		for nodeIDResponder := range m.Nodes() {
+		for nodeIDResponder := range m.GetNodes() {
 			response, err := controller.Ping(nodeIDResponder)
 			if err != nil {
 				t.Error(err)
@@ -361,111 +318,105 @@ func TestCosts(t *testing.T) {
 
 func TestDuplicateNodes(t *testing.T) {
 	t.Parallel()
-	// Setup our mesh yaml data
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
+	m := NewLibMesh()
 
-	// Generate a mesh where each node n is connected to only n+1 and n-1
-	// if they exist
-	data.Nodes["node1"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
+	defer func() {
+		t.Log(m.LogWriter.String())
+	}()
+
+	node1 := m.NewLibNode("node1")
+	node1.ListenerCfgs = map[listenerName]ListenerCfg{
+		"tcp": &backends.TCPListenerCfg{
+			BindAddr: "127.0.0.1:0",
+			Cost:     4.5,
+			NodeCost: map[string]float64{"node2": 2.6, "node3": 3.2},
 		},
 	}
-	data.Nodes["node2"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node1": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
-		},
+
+	node2 := m.NewLibNode("node2")
+	node2.Connections = []Connection{
+		{RemoteNode: node1, Protocol: "tcp"},
 	}
-	data.Nodes["node1_dup"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node2": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"node": map[interface{}]interface{}{
-					"id": "node1",
-				},
-			},
-		},
+
+	node3 := m.NewLibNode("node3")
+	node3.netceptorInstance = netceptor.New(context.Background(), "node2")
+	node3.Connections = []Connection{
+		{RemoteNode: node1, Protocol: "tcp"},
 	}
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Hack a duplicate node onto the mesh
+	delete(m.nodes, "node3")
+	m.nodes["node2-dupe"] = node3
+
+	err := m.Start(t.Name())
 	defer m.WaitForShutdown()
 	defer m.Destroy()
 
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	err = m.WaitForReady(ctx)
-	if err == nil {
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 1*time.Minute)
+	sleepInterval := 100 * time.Millisecond
+	if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+		return strings.Contains(m.LogWriter.String(), "connected using a node ID we are already connected to")
+	}) {
 		t.Fatal("duplicate nodes were not expected to exist together")
 	}
+
+	time.Sleep(5 * time.Second)
 }
 
-func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		// Setup our mesh yaml data
-		b.StopTimer()
-		data := mesh.YamlData{}
-		data.Nodes = make(map[string]*mesh.YamlNode)
+// func benchmarkLinearMeshStartup(totalNodes int, b *testing.B) {
+// 	for i := 0; i < b.N; i++ {
+// 		// Setup our mesh yaml data
+// 		b.StopTimer()
+// 		data := YamlData{}
+// 		data.Nodes = make(map[string]*YamlNode)
 
-		// Generate a mesh where each node n is connected to only n+1 and n-1
-		// if they exist
-		for i := 0; i < totalNodes; i++ {
-			connections := make(map[string]mesh.YamlConnection)
-			nodeID := "Node" + strconv.Itoa(i)
-			if i > 0 {
-				prevNodeID := "Node" + strconv.Itoa(i-1)
-				connections[prevNodeID] = mesh.YamlConnection{
-					Index: 0,
-				}
-			}
-			data.Nodes[nodeID] = &mesh.YamlNode{
-				Connections: connections,
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tcp-listener": map[interface{}]interface{}{},
-					},
-				},
-			}
-		}
-		b.StartTimer()
+// 		// Generate a mesh where each node n is connected to only n+1 and n-1
+// 		// if they exist
+// 		for i := 0; i < totalNodes; i++ {
+// 			connections := make(map[string]YamlConnection)
+// 			nodeID := "Node" + strconv.Itoa(i)
+// 			if i > 0 {
+// 				prevNodeID := "Node" + strconv.Itoa(i-1)
+// 				connections[prevNodeID] = YamlConnection{
+// 					Index: 0,
+// 				}
+// 			}
+// 			data.Nodes[nodeID] = &YamlNode{
+// 				Connections: connections,
+// 				NodedefBase: []interface{}{
+// 					map[interface{}]interface{}{
+// 						"tcp-listener": map[interface{}]interface{}{},
+// 					},
+// 				},
+// 			}
+// 		}
+// 		b.StartTimer()
 
-		// Reset the Timer because building the yaml data for the mesh may have
-		// taken a bit
-		m, err := mesh.NewCLIMeshFromYaml(data, b.Name())
-		if err != nil {
-			b.Fatal(err)
-		}
-		ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-		err = m.WaitForReady(ctx)
-		if err != nil {
-			b.Fatal(err)
-		}
-		b.StopTimer()
-		m.Destroy()
-		m.WaitForShutdown()
-		b.StartTimer()
-	}
-}
+// 		// Reset the Timer because building the yaml data for the mesh may have
+// 		// taken a bit
+// 		m, err := NewCLIMeshFromYaml(data, b.Name())
+// 		if err != nil {
+// 			b.Fatal(err)
+// 		}
+// 		ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+// 		err = m.WaitForReady(ctx)
+// 		if err != nil {
+// 			b.Fatal(err)
+// 		}
+// 		b.StopTimer()
+// 		m.Destroy()
+// 		m.WaitForShutdown()
+// 		b.StartTimer()
+// 	}
+// }
 
-func BenchmarkLinearMeshStartup100(b *testing.B) {
-	benchmarkLinearMeshStartup(100, b)
-}
+// func BenchmarkLinearMeshStartup100(b *testing.B) {
+// 	benchmarkLinearMeshStartup(100, b)
+// }
 
-func BenchmarkLinearMeshStartup10(b *testing.B) {
-	benchmarkLinearMeshStartup(10, b)
-}
+// func BenchmarkLinearMeshStartup10(b *testing.B) {
+// 	benchmarkLinearMeshStartup(10, b)
+// }

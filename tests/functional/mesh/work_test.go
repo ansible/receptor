@@ -1,1003 +1,689 @@
 package mesh
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/functional/lib/mesh"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/ansible/receptor/tests/functional/lib/utils"
-	_ "github.com/fortytw2/leaktest"
+	"github.com/ansible/receptor/pkg/workceptor"
+	"github.com/ansible/receptor/tests/utils"
 )
 
-func checkSkipKube(t *testing.T) {
-	if skip := os.Getenv("SKIP_KUBE"); skip == "1" {
-		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
-	}
-}
-
-func tearDown(controllers map[string]*receptorcontrol.ReceptorControl, m *mesh.CLIMesh) {
-	defer m.WaitForShutdown()
-	defer m.Destroy()
-	defer func() {
-		for _, controller := range controllers {
-			controller.Close()
-		}
-	}()
-}
-
-func TestWork(t *testing.T) {
+func TestWorkSubmitWithTLSClient(t *testing.T) {
 	t.Parallel()
-	home := os.Getenv("HOME")
-	echoSleepLong := map[interface{}]interface{}{
-		"work-command": map[interface{}]interface{}{
-			"workType": "echosleeplong",
-			"command":  "bash",
-			"params":   "-c \"for i in {1..5}; do echo $i; sleep 3;done\"",
-		},
-	}
-	echoSleepShort := map[interface{}]interface{}{
-		"work-command": map[interface{}]interface{}{
-			"workType": "echosleepshort",
-			"command":  "bash",
-			"params":   "-c \"for i in {1..5}; do echo $i;done\"",
-		},
-	}
-	echoSleepLong50 := map[interface{}]interface{}{
-		"work-command": map[interface{}]interface{}{
-			"workType": "echosleeplong50",
-			"command":  "bash",
-			"params":   "-c \"for i in {1..50}; do echo $i; sleep 4;done\"",
-		},
-	}
-	kubeEchoSleepLong := map[interface{}]interface{}{
-		"work-kubernetes": map[interface{}]interface{}{
-			"workType":   "echosleeplong",
-			"authmethod": "kubeconfig",
-			"namespace":  "default",
-			"kubeconfig": filepath.Join(home, ".kube/config"),
-			"image":      "alpine",
-			"command":    "sh -c \"for i in `seq 1 5`; do echo $i; sleep 3;done\"",
-		},
-	}
-	kubeEchoSleepLong50 := map[interface{}]interface{}{
-		"work-kubernetes": map[interface{}]interface{}{
-			"workType":   "echosleeplong50",
-			"authmethod": "kubeconfig",
-			"namespace":  "default",
-			"kubeconfig": filepath.Join(home, ".kube/config"),
-			"image":      "alpine",
-			"command":    "sh -c \"for i in `seq 1 50`; do echo $i; sleep 4;done\"",
-		},
-	}
-	kubeEchoSleepShort := map[interface{}]interface{}{
-		"work-kubernetes": map[interface{}]interface{}{
-			"workType":   "echosleepshort",
-			"authmethod": "kubeconfig",
-			"namespace":  "default",
-			"kubeconfig": filepath.Join(home, ".kube/config"),
-			"image":      "alpine",
-			"command":    "sh -c \"for i in `seq 1 5`; do echo $i;done\"",
-		},
-	}
-	testTable := []struct {
-		testGroup     string
-		shortCommand  map[interface{}]interface{}
-		longCommand   map[interface{}]interface{}
-		longCommand50 map[interface{}]interface{}
-	}{
-		{"normal_worker", echoSleepShort, echoSleepLong, echoSleepLong50},
-		{"kube_worker", kubeEchoSleepShort, kubeEchoSleepLong, kubeEchoSleepLong50},
-	}
-	for _, subtest := range testTable {
-		testGroup := subtest.testGroup
-		shortCommand := subtest.shortCommand
-		longCommand := subtest.longCommand
-		longCommand50 := subtest.longCommand50
-		// Setup our mesh yaml data
-		workSetup := func(testName string) (map[string]*receptorcontrol.ReceptorControl, *mesh.CLIMesh, []byte) {
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
-			expectedResults := []byte("1\n2\n3\n4\n5\n")
-			// Setup certs
-			caKey, caCrt, err := utils.GenerateCA("ca", "localhost")
-			if err != nil {
-				t.Fatal(err)
-			}
-			key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "node1", nil, []string{"node1"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "node2", nil, []string{"node2"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			key3, crt3, err := utils.GenerateCertWithCA("node1wrongCN", caKey, caCrt, "node1wrongCN", nil, []string{"node1wrongCN"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Generate a mesh with 3 nodes
-			data.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tcp-listener": map[interface{}]interface{}{
-							"cost": 1.0,
-							"nodecost": map[interface{}]interface{}{
-								"node1": 1.0,
-								"node3": 1.0,
-							},
-						},
-					},
-					map[interface{}]interface{}{
-						"tls-server": map[interface{}]interface{}{
-							"name":              "control_tls",
-							"cert":              crt2,
-							"key":               key2,
-							"requireclientcert": true,
-							"clientcas":         caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						"control-service": map[interface{}]interface{}{
-							"service": "control",
-							"tls":     "control_tls",
-						},
-					},
-					shortCommand,
-				},
-			}
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 0,
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":               "tlsclient",
-							"rootcas":            caCrt,
-							"insecureskipverify": false,
-							"cert":               crt1,
-							"key":                key1,
-						},
-					},
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":                   "tlsclientwrongCN",
-							"rootcas":                caCrt,
-							"insecureskipverify":     false,
-							"cert":                   crt3,
-							"key":                    key3,
-							"skipreceptornamescheck": true,
-						},
-					},
-				},
-			}
-			data.Nodes["node3"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 0,
-					},
-				},
-				NodedefBase: []interface{}{
-					longCommand,
-					shortCommand,
-					longCommand50,
-				},
-			}
 
-			m, err := mesh.NewCLIMeshFromYaml(data, testName)
-			if err != nil {
-				if m != nil {
-					t.Fatal(err, m.Dir())
-				} else {
-					t.Fatal(err)
-				}
-			}
+	for _, plugin := range workPlugins {
+		plugin := plugin
 
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			nodes := m.Nodes()
-			controllers := make(map[string]*receptorcontrol.ReceptorControl)
-			for k := range nodes {
-				controller := receptorcontrol.New()
-				err = controller.Connect(nodes[k].ControlSocket())
-				if err != nil {
-					t.Fatal(err, m.Dir())
-				}
-				controllers[k] = controller
-			}
-
-			return controllers, m, expectedResults
-		}
-
-		assertFilesReleased := func(ctx context.Context, nodeDir, nodeID, unitID string) error {
-			workPath := filepath.Join(nodeDir, "datadir", nodeID, unitID)
-			check := func() bool {
-				_, err := os.Stat(workPath)
-
-				return os.IsNotExist(err)
-			}
-			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
-				return fmt.Errorf("unitID %s on %s did not release", unitID, nodeID)
-			}
-
-			return nil
-		}
-
-		assertStdoutFizeSize := func(ctx context.Context, nodeDir, nodeID, unitID string, waitUntilSize int) error {
-			stdoutFilename := filepath.Join(nodeDir, "datadir", nodeID, unitID, "stdout")
-			check := func() bool {
-				_, err := os.Stat(stdoutFilename)
-				if os.IsNotExist(err) {
-					return false
-				}
-				fstat, _ := os.Stat(stdoutFilename)
-
-				return int(fstat.Size()) >= waitUntilSize
-			}
-			if !utils.CheckUntilTimeout(ctx, 3000*time.Millisecond, check) {
-				return fmt.Errorf("file size not correct for %s", stdoutFilename)
-			}
-
-			return nil
-		}
-
-		t.Run(testGroup+"/work submit with tlsclient", func(t *testing.T) {
-			// tests work submit via json
-			// tests connecting to remote control service with tlsclient
-			// tests that having a ttl that never times out (10 hours) works fine
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
+			controllers, m, expectedResults := workSetup(plugin, t)
 
-			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":"", "ttl":"10h"}`
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+
+			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"client","node":"node2","params":"", "ttl":"10h"}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.DataDir)
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.DataDir)
+			}
+
+			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
 			}
 		})
+	}
+}
 
-		t.Run(testGroup+"/work submit with incorrect tlsclient CN", func(t *testing.T) {
-			// tests that submitting work with wrong cert CN immediately fails the job
-			// also tests that releasing a job that has not been started on remote
-			// will not attempt to connect to remote
+// Tests that submitting work with wrong cert CN immediately fails the job
+// also tests that releasing a job that has not been started on remote
+// will not attempt to connect to remote
+func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, _ := workSetup(plugin, t)
+			nodes := m.GetNodes()
 
 			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclientwrongCN","node":"node2","params":""}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
+
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkFailed(ctx, unitID)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
+
 			_, err = controllers["node1"].WorkRelease(unitID)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
+
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
+
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
+			err = assertFilesReleased(ctx, nodes["node1"].GetDataDir(), "node1", unitID)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
 		})
+	}
+}
 
-		t.Run(testGroup+"/start remote work with ttl", func(t *testing.T) {
+func TestStartRemoteWorkWithTTL(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, _ := workSetup(plugin, t)
+
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			nodes := m.GetNodes()
 
 			nodes["node2"].Shutdown()
-			nodes["node2"].WaitForShutdown()
 
-			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclient","node":"node2","params":"","ttl":"5s"}`
+			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"client","node":"node2","params":"","ttl":"5s"}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 			err = controllers["node1"].AssertWorkTimedOut(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
+			ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
+			ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+			err = assertFilesReleased(ctx, nodes["node1"].GetDataDir(), "node1", unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err)
 			}
 		})
+	}
+}
 
-		t.Run(testGroup+"/cancel then release remote work", func(t *testing.T) {
-			// also tests that release still works after control service restarts
+func TestCancelThenReleaseRemoteWork(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, _ := workSetup(plugin, t)
+
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			// defer tearDown(controllers, m)
+			nodes := m.GetNodes()
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			_, err = controllers["node1"].WorkCancel(unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkCancelled(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			workStatus, err := controllers["node1"].GetWorkStatus(unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
 			if remoteUnitID == "" {
 				t.Errorf("remoteUnitID should not be empty")
 			}
 			nodes["node1"].Shutdown()
-			nodes["node1"].WaitForShutdown()
 			err = nodes["node1"].Start()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].Close()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].Reconnect()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node1"].Dir(), "node1", unitID)
+			err = assertFilesReleased(ctx, nodes["node1"].GetDataDir(), "node1", unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node3"].Dir(), "node3", remoteUnitID)
+			err = assertFilesReleased(ctx, nodes["node3"].GetDataDir(), "node3", remoteUnitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 		})
+	}
+}
 
-		t.Run(testGroup+"/work submit while remote node is down", func(t *testing.T) {
+func TestWorkSubmitWhileRemoteNodeIsDown(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, expectedResults := workSetup(plugin, t)
+			nodes := m.GetNodes()
 
 			nodes["node3"].Shutdown()
-			nodes["node3"].WaitForShutdown()
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleepshort")
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkPending(ctx, unitID)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+
 			err = nodes["node3"].Start()
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+
 			// Wait for node3 to join the mesh again
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
+			}
+
+			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
 			}
 		})
+	}
+}
 
-		t.Run(testGroup+"/work streaming resumes when relay node restarts", func(t *testing.T) {
+func TestWorkStreamingResumesWhenRelayNodeRestarts(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, expectedResults := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, expectedResults := workSetup(plugin, t)
+			nodes := m.GetNodes()
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 1)
+			err = assertStdoutFizeSize(ctx, nodes["node1"].GetDataDir(), "node1", unitID, 1)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults[:1])
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+			t.Log("Shutting down node2.")
 			nodes["node2"].Shutdown()
-			nodes["node2"].WaitForShutdown()
+			t.Log("node2 has shut down. Restarting it now.")
 			nodes["node2"].Start()
 			// Wait for node2 to join the mesh again
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+			t.Log("node2 has rejoined the mesh.")
+
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertStdoutFizeSize(ctx, nodes["node1"].Dir(), "node1", unitID, 10)
+			err = assertStdoutFizeSize(ctx, nodes["node1"].GetDataDir(), "node1", unitID, 10)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 		})
-		t.Run(testGroup+"/results on restarted node", func(t *testing.T) {
+	}
+}
+
+func TestResultsOnRestartedNode(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, expectedResults := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, expectedResults := workSetup(plugin, t)
+			nodes := m.GetNodes()
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+
 			nodes["node3"].Shutdown()
-			nodes["node3"].WaitForShutdown()
 			err = nodes["node3"].Start()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			// Wait for node3 to join the mesh again
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
+
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 		})
-		t.Run(testGroup+"/work submit and release to non-existent node", func(t *testing.T) {
+	}
+}
+
+func TestWorkSubmitAndReleaseToNonexistentNode(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
 			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
-			nodes := m.Nodes()
+			controllers, m, _ := workSetup(plugin, t)
+			nodes := m.GetNodes()
 
 			// submit work from node1 to non-existent-node
 			// node999 was never initialised
 			unitID, err := controllers["node1"].WorkSubmit("node999", "echosleeplong")
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 
 			// wait for 10 seconds, and check if the work is in pending state
 			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkPending(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 
 			nodes["node1"].Shutdown()
-			nodes["node1"].WaitForShutdown()
 			err = nodes["node1"].Start()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = m.WaitForReady(ctx)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].Close()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			err = controllers["node1"].Reconnect()
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 
 			// release the work on node1
 			_, err = controllers["node1"].WorkRelease(unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
 			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-		})
-		t.Run(testGroup+"/reload backends while streaming work results", func(t *testing.T) {
-			t.Parallel()
-			if strings.Contains(t.Name(), "kube") {
-				checkSkipKube(t)
-			}
-			controllers, m, _ := workSetup(t.Name())
-			defer tearDown(controllers, m)
-
-			// submit work from node 2 to node 3
-			unitID, err := controllers["node2"].WorkSubmit("node3", "echosleeplong50")
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// wait for 10 seconds, and check if the work is in pending state
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node2"].AssertWorkPending(ctx, unitID)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// declare a new mesh with no connection between nodes
-			modifiedData := mesh.YamlData{}
-			modifiedData.Nodes = make(map[string]*mesh.YamlNode)
-			modifiedData.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-			}
-			modifiedData.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-			}
-			modifiedData.Nodes["node3"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-			}
-
-			// modify the existing mesh
-			err = mesh.ModifyCLIMeshFromYaml(modifiedData, *m)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// reload the entire mesh
-			for k := range controllers {
-				err = controllers[k].Reload()
-				if err != nil {
-					t.Fatal(err, m.Dir())
-				}
-			}
-
-			// ping should not be successful in a broken mesh
-			_, err = controllers["node1"].Ping("node3")
-			if err == nil {
-				t.Fatal("ping should not be successful")
-			}
-
-			// read the work status
-			workStatus, err := controllers["node2"].GetWorkStatus(unitID)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// modify the mesh to have connection again
-			withConnectionData := mesh.YamlData{}
-			withConnectionData.Nodes = make(map[string]*mesh.YamlNode)
-			withConnectionData.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-			}
-			withConnectionData.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 0,
-					},
-				},
-			}
-			withConnectionData.Nodes["node3"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 0,
-					},
-				},
-			}
-
-			err = mesh.ModifyCLIMeshFromYaml(withConnectionData, *m)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// reload the entire mesh
-			for k := range controllers {
-				err = controllers[k].Reload()
-				if err != nil {
-					t.Fatal(err, m.Dir())
-				}
-			}
-
-			// wait for mesh to become ready again
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// ping should be successful in the mesh with connections
-			_, err = controllers["node1"].Ping("node3")
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node2"].AssertWorkSizeIncreasing(ctx, unitID, workStatus.StdoutSize)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			// it takes some time for the streaming to start again
-			time.Sleep(15 * time.Second)
-
-			newWorkStatus, err := controllers["node2"].GetWorkStatus(unitID)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-
-			if newWorkStatus.StdoutSize <= workStatus.StdoutSize {
-				t.Fatal("Work size is not increasing")
-			}
-
-			// cancel the work so that it doesnt run after the test ends
-			_, err = controllers["node2"].WorkCancel(unitID)
-			if err != nil {
-				t.Fatal(err, m.Dir())
-			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node2"].AssertWorkCancelled(ctx, unitID)
-			if err != nil {
-				t.Fatal(err, m.Dir())
+				t.Fatal(err, m.GetDataDir())
 			}
 		})
 	}
 }
 
 func TestRuntimeParams(t *testing.T) {
-	echoCommand := map[interface{}]interface{}{
-		"workType":           "echo",
-		"command":            "echo",
-		"params":             "",
-		"allowruntimeparams": true,
-	}
-
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
-	data.Nodes["node0"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
-			map[interface{}]interface{}{
-				"work-command": echoCommand,
-			},
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.CommandWorkerCfg{
+			WorkType:           "echo",
+			Command:            "echo",
+			AllowRuntimeParams: true,
 		},
 	}
 
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	err := m.Start(t.Name())
+
 	if err != nil {
-		if m != nil {
-			t.Fatal(err, m.Dir())
-		} else {
-			t.Fatal(err)
-		}
+		t.Fatal(err, m.GetDataDir())
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
+
 	if err != nil {
-		t.Fatal(err, m.Dir())
-	}
-	nodes := m.Nodes()
-	controllers := make(map[string]*receptorcontrol.ReceptorControl)
-	defer tearDown(controllers, m)
-	controllers["node0"] = receptorcontrol.New()
-	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
-	if err != nil {
-		t.Fatal(err, m.Dir())
-	}
-	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
-	unitID, err := controllers["node0"].WorkSubmitJSON(command)
-	if err != nil {
-		t.Fatal(err, m.Dir())
-	}
-	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
-	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
 
-	err = controllers["node0"].AssertWorkResults(unitID, []byte("it worked!"))
+	nodes := m.GetNodes()
+	controllers := make(map[string]*ReceptorControl)
+	// defer tearDown(controllers, m)
+	controllers["node1"] = NewReceptorControl()
+	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
+
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"localhost","params":"it worked!"}`
+	unitID, err := controllers["node1"].WorkSubmitJSON(command)
+
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	err = controllers["node1"].AssertWorkResults(unitID, []byte("it worked!"))
+
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
 	}
 }
 
 func TestKubeRuntimeParams(t *testing.T) {
 	checkSkipKube(t)
-	home := os.Getenv("HOME")
-	configfilename := filepath.Join(home, ".kube/config")
-	reader, err := os.Open(configfilename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buf, err := io.ReadAll(reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kubeconfig := string(buf)
-	kubeconfig = strings.ReplaceAll(kubeconfig, "\n", "\\n")
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
-	data.Nodes["node0"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
-			map[interface{}]interface{}{
-				"work-kubernetes": map[interface{}]interface{}{
-					"workType":         "echo",
-					"authmethod":       "runtime",
-					"namespace":        "default",
-					"allowruntimepod":  true,
-					"allowruntimeauth": true,
-				},
-			},
+
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.KubeWorkerCfg{
+			WorkType:         "echo",
+			AuthMethod:       "runtime",
+			Namespace:        "default",
+			AllowRuntimePod:  true,
+			AllowRuntimeAuth: true,
 		},
 	}
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-	if err != nil {
-		if m != nil {
-			t.Fatal(err, m.Dir())
-		} else {
-			t.Fatal(err)
-		}
-	}
+
+	m.Start(t.Name())
+
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err = m.WaitForReady(ctx)
+	err := m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	nodes := m.Nodes()
-	controllers := make(map[string]*receptorcontrol.ReceptorControl)
-	defer tearDown(controllers, m)
-	controllers["node0"] = receptorcontrol.New()
-	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
+	nodes := m.GetNodes()
+	controllers := make(map[string]*ReceptorControl)
+	// defer tearDown(controllers, m)
+	controllers["node1"] = NewReceptorControl()
+
+	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	command := fmt.Sprintf(`{"command": "work", "subcommand": "submit", "node": "localhost", "worktype": "echo", "secret_kube_pod": "---\napiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: centos:8\n    command:\n    - bash\n    args:\n    - \"-c\"\n    - for i in {1..5}; do echo $i;done\n", "secret_kube_config": "%s"}`, kubeconfig)
-	unitID, err := controllers["node0"].WorkSubmitJSON(command)
+	var submitJSON = new(bytes.Buffer)
+	err = json.Compact(submitJSON, []byte(`{
+		"command": "work",
+		"subcommand": "submit",
+		"node": "localhost",
+		"worktype": "echo",
+		"secret_kube_pod": "%s",
+		"secret_kube_config": "%s"
+    }`))
+
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err)
 	}
-	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
+
+	kubeConfigBytes, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config"))
+
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err)
 	}
-	err = controllers["node0"].AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
+
+	// is there a better way to do this?
+	kubeConfig := strings.ReplaceAll(string(kubeConfigBytes), "\n", "\\n")
+
+	echoPodBytes, err := ioutil.ReadFile("testdata/echo-pod.yml")
+
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err)
+	}
+
+	// is there a better way to do this?
+	echoPod := strings.ReplaceAll(string(echoPodBytes), "\n", "\\n")
+
+	command := fmt.Sprintf(submitJSON.String(), echoPod, kubeConfig)
+
+	unitID, err := controllers["node1"].WorkSubmitJSON(command)
+
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	err = controllers["node1"].AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
+
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
 	}
 }
 
 func TestRuntimeParamsNotAllowed(t *testing.T) {
-	echoCommand := map[interface{}]interface{}{
-		"workType":           "echo",
-		"command":            "echo",
-		"params":             "",
-		"allowruntimeparams": false,
-	}
-
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
-	data.Nodes["node0"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
-			map[interface{}]interface{}{
-				"work-command": echoCommand,
-			},
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.CommandWorkerCfg{
+			WorkType:           "echo",
+			Command:            "echo",
+			AllowRuntimeParams: false,
 		},
 	}
 
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	err := m.Start(t.Name())
+
 	if err != nil {
-		if m != nil {
-			t.Fatal(err, m.Dir())
-		} else {
-			t.Fatal(err)
-		}
+		t.Fatal(err, m.GetDataDir())
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	nodes := m.Nodes()
-	controllers := make(map[string]*receptorcontrol.ReceptorControl)
-	defer tearDown(controllers, m)
-	controllers["node0"] = receptorcontrol.New()
-	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
+	nodes := m.GetNodes()
+	controllers := make(map[string]*ReceptorControl)
+	// defer tearDown(controllers, m)
+	controllers["node1"] = NewReceptorControl()
+	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node0","params":"it worked!"}`
-	_, err = controllers["node0"].WorkSubmitJSON(command)
+	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node1","params":"it worked!"}`
+	_, err = controllers["node1"].WorkSubmitJSON(command)
+
 	if err == nil {
-		t.Fatal("Expected work submit to fail but it succeeded")
+		t.Fatal("Expected this to fail")
+	}
+
+	if !strings.Contains(err.Error(), "extra params provided but not allowed") {
+		t.Fatal("Did not see the expected error")
 	}
 }
 
 func TestKubeContainerFailure(t *testing.T) {
 	checkSkipKube(t)
-	home := os.Getenv("HOME")
-	command := map[interface{}]interface{}{
-		"work-kubernetes": map[interface{}]interface{}{
-			"workType":   "kubejob",
-			"authmethod": "kubeconfig",
-			"namespace":  "default",
-			"kubeconfig": filepath.Join(home, ".kube/config"),
-			"image":      "alpine",
-			"command":    "thiscommandwontexist",
+
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.KubeWorkerCfg{
+			WorkType:   "kubejob",
+			AuthMethod: "kubeconfig",
+			Image:      "alpine",
+			KubeConfig: filepath.Join(os.Getenv("HOME"), ".kube/config"),
+			Namespace:  "default",
+			Command:    "thiscommandwontexist",
 		},
 	}
 
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
-	data.Nodes["node0"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
-			command,
-		},
-	}
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
-	if err != nil {
-		if m != nil {
-			t.Fatal(err, m.Dir())
-		} else {
-			t.Fatal(err)
-		}
-	}
+	m.Start(t.Name())
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err = m.WaitForReady(ctx)
+	err := m.WaitForReady(ctx)
+
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	nodes := m.Nodes()
-	controllers := make(map[string]*receptorcontrol.ReceptorControl)
-	defer tearDown(controllers, m)
-	controllers["node0"] = receptorcontrol.New()
-	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
+	nodes := m.GetNodes()
+	controllers := make(map[string]*ReceptorControl)
+	// defer tearDown(controllers, m)
+	controllers["node1"] = NewReceptorControl()
+	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	job := `{"command":"work","subcommand":"submit","worktype":"kubejob","node":"node0"}`
-	unitID, err := controllers["node0"].WorkSubmitJSON(job)
+	job := `{"command":"work","subcommand":"submit","worktype":"kubejob","node":"node1"}`
+	unitID, err := controllers["node1"].WorkSubmitJSON(job)
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
 	ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-	err = controllers["node0"].AssertWorkFailed(ctx, unitID)
+	err = controllers["node1"].AssertWorkFailed(ctx, unitID)
 	if err != nil {
 		t.Fatal("Expected work to fail but it succeeded")
+	}
+
+	status, err := controllers["node1"].GetWorkStatus(unitID)
+
+	if err != nil {
+		t.Fatal("Could not check status")
+	}
+
+	expected := `executable file not found in $PATH`
+	actual := status.Detail
+	if !strings.Contains(actual, expected) {
+		t.Fatalf("Did not see the expected error. Wanted %s, got: %s", expected, actual)
 	}
 }
 
 func TestSignedWorkVerification(t *testing.T) {
 	t.Parallel()
-	echoCommand := map[interface{}]interface{}{
-		"workType":        "echo",
-		"command":         "echo",
-		"params":          "",
-		"verifysignature": true,
-	}
+
 	privateKey, publicKey, err := utils.GenerateRSAPair()
 	if err != nil {
 		t.Fatal(err)
@@ -1006,87 +692,88 @@ func TestSignedWorkVerification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := mesh.YamlData{}
-	data.Nodes = make(map[string]*mesh.YamlNode)
-	data.Nodes["node0"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"tcp-listener": map[interface{}]interface{}{},
-			},
-			map[interface{}]interface{}{
-				"work-signing": privateKey,
-			},
+
+	m := NewLibMesh()
+
+	node1 := m.NewLibNode("node1")
+	node1.WorkSigningKey = &workceptor.SigningKeyPrivateCfg{
+		PrivateKey: privateKey,
+	}
+	node1.ListenerCfgs = map[listenerName]ListenerCfg{
+		listenerName("tcp"): newListenerCfg("tcp", "", 1, nil),
+	}
+
+	node2 := m.NewLibNode("node2")
+	node2.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.CommandWorkerCfg{
+			WorkType:        "echo",
+			Command:         "echo",
+			VerifySignature: true,
 		},
 	}
-	data.Nodes["node1"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node0": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"work-command": echoCommand,
-			},
-			map[interface{}]interface{}{
-				"work-verification": publicKey,
-			},
+	node2.WorkVerificationKey = &workceptor.VerifyingKeyPublicCfg{
+		PublicKey: publicKey,
+	}
+	node2.Connections = []Connection{
+		{RemoteNode: node1, Protocol: "tcp"},
+	}
+
+	node3 := m.NewLibNode("node3")
+	node3.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.CommandWorkerCfg{
+			WorkType:        "echo",
+			Command:         "echo",
+			VerifySignature: true,
 		},
 	}
-	data.Nodes["node2"] = &mesh.YamlNode{
-		Connections: map[string]mesh.YamlConnection{
-			"node0": {
-				Index: 0,
-			},
-		},
-		NodedefBase: []interface{}{
-			map[interface{}]interface{}{
-				"work-command": echoCommand,
-			},
-			map[interface{}]interface{}{
-				"work-verification": publicKeyWrong,
-			},
-		},
+	node3.WorkVerificationKey = &workceptor.VerifyingKeyPublicCfg{
+		PublicKey: publicKeyWrong,
 	}
-	m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+	node3.Connections = []Connection{
+		{RemoteNode: node1, Protocol: "tcp"},
+	}
+
+	err = m.Start(t.Name())
+
 	if err != nil {
-		if m != nil {
-			t.Fatal(err, m.Dir())
-		} else {
-			t.Fatal(err)
-		}
+		t.Fatal(err)
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err = m.WaitForReady(ctx)
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
-	nodes := m.Nodes()
-	controllers := make(map[string]*receptorcontrol.ReceptorControl)
-	defer tearDown(controllers, m)
-	controllers["node0"] = receptorcontrol.New()
-	err = controllers["node0"].Connect(nodes["node0"].ControlSocket())
+	nodes := m.GetNodes()
+	controllers := make(map[string]*ReceptorControl)
+	// defer tearDown(controllers, m)
+	controllers["node1"] = NewReceptorControl()
+	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
 
-	job := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node1", "signwork":"true"}`
-	unitID, err := controllers["node0"].WorkSubmitJSON(job)
+	job := `{"command":"work","subcommand":"submit","worktype":"echo","node":"node2", "signwork":"true"}`
+	unitID, err := controllers["node1"].WorkSubmitJSON(job)
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
 	ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-	err = controllers["node0"].AssertWorkSucceeded(ctx, unitID)
+	err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
 	if err != nil {
-		t.Fatal(err, m.Dir())
+		t.Fatal(err, m.GetDataDir())
 	}
 
 	// node2 has the wrong public key to verify work signatures, so the work submission should fail
-	job = `{"command":"work","subcommand":"submit","worktype":"echo","node":"node2", "signwork":"true"}`
-	_, err = controllers["node0"].WorkSubmitJSON(job)
+	job = `{"command":"work","subcommand":"submit","worktype":"echo","node":"node3", "signwork":"true"}`
+	_, err = controllers["node1"].WorkSubmitJSON(job)
 	if err == nil {
 		t.Fatal("expected work submission to fail")
+	}
+
+	expected := `could not verify signature: crypto/rsa: verification error`
+	actual := err.Error()
+	if !strings.Contains(actual, expected) {
+		t.Fatalf("Did not see the expected error. Wanted %s, got: %s", expected, actual)
 	}
 }

@@ -5,76 +5,56 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/functional/lib/mesh"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/ansible/receptor/pkg/netceptor"
 	_ "github.com/fortytw2/leaktest"
 )
 
 func TestFirewall(t *testing.T) {
 	t.Parallel()
-	testTable := []struct {
-		listener string
-	}{
-		{"tcp-listener"},
-		{"ws-listener"},
-	}
-	for _, data := range testTable {
-		listener := data.listener
-		t.Run(listener, func(t *testing.T) {
-			t.Parallel()
-			// Setup our mesh yaml data
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
 
-			// Generate a mesh of node1->node2->node3 with firewall rules so node2 can talk to node1 and node3,
-			// but node1 and node3 can't talk to each other because node2 blocks the traffic
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 0,
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
-				},
+	for _, proto := range []string{"tcp", "ws", "udp"} {
+		proto := proto
+
+		t.Run(proto, func(t *testing.T) {
+			t.Parallel()
+
+			m := NewLibMesh()
+
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			node1 := m.NewLibNode("node1")
+			node2 := m.NewLibNode("node2")
+
+			node1.Connections = []Connection{
+				{RemoteNode: node2, Protocol: proto},
 			}
-			data.Nodes["node2"] = &mesh.YamlNode{
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
-					map[interface{}]interface{}{
-						"node": map[interface{}]interface{}{
-							"id": "node2",
-							"firewallrules": []map[interface{}]interface{}{
-								{"Action": "accept", "FromNode": "node2"},
-								{"Action": "reject", "ToNode": "node3"},
-								{"Action": "reject", "ToNode": "node1"},
-							},
-						},
-					},
-				},
+			m.GetNodes()[node1.GetID()] = node1
+
+			node2.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "", 1, nil),
 			}
-			data.Nodes["node3"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 0,
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
-				},
+			m.GetNodes()[node2.GetID()] = node2
+			node2.Config.FirewallRules = []netceptor.FirewallRuleData{
+				{"Action": "accept", "FromNode": "node2"},
+				{"Action": "reject", "ToNode": "node3"},
+				{"Action": "reject", "ToNode": "node1"},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+
+			node3 := m.NewLibNode("node3")
+			node3.Connections = []Connection{
+				{RemoteNode: node2, Protocol: proto},
+			}
+			m.GetNodes()[node3.GetID()] = node3
+
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+			err := m.Start(t.Name())
+
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
 
 			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
 			err = m.WaitForReady(ctx)
@@ -83,9 +63,9 @@ func TestFirewall(t *testing.T) {
 			}
 
 			// Test that node1 and node3 can ping node2
-			for _, nodeSender := range []mesh.Node{m.Nodes()["node1"], m.Nodes()["node3"]} {
-				controller := receptorcontrol.New()
-				err = controller.Connect(nodeSender.ControlSocket())
+			for _, nodeSender := range []*LibNode{m.GetNodes()["node1"], m.GetNodes()["node3"]} {
+				controller := NewReceptorControl()
+				err = controller.Connect(nodeSender.GetControlSocket())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -99,8 +79,8 @@ func TestFirewall(t *testing.T) {
 
 			// Test that node1 and node3 cannot ping each other
 			for strSender, strReceiver := range map[string]string{"node1": "node3", "node3": "node1"} {
-				controller := receptorcontrol.New()
-				err = controller.Connect(m.Nodes()[strSender].ControlSocket())
+				controller := NewReceptorControl()
+				err = controller.Connect(m.GetNodes()[strSender].GetControlSocket())
 				if err != nil {
 					t.Fatal(err)
 				}

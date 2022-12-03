@@ -13,6 +13,19 @@ import (
 )
 
 func TestQuicConnectTimeout(t *testing.T) {
+	//
+	// Note!
+	// It is important that this test do not run in parellel since it modifies package-level variables.
+	//
+
+	defaultIdleTimeout := netceptor.MaxIdleTimeoutForQuicConnections
+	defaultQuicKeepAlive := netceptor.KeepAliveForQuicConnections
+
+	defer func() {
+		netceptor.MaxIdleTimeoutForQuicConnections = defaultIdleTimeout
+		netceptor.KeepAliveForQuicConnections = defaultQuicKeepAlive
+	}()
+
 	// Change MaxIdleTimeoutForQuicConnections to 1 seconds (default in lib is 30, our code is 60)
 	netceptor.MaxIdleTimeoutForQuicConnections = 1 * time.Second
 	// We also have to disable heart beats or the connection will not properly timeout
@@ -87,7 +100,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 
 	// Connect to the echo server from node 2.  We expect this to error out at first with
 	// "no route to node" because it takes a second or two for node1 and node2 to exchange
-	// routing information and form a mesh.
+	// routing information and form a
 	var c2 net.Conn
 	for {
 		c2, err = n2.Dial("node1", "echo", nil)

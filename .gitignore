@@ -19,3 +19,4 @@ kubectl
 /receptorctl/venv/
 .vagrant/
 /docs/build
+venv

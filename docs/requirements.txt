@@ -1,4 +1,4 @@
 pbr
 sphinx
 six
-sphinx-ansible-theme
+sphinx-ansible-theme == 0.10.1

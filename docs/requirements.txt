@@ -1,3 +1,4 @@
 pbr
 sphinx
 six
+sphinx-ansible-theme

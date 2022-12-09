@@ -32,6 +32,7 @@ author = 'Red Hat Ansible'
 # ones.
 extensions = [
     'sphinx.ext.autosectionlabel',
+    'sphinx_ansible_theme',
     'pbr.sphinxext',
 ]
 
@@ -46,14 +47,22 @@ templates_path = ['_templates']
 exclude_patterns = ['Thumbs.db', '.DS_Store']
 
 pygments_style = 'sphinx'
-language = None
+language = 'en'
 master_doc = 'index'
 source_suffix = '.rst'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'sphinx_ansible_theme'
+html_title = "Receptor Documentation"
+
+html_theme_options = {
+    'display_version': False,
+    'titles_only': False,
+    'documentation_home_url': 'https://receptor.readthedocs.io/en/latest/'
+}
+
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

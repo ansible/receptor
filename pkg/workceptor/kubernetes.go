@@ -697,6 +697,9 @@ func shouldUseReconnect(kw *kubeUnit) bool {
 		return false
 	}
 
+	// ignore pre-release in version comparison
+	semver = semver.WithPreRelease("")
+
 	// The patch was backported to minor version 23, 24 and 25. We must check z stream
 	// based on the minor version
 	// if minor version == 24, compare with v1.24.8

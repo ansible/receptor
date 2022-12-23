@@ -179,7 +179,7 @@ to the receptor command as positional arguments immediately after the ``workType
     helloworld.sh
 
 Passing options or flags to the work command needs to be done using the ``--param`` parameter to
-override the ``params`` work command setting. The ``--all`` flag can be passed to the work command this way:
+extend the ``params`` work command setting. The ``--all`` flag can be passed to the work command this way:
 
 .. code::
 

@@ -284,8 +284,13 @@ func (cw *commandUnit) Restart() error {
 		cw.UpdateBasicStatus(WorkStateFailed, "Pending at restart", stdoutSize(cw.UnitDir()))
 	}
 	if isOrphaned, err := cw.isOrphaned(); isOrphaned {
-		// Job never completed - mark it failed
-		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Orphaned: %s", err), stdoutSize(cw.UnitDir()))
+		// Job never completed - mark it failed and wipe pid
+		cw.UpdateFullStatus(func(status *StatusFileData) {
+			status.State = WorkStateFailed
+			status.Detail = fmt.Sprintf("Orphaned: %s", err)
+			status.StdoutSize = stdoutSize(cw.UnitDir())
+			status.ExtraData.(*commandExtraData).Pid = 0
+		})
 	}
 	go cw.monitorLocalStatus()
 

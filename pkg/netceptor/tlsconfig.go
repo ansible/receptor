@@ -150,7 +150,7 @@ func (cfg tlsServerCfg) Prepare() error {
 
 	if tlscfg.ClientAuth != tls.NoClientCert {
 		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints,
-			"", ExpectedHostnameTypeDNS, VerifyClient)
+			"", ExpectedHostnameTypeDNS, VerifyClient, MainInstance.Logger)
 	}
 
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)

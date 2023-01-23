@@ -547,6 +547,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 					time.Sleep(time.Second)
 				}
 			}
+			// if recieve client side rate limit error progress backoff
 			if err != nil {
 				errMsg := fmt.Sprintf("Error getting pod %s/%s: %s", podNamespace, podName, err)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -986,6 +987,9 @@ func (kw *kubeUnit) connectToKube() error {
 		return err
 	}
 
+	// Temporary change to increase QPS and Burst by 10x to avoid rate limiting errors
+	kw.config.QPS = 100
+	kw.config.Burst = 1000
 	kw.clientset, err = kubernetes.NewForConfig(kw.config)
 	if err != nil {
 		return err

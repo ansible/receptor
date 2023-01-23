@@ -1,0 +1,12 @@
+[Unit]
+Description=Receptor
+
+[Service]
+ExecStart=/usr/bin/receptor -c /etc/receptor/receptor.conf
+User=receptor
+Group=receptor
+StandardOutput=append:/var/log/receptor/receptor.log
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

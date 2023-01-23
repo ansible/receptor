@@ -1,0 +1,9 @@
+module receptor 1.0;
+
+require {
+	type init_t;
+	type var_log_t;
+	class file create;
+}
+
+allow init_t var_log_t:file create;

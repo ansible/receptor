@@ -20,6 +20,65 @@ archives:
   - files:
       - none*
 
+nfpms:
+  - vendor: Ansible
+    homepage: https://github.com/ansible/receptor
+    description: >-
+      Project Receptor is a flexible multi-service relayer with remote execution and
+      orchestration capabilities linking controllers with executors across a mesh of
+      nodes.
+    license: ASL 2.0
+    formats:
+      - rpm
+    contents:
+      - dst: /var/lib/receptor
+        type: dir
+        file_info:
+          mode: 0700
+      - dst: /var/log/receptor
+        type: dir
+        file_info:
+          mode: 0755
+      - dst: /var/run/receptor
+        type: dir
+        file_info:
+          mode: 2775
+      - dst: /etc/receptor
+        type: dir
+        file_info:
+          mode: 0755
+      - src: packaging/rpm/etc/receptor/receptor.conf
+        dst: /etc/receptor/receptor.conf
+        type: config|noreplace
+      - src: packaging/rpm/etc/receptor/receptor.conf.example
+        dst: /etc/receptor/receptor.conf.example
+      - src: packaging/rpm/etc/logrotate.d/receptor
+        dst: /etc/logrotate.d/receptor
+      - src: packaging/rpm/usr/lib/systemd/system/receptor.service
+        dst: /usr/lib/systemd/system/receptor.service
+      - src: packaging/rpm/usr/lib/systemd/system/receptor@.service
+        dst: /usr/lib/systemd/system/receptor@.service
+      - src: packaging/rpm/usr/share/sosreport/sos/plugins/receptor.py
+        dst: /usr/share/sosreport/sos/plugins/receptor.py
+      - src: packaging/rpm/usr/share/selinux/packages/receptor.pp
+        dst: /usr/share/selinux/packages/receptor.pp
+        file_info:
+          mode: 0600
+      - src: packaging/rpm/usr/share/bash-completion/completions/receptor
+        dst: /usr/share/bash-completion/completions/receptor
+    scripts:
+      preinstall: packaging/rpm/preinstall.sh
+      postinstall: packaging/rpm/postinstall.sh
+      postremove: packaging/rpm/postremove.sh
+    dependencies:
+      - logrotate
+      - sos
+      - systemd
+      - libselinux-utils
+      - policycoreutils
+    rpm:
+      group: Unspecified
+
 release:
   mode: keep-existing
 

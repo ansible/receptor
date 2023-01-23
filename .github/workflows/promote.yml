@@ -82,6 +82,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
 
+      - name: Compile SELinux policy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y selinux-policy-dev
+          cd packaging/rpm/usr/share/selinux/packages/
+          make -f /usr/share/selinux/devel/Makefile receptor.pp
+
+      - name: Generate bash-completion
+        run: |
+          make receptor
+          mkdir -p packaging/rpm/usr/share/bash-completion/completions/
+          ./receptor --bash-completion > packaging/rpm/usr/share/bash-completion/completions/receptor
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:

@@ -1,0 +1,4 @@
+!receptor
+usr/share/selinux/packages/*
+!usr/share/selinux/packages/receptor.te
+usr/share/bash-completion/completions

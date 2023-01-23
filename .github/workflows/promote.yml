@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -67,3 +70,21 @@ jobs:
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
+
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{github.event.release.tag_name}}
+    steps:
+      - name: Checkout Receptor
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          args: release --rm-dist -f packaging/goreleaser/goreleaser.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

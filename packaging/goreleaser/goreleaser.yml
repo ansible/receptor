@@ -1,0 +1,27 @@
+---
+project_name: receptor
+
+builds:
+  - main: ./cmd/receptor-cl
+    binary: receptor
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -X "github.com/ansible/receptor/internal/version.Version={{.Env.VERSION}}"
+
+archives:
+  - files:
+      - none*
+
+release:
+  mode: keep-existing
+
+changelog:
+  skip: true

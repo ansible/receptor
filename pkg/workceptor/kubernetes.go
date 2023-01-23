@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -33,6 +35,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	watch2 "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/retry"
 )
 
 // kubeUnit implements the WorkUnit interface.
@@ -312,14 +316,31 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 		// resuming from a previously created pod
 		var err error
-		for retries := 5; retries > 0; retries-- {
-			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
-			if err == nil {
-				break
-			} else {
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
+		var attempts int
+		retry.OnError(
+			wait.Backoff{
+				Duration: 1 * time.Second,
+				Factor:   1.5,
+				Steps:    5,
+				Jitter:   0.1,
+			}, func(err error) bool {
+				return err != nil
+			}, func() error {
+				kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					attempts++
+					kw.Warning("Error getting pod %s/%s. Attempt %d. %s",
+						podNamespace,
+						podName,
+						attempts,
+						err,
+					)
+				}
+
+				return err
+			},
+		)
+
 		if err != nil {
 			errMsg := fmt.Sprintf("Error getting pod %s/%s: %s", podNamespace, podName, err)
 			kw.Error(errMsg)
@@ -443,23 +464,34 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			})
 
 			var err error
-			for retries := 5; retries > 0; retries-- {
-				err = exec.Stream(remotecommand.StreamOptions{
-					Stdin: stdin,
-					Tty:   false,
-				})
-				if err != nil {
-					// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
-					kw.Warning("Error streaming stdin to pod %s/%s. Retrying: %s",
-						podNamespace,
-						podName,
-						err,
-					)
-					time.Sleep(100 * time.Millisecond)
-				} else {
-					break
-				}
-			}
+			var attempts int
+			retry.OnError(
+				wait.Backoff{
+					Duration: 1 * time.Second,
+					Factor:   1.5,
+					Steps:    5,
+					Jitter:   0.1,
+				}, func(err error) bool {
+					return err != nil
+				}, func() error {
+					err = exec.Stream(remotecommand.StreamOptions{
+						Stdin: stdin,
+						Tty:   false,
+					})
+					if err != nil {
+						attempts++
+						// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
+						kw.Warning("Error streaming stdin to pod %s/%s. Attempts %d. %s",
+							podNamespace,
+							podName,
+							attempts,
+							err,
+						)
+					}
+
+					return err
+				},
+			)
 
 			if err != nil {
 				stdinErr = err
@@ -500,17 +532,34 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				Follow:    true,
 			},
 		)
+
 		// get logstream, with retry
-		for retries := 5; retries > 0; retries-- {
-			logStream, err = logReq.Stream(kw.ctx)
-			if err == nil {
-				break
-			} else {
-				errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Will retry %d more times.", podNamespace, podName, retries)
-				kw.Warning(errMsg)
-				time.Sleep(time.Second)
-			}
-		}
+		var err error
+		var attempts int
+		retry.OnError(
+			wait.Backoff{
+				Duration: 1 * time.Second,
+				Factor:   1.5,
+				Steps:    5,
+				Jitter:   0.1,
+			}, func(err error) bool {
+				return err != nil
+			}, func() error {
+				logStream, err = logReq.Stream(kw.ctx)
+				if err != nil {
+					attempts++
+					kw.Warning("Error opening log stream for pod %s/%s. Attempt %d. %s",
+						podNamespace,
+						podName,
+						attempts,
+						err,
+					)
+				}
+
+				return err
+			},
+		)
+
 		if err != nil {
 			errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s: %s", podNamespace, podName, err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -536,17 +585,33 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				break
 			}
 
-			// get pod, with retry
-			for retries := 5; retries > 0; retries-- {
-				kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
-				if err == nil {
-					break
-				} else {
-					errMsg := fmt.Sprintf("Error getting pod %s/%s. Will retry %d more times.", podNamespace, podName, retries)
-					kw.Warning(errMsg)
-					time.Sleep(time.Second)
-				}
-			}
+			// get pod with retry
+			var err error
+			var attempts int
+			retry.OnError(
+				wait.Backoff{
+					Duration: 1 * time.Second,
+					Factor:   1.5,
+					Steps:    5,
+					Jitter:   0.1,
+				}, func(err error) bool {
+					return err != nil
+				}, func() error {
+					kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
+					if err != nil {
+						attempts++
+						kw.Warning("Error getting pod %s/%s. Attempt %d. %s",
+							podNamespace,
+							podName,
+							attempts,
+							err,
+						)
+					}
+
+					return err
+				},
+			)
+
 			if err != nil {
 				errMsg := fmt.Sprintf("Error getting pod %s/%s: %s", podNamespace, podName, err)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -563,19 +628,38 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 					SinceTime:  &metav1.Time{Time: sinceTime},
 				},
 			)
-			// get logstream, with retry
-			for retries := 5; retries > 0; retries-- {
-				logStream, err = logReq.Stream(kw.ctx)
-				if err == nil {
-					break
-				} else {
-					errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Will retry %d more times.", podNamespace, podName, retries)
-					kw.Warning(errMsg)
-					time.Sleep(time.Second)
-				}
-			}
+
+			err = nil
+			attempts = 0
+			retry.OnError(
+				wait.Backoff{
+					Duration: 1 * time.Second,
+					Factor:   1.5,
+					Steps:    5,
+					Jitter:   0.1,
+				}, func(err error) bool {
+					return err != nil
+				}, func() error {
+					logStream, err = logReq.Stream(kw.ctx)
+					if err != nil {
+						attempts++
+						kw.Warning("Error opening log stream for pod %s/%s. Attempt %d. %s",
+							podNamespace,
+							podName,
+							attempts,
+							err,
+						)
+					}
+
+					return err
+				},
+			)
 			if err != nil {
-				errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s: %s", podNamespace, podName, err)
+				errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s: %s",
+					podNamespace,
+					podName,
+					err,
+				)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 				kw.Error(errMsg)
 
@@ -587,7 +671,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			for stdinErr == nil { // check between every line read to see if we need to stop reading
 				line, err := streamReader.ReadString('\n')
 				if err == io.EOF {
-					kw.Debug("Detected EOF for pod %s/%s. Will retry %d more times.", podNamespace, podName, remainingEOFAttempts)
+					kw.Debug("Detected EOF for pod %s/%s. Attempt %d.", podNamespace, podName, remainingEOFAttempts)
 					successfulWrite = false
 					remainingEOFAttempts--
 					if remainingEOFAttempts > 0 {
@@ -903,6 +987,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 
 	// Read stdout from pod
 	_, err = io.Copy(stdout, conn)
+
 	if ctx.Err() != nil {
 		return
 	}
@@ -988,6 +1073,49 @@ func (kw *kubeUnit) connectToKube() error {
 	}
 	if err != nil {
 		return err
+	}
+
+	qps := 100
+	burst := 1000
+
+	// RECEPTOR_KUBE_CLIENTSET_QPS
+	// default: 100
+	envQPS, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_QPS")
+	if ok {
+		var err error
+		qps, err = strconv.Atoi(envQPS)
+		if err != nil {
+			return fmt.Errorf("invalid value for RECEPTOR_KUBE_CLIENTSET_QPS: %s. Error %s", envQPS, err)
+		}
+		burst = qps * 10
+	}
+
+	// RECEPTOR_KUBE_CLIENTSET_BURST
+	// default: 10 x QPS
+	envBurst, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_BURST")
+	if ok {
+		var err error
+		burst, err = strconv.Atoi(envBurst)
+		if err != nil {
+			return fmt.Errorf("invalid value for RECEPTOR_KUBE_CLIENTSET_BURST: %s. Error %s", envBurst, err)
+		}
+	}
+
+	kw.config.QPS = float32(qps)
+	kw.config.Burst = burst
+
+	// RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER
+	// default: tokenbucket
+	// options: never, always, tokenbucket
+	envRateLimiter, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER")
+	if ok {
+		switch envRateLimiter {
+		case "never":
+			kw.config.RateLimiter = flowcontrol.NewFakeNeverRateLimiter()
+		case "always":
+			kw.config.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+		default:
+		}
 	}
 
 	kw.clientset, err = kubernetes.NewForConfig(kw.config)

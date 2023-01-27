@@ -102,7 +102,7 @@ func (m *LibMesh) Nodes() map[string]Node {
 // TCPListen helper function to create and start a TCPListener
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewTCPListener(address, tlsCfg)
+	b1, err := backends.NewTCPListener(address, tlsCfg, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]fl
 // TCPDial helper function to create and start a TCPDialer
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewTCPDialer(address, true, tlsCfg)
+	b1, err := backends.NewTCPDialer(address, true, tlsCfg, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 // UDPListen helper function to create and start a UDPListener
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]float64) error {
-	b1, err := backends.NewUDPListener(address)
+	b1, err := backends.NewUDPListener(address, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]fl
 // UDPDial helper function to create and start a UDPDialer
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) UDPDial(address string, cost float64) error {
-	b1, err := backends.NewUDPDialer(address, true)
+	b1, err := backends.NewUDPDialer(address, true, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS
-	b1, err := backends.NewWebsocketListener(address, tlsCfg)
+	b1, err := backends.NewWebsocketListener(address, tlsCfg, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[str
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS and extra headers
-	b1, err := backends.NewWebsocketDialer(address, nil, "", true)
+	b1, err := backends.NewWebsocketDialer(address, nil, "", true, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}

@@ -23,7 +23,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 	n2 := netceptor.New(context.Background(), "node2")
 
 	// Start a TCP listener on the first node
-	b1, err := backends.NewTCPListener("localhost:3333", nil)
+	b1, err := backends.NewTCPListener("localhost:3333", nil, n1.Logger)
 	if err != nil {
 		t.Fatalf("Error listening on TCP: %s\n", err)
 	}
@@ -33,7 +33,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 	}
 
 	// Start a TCP dialer on the second node - this will connect to the listener we just started
-	b2, err := backends.NewTCPDialer("localhost:3333", false, nil)
+	b2, err := backends.NewTCPDialer("localhost:3333", false, nil, n2.Logger)
 	if err != nil {
 		t.Fatalf("Error dialing on TCP: %s\n", err)
 	}

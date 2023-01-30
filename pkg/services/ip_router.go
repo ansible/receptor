@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
@@ -127,7 +126,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 	defer ipr.knownRoutesLock.RUnlock()
 	routes, err := netlink.RouteList(ipr.link, netlink.FAMILY_ALL)
 	if err != nil {
-		logger.Error("error retrieving kernel routes list: %s", err)
+		ipr.nc.Logger.Error("error retrieving kernel routes list: %s", err)
 
 		return
 	}
@@ -154,10 +153,10 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 			}
 		}
 		if !found {
-			logger.Debug("Adding route to %s", kr.dest.String())
+			ipr.nc.Logger.Debug("Adding route to %s", kr.dest.String())
 			err := ipr.addRoute(kr.dest)
 			if err != nil {
-				logger.Error("error adding kernel route to %s: %s", kr.dest.String(), err)
+				ipr.nc.Logger.Error("error adding kernel route to %s: %s", kr.dest.String(), err)
 			}
 		}
 	}
@@ -180,10 +179,10 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 			}
 		}
 		if !found {
-			logger.Debug("Removing route to %s", route.Dst.String())
+			ipr.nc.Logger.Debug("Removing route to %s", route.Dst.String())
 			err := netlink.RouteDel(&route)
 			if err != nil {
-				logger.Error("error deleting kernel route to %s: %s", route.Dst.String(), err)
+				ipr.nc.Logger.Error("error deleting kernel route to %s: %s", route.Dst.String(), err)
 			}
 		}
 	}
@@ -202,7 +201,7 @@ func (ipr *IPRouterService) runAdvertisingWatcher() {
 }
 
 func (ipr *IPRouterService) runTunToNetceptor() {
-	logger.Debug("Running tunnel-to-Receptor forwarder\n")
+	ipr.nc.Logger.Debug("Running tunnel-to-Receptor forwarder\n")
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ipr.nc.Context().Err() != nil {
@@ -210,7 +209,7 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		}
 		n, err := ipr.tunIf.Read(buf)
 		if err != nil {
-			logger.Error("Error reading from tun device: %s\n", err)
+			ipr.nc.Logger.Error("Error reading from tun device: %s\n", err)
 
 			continue
 		}
@@ -223,17 +222,17 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		case 4:
 			header, err := ipv4.ParseHeader(packet)
 			if err != nil {
-				logger.Debug("Malformed ipv4 packet received: %s", err)
+				ipr.nc.Logger.Debug("Malformed ipv4 packet received: %s", err)
 			}
 			destIP = header.Dst
 		case 6:
 			header, err := ipv6.ParseHeader(packet)
 			if err != nil {
-				logger.Debug("Malformed ipv6 packet received: %s", err)
+				ipr.nc.Logger.Debug("Malformed ipv6 packet received: %s", err)
 			}
 			destIP = header.Dst
 		default:
-			logger.Debug("Packet received with unknown version %d", ipVersion)
+			ipr.nc.Logger.Debug("Packet received with unknown version %d", ipVersion)
 
 			continue
 		}
@@ -260,16 +259,16 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 
 		// Send the packet via Receptor
 		remoteAddr := ipr.nc.NewAddr(remoteNode, ipr.networkName)
-		logger.Trace("    Forwarding data length %d to %s via %s\n", n, destIP, remoteAddr.String())
+		ipr.nc.Logger.Trace("    Forwarding data length %d to %s via %s\n", n, destIP, remoteAddr.String())
 		wn, err := ipr.nConn.WriteTo(packet, remoteAddr)
 		if err != nil || wn != n {
-			logger.Error("Error writing to Receptor network: %s\n", err)
+			ipr.nc.Logger.Error("Error writing to Receptor network: %s\n", err)
 		}
 	}
 }
 
 func (ipr *IPRouterService) runNetceptorToTun() {
-	logger.Debug("Running netceptor to tunnel forwarder\n")
+	ipr.nc.Logger.Debug("Running netceptor to tunnel forwarder\n")
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ipr.nc.Context().Err() != nil {
@@ -277,15 +276,15 @@ func (ipr *IPRouterService) runNetceptorToTun() {
 		}
 		n, addr, err := ipr.nConn.ReadFrom(buf)
 		if err != nil {
-			logger.Error("Error reading from Receptor: %s\n", err)
+			ipr.nc.Logger.Error("Error reading from Receptor: %s\n", err)
 
 			continue
 		}
-		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
+		ipr.nc.Logger.Trace("    Forwarding data length %d from %s to %s\n", n,
 			addr.String(), ipr.tunIf.Name())
 		wn, err := ipr.tunIf.Write(buf[:n])
 		if err != nil || wn != n {
-			logger.Error("Error writing to tun device: %s\n", err)
+			ipr.nc.Logger.Error("Error writing to tun device: %s\n", err)
 		}
 	}
 }
@@ -370,7 +369,7 @@ type ipRouterCfg struct {
 
 // Run runs the action.
 func (cfg ipRouterCfg) Run() error {
-	logger.Debug("Running tun router service %s\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running tun router service %s\n", cfg)
 	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)
 	if err != nil {
 		return err

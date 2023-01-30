@@ -10,7 +10,6 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
@@ -29,14 +28,14 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 		for {
 			uc, err := uli.Accept()
 			if err != nil {
-				logger.Error("Error accepting Unix socket connection: %s", err)
+				s.Logger.Error("Error accepting Unix socket connection: %s", err)
 
 				return
 			}
 			go func() {
 				qc, err := s.Dial(node, rservice, tlscfg)
 				if err != nil {
-					logger.Error("Error connecting on Receptor network: %s", err)
+					s.Logger.Error("Error connecting on Receptor network: %s", err)
 
 					return
 				}
@@ -61,13 +60,13 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 		for {
 			qc, err := qli.Accept()
 			if err != nil {
-				logger.Error("Error accepting connection on Receptor network: %s\n", err)
+				s.Logger.Error("Error accepting connection on Receptor network: %s\n", err)
 
 				return
 			}
 			uc, err := net.Dial("unix", filename)
 			if err != nil {
-				logger.Error("Error connecting via Unix socket: %s\n", err)
+				s.Logger.Error("Error connecting via Unix socket: %s\n", err)
 
 				continue
 			}
@@ -89,7 +88,7 @@ type unixProxyInboundCfg struct {
 
 // Run runs the action.
 func (cfg unixProxyInboundCfg) Run() error {
-	logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return err
@@ -108,7 +107,7 @@ type unixProxyOutboundCfg struct {
 
 // Run runs the action.
 func (cfg unixProxyOutboundCfg) Run() error {
-	logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

@@ -569,6 +569,10 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		successfulWrite := false
 		remainingEOFAttempts := eofRetries // resets on each successful read from pod stdout
 
+		// isAnsibleRunner is true if the job is an ansible-runner job
+		// this is used later on for determining if we reach the true EOF for an ansible-runner job
+		isAnsibleRunner := strings.HasPrefix(ked.Params, "ansible-runner")
+
 		for {
 			if stdinErr != nil {
 				break
@@ -643,10 +647,28 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				break
 			}
 
+			ansibleRunnerEOFDetected := false
+
 			// read from logstream
 			streamReader := bufio.NewReader(logStream)
 			for stdinErr == nil { // check between every line read to see if we need to stop reading
 				line, err := streamReader.ReadString('\n')
+
+				// If we are running a ansible-runner command we do not need to retry on EOF if:
+				// 1. previous read ends with ansible-runner EOF `{"eof": true}`
+				// 2. current read result in a EOF error
+				// this is to avoid accidentally exiting the loop when a random message ends with `{"eof": true}`
+				if isAnsibleRunner && ansibleRunnerEOFDetected && err == io.EOF {
+					// the ansibleRunnerEOFDetected here is from the previous read
+					kw.Debug("Detected ansible-runner EOF and current read result in EOF. Read completed.")
+
+					return
+				}
+
+				if isAnsibleRunner {
+					ansibleRunnerEOFDetected = strings.HasSuffix(line, `{"eof": true}`)
+				}
+
 				if err == io.EOF {
 					kw.Debug("Detected EOF for pod %s/%s. Attempt %d.", podNamespace, podName, remainingEOFAttempts)
 					successfulWrite = false

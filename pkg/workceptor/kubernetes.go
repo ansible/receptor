@@ -653,46 +653,10 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 }
 
-func shouldUseReconnect(kw *kubeUnit) bool {
-	// Attempt to detect support for streaming from pod with timestamps based on
-	// Kubernetes server version
-	// In order to use reconnect method, Kubernetes server must be at least
-	//   v1.23.14
-	//   v1.24.8
-	//   v1.25.4
-	// These versions contain a critical patch that permits connecting to the
-	// logstream with timestamps enabled.
-	// Without the patch, stdout lines would be split after 4K characters into a
-	// new line, which will cause issues in Receptor.
-	// https://github.com/kubernetes/kubernetes/issues/77603
-	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
-	// accepted values: "enabled", "disabled", "auto" with "auto" being the default
-	// all invalid value will assume to be "auto"
-
-	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
-	if ok {
-		switch env {
-		case "enabled":
-			return true
-		case "disabled":
-			return false
-		case "auto":
-			// continue
-		default:
-			// continue
-		}
-	}
-
-	serverVerInfo, err := kw.clientset.ServerVersion()
+func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
 	if err != nil {
-		logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
-
-		return false
-	}
-
-	semver, err := version.ParseSemantic(serverVerInfo.String())
-	if err != nil {
-		logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", serverVerInfo.String())
+		logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
 
 		return false
 	}
@@ -706,23 +670,63 @@ func shouldUseReconnect(kw *kubeUnit) bool {
 	// if minor version == 25, compare with v1.25.4
 	// all other minor versions compare with v1.23.14
 	var compatibleVer string
-	switch serverVerInfo.Minor {
-	case "24":
+	switch semver.Minor() {
+	case 24:
 		compatibleVer = "v1.24.8"
-	case "25":
+	case 25:
 		compatibleVer = "v1.25.4"
 	default:
 		compatibleVer = "v1.23.14"
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		logger.Debug("Kubernetes version %s is at least %s, using reconnect support", serverVerInfo.GitVersion, compatibleVer)
+		logger.Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
 
 		return true
 	}
-	logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", serverVerInfo.GitVersion, compatibleVer)
+	logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
 
 	return false
+}
+
+func shouldUseReconnect(kw *kubeUnit) bool {
+	// Attempt to detect support for streaming from pod with timestamps based on
+	// Kubernetes server version
+	// In order to use reconnect method, Kubernetes server must be at least
+	//   v1.23.14
+	//   v1.24.8
+	//   v1.25.4
+	// These versions contain a critical patch that permits connecting to the
+	// logstream with timestamps enabled.
+	// Without the patch, stdout lines would be split after 4K characters into a
+	// new line, which will cause issues in Receptor.
+	// https://github.com/kubernetes/kubernetes/issues/77603
+	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
+	// accepted values: "enabled", "disabled", "auto" with "disabled" being the default
+	// all invalid value will assume to be "disabled"
+
+	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+	if ok {
+		switch env {
+		case "enabled":
+			return true
+		case "disabled":
+			return false
+		case "auto":
+			// continue
+		default:
+			return false
+		}
+	}
+
+	serverVerInfo, err := kw.clientset.ServerVersion()
+	if err != nil {
+		logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
+
+		return false
+	}
+
+	return isCompatibleK8S(kw, serverVerInfo.String())
 }
 
 func parseTime(s string) *time.Time {

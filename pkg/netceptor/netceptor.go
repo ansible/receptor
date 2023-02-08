@@ -340,7 +340,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		serverTLSConfigs:         make(map[string]*tls.Config),
 		firewallLock:             &sync.RWMutex{},
 		workCommandsLock:         &sync.RWMutex{},
-		Logger:                   logger.NewReceptorLogger(nodeID),
+		Logger:                   logger.NewReceptorLogger(""),
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,

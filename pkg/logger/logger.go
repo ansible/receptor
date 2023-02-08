@@ -212,6 +212,10 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 	}
 }
 
+func (rl *ReceptorLogger) SetPrefix(prefix string) {
+	rl.Prefix = prefix
+}
+
 // GetLogLevelByName is a helper function for returning level associated with log
 // level string.
 func (rl *ReceptorLogger) GetLogLevelByName(logName string) (int, error) {

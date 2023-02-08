@@ -5,13 +5,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
-	"runtime"
 	"strings"
-	"time"
 
 	"github.com/ghjm/cmdline"
-	logrus "github.com/sirupsen/logrus"
 )
 
 var (
@@ -145,45 +141,14 @@ func Trace(format string, v ...interface{}) {
 }
 
 type ReceptorLogger struct {
-	logrus.Logger
+	log.Logger
 	Prefix string
 }
 
 // NewReceptorLogger to instantiate a new logger object.
 func NewReceptorLogger(prefix string) *ReceptorLogger {
-	var logger = logrus.New()
-	// set the formatter, can also be a JSON formatter
-	logger.SetFormatter(&logrus.TextFormatter{
-		TimestampFormat: time.RFC3339Nano,
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyTime: "@timestamp",
-			"prefix":            prefix,
-		},
-		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-			s := strings.Split(f.Function, ".")
-			funcName := s[len(s)-1]
-			return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
-		},
-	})
-	logger.SetOutput(os.Stdout)
-
-	var logrusLevel logrus.Level
-
-	switch logLevel {
-	case DebugLevel:
-		logrusLevel = logrus.DebugLevel
-	case ErrorLevel:
-		logrusLevel = logrus.ErrorLevel
-	case WarningLevel:
-		logrusLevel = logrus.WarnLevel
-	default:
-		logrusLevel = logrus.InfoLevel
-	}
-
-	logger.SetLevel(logrusLevel)
-
 	return &ReceptorLogger{
-		Logger: *logger,
+		Logger: *log.New(os.Stdout, prefix, log.LstdFlags),
 		Prefix: prefix,
 	}
 }
@@ -195,28 +160,29 @@ func (rl *ReceptorLogger) GetLogLevel() int {
 
 // Error reports unexpected behavior, likely to result in termination.
 func (rl *ReceptorLogger) Error(format string, v ...interface{}) {
-	rl.Logger.Errorf(format, v...)
+	rl.Log(ErrorLevel, format, v...)
 }
 
 // Warning reports unexpected behavior, not necessarily resulting in termination.
 func (rl *ReceptorLogger) Warning(format string, v ...interface{}) {
-	rl.Logger.Warnf(format, v...)
+	rl.Log(WarningLevel, format, v...)
 }
 
 // Info provides general purpose statements useful to end user.
 func (rl *ReceptorLogger) Info(format string, v ...interface{}) {
-	rl.Logger.Infof(format, v...)
+	rl.Log(InfoLevel, format, v...)
 }
 
 // Debug contains extra information helpful to developers.
 func (rl *ReceptorLogger) Debug(format string, v ...interface{}) {
-	rl.Logger.Debugf(format, v...)
+	rl.Log(DebugLevel, format, v...)
 }
 
 // Trace outputs detailed packet traversal.
 func (rl *ReceptorLogger) Trace(format string, v ...interface{}) {
 	if showTrace {
-		rl.Logger.Tracef(format, v...)
+		log.SetPrefix("TRACE ")
+		log.Printf(format, v...)
 	}
 }
 
@@ -227,14 +193,21 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 
 		return
 	}
-	_, err := LogLevelToName(level)
+	var prefix string
+	logLevelName, err := LogLevelToName(level)
 	if err != nil {
 		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
 
 		return
 	}
+	if rl.Prefix != "" {
+		prefix = strings.ToUpper(logLevelName) + " " + rl.Prefix + " "
+	} else {
+		prefix = strings.ToUpper(logLevelName) + " "
+	}
 
 	if logLevel >= level {
+		rl.Logger.SetPrefix(prefix)
 		rl.Logger.Printf(format, v...)
 	}
 }

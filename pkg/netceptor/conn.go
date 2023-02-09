@@ -16,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/lucas-clemente/quic-go"
 )
 
@@ -72,7 +71,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				clientTLSCfg := tlscfg.Clone()
 				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
-				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient)
+				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
 
 				return clientTLSCfg, nil
 			}
@@ -399,7 +398,7 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	// read from channel until closed
 	for msg := range msgCh {
 		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-			logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
+			pc.s.Logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
 			cancel()
 		}
 	}
@@ -434,7 +433,7 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

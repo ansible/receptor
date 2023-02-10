@@ -24,14 +24,16 @@ type TCPDialer struct {
 	address string
 	redial  bool
 	tls     *tls.Config
+	logger  *logger.ReceptorLogger
 }
 
 // NewTCPDialer instantiates a new TCP backend.
-func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, error) {
+func NewTCPDialer(address string, redial bool, tls *tls.Config, logger *logger.ReceptorLogger) (*TCPDialer, error) {
 	td := TCPDialer{
 		address: address,
 		redial:  redial,
 		tls:     tls,
+		logger:  logger,
 	}
 
 	return &td, nil
@@ -39,7 +41,7 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config) (*TCPDialer, err
 
 // Start runs the given session function over this backend service.
 func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
-	return dialerSession(ctx, wg, b.redial, 5*time.Second,
+	return dialerSession(ctx, wg, b.redial, 5*time.Second, b.logger,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			var conn net.Conn
 			var err error
@@ -64,14 +66,16 @@ type TCPListener struct {
 	tls     *tls.Config
 	li      net.Listener
 	innerLi *net.TCPListener
+	logger  *logger.ReceptorLogger
 }
 
 // NewTCPListener instantiates a new TCPListener backend.
-func NewTCPListener(address string, tls *tls.Config) (*TCPListener, error) {
+func NewTCPListener(address string, tls *tls.Config, logger *logger.ReceptorLogger) (*TCPListener, error) {
 	tl := TCPListener{
 		address: address,
 		tls:     tls,
 		li:      nil,
+		logger:  logger,
 	}
 
 	return &tl, nil
@@ -88,7 +92,7 @@ func (b *TCPListener) Addr() net.Addr {
 
 // Start runs the given session function over the TCPListener backend.
 func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
-	sessChan, err := listenerSession(ctx, wg,
+	sessChan, err := listenerSession(ctx, wg, b.logger,
 		func() error {
 			var err error
 			lc := net.ListenConfig{}
@@ -139,7 +143,7 @@ func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netce
 			_ = b.li.Close()
 		})
 	if err == nil {
-		logger.Debug("Listening on TCP %s\n", b.Addr().String())
+		b.logger.Debug("Listening on TCP %s\n", b.Addr().String())
 	}
 
 	return sessChan, err
@@ -254,9 +258,9 @@ func (cfg tcpListenerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	b, err := NewTCPListener(address, tlscfg)
+	b, err := NewTCPListener(address, tlscfg, netceptor.MainInstance.Logger)
 	if err != nil {
-		logger.Error("Error creating listener %s: %s\n", address, err)
+		netceptor.MainInstance.Logger.Error("Error creating listener %s: %s\n", address, err)
 
 		return err
 	}
@@ -291,7 +295,7 @@ func (cfg tcpDialerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg tcpDialerCfg) Run() error {
-	logger.Debug("Running TCP peer connection %s\n", cfg.Address)
+	netceptor.MainInstance.Logger.Debug("Running TCP peer connection %s\n", cfg.Address)
 	host, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
 		return err
@@ -300,9 +304,9 @@ func (cfg tcpDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
+	b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg, netceptor.MainInstance.Logger)
 	if err != nil {
-		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+		netceptor.MainInstance.Logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 
 		return err
 	}

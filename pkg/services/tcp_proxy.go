@@ -9,7 +9,6 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
@@ -30,13 +29,13 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 		for {
 			tc, err := tli.Accept()
 			if err != nil {
-				logger.Error("Error accepting TCP connection: %s\n", err)
+				s.Logger.Error("Error accepting TCP connection: %s\n", err)
 
 				return
 			}
 			qc, err := s.Dial(node, rservice, tlsClient)
 			if err != nil {
-				logger.Error("Error connecting on Receptor network: %s\n", err)
+				s.Logger.Error("Error connecting on Receptor network: %s\n", err)
 
 				continue
 			}
@@ -62,7 +61,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 		for {
 			qc, err := qli.Accept()
 			if err != nil {
-				logger.Error("Error accepting connection on Receptor network: %s\n", err)
+				s.Logger.Error("Error accepting connection on Receptor network: %s\n", err)
 
 				return
 			}
@@ -73,7 +72,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 				tc, err = tls.Dial("tcp", address, tlsClient)
 			}
 			if err != nil {
-				logger.Error("Error connecting via TCP: %s\n", err)
+				s.Logger.Error("Error connecting via TCP: %s\n", err)
 
 				continue
 			}
@@ -96,7 +95,7 @@ type tcpProxyInboundCfg struct {
 
 // Run runs the action.
 func (cfg tcpProxyInboundCfg) Run() error {
-	logger.Debug("Running TCP inbound proxy service %v\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running TCP inbound proxy service %v\n", cfg)
 	tlsClientCfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLSClient, cfg.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return err
@@ -120,7 +119,7 @@ type tcpProxyOutboundCfg struct {
 
 // Run runs the action.
 func (cfg tcpProxyOutboundCfg) Run() error {
-	logger.Debug("Running TCP inbound proxy service %s\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running TCP inbound proxy service %s\n", cfg)
 	tlsServerCfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLSServer)
 	if err != nil {
 		return err

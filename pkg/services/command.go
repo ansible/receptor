@@ -8,7 +8,6 @@ import (
 	"net"
 	"os/exec"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/creack/pty"
@@ -37,21 +36,21 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 		"type": "Command Service",
 	})
 	if err != nil {
-		logger.Error("Error listening on Receptor network: %s\n", err)
+		s.Logger.Error("Error listening on Receptor network: %s\n", err)
 
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
-			logger.Error("Error accepting connection on Receptor network: %s\n", err)
+			s.Logger.Error("Error accepting connection on Receptor network: %s\n", err)
 
 			return
 		}
 		go func() {
 			err := runCommand(qc, command)
 			if err != nil {
-				logger.Error("Error running command: %s\n", err)
+				s.Logger.Error("Error running command: %s\n", err)
 			}
 			_ = qc.Close()
 		}()
@@ -67,7 +66,7 @@ type commandSvcCfg struct {
 
 // Run runs the action.
 func (cfg commandSvcCfg) Run() error {
-	logger.Info("Running command service %s\n", cfg)
+	netceptor.MainInstance.Logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

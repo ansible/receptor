@@ -149,7 +149,7 @@ func (t *reloadCommandType) InitFromJSON(config map[string]interface{}) (Control
 	return c, nil
 }
 
-func handleError(err error, errorcode int) (map[string]interface{}, error) {
+func handleError(err error, errorcode int, logger *logger.ReceptorLogger) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
 	cfr["Success"] = false
 	cfr["Error"] = fmt.Sprintf("%s ERRORCODE %d", err.Error(), errorcode)
@@ -161,31 +161,31 @@ func handleError(err error, errorcode int) (map[string]interface{}, error) {
 func (c *reloadCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
-	logger.Debug("Reloading")
+	nc.Logger.Debug("Reloading")
 
 	// Do a quick check to catch any yaml errors before canceling backends
 	err := reloadParseAndRun([]string{"PreReload"})
 	if err != nil {
-		return handleError(err, 4)
+		return handleError(err, 4, nc.Logger)
 	}
 
 	// check if non-reloadable items have been added or modified
 	err = checkReload()
 	if err != nil {
-		return handleError(err, 3)
+		return handleError(err, 3, nc.Logger)
 	}
 
 	// check if non-reloadable items have been removed
 	err = cfgAbsent()
 	if err != nil {
-		return handleError(err, 3)
+		return handleError(err, 3, nc.Logger)
 	}
 
 	nc.CancelBackends()
 	// reloadParseAndRun is a ParseAndRun closure, set in receptor.go/main()
 	err = reloadParseAndRun([]string{"PreReload", "Reload"})
 	if err != nil {
-		return handleError(err, 4)
+		return handleError(err, 4, nc.Logger)
 	}
 
 	cfr := make(map[string]interface{})

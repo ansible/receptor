@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
@@ -21,7 +22,7 @@ type ControlCommand interface {
 
 // ControlFuncOperations provides callbacks for control services to take actions.
 type ControlFuncOperations interface {
-	BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error
+	BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error
 	ReadFromConn(message string, out io.Writer) error
 	WriteToConn(message string, in chan []byte) error
 	Close() error

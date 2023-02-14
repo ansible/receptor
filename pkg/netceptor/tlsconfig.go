@@ -53,7 +53,7 @@ func checkCertificatesMatchNodeID(certbytes []byte, n *Netceptor, certName strin
 		return err
 	}
 
-	found, receptorNames, err := utils.ParseReceptorNamesFromCert(parsedCert, n.nodeID)
+	found, receptorNames, err := utils.ParseReceptorNamesFromCert(parsedCert, n.nodeID, n.Logger)
 	if err != nil {
 		return err
 	}

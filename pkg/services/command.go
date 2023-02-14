@@ -8,6 +8,7 @@ import (
 	"net"
 	"os/exec"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/creack/pty"
@@ -15,7 +16,7 @@ import (
 	"github.com/google/shlex"
 )
 
-func runCommand(qc net.Conn, command string) error {
+func runCommand(qc net.Conn, command string, logger *logger.ReceptorLogger) error {
 	args, err := shlex.Split(command)
 	if err != nil {
 		return err
@@ -25,7 +26,7 @@ func runCommand(qc net.Conn, command string) error {
 	if err != nil {
 		return err
 	}
-	utils.BridgeConns(tty, "external command", qc, "command service")
+	utils.BridgeConns(tty, "external command", qc, "command service", logger)
 
 	return nil
 }
@@ -48,7 +49,7 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 			return
 		}
 		go func() {
-			err := runCommand(qc, command)
+			err := runCommand(qc, command, s.Logger)
 			if err != nil {
 				s.Logger.Error("Error running command: %s\n", err)
 			}

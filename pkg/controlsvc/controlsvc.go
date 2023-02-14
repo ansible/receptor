@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
@@ -31,14 +32,14 @@ func (s *sockControl) RemoteAddr() net.Addr {
 }
 
 // BridgeConn bridges the socket to another socket.
-func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error {
+func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
 		if err != nil {
 			return err
 		}
 	}
-	utils.BridgeConns(s.conn, "control service", bc, bcName)
+	utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
 
 	return nil
 }

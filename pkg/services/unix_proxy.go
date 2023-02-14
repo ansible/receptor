@@ -39,7 +39,7 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 
 					return
 				}
-				utils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
+				utils.BridgeConns(uc, "unix socket service", qc, "receptor connection", s.Logger)
 			}()
 		}
 	}()
@@ -70,7 +70,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 
 				continue
 			}
-			go utils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
+			go utils.BridgeConns(qc, "receptor service", uc, "unix socket connection", s.Logger)
 		}
 	}()
 

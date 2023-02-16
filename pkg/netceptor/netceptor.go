@@ -533,7 +533,7 @@ func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*backendInfo))
 						defer runProtocolWg.Done()
 						err := s.runProtocol(ctxBackend, sess, bi)
 						if err != nil {
-							s.Logger.Error("Backend error: %s\n", err)
+							s.Logger.SanitizedError("Backend error: %s\n", err)
 						}
 					}()
 				} else {
@@ -1440,7 +1440,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		if ri.UpdateEpoch > s.epoch {
 			// Update has our node ID but a newer epoch - so if clocks are in sync they are a duplicate
-			s.Logger.Error("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
+			s.Logger.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
 			// Send routing update noting our suspicion
 			s.sendRoutingUpdate(ri.UpdateEpoch)
 
@@ -1459,7 +1459,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	s.seenUpdates[ri.UpdateID] = time.Now()
 	s.seenUpdatesLock.Unlock()
 	if ri.SuspectedDuplicate != 0 {
-		s.Logger.Warning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
+		s.Logger.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
 		s.knownNodeLock.Lock()
 		ni, ok := s.knownNodeInfo[ri.NodeID]
 		if ok {
@@ -1470,7 +1470,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		s.knownNodeLock.Unlock()
 	} else {
-		s.Logger.Debug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
+		s.Logger.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
 		s.knownNodeLock.Lock()
 		ni, ok := s.knownNodeInfo[ri.NodeID]
 		if ok {
@@ -1678,7 +1678,7 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 	if err != nil {
 		return err
 	}
-	s.Logger.Debug("Received service advertisement %v\n", si)
+	s.Logger.SanitizedDebug("Received service advertisement from %s\n", si.NodeID)
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[si.NodeID]
@@ -1916,7 +1916,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 
 					return fmt.Errorf("remote node rejected the connection")
 				default:
-					s.Logger.Warning("Unknown message type %d\n", msgType)
+					s.Logger.Warning("Unknown message type\n")
 				}
 			} else {
 				// Connection not established
@@ -1972,7 +1972,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 					case <-ctx.Done():
 						return nil
 					}
-					s.Logger.Info("Connection established with %s\n", remoteNodeID)
+					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
 					s.addNameHash(remoteNodeID)
 					s.connLock.Lock()
 					s.connections[remoteNodeID] = ci

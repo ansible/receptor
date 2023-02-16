@@ -1,7 +1,10 @@
 package workceptor
 
 import (
+	"context"
 	"testing"
+
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 func Test_isCompatibleK8S(t *testing.T) {
@@ -11,6 +14,22 @@ func Test_isCompatibleK8S(t *testing.T) {
 	}
 
 	kw := &kubeUnit{}
+
+	// Create Netceptor node using external backends
+	n1 := netceptor.New(context.Background(), "node1")
+	b1, err := netceptor.NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n1.AddBackend(b1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := New(context.Background(), n1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kw.w = w
 
 	tests := []args{
 		// K8S compatible versions

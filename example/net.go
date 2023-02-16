@@ -19,7 +19,7 @@ import (
 
 func main() {
 	// Suppress log output.  Remove this if you want to see log information.
-	logger.QuietMode()
+	logger.SetGlobalQuietMode()
 
 	// Create two nodes of the Receptor network-layer protocol (Netceptors).
 	n1 := netceptor.New(context.Background(), "node1")

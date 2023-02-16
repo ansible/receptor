@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go" //nolint:typecheck
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
@@ -37,7 +37,7 @@ type acceptResult struct {
 type Listener struct {
 	s          *Netceptor
 	pc         *PacketConn
-	ql         quic.Listener
+	ql         quic.Listener //nolint:typecheck
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
@@ -88,11 +88,11 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	}
 	pc.startUnreachable()
 	s.listenerRegistry[service] = pc
-	cfg := &quic.Config{
+	cfg := &quic.Config{ //nolint:typecheck
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := quic.Listen(pc, tlscfg, cfg)
+	ql, err := quic.Listen(pc, tlscfg, cfg) //nolint:typecheck
 	if err != nil {
 		return nil, err
 	}
@@ -270,8 +270,8 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
-	qc       quic.Connection
-	qs       quic.Stream
+	qc       quic.Connection //nolint:typecheck
+	qs       quic.Stream     //nolint:typecheck
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
@@ -291,7 +291,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	rAddr := s.NewAddr(node, service)
-	cfg := &quic.Config{
+	cfg := &quic.Config{ //nolint:typecheck
 		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
 	}
@@ -327,7 +327,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
+	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg) //nolint:typecheck
 	if err != nil {
 		close(okChan)
 		pcClose()

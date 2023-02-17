@@ -1101,7 +1101,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		}
 
 		if expectedHostnameType == ExpectedHostnameTypeReceptor {
-			found, receptorNames, err := utils.ParseReceptorNamesFromCert(certs[0], expectedHostname)
+			found, receptorNames, err := utils.ParseReceptorNamesFromCert(certs[0], expectedHostname, logger)
 			if err != nil {
 				return err
 			}

@@ -39,7 +39,7 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 
 				continue
 			}
-			go utils.BridgeConns(tc, "tcp service", qc, "receptor connection")
+			go utils.BridgeConns(tc, "tcp service", qc, "receptor connection", s.Logger)
 		}
 	}()
 
@@ -76,7 +76,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 
 				continue
 			}
-			go utils.BridgeConns(qc, "receptor service", tc, "tcp connection")
+			go utils.BridgeConns(qc, "receptor service", tc, "tcp connection", s.Logger)
 		}
 	}()
 

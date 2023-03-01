@@ -16,6 +16,7 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.
@@ -239,6 +240,35 @@ func (cw *commandUnit) Start() error {
 	return cw.runCommand(cmd)
 }
 
+// isOrphaned checks if command runner for this unit exists
+func (cw *commandUnit) isOrphaned() (bool, error) {
+	pid := cw.Status().ExtraData.(*commandExtraData).Pid
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		// process does not exist
+		return true, err
+	}
+
+	cmd, err := p.CmdlineSlice()
+	if err != nil {
+		return true, err
+	}
+
+	if len(cmd) == 0 || cmd[0] != os.Args[0] {
+		// process is not receptor
+		return true, fmt.Errorf("pid %v is not command runner", pid)
+	}
+	unitdirArg := fmt.Sprintf("unitdir=%s", cw.UnitDir())
+	for _, arg := range cmd {
+		if arg == unitdirArg {
+			// process is receptor and is using expected unitdir
+			return false, nil
+		}
+	}
+	// process is receptor but is using different unitdir
+	return true, fmt.Errorf("pid %v is command runner for different unit", pid)
+}
+
 // Restart resumes monitoring a job after a Receptor restart.
 func (cw *commandUnit) Restart() error {
 	if err := cw.Load(); err != nil {
@@ -252,6 +282,15 @@ func (cw *commandUnit) Restart() error {
 	if state == WorkStatePending {
 		// Job never started - mark it failed
 		cw.UpdateBasicStatus(WorkStateFailed, "Pending at restart", stdoutSize(cw.UnitDir()))
+	}
+	if isOrphaned, err := cw.isOrphaned(); isOrphaned {
+		// Job never completed - mark it failed and wipe pid
+		cw.UpdateFullStatus(func(status *StatusFileData) {
+			status.State = WorkStateFailed
+			status.Detail = fmt.Sprintf("Orphaned: %s", err)
+			status.StdoutSize = stdoutSize(cw.UnitDir())
+			status.ExtraData.(*commandExtraData).Pid = 0
+		})
 	}
 	go cw.monitorLocalStatus()
 

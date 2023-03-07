@@ -204,7 +204,6 @@ func (pc *PacketConn) Close() error {
 	if pc.cancel != nil {
 		pc.cancel()
 	}
-	close(pc.recvChan)
 	if pc.advertise {
 		err := pc.s.removeLocalServiceAdvertisement(pc.localService)
 		if err != nil {

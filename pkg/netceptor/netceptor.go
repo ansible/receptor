@@ -1640,6 +1640,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		s.listenerLock.RUnlock()
 		select {
 		case <-pc.context.Done():
+			close(pc.recvChan)
 			return nil
 		case pc.recvChan <- md:
 		}

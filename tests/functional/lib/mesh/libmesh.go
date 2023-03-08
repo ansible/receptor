@@ -386,7 +386,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						return nil, err
 					}
 					switch backend := node.Backends[len(node.Backends)-1].(type) {
-					case *backends.UDPListener:
+					case *backends.UDPListener: //nolint:typecheck
 						address = backend.LocalAddr().String()
 					case *backends.TCPListener:
 						address = backend.Addr().String()

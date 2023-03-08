@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/ghjm/cmdline"
 )
@@ -24,23 +25,13 @@ const (
 )
 
 // QuietMode turns off all log output.
-func QuietMode() {
+func SetGlobalQuietMode() {
 	logLevel = 0
 }
 
 // SetLogLevel is a helper function for setting logLevel int.
-func SetLogLevel(level int) {
+func SetGlobalLogLevel(level int) {
 	logLevel = level
-}
-
-// SetOutput sets the output destination for the logger.
-func SetOutput(w io.Writer) {
-	log.SetOutput(w)
-}
-
-// SetShowTrace is a helper function for setting showTrace bool.
-func SetShowTrace(trace bool) {
-	showTrace = trace
 }
 
 // GetLogLevelByName is a helper function for returning level associated with log
@@ -86,63 +77,15 @@ type MessageFunc func(level int, format string, v ...interface{})
 
 var logger MessageFunc
 
-// Log sends a log message at a given level.
-func Log(level int, format string, v ...interface{}) {
-	if logger != nil {
-		logger(level, format, v...)
-
-		return
-	}
-	var prefix string
-	logLevelName, err := LogLevelToName(level)
-	if err != nil {
-		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
-
-		return
-	}
-	prefix = strings.ToUpper(logLevelName) + " "
-	if logLevel >= level {
-		log.SetPrefix(prefix)
-		log.Printf(format, v...)
-	}
-}
-
 // RegisterLogger registers a function for log delivery.
 func RegisterLogger(msgFunc MessageFunc) {
 	logger = msgFunc
 }
 
-// Error reports unexpected behavior, likely to result in termination.
-func Error(format string, v ...interface{}) {
-	Log(ErrorLevel, format, v...)
-}
-
-// Warning reports unexpected behavior, not necessarily resulting in termination.
-func Warning(format string, v ...interface{}) {
-	Log(WarningLevel, format, v...)
-}
-
-// Info provides general purpose statements useful to end user.
-func Info(format string, v ...interface{}) {
-	Log(InfoLevel, format, v...)
-}
-
-// Debug contains extra information helpful to developers.
-func Debug(format string, v ...interface{}) {
-	Log(DebugLevel, format, v...)
-}
-
-// Trace outputs detailed packet traversal.
-func Trace(format string, v ...interface{}) {
-	if showTrace {
-		log.SetPrefix("TRACE ")
-		log.Printf(format, v...)
-	}
-}
-
 type ReceptorLogger struct {
 	log.Logger
 	Prefix string
+	m      sync.Mutex
 }
 
 // NewReceptorLogger to instantiate a new logger object.
@@ -151,6 +94,16 @@ func NewReceptorLogger(prefix string) *ReceptorLogger {
 		Logger: *log.New(os.Stdout, prefix, log.LstdFlags),
 		Prefix: prefix,
 	}
+}
+
+// SetOutput sets the output destination for the logger.
+func (rl *ReceptorLogger) SetOutput(w io.Writer) {
+	rl.Logger.SetOutput(w)
+}
+
+// SetShowTrace is a helper function for setting showTrace bool.
+func (rl *ReceptorLogger) SetShowTrace(trace bool) {
+	showTrace = trace
 }
 
 // GetLogLevel returns the log level.
@@ -163,9 +116,19 @@ func (rl *ReceptorLogger) Error(format string, v ...interface{}) {
 	rl.Log(ErrorLevel, format, v...)
 }
 
+// SanError reports unexpected behavior, likely to result in termination.
+func (rl *ReceptorLogger) SanitizedError(format string, v ...interface{}) {
+	rl.SanitizedLog(ErrorLevel, format, v...)
+}
+
 // Warning reports unexpected behavior, not necessarily resulting in termination.
 func (rl *ReceptorLogger) Warning(format string, v ...interface{}) {
 	rl.Log(WarningLevel, format, v...)
+}
+
+// SanitizedWarning reports unexpected behavior, not necessarily resulting in termination.
+func (rl *ReceptorLogger) SanitizedWarning(format string, v ...interface{}) {
+	rl.SanitizedLog(WarningLevel, format, v...)
 }
 
 // Info provides general purpose statements useful to end user.
@@ -173,16 +136,34 @@ func (rl *ReceptorLogger) Info(format string, v ...interface{}) {
 	rl.Log(InfoLevel, format, v...)
 }
 
+// SanitizedInfo provides general purpose statements useful to end user.
+func (rl *ReceptorLogger) SanitizedInfo(format string, v ...interface{}) {
+	rl.SanitizedLog(InfoLevel, format, v...)
+}
+
 // Debug contains extra information helpful to developers.
 func (rl *ReceptorLogger) Debug(format string, v ...interface{}) {
 	rl.Log(DebugLevel, format, v...)
 }
 
+// SanitizedDebug contains extra information helpful to developers.
+func (rl *ReceptorLogger) SanitizedDebug(format string, v ...interface{}) {
+	rl.SanitizedLog(DebugLevel, format, v...)
+}
+
 // Trace outputs detailed packet traversal.
 func (rl *ReceptorLogger) Trace(format string, v ...interface{}) {
 	if showTrace {
-		log.SetPrefix("TRACE ")
-		log.Printf(format, v...)
+		rl.SetPrefix("TRACE")
+		rl.Log(logLevel, format, v...)
+	}
+}
+
+// SanitizedTrace outputs detailed packet traversal.
+func (rl *ReceptorLogger) SanitizedTrace(format string, v ...interface{}) {
+	if showTrace {
+		rl.SetPrefix("TRACE")
+		rl.SanitizedLog(logLevel, format, v...)
 	}
 }
 
@@ -196,12 +177,12 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 	var prefix string
 	logLevelName, err := LogLevelToName(level)
 	if err != nil {
-		Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
+		rl.Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
 
 		return
 	}
-	if rl.Prefix != "" {
-		prefix = strings.ToUpper(logLevelName) + " " + rl.Prefix + " "
+	if rl.GetPrefix() != "" {
+		prefix = rl.GetPrefix() + " " + strings.ToUpper(logLevelName) + " "
 	} else {
 		prefix = strings.ToUpper(logLevelName) + " "
 	}
@@ -212,8 +193,47 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 	}
 }
 
+// SanitizedLog adds a prefix and prints a given log message.
+func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{}) {
+	if logger != nil {
+		logger(level, format, v...)
+
+		return
+	}
+	var prefix string
+	logLevelName, err := LogLevelToName(level)
+	if err != nil {
+		message := fmt.Sprintf(format, v...)
+		sanMessage := strings.ReplaceAll(message, "\n", "")
+		rl.Error("Log entry received with invalid level: %s\n", sanMessage)
+
+		return
+	}
+	if rl.GetPrefix() != "" {
+		prefix = rl.GetPrefix() + " " + strings.ToUpper(logLevelName) + " "
+	} else {
+		prefix = strings.ToUpper(logLevelName) + " "
+	}
+
+	if logLevel >= level {
+		message := fmt.Sprintf(format, v...)
+		sanMessage := strings.ReplaceAll(message, "\n", "")
+		rl.Logger.SetPrefix(prefix)
+		rl.Logger.Print(sanMessage)
+	}
+}
+
 func (rl *ReceptorLogger) SetPrefix(prefix string) {
+	rl.m.Lock()
+	defer rl.m.Unlock()
 	rl.Prefix = prefix
+}
+
+func (rl *ReceptorLogger) GetPrefix() string {
+	rl.m.Lock()
+	defer rl.m.Unlock()
+
+	return rl.Prefix
 }
 
 // GetLogLevelByName is a helper function for returning level associated with log
@@ -228,6 +248,19 @@ func (rl *ReceptorLogger) GetLogLevelByName(logName string) (int, error) {
 	return 0, err
 }
 
+// LogLevelToName takes an int and returns the corresponding log level name.
+func (rl *ReceptorLogger) LogLevelToName(logLevel int) (string, error) {
+	var err error
+	for k, v := range logLevelMap {
+		if v == logLevel {
+			return k, nil
+		}
+	}
+	err = fmt.Errorf("%d is not a valid log level", logLevel)
+
+	return "", err
+}
+
 type loglevelCfg struct {
 	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
 }
@@ -238,7 +271,7 @@ func (cfg loglevelCfg) Init() error {
 	if err != nil {
 		return err
 	}
-	SetLogLevel(val)
+	SetGlobalLogLevel(val)
 
 	return nil
 }
@@ -246,8 +279,6 @@ func (cfg loglevelCfg) Init() error {
 type traceCfg struct{}
 
 func (cfg traceCfg) Prepare() error {
-	SetShowTrace(true)
-
 	return nil
 }
 

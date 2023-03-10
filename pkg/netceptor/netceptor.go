@@ -112,6 +112,7 @@ type Netceptor struct {
 	workCommandsLock         *sync.RWMutex
 	epoch                    uint64
 	sequence                 uint64
+	sequenceLock             *sync.RWMutex
 	connLock                 *sync.RWMutex
 	connections              map[string]*connInfo
 	knownNodeLock            *sync.RWMutex
@@ -312,6 +313,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		maxConnectionIdleTime:    maxConnectionIdleTime,
 		epoch:                    uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
 		sequence:                 0,
+		sequenceLock:             &sync.RWMutex{},
 		connLock:                 &sync.RWMutex{},
 		connections:              make(map[string]*connInfo),
 		knownNodeLock:            &sync.RWMutex{},
@@ -1368,6 +1370,8 @@ func (s *Netceptor) printRoutingTable() {
 func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate {
 	s.connLock.Lock()
 	defer s.connLock.Unlock()
+	s.sequenceLock.Lock()
+	defer s.sequenceLock.Unlock()
 	s.sequence++
 	conns := make(map[string]float64)
 	for conn := range s.connections {

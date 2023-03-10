@@ -1487,6 +1487,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		} else {
 			select {
 			case <-s.context.Done():
+				s.knownNodeLock.Unlock()
 				return
 			case s.sendRouteFloodChan <- 0:
 			}

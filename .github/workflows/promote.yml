@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -67,3 +70,30 @@ jobs:
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
+
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{github.event.release.tag_name}}
+    steps:
+      - name: Checkout Receptor
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+
+      - name: Build packages
+        run: |
+          make build-package GOOS=linux GOARCH=amd64 BINNAME=receptor
+          make build-package GOOS=linux GOARCH=arm64 BINNAME=receptor
+          make build-package GOOS=darwin GOARCH=amd64 BINNAME=receptor
+          make build-package GOOS=darwin GOARCH=arm64 BINNAME=receptor
+          make build-package GOOS=windows GOARCH=amd64 BINNAME=receptor.exe
+          make build-package GOOS=windows GOARCH=arm64 BINNAME=receptor.exe
+
+      - name: Publish packages
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |-
+            dist/checksums.txt
+            dist/*.tar.gz

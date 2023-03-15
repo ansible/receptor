@@ -71,6 +71,14 @@ build-all:
 	go build -o receptor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth ./cmd/receptor-cl && \
 	go build -o receptor ./cmd/receptor-cl
 
+DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
+build-package:
+	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
+	mkdir -p dist/$(DIST) && \
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o dist/$(DIST)/$(BINNAME) $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl && \
+	tar -C dist/$(DIST) -zcf dist/$(DIST).tar.gz $(BINNAME) && \
+	cd dist/ && sha256sum $(DIST).tar.gz >> checksums.txt
+
 RUNTEST ?=
 ifeq ($(RUNTEST),)
 TESTCMD =
@@ -156,6 +164,7 @@ clean:
 	@rm -fv receptor-python-worker/dist/*
 	@rm -fv packaging/container/receptor
 	@rm -fv packaging/container/*.whl
+	@rm -rfv dist/
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv receptorctl-test-venv/

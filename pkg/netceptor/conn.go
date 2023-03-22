@@ -127,12 +127,12 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(context.Background(), service, tlscfg, false, nil)
+	return s.listen(s.context, service, tlscfg, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(context.Background(), service, tlscfg, true, tags)
+	return s.listen(s.context, service, tlscfg, true, tags)
 }
 
 // ListenContext returns a stream listener compatible with Go's net.Listener.

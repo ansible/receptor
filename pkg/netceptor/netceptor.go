@@ -894,6 +894,7 @@ func (s *Netceptor) SubscribeRoutingUpdates() chan map[string]string {
 // Forwards a message to all neighbors, possibly excluding one.
 func (s *Netceptor) flood(message []byte, excludeConn string) {
 	s.connLock.RLock()
+	defer s.connLock.RUnlock()
 	for conn, ci := range s.connections {
 		if conn != excludeConn {
 			go func(ci *connInfo) {
@@ -905,7 +906,6 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 			}(ci)
 		}
 	}
-	s.connLock.RUnlock()
 }
 
 // GetServerTLSConfig retrieves a server TLS config by name.
@@ -1368,8 +1368,8 @@ func (s *Netceptor) printRoutingTable() {
 
 // Constructs a routing update message.
 func (s *Netceptor) makeRoutingUpdate(suspectedDuplicate uint64) *routingUpdate {
-	s.connLock.Lock()
-	defer s.connLock.Unlock()
+	s.connLock.RLock()
+	defer s.connLock.RUnlock()
 	s.sequenceLock.Lock()
 	defer s.sequenceLock.Unlock()
 	s.sequence++
@@ -1940,18 +1940,6 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
 					remoteNodeAccepted := true
-					s.connLock.RLock()
-					for conn := range s.connections {
-						if remoteNodeID == conn {
-							remoteNodeAccepted = false
-
-							break
-						}
-					}
-					s.connLock.RUnlock()
-					if !remoteNodeAccepted {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
-					}
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
 						for i := range bi.allowedPeers {
@@ -1971,18 +1959,31 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost
 					}
+					s.connLock.Lock()
+					for conn := range s.connections {
+						if remoteNodeID == conn {
+							remoteNodeAccepted = false
+
+							break
+						}
+					}
+					if !remoteNodeAccepted {
+						s.connLock.Unlock()
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
+					}
+					s.connections[remoteNodeID] = ci
+					s.connLock.Unlock()
 
 					// Establish the connection
 					select {
 					case initDoneChan <- true:
 					case <-ctx.Done():
 						return nil
+					case <-ci.Context.Done():
+						return nil
 					}
 					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
 					s.addNameHash(remoteNodeID)
-					s.connLock.Lock()
-					s.connections[remoteNodeID] = ci
-					s.connLock.Unlock()
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]
 					if !ok {
@@ -1999,10 +2000,14 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 					case s.sendRouteFloodChan <- 0:
 					case <-ctx.Done():
 						return nil
+					case <-ci.Context.Done():
+						return nil
 					}
 					select {
 					case s.updateRoutingTableChan <- 0:
 					case <-ctx.Done():
+						return nil
+					case <-ci.Context.Done():
 						return nil
 					}
 					established = true

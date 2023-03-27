@@ -5,6 +5,7 @@ package backends
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"sync"
@@ -24,6 +25,14 @@ type UDPDialer struct {
 	address string
 	redial  bool
 	logger  *logger.ReceptorLogger
+}
+
+func (b *UDPDialer) GetAddr() string {
+	return b.address
+}
+
+func (b *UDPDialer) GetTLS() *tls.Config {
+	return nil
 }
 
 // NewUDPDialer instantiates a new UDPDialer backend.
@@ -125,6 +134,14 @@ type UDPListener struct {
 	sessRegLock     sync.RWMutex
 	sessionRegistry map[string]*UDPListenerSession
 	logger          *logger.ReceptorLogger
+}
+
+func (b *UDPListener) GetAddr() string {
+	return b.LocalAddr().String()
+}
+
+func (b *UDPListener) GetTLS() *tls.Config {
+	return &tls.Config{}
 }
 
 // NewUDPListener instantiates a new UDPListener backend.
@@ -269,8 +286,9 @@ func (ns *UDPListenerSession) Close() error {
 // Command line
 // **************************************************************************
 
-// udpListenerCfg is the cmdline configuration object for a UDP listener.
-type udpListenerCfg struct {
+//TODO make these fields private
+// UDPListenerCfg is the cmdline configuration object for a UDP listener.
+type UDPListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port         int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
 	Cost         float64            `description:"Connection cost (weight)" default:"1.0"`
@@ -278,8 +296,28 @@ type udpListenerCfg struct {
 	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
+func (cfg UDPListenerCfg) GetCost() float64 {
+	return cfg.Cost
+}
+
+func (cfg UDPListenerCfg) GetNodeCost() map[string]float64 {
+	return cfg.NodeCost
+}
+
+func (cfg UDPListenerCfg) GetAddr() string {
+	return cfg.BindAddr
+}
+
+func (cfg UDPListenerCfg) GetPort() int {
+	return cfg.Port
+}
+
+func (cfg UDPListenerCfg) GetTLS() string {
+	return ""
+}
+
 // Prepare verifies the parameters are correct.
-func (cfg udpListenerCfg) Prepare() error {
+func (cfg UDPListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -293,7 +331,7 @@ func (cfg udpListenerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg udpListenerCfg) Run() error {
+func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	b, err := NewUDPListener(address, netceptor.MainInstance.Logger)
 	if err != nil {
@@ -356,7 +394,7 @@ func (cfg udpDialerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg udpListenerCfg) PreReload() error {
+func (cfg UDPListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
@@ -364,13 +402,13 @@ func (cfg udpDialerCfg) Reload() error {
 	return cfg.Run()
 }
 
-func (cfg udpListenerCfg) Reload() error {
+func (cfg UDPListenerCfg) Reload() error {
 	return cfg.Run()
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"UDP-listener", "Run a backend listener on a UDP port", udpListenerCfg{}, cmdline.Section(backendSection))
+		"UDP-listener", "Run a backend listener on a UDP port", UDPListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"UDP-peer", "Make an outbound backend connection to a UDP peer", udpDialerCfg{}, cmdline.Section(backendSection))
 }

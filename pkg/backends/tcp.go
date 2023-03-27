@@ -39,6 +39,14 @@ func NewTCPDialer(address string, redial bool, tls *tls.Config, logger *logger.R
 	return &td, nil
 }
 
+func (b *TCPDialer) GetAddr() string {
+	return b.address
+}
+
+func (b *TCPDialer) GetTLS() *tls.Config {
+	return b.tls
+}
+
 // Start runs the given session function over this backend service.
 func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, wg, b.redial, 5*time.Second, b.logger,
@@ -63,7 +71,7 @@ func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netcept
 // TCPListener implements Backend for inbound TCP.
 type TCPListener struct {
 	address string
-	tls     *tls.Config
+	TLS     *tls.Config
 	li      net.Listener
 	innerLi *net.TCPListener
 	logger  *logger.ReceptorLogger
@@ -73,7 +81,7 @@ type TCPListener struct {
 func NewTCPListener(address string, tls *tls.Config, logger *logger.ReceptorLogger) (*TCPListener, error) {
 	tl := TCPListener{
 		address: address,
-		tls:     tls,
+		TLS:     tls,
 		li:      nil,
 		logger:  logger,
 	}
@@ -88,6 +96,18 @@ func (b *TCPListener) Addr() net.Addr {
 	}
 
 	return b.li.Addr()
+}
+
+func (b *TCPListener) GetAddr() string {
+	return b.li.Addr().String()
+}
+
+func (b *TCPListener) GetCost() string {
+	return b.li.Addr().String()
+}
+
+func (b *TCPListener) GetTLS() *tls.Config {
+	return b.TLS
 }
 
 // Start runs the given session function over the TCPListener backend.
@@ -105,11 +125,11 @@ func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netce
 			if !ok {
 				return fmt.Errorf("listen returned a non-TCP listener")
 			}
-			if b.tls == nil {
+			if b.TLS == nil {
 				b.li = li
 				b.innerLi = tli
 			} else {
-				tlsLi := tls.NewListener(tli, b.tls)
+				tlsLi := tls.NewListener(tli, b.TLS)
 				b.li = tlsLi
 				b.innerLi = tli
 			}
@@ -143,7 +163,7 @@ func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netce
 			_ = b.li.Close()
 		})
 	if err == nil {
-		b.logger.Debug("Listening on TCP %s\n", b.Addr().String())
+		b.logger.Debug("Listening on TCP %s\n", b.GetAddr())
 	}
 
 	return sessChan, err
@@ -227,8 +247,9 @@ func (ns *TCPSession) Close() error {
 // Command line
 // **************************************************************************
 
-// tcpListenerCfg is the cmdline configuration object for a TCP listener.
-type tcpListenerCfg struct {
+//TODO make these fields private
+// TCPListenerCfg is the cmdline configuration object for a TCP listener.
+type TCPListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port         int                `description:"Local TCP port to listen on" barevalue:"yes" required:"yes"`
 	TLS          string             `description:"Name of TLS server config"`
@@ -237,8 +258,24 @@ type tcpListenerCfg struct {
 	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
+func (cfg TCPListenerCfg) GetCost() float64 {
+	return cfg.Cost
+}
+
+func (cfg TCPListenerCfg) GetNodeCost() map[string]float64 {
+	return cfg.NodeCost
+}
+
+func (cfg TCPListenerCfg) GetAddr() string {
+	return cfg.BindAddr
+}
+
+func (cfg TCPListenerCfg) GetTLS() string {
+	return cfg.TLS
+}
+
 // Prepare verifies the parameters are correct.
-func (cfg tcpListenerCfg) Prepare() error {
+func (cfg TCPListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -252,7 +289,7 @@ func (cfg tcpListenerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg tcpListenerCfg) Run() error {
+func (cfg TCPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -275,8 +312,9 @@ func (cfg tcpListenerCfg) Run() error {
 	return nil
 }
 
-// tcpDialerCfg is the cmdline configuration object for a TCP dialer.
-type tcpDialerCfg struct {
+//TODO make these fields private
+// TCPDialerCfg is the cmdline configuration object for a TCP dialer.
+type TCPDialerCfg struct {
 	Address      string   `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
 	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
 	TLS          string   `description:"Name of TLS client config"`
@@ -285,7 +323,7 @@ type tcpDialerCfg struct {
 }
 
 // Prepare verifies the parameters are correct.
-func (cfg tcpDialerCfg) Prepare() error {
+func (cfg TCPDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -294,7 +332,7 @@ func (cfg tcpDialerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg tcpDialerCfg) Run() error {
+func (cfg TCPDialerCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running TCP peer connection %s\n", cfg.Address)
 	host, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
@@ -320,25 +358,25 @@ func (cfg tcpDialerCfg) Run() error {
 	return nil
 }
 
-func (cfg tcpDialerCfg) PreReload() error {
+func (cfg TCPDialerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg tcpListenerCfg) PreReload() error {
+func (cfg TCPListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg tcpDialerCfg) Reload() error {
+func (cfg TCPDialerCfg) Reload() error {
 	return cfg.Run()
 }
 
-func (cfg tcpListenerCfg) Reload() error {
+func (cfg TCPListenerCfg) Reload() error {
 	return cfg.Run()
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"tcp-listener", "Run a backend listener on a TCP port", tcpListenerCfg{}, cmdline.Section(backendSection))
+		"tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"tcp-peer", "Make an outbound backend connection to a TCP peer", tcpDialerCfg{}, cmdline.Section(backendSection))
+		"tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, cmdline.Section(backendSection))
 }

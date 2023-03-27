@@ -397,7 +397,7 @@ func (r *ReceptorControl) AssertWorkCancelled(ctx context.Context, unitID string
 		if err != nil {
 			return false
 		}
-		if workStatus.State != workceptor.WorkStateFailed {
+		if workStatus.State != workceptor.WorkStateCanceled {
 			return false
 		}
 		detail := workStatus.Detail

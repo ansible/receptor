@@ -29,6 +29,7 @@ const (
 	WorkStateRunning   = 1
 	WorkStateSucceeded = 2
 	WorkStateFailed    = 3
+	WorkStateCanceled  = 4
 )
 
 // IsComplete returns true if a given WorkState indicates the job is finished.

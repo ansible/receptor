@@ -30,6 +30,14 @@ type WebsocketDialer struct {
 	logger      *logger.ReceptorLogger
 }
 
+func (b *WebsocketDialer) GetAddr() string {
+	return b.address
+}
+
+func (b *WebsocketDialer) GetTLS() *tls.Config {
+	return b.tlscfg
+}
+
 // NewWebsocketDialer instantiates a new WebsocketDialer backend.
 func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, redial bool, logger *logger.ReceptorLogger) (*WebsocketDialer, error) {
 	addrURL, err := url.Parse(address)
@@ -87,6 +95,14 @@ type WebsocketListener struct {
 	li      net.Listener
 	server  *http.Server
 	logger  *logger.ReceptorLogger
+}
+
+func (b *WebsocketListener) GetAddr() string {
+	return b.Addr().String()
+}
+
+func (b *WebsocketListener) GetTLS() *tls.Config {
+	return b.tlscfg
 }
 
 // NewWebsocketListener instantiates a new WebsocketListener backend.
@@ -251,8 +267,9 @@ func (ns *WebsocketSession) Close() error {
 // Command line
 // **************************************************************************
 
-// websocketListenerCfg is the cmdline configuration object for a websocket listener.
-type websocketListenerCfg struct {
+//TODO make fields private
+// WebsocketListenerCfg is the cmdline configuration object for a websocket listener.
+type WebsocketListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port         int                `description:"Local TCP port to run http server on" barevalue:"yes" required:"yes"`
 	Path         string             `description:"URI path to the websocket server" default:"/"`
@@ -262,8 +279,24 @@ type websocketListenerCfg struct {
 	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
+func (cfg WebsocketListenerCfg) GetCost() float64 {
+	return cfg.Cost
+}
+
+func (cfg WebsocketListenerCfg) GetNodeCost() map[string]float64 {
+	return cfg.NodeCost
+}
+
+func (cfg WebsocketListenerCfg) GetAddr() string {
+	return cfg.BindAddr
+}
+
+func (cfg WebsocketListenerCfg) GetTLS() string {
+	return cfg.TLS
+}
+
 // Prepare verifies the parameters are correct.
-func (cfg websocketListenerCfg) Prepare() error {
+func (cfg WebsocketListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -277,7 +310,7 @@ func (cfg websocketListenerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg websocketListenerCfg) Run() error {
+func (cfg WebsocketListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -365,7 +398,7 @@ func (cfg websocketDialerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg websocketListenerCfg) PreReload() error {
+func (cfg WebsocketListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
@@ -373,13 +406,13 @@ func (cfg websocketDialerCfg) Reload() error {
 	return cfg.Run()
 }
 
-func (cfg websocketListenerCfg) Reload() error {
+func (cfg WebsocketListenerCfg) Reload() error {
 	return cfg.Run()
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"ws-listener", "Run an http server that accepts websocket connections", websocketListenerCfg{}, cmdline.Section(backendSection))
+		"ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"ws-peer", "Connect outbound to a websocket peer", websocketDialerCfg{}, cmdline.Section(backendSection))
 }

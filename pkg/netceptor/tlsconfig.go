@@ -80,6 +80,8 @@ func baseTLS(minTLS13 bool) *tls.Config {
 			CipherSuites: []uint16{
 				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 			},
 		}
 	}
@@ -87,8 +89,8 @@ func baseTLS(minTLS13 bool) *tls.Config {
 	return tlscfg
 }
 
-// tlsServerCfg stores the configuration options for a TLS server.
-type tlsServerCfg struct {
+// TLSServerConfig stores the configuration options for a TLS server.
+type TLSServerConfig struct {
 	Name                   string   `required:"true" description:"Name of this TLS server configuration"`
 	Cert                   string   `required:"true" description:"Server certificate filename"`
 	Key                    string   `required:"true" description:"Server private key filename"`
@@ -99,25 +101,24 @@ type tlsServerCfg struct {
 	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"false"`
 }
 
-// Prepare creates the tls.config and stores it in the global map.
-func (cfg tlsServerCfg) Prepare() error {
+func (cfg TLSServerConfig) PrepareTLSServerConfig(n *Netceptor) (*tls.Config, error) {
 	tlscfg := baseTLS(cfg.MinTLS13)
 	certBytes, err := os.ReadFile(cfg.Cert)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	keybytes, err := os.ReadFile(cfg.Key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cert, err := tls.X509KeyPair(certBytes, keybytes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// check server crt to ensure that the receptor NodeID is in the client certificate as an OID
 	if !cfg.SkipReceptorNamesCheck {
-		if err := checkCertificatesMatchNodeID(certBytes, MainInstance, cfg.Name, cfg.Cert); err != nil {
-			return err
+		if err := checkCertificatesMatchNodeID(certBytes, n, cfg.Name, cfg.Cert); err != nil {
+			return nil, err
 		}
 	}
 
@@ -126,7 +127,7 @@ func (cfg tlsServerCfg) Prepare() error {
 	if cfg.ClientCAs != "" {
 		caBytes, err := os.ReadFile(cfg.ClientCAs)
 		if err != nil {
-			return fmt.Errorf("error reading client CAs file: %s", err)
+			return nil, fmt.Errorf("error reading client CAs file: %s", err)
 		}
 		clientCAs := x509.NewCertPool()
 		clientCAs.AppendCertsFromPEM(caBytes)
@@ -145,19 +146,30 @@ func (cfg tlsServerCfg) Prepare() error {
 	var pinnedFingerprints [][]byte
 	pinnedFingerprints, err = decodeFingerprints(cfg.PinnedClientCert)
 	if err != nil {
-		return fmt.Errorf("error decoding fingerprints: %s", err)
+		return nil, fmt.Errorf("error decoding fingerprints: %s", err)
 	}
 
 	if tlscfg.ClientAuth != tls.NoClientCert {
 		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints,
-			"", ExpectedHostnameTypeDNS, VerifyClient, MainInstance.Logger)
+			"", ExpectedHostnameTypeDNS, VerifyClient, n.Logger)
+	}
+
+	return tlscfg, nil
+}
+
+// Prepare creates the tls.config and stores it in the global map.
+func (cfg TLSServerConfig) Prepare() error {
+	tlscfg, err := cfg.PrepareTLSServerConfig(MainInstance)
+
+	if err != nil {
+		return fmt.Errorf("error preparing tls server config: %s", err)
 	}
 
 	return MainInstance.SetServerTLSConfig(cfg.Name, tlscfg)
 }
 
-// tlsClientConfig stores the configuration options for a TLS client.
-type tlsClientConfig struct {
+// TLSClientConfig stores the configuration options for a TLS client.
+type TLSClientConfig struct {
 	Name                   string   `required:"true" description:"Name of this TLS client configuration"`
 	Cert                   string   `required:"false" description:"Client certificate filename"`
 	Key                    string   `required:"false" description:"Client private key filename"`
@@ -168,30 +180,29 @@ type tlsClientConfig struct {
 	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"false"`
 }
 
-// Prepare creates the tls.config and stores it in the global map.
-func (cfg tlsClientConfig) Prepare() error {
-	tlscfg := baseTLS(cfg.MinTLS13)
+func (cfg TLSClientConfig) PrepareTLSClientConfig(n *Netceptor) (tlscfg *tls.Config, pinnedFingerprints [][]byte, err error) {
+	tlscfg = baseTLS(cfg.MinTLS13)
 	if cfg.Cert != "" || cfg.Key != "" {
 		if cfg.Cert == "" || cfg.Key == "" {
-			return fmt.Errorf("cert and key must both be supplied or neither")
+			return nil, nil, fmt.Errorf("cert and key must both be supplied or neither")
 		}
 		certBytes, err := os.ReadFile(cfg.Cert)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		keyBytes, err := os.ReadFile(cfg.Key)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		cert, err := tls.X509KeyPair(certBytes, keyBytes)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 
 		// check client crt to ensure that the receptor NodeID is in the client certificate as an OID
 		if !cfg.SkipReceptorNamesCheck {
 			if err := checkCertificatesMatchNodeID(certBytes, MainInstance, cfg.Name, cfg.Cert); err != nil {
-				return err
+				return nil, nil, err
 			}
 		}
 		tlscfg.Certificates = []tls.Certificate{cert}
@@ -200,7 +211,7 @@ func (cfg tlsClientConfig) Prepare() error {
 	if cfg.RootCAs != "" {
 		caBytes, err := os.ReadFile(cfg.RootCAs)
 		if err != nil {
-			return fmt.Errorf("error reading root CAs file: %s", err)
+			return nil, nil, fmt.Errorf("error reading root CAs file: %s", err)
 		}
 
 		rootCAs := x509.NewCertPool()
@@ -208,19 +219,30 @@ func (cfg tlsClientConfig) Prepare() error {
 		tlscfg.RootCAs = rootCAs
 	}
 
-	pinnedFingerprints, err := decodeFingerprints(cfg.PinnedServerCert)
+	pinnedFingerprints, err = decodeFingerprints(cfg.PinnedServerCert)
 	if err != nil {
-		return fmt.Errorf("error decoding fingerprints: %s", err)
+		return nil, nil, fmt.Errorf("error decoding fingerprints: %s", err)
 	}
 
 	tlscfg.InsecureSkipVerify = cfg.InsecureSkipVerify
+
+	return tlscfg, pinnedFingerprints, nil
+}
+
+// Prepare creates the tls.config and stores it in the global map.
+func (cfg TLSClientConfig) Prepare() error {
+	tlscfg, pinnedFingerprints, err := cfg.PrepareTLSClientConfig(MainInstance)
+
+	if err != nil {
+		return fmt.Errorf("error preparing tls client config: %s", err)
+	}
 
 	return MainInstance.SetClientTLSConfig(cfg.Name, tlscfg, pinnedFingerprints)
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
-		"tls-server", "Define a TLS server configuration", tlsServerCfg{}, cmdline.Section(configSection))
+		"tls-server", "Define a TLS server configuration", TLSServerConfig{}, cmdline.Section(configSection))
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
-		"tls-client", "Define a TLS client configuration", tlsClientConfig{}, cmdline.Section(configSection))
+		"tls-client", "Define a TLS client configuration", TLSClientConfig{}, cmdline.Section(configSection))
 }

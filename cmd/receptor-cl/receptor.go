@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
 	"strings"
@@ -97,6 +98,14 @@ func (cfg nullBackendCfg) Run() error {
 		return err
 	}
 
+	return nil
+}
+
+func (cfg *nullBackendCfg) GetAddr() string {
+	return ""
+}
+
+func (cfg *nullBackendCfg) GetTLS() *tls.Config {
 	return nil
 }
 

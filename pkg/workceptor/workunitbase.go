@@ -62,16 +62,17 @@ func IsPending(err error) bool {
 
 // BaseWorkUnit includes data common to all work units, and partially implements the WorkUnit interface.
 type BaseWorkUnit struct {
-	w               *Workceptor
-	status          StatusFileData
-	unitID          string
-	unitDir         string
-	statusFileName  string
-	stdoutFileName  string
-	statusLock      *sync.RWMutex
-	lastUpdateError error
-	ctx             context.Context
-	cancel          context.CancelFunc
+	w                   *Workceptor
+	status              StatusFileData
+	unitID              string
+	unitDir             string
+	statusFileName      string
+	stdoutFileName      string
+	statusLock          *sync.RWMutex
+	lastUpdateError     error
+	lastUpdateErrorLock *sync.RWMutex
+	ctx                 context.Context
+	cancel              context.CancelFunc
 }
 
 // Init initializes the basic work unit data, in memory only.
@@ -86,6 +87,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
+	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 }
 
@@ -291,6 +293,8 @@ func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
+	bwu.lastUpdateErrorLock.Lock()
+	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
 	if err != nil {
 		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
@@ -315,6 +319,8 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize)
+	bwu.lastUpdateErrorLock.Lock()
+	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
 	if err != nil {
 		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
@@ -323,6 +329,9 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 
 // LastUpdateError returns the last error (including nil) resulting from an UpdateBasicStatus or UpdateFullStatus.
 func (bwu *BaseWorkUnit) LastUpdateError() error {
+	bwu.lastUpdateErrorLock.Lock()
+	defer bwu.lastUpdateErrorLock.Unlock()
+
 	return bwu.lastUpdateError
 }
 

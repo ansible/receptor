@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
@@ -551,9 +553,9 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		defer streamWait.Done()
 		var sinceTime time.Time
 		var logStream io.ReadCloser
-		eofRetries := 5
+		retries := 5
 		successfulWrite := false
-		remainingEOFAttempts := eofRetries // resets on each successful read from pod stdout
+		remainingRetries := retries // resets on each successful read from pod stdout
 
 		for {
 			if stdinErr != nil {
@@ -630,18 +632,36 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 						"Detected EOF for pod %s/%s. Will retry %d more times. Error: %s",
 						podNamespace,
 						podName,
-						remainingEOFAttempts,
+						remainingRetries,
 						err,
 					)
 					successfulWrite = false
-					remainingEOFAttempts--
-					if remainingEOFAttempts > 0 {
+					remainingRetries--
+					if remainingRetries > 0 {
 						time.Sleep(200 * time.Millisecond)
 
 						break
 					}
 
 					return
+				} else if _, ok := err.(http2.GoAwayError); ok {
+					// GOAWAY is sent by the server to indicate that the server is gracefully shutting down
+					// this happens if the kube API server we are connected to is being restarted or is shutting down
+					// for example during a cluster upgrade and rolling restart of the master node
+					kw.Info(
+						"Detected http2.GoAwayError for pod %s/%s. Will retry %d more times. Error: %s",
+						podNamespace,
+						podName,
+						remainingRetries,
+						err,
+					)
+					successfulWrite = false
+					remainingRetries--
+					if remainingRetries > 0 {
+						time.Sleep(200 * time.Millisecond)
+
+						break
+					}
 				}
 				if err != nil {
 					stdoutErr = err
@@ -664,7 +684,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 					return
 				}
-				remainingEOFAttempts = eofRetries // each time we read successfully, reset this counter
+				remainingRetries = retries // each time we read successfully, reset this counter
 				sinceTime = *timeStamp
 				successfulWrite = true
 			}

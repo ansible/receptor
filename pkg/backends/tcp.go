@@ -247,7 +247,7 @@ func (ns *TCPSession) Close() error {
 // Command line
 // **************************************************************************
 
-//TODO make these fields private
+// TODO make these fields private
 // TCPListenerCfg is the cmdline configuration object for a TCP listener.
 type TCPListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
@@ -312,7 +312,7 @@ func (cfg TCPListenerCfg) Run() error {
 	return nil
 }
 
-//TODO make these fields private
+// TODO make these fields private
 // TCPDialerCfg is the cmdline configuration object for a TCP dialer.
 type TCPDialerCfg struct {
 	Address      string   `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`

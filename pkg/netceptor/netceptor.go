@@ -1492,6 +1492,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 			select {
 			case <-s.context.Done():
 				s.knownNodeLock.Unlock()
+
 				return
 			case s.sendRouteFloodChan <- 0:
 			}
@@ -1646,6 +1647,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		select {
 		case <-pc.context.Done():
 			close(pc.recvChan)
+
 			return nil
 		case pc.recvChan <- md:
 		}
@@ -1969,6 +1971,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *ba
 					}
 					if !remoteNodeAccepted {
 						s.connLock.Unlock()
+
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
 					}
 					s.connections[remoteNodeID] = ci

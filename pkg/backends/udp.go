@@ -286,7 +286,7 @@ func (ns *UDPListenerSession) Close() error {
 // Command line
 // **************************************************************************
 
-//TODO make these fields private
+// TODO make these fields private
 // UDPListenerCfg is the cmdline configuration object for a UDP listener.
 type UDPListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`

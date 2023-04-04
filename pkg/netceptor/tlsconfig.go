@@ -160,7 +160,6 @@ func (cfg TLSServerConfig) PrepareTLSServerConfig(n *Netceptor) (*tls.Config, er
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg TLSServerConfig) Prepare() error {
 	tlscfg, err := cfg.PrepareTLSServerConfig(MainInstance)
-
 	if err != nil {
 		return fmt.Errorf("error preparing tls server config: %s", err)
 	}
@@ -232,7 +231,6 @@ func (cfg TLSClientConfig) PrepareTLSClientConfig(n *Netceptor) (tlscfg *tls.Con
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg TLSClientConfig) Prepare() error {
 	tlscfg, pinnedFingerprints, err := cfg.PrepareTLSClientConfig(MainInstance)
-
 	if err != nil {
 		return fmt.Errorf("error preparing tls client config: %s", err)
 	}

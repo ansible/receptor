@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
 	_ "github.com/ansible/receptor/internal/version"
@@ -14,75 +13,9 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/netceptor"
 	_ "github.com/ansible/receptor/pkg/services"
-	"github.com/ansible/receptor/pkg/workceptor"
+	"github.com/ansible/receptor/pkg/types"
 	"github.com/ghjm/cmdline"
 )
-
-type nodeCfg struct {
-	ID                       string                       `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
-	DataDir                  string                       `description:"Directory in which to store node data"`
-	FirewallRules            []netceptor.FirewallRuleData `description:"Firewall Rules (see documentation for syntax)"`
-	MaxIdleConnectionTimeout string                       `description:"Max duration with no traffic before a backend connection is timed out and refreshed."`
-}
-
-func (cfg nodeCfg) Init() error {
-	var err error
-	if cfg.ID == "" {
-		host, err := os.Hostname()
-		if err != nil {
-			return err
-		}
-		lchost := strings.ToLower(host)
-		if lchost == "localhost" || strings.HasPrefix(lchost, "localhost.") {
-			return fmt.Errorf("no node ID specified and local host name is localhost")
-		}
-		cfg.ID = host
-	}
-	if strings.ToLower(cfg.ID) == "localhost" {
-		return fmt.Errorf("node ID \"localhost\" is reserved")
-	}
-
-	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
-
-	if len(cfg.FirewallRules) > 0 {
-		rules, err := netceptor.ParseFirewallRules(cfg.FirewallRules)
-		if err != nil {
-			return err
-		}
-		err = netceptor.MainInstance.AddFirewallRules(rules, true)
-		if err != nil {
-			return err
-		}
-	}
-
-	// update netceptor.MainInstance with the MaxIdleConnectionTimeout from the nodeCfg struct
-	// this is a fall-forward mechanism. If the user didn't provide a value for MaxIdleConnectionTimeout in their configuration file,
-	// we will apply the default timeout of 30s to netceptor.maxConnectionIdleTime
-	if cfg.MaxIdleConnectionTimeout != "" {
-		err = netceptor.MainInstance.SetMaxConnectionIdleTime(cfg.MaxIdleConnectionTimeout)
-		if err != nil {
-			return err
-		}
-	}
-
-	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
-	if err != nil {
-		return err
-	}
-	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
-	err = workceptor.MainInstance.RegisterWithControlService(controlsvc.MainInstance)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (cfg nodeCfg) Run() error {
-	workceptor.MainInstance.ListKnownUnitIDs() // Triggers a scan of unit dirs and restarts any that need it
-
-	return nil
-}
 
 type nullBackendCfg struct{}
 
@@ -115,7 +48,7 @@ func (cfg nullBackendCfg) Reload() error {
 
 func main() {
 	cl := cmdline.NewCmdline()
-	cl.AddConfigType("node", "Node configuration of this instance", nodeCfg{}, cmdline.Required, cmdline.Singleton)
+	cl.AddConfigType("node", "Node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)
 
 	// Add registered config types from imported modules

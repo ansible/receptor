@@ -267,7 +267,7 @@ func (ns *WebsocketSession) Close() error {
 // Command line
 // **************************************************************************
 
-//TODO make fields private
+// TODO make fields private
 // WebsocketListenerCfg is the cmdline configuration object for a websocket listener.
 type WebsocketListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`

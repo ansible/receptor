@@ -87,6 +87,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		hopsToLive:   s.maxForwardingHops,
 	}
 	pc.startUnreachable()
+	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{ //nolint:typecheck
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
@@ -135,17 +136,6 @@ func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags 
 	return s.listen(s.context, service, tlscfg, true, tags)
 }
 
-// ListenContext returns a stream listener compatible with Go's net.Listener.
-// If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) ListenContext(ctx context.Context, service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(ctx, service, tlscfg, false, nil)
-}
-
-// ListenContextAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
-func (s *Netceptor) ListenContextAndAdvertise(ctx context.Context, service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(ctx, service, tlscfg, true, tags)
-}
-
 func (li *Listener) sendResult(conn net.Conn, err error) {
 	select {
 	case li.acceptChan <- &acceptResult{
@@ -159,6 +149,8 @@ func (li *Listener) sendResult(conn net.Conn, err error) {
 func (li *Listener) acceptLoop(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-li.doneChan:
 			return
 		default:

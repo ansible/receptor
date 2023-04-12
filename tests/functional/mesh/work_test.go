@@ -158,7 +158,6 @@ func TestCancelThenReleaseRemoteWork(t *testing.T) {
 				t.Log(m.LogWriter.String())
 			}()
 
-			// defer tearDown(controllers, m)
 			nodes := m.GetNodes()
 
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
@@ -471,7 +470,6 @@ func TestRuntimeParams(t *testing.T) {
 
 	nodes := m.GetNodes()
 	controllers := make(map[string]*ReceptorControl)
-	// defer tearDown(controllers, m)
 	controllers["node1"] = NewReceptorControl()
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 
@@ -523,7 +521,6 @@ func TestKubeRuntimeParams(t *testing.T) {
 	}
 	nodes := m.GetNodes()
 	controllers := make(map[string]*ReceptorControl)
-	// defer tearDown(controllers, m)
 	controllers["node1"] = NewReceptorControl()
 
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
@@ -607,7 +604,6 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	}
 	nodes := m.GetNodes()
 	controllers := make(map[string]*ReceptorControl)
-	// defer tearDown(controllers, m)
 	controllers["node1"] = NewReceptorControl()
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {
@@ -651,7 +647,6 @@ func TestKubeContainerFailure(t *testing.T) {
 	}
 	nodes := m.GetNodes()
 	controllers := make(map[string]*ReceptorControl)
-	// defer tearDown(controllers, m)
 	controllers["node1"] = NewReceptorControl()
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {
@@ -746,7 +741,6 @@ func TestSignedWorkVerification(t *testing.T) {
 	}
 	nodes := m.GetNodes()
 	controllers := make(map[string]*ReceptorControl)
-	// defer tearDown(controllers, m)
 	controllers["node1"] = NewReceptorControl()
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
 	if err != nil {

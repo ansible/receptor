@@ -352,7 +352,7 @@ func (n *LibNode) StartListeners() error {
 
 	for _, listenerCfg := range n.ListenerCfgs {
 		switch lcfg := listenerCfg.(type) {
-		case *backends.TCPListenerCfg:
+		case *backends.TCPListenerCfg: //nolint:typecheck
 			bi, err = n.TCPListen(listenerCfg)
 
 			// Record what address we are listening on so we can reuse it if we restart this node

@@ -93,7 +93,6 @@ func TestSSLListeners(t *testing.T) {
 
 			receptorStdOut := bytes.Buffer{}
 			port, err := utils.GetFreeTCPPort()
-
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -100,7 +100,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 
 	// Connect to the echo server from node 2.  We expect this to error out at first with
 	// "no route to node" because it takes a second or two for node1 and node2 to exchange
-	// routing information and form a
+	// routing information and form a mesh
 	var c2 net.Conn
 	for {
 		c2, err = n2.Dial("node1", "echo", nil)

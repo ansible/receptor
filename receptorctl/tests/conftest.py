@@ -264,7 +264,7 @@ def start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path):
                 "w",
             )
         )
-        receptor_nodes.GetNodes().append(
+        receptor_nodes.nodes.append(
             subprocess.Popen(
                 [receptor_bin_path, "-c", config_file],
                 stdout=receptor_nodes.log_files[i],
@@ -286,12 +286,12 @@ def receptor_mesh_mesh1(
     start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path)
 
     receptor_mesh_wait_until_ready(
-        receptor_nodes.GetNodes(), receptor_mesh.default_receptor_controller_unix()
+        receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix()
     )
 
     yield
 
-    receptor_nodes_kill(receptor_nodes.GetNodes())
+    receptor_nodes_kill(receptor_nodes.nodes)
 
 
 @pytest.fixture(scope="class")
@@ -324,12 +324,12 @@ def receptor_mesh_access_control(
     start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path)
 
     receptor_mesh_wait_until_ready(
-        receptor_nodes.GetNodes(), receptor_mesh.default_receptor_controller_unix()
+        receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix()
     )
 
     yield
 
-    receptor_nodes_kill(receptor_nodes.GetNodes())
+    receptor_nodes_kill(receptor_nodes.nodes)
 
 
 @pytest.fixture(scope="function")

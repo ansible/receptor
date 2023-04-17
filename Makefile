@@ -87,15 +87,15 @@ TESTCMD = -run $(RUNTEST)
 endif
 
 test: receptor
-	PATH=${PWD}:${PATH} \
-	go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -race -v
+	PATH="${PWD}:${PATH}" \
+	go test ./... $(TESTCMD) -count=1 -race -timeout 5m
 
 receptorctl-test: receptorctl/.VERSION
 	@cd receptorctl && tox -e py3
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
-	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
+	  make test; do \
 	  i=$$((i+1)); done
 
 kubectl:

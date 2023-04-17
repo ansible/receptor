@@ -29,6 +29,7 @@ const (
 	WorkStateRunning   = 1
 	WorkStateSucceeded = 2
 	WorkStateFailed    = 3
+	WorkStateCanceled  = 4
 )
 
 // IsComplete returns true if a given WorkState indicates the job is finished.
@@ -292,10 +293,12 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
+
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
+
 	if err != nil {
 		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
@@ -318,10 +321,12 @@ func (sfd *StatusFileData) UpdateBasicStatus(filename string, state int, detail 
 func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize int64) {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
+
 	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize)
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
+
 	if err != nil {
 		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
@@ -329,8 +334,8 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 
 // LastUpdateError returns the last error (including nil) resulting from an UpdateBasicStatus or UpdateFullStatus.
 func (bwu *BaseWorkUnit) LastUpdateError() error {
-	bwu.lastUpdateErrorLock.Lock()
-	defer bwu.lastUpdateErrorLock.Unlock()
+	bwu.lastUpdateErrorLock.RLock()
+	defer bwu.lastUpdateErrorLock.RUnlock()
 
 	return bwu.lastUpdateError
 }

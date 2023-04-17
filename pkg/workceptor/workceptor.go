@@ -25,15 +25,16 @@ import (
 // Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
 	ctx               context.Context
+	Cancel            context.CancelFunc
 	nc                *netceptor.Netceptor
 	dataDir           string
 	workTypesLock     *sync.RWMutex
 	workTypes         map[string]*workType
 	activeUnitsLock   *sync.RWMutex
 	activeUnits       map[string]WorkUnit
-	signingKey        string
-	signingExpiration time.Duration
-	verifyingKey      string
+	SigningKey        string
+	SigningExpiration time.Duration
+	VerifyingKey      string
 }
 
 // workType is the record for a registered type of work.
@@ -48,17 +49,19 @@ func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workcep
 		dataDir = path.Join(os.TempDir(), "receptor")
 	}
 	dataDir = path.Join(dataDir, nc.NodeID())
+	c, cancel := context.WithCancel(ctx)
 	w := &Workceptor{
-		ctx:               ctx,
+		ctx:               c,
+		Cancel:            cancel,
 		nc:                nc,
 		dataDir:           dataDir,
 		workTypesLock:     &sync.RWMutex{},
 		workTypes:         make(map[string]*workType),
 		activeUnitsLock:   &sync.RWMutex{},
 		activeUnits:       make(map[string]WorkUnit),
-		signingKey:        "",
-		signingExpiration: 5 * time.Minute,
-		verifyingKey:      "",
+		SigningKey:        "",
+		SigningExpiration: 5 * time.Minute,
+		VerifyingKey:      "",
 	}
 	err := w.RegisterWorker("remote", newRemoteWorker, false)
 	if err != nil {
@@ -147,16 +150,16 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 }
 
 func (w *Workceptor) createSignature(nodeID string) (string, error) {
-	if w.signingKey == "" {
+	if w.SigningKey == "" {
 		return "", fmt.Errorf("cannot sign work: signing key is empty")
 	}
-	exp := time.Now().Add(w.signingExpiration)
+	exp := time.Now().Add(w.SigningExpiration)
 
 	claims := &jwt.RegisteredClaims{
 		ExpiresAt: jwt.NewNumericDate(exp),
 		Audience:  []string{nodeID},
 	}
-	rsaPrivateKey, err := certificates.LoadPrivateKey(w.signingKey)
+	rsaPrivateKey, err := certificates.LoadPrivateKey(w.SigningKey)
 	if err != nil {
 		return "", fmt.Errorf("could not load signing key file: %s", err.Error())
 	}
@@ -189,10 +192,10 @@ func (w *Workceptor) VerifySignature(signature string) error {
 	if signature == "" {
 		return fmt.Errorf("could not verify signature: signature is empty")
 	}
-	if w.verifyingKey == "" {
+	if w.VerifyingKey == "" {
 		return fmt.Errorf("could not verify signature: verifying key not specified")
 	}
-	rsaPublicKey, err := certificates.LoadPublicKey(w.verifyingKey)
+	rsaPublicKey, err := certificates.LoadPublicKey(w.VerifyingKey)
 	if err != nil {
 		return fmt.Errorf("could not load verifying key file: %s", err.Error())
 	}
@@ -272,7 +275,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, t
 
 			return nil, err
 		}
-		if signWork && duration > w.signingExpiration {
+		if signWork && duration > w.SigningExpiration {
 			w.nc.Logger.Warning("json web token expires before ttl")
 		}
 		expiration = time.Now().Add(duration)

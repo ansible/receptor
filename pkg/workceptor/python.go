@@ -49,8 +49,8 @@ type workPythonCfg struct {
 	Config   map[string]interface{} `description:"Plugin-specific configuration"`
 }
 
-// newWorker is a factory to produce worker instances.
-func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+// NewWorker is a factory to produce worker instances.
+func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
 			BaseWorkUnit: BaseWorkUnit{
@@ -70,7 +70,7 @@ func (cfg workPythonCfg) newWorker(w *Workceptor, unitID string, workType string
 
 // Run runs the action.
 func (cfg workPythonCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, false)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, false)
 
 	return err
 }

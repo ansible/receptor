@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ansible/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/tests/utils"
 )
 
 // setup handle using hardcoded PEMs.

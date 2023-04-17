@@ -59,7 +59,7 @@ func checkCertificatesMatchNodeID(certbytes []byte, n *Netceptor, certName strin
 	}
 
 	if !found {
-		return fmt.Errorf("MainInstance.nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s", MainInstance.nodeID, fmt.Sprint(receptorNames), certName, certPath)
+		return fmt.Errorf("nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s", n.nodeID, fmt.Sprint(receptorNames), certName, certPath)
 	}
 
 	return nil
@@ -200,7 +200,7 @@ func (cfg TLSClientConfig) PrepareTLSClientConfig(n *Netceptor) (tlscfg *tls.Con
 
 		// check client crt to ensure that the receptor NodeID is in the client certificate as an OID
 		if !cfg.SkipReceptorNamesCheck {
-			if err := checkCertificatesMatchNodeID(certBytes, MainInstance, cfg.Name, cfg.Cert); err != nil {
+			if err := checkCertificatesMatchNodeID(certBytes, n, cfg.Name, cfg.Cert); err != nil {
 				return nil, nil, err
 			}
 		}

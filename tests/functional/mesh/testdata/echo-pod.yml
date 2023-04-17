@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+    - name: worker
+      image: centos:8
+      command:
+        - bash
+      args:
+        - -c
+        - for i in {1..5}; do echo $i;done

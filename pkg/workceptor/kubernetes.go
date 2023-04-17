@@ -296,7 +296,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 				return
 			}
 		} else {
-			// for newly created pod we need to streaming stdin
+			// for newly created pod we need to stream stdin
 			skipStdin = false
 		}
 
@@ -708,17 +708,24 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		var errDetail string
 		switch {
 		case stdinErr == nil:
-			errDetail = fmt.Sprintf("%s", stdoutErr)
+			errDetail = fmt.Sprintf("Error with pod's stdout: %s", stdoutErr)
 		case stdoutErr == nil:
-			errDetail = fmt.Sprintf("%s", stdinErr)
+
+			errDetail = fmt.Sprintf("Error with pod's stdin: %s", stdinErr)
 		default:
-			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", stdinErr, stdoutErr)
+			errDetail = fmt.Sprintf("Error running pod. stdin: %s, stdout: %s", stdinErr, stdoutErr)
 		}
-		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
+
+		if kw.ctx.Err() != context.Canceled {
+			kw.UpdateBasicStatus(WorkStateFailed, errDetail, stdout.Size())
+		}
 
 		return
 	}
-	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+
+	if kw.ctx.Err() != context.Canceled {
+		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+	}
 }
 
 func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
@@ -1300,6 +1307,7 @@ func (kw *kubeUnit) Start() error {
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (kw *kubeUnit) Cancel() error {
 	kw.cancel()
+	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
@@ -1327,8 +1335,8 @@ func (kw *kubeUnit) Release(force bool) error {
 // Command line
 // **************************************************************************
 
-// workKubeCfg is the cmdline configuration object for a Kubernetes worker plugin.
-type workKubeCfg struct {
+// KubeWorkerCfg is the cmdline configuration object for a Kubernetes worker plugin.
+type KubeWorkerCfg struct {
 	WorkType            string `required:"true" description:"Name for this worker type"`
 	Namespace           string `description:"Kubernetes namespace to create pods in"`
 	Image               string `description:"Container image to use for the worker pod"`
@@ -1346,8 +1354,8 @@ type workKubeCfg struct {
 	VerifySignature     bool   `description:"Verify a signed work submission" default:"false"`
 }
 
-// newWorker is a factory to produce worker instances.
-func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+// NewWorker is a factory to produce worker instances.
+func (cfg KubeWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
@@ -1376,7 +1384,7 @@ func (cfg workKubeCfg) newWorker(w *Workceptor, unitID string, workType string) 
 }
 
 // Prepare inspects the configuration for validity.
-func (cfg workKubeCfg) Prepare() error {
+func (cfg KubeWorkerCfg) Prepare() error {
 	lcAuth := strings.ToLower(cfg.AuthMethod)
 	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "runtime" {
 		return fmt.Errorf("invalid AuthMethod: %s", cfg.AuthMethod)
@@ -1407,14 +1415,22 @@ func (cfg workKubeCfg) Prepare() error {
 	return nil
 }
 
+func (cfg KubeWorkerCfg) GetWorkType() string {
+	return cfg.WorkType
+}
+
+func (cfg KubeWorkerCfg) GetVerifySignature() bool {
+	return cfg.VerifySignature
+}
+
 // Run runs the action.
-func (cfg workKubeCfg) Run() error {
-	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, cfg.VerifySignature)
+func (cfg KubeWorkerCfg) Run() error {
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, cfg.VerifySignature)
 
 	return err
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-kubernetes", "Run a worker using Kubernetes", workKubeCfg{}, cmdline.Section(workersSection))
+		"work-kubernetes", "Run a worker using Kubernetes", KubeWorkerCfg{}, cmdline.Section(workersSection))
 }

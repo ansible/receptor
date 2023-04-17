@@ -10,18 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/tests/utils"
 )
 
-func ConfirmListening(pid int) (bool, error) {
-	pidString := "pid=" + strconv.Itoa(pid)
+func ConfirmListening(pid int, proto string) (bool, error) {
 	out := bytes.Buffer{}
-	ssCmd := exec.Command("ss", "-tulnp")
-	ssCmd.Stdout = &out
-	if err := ssCmd.Run(); err != nil {
-		return false, err
-	}
-	if strings.Contains(out.String(), pidString) {
+	cmd := exec.Command("lsof", "-tap", fmt.Sprint(pid), "-i", proto)
+	cmd.Stdout = &out
+	cmd.Run()
+
+	if strings.Contains(out.String(), fmt.Sprint(pid)) {
 		return true, nil
 	}
 
@@ -39,14 +37,16 @@ func TestHelp(t *testing.T) {
 func TestListeners(t *testing.T) {
 	t.Parallel()
 	testTable := []struct {
-		listener string
+		listener    string
+		listenProto string
 	}{
-		{"--tcp-listener"},
-		{"--ws-listener"},
-		{"--udp-listener"},
+		{"--tcp-listener", "TCP"},
+		{"--ws-listener", "TCP"},
+		{"--udp-listener", "UDP"},
 	}
 	for _, data := range testTable {
 		listener := data.listener
+		listenProto := data.listenProto
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 			receptorStdOut := bytes.Buffer{}
@@ -61,7 +61,7 @@ func TestListeners(t *testing.T) {
 
 			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 			success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
-				return ConfirmListening(cmd.Process.Pid)
+				return ConfirmListening(cmd.Process.Pid, listenProto)
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -92,8 +92,10 @@ func TestSSLListeners(t *testing.T) {
 			}
 
 			receptorStdOut := bytes.Buffer{}
-			port := utils.ReserveTCPPort()
-			defer utils.FreeTCPPort(port)
+			port, err := utils.GetFreeTCPPort()
+			if err != nil {
+				t.Fatal(err)
+			}
 			cmd := exec.Command("receptor", "--node", "id=test", "--tls-server", "name=server-tls", fmt.Sprintf("cert=%s", crt), fmt.Sprintf("key=%s", key), listener, fmt.Sprintf("port=%d", port), "tls=server-tls")
 			cmd.Stdout = &receptorStdOut
 			err = cmd.Start()
@@ -145,7 +147,7 @@ func TestNegativeCost(t *testing.T) {
 			}
 
 			// Wait for our process to hopefully run and quit
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 
 			cmd.Process.Kill()
 			cmd.Wait()
@@ -159,15 +161,17 @@ func TestNegativeCost(t *testing.T) {
 func TestCostMap(t *testing.T) {
 	t.Parallel()
 	testTable := []struct {
-		listener string
-		costMaps []string
+		listener    string
+		listenProto string
+		costMaps    []string
 	}{
-		{"--tcp-listener", []string{"{}", "{\"a\": 1}", "{\"a\": 1.1}", "{\"a\": 1.3, \"b\": 5.6, \"c\": 0.2}"}},
-		{"--ws-listener", []string{"{}", "{\"a\": 1}", "{\"a\": 1.1}", "{\"a\": 1.3, \"b\": 5.6, \"c\": 0.2}"}},
-		{"--udp-listener", []string{"{}", "{\"a\": 1}", "{\"a\": 1.1}", "{\"a\": 1.3, \"b\": 5.6, \"c\": 0.2}"}},
+		{"--tcp-listener", "TCP", []string{"{}", "{\"a\": 1}", "{\"a\": 1.1}", "{\"a\": 1.3, \"b\": 5.6, \"c\": 0.2}"}},
+		{"--ws-listener", "TCP", []string{"{}", "{\"a\": 1}", "{\"a\": 1.1}", "{\"a\": 1.3, \"b\": 5.6, \"c\": 0.2}"}},
+		{"--udp-listener", "UDP", []string{"{}", "{\"a\": 1}", "{\"a\": 1.1}", "{\"a\": 1.3, \"b\": 5.6, \"c\": 0.2}"}},
 	}
 	for _, data := range testTable {
 		listener := data.listener
+		listenProto := data.listenProto
 		costMaps := make([]string, len(data.costMaps))
 		copy(costMaps, data.costMaps)
 		t.Run(listener, func(t *testing.T) {
@@ -188,7 +192,7 @@ func TestCostMap(t *testing.T) {
 
 					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
-						return ConfirmListening(cmd.Process.Pid)
+						return ConfirmListening(cmd.Process.Pid, listenProto)
 					})
 					if err != nil {
 						t.Fatal(err)
@@ -205,15 +209,17 @@ func TestCostMap(t *testing.T) {
 func TestCosts(t *testing.T) {
 	t.Parallel()
 	testTable := []struct {
-		listener string
-		costs    []string
+		listener    string
+		listenProto string
+		costs       []string
 	}{
-		{"--tcp-listener", []string{"1", "1.5", "1.0", "0.2", "52", "23"}},
-		{"--ws-listener", []string{"1", "1.5", "1.0", "0.2", "52", "23"}},
-		{"--udp-listener", []string{"1", "1.5", "1.0", "0.2", "52", "23"}},
+		{"--tcp-listener", "TCP", []string{"1", "1.5", "1.0", "0.2", "52", "23"}},
+		{"--ws-listener", "TCP", []string{"1", "1.5", "1.0", "0.2", "52", "23"}},
+		{"--udp-listener", "UDP", []string{"1", "1.5", "1.0", "0.2", "52", "23"}},
 	}
 	for _, data := range testTable {
 		listener := data.listener
+		listenProto := data.listenProto
 		costs := make([]string, len(data.costs))
 		copy(costs, data.costs)
 		t.Run(listener, func(t *testing.T) {
@@ -234,7 +240,7 @@ func TestCosts(t *testing.T) {
 
 					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
 					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
-						return ConfirmListening(cmd.Process.Pid)
+						return ConfirmListening(cmd.Process.Pid, listenProto)
 					})
 					if err != nil {
 						t.Fatal(err)

@@ -292,7 +292,7 @@ func (cw *commandUnit) Cancel() error {
 
 	proc.Wait()
 
-	cw.UpdateBasicStatus(WorkStateCanceled, "Work unit canceled", -1)
+	cw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 
 	return nil
 }

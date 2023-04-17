@@ -310,9 +310,7 @@ func TestWorkStreamingResumesWhenRelayNodeRestarts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			t.Log("Shutting down node2.")
 			nodes["node2"].Shutdown()
-			t.Log("node2 has shut down. Restarting it now.")
 			nodes["node2"].Start()
 			// Wait for node2 to join the mesh again
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
@@ -320,7 +318,6 @@ func TestWorkStreamingResumesWhenRelayNodeRestarts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			t.Log("node2 has rejoined the mesh.")
 
 			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
 			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)

@@ -1307,7 +1307,7 @@ func (kw *kubeUnit) Start() error {
 // Cancel releases resources associated with a job, including cancelling it if running.
 func (kw *kubeUnit) Cancel() error {
 	kw.cancel()
-	kw.UpdateBasicStatus(WorkStateCanceled, "Work unit canceled", -1)
+	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {

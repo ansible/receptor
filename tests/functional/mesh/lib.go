@@ -201,9 +201,6 @@ func (m *LibMesh) CheckRoutes() bool {
 	for _, status := range meshStatus {
 		// loop over m.MeshDefinition.Nodes instead... check for NodeConfig.ID, fall back to key
 		for _, node := range m.GetNodes() {
-			// if node.GetID() != "" {
-			// 	nodeID = nodeDetails.NodeConfig.ID
-			// }
 			// Dont check a route to ourselves
 			if status.NodeID == node.GetID() {
 				continue

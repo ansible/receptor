@@ -50,7 +50,6 @@ def wait_for_workunit_state():
         if expected_state_name is not None:
             for _ in range(remaining_time):
                 status = node_controller.simple_command("work status {}".format(unitid))
-                print(status["StateName"])
                 if status["StateName"] == expected_state_name:
                     return True
                 else:
@@ -154,12 +153,12 @@ class TestWorkUnit:
         assert wait_for_workunit_state(
             node1_controller,
             state_unitid,
-            expected_detail="Work unit canceled",
+            expected_detail="Canceled",
             timeout_seconds=wait_for,
         ), "Workunit timed out and never finished"
 
         # Get work list and check for the workunit detail state
         work_list = node1_controller.simple_command("work list")
-        assert work_list[state_unitid]["Detail"] == "Work unit canceled"
+        assert work_list[state_unitid]["Detail"] == "Canceled"
 
         node1_controller.close()

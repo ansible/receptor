@@ -54,21 +54,17 @@ func TestMeshStartup(t *testing.T) {
 
 			// Test that each Node can ping each Node
 			for _, node := range m.GetNodes() {
-				// t.Logf("Pinging nodes from %s (%s)", node.GetID(), node.GetDataDir())
 				controller := NewReceptorControl()
-				// t.Logf("connecting to %s", node.GetControlSocket())
 				err = controller.Connect(node.GetControlSocket())
 				if err != nil {
 					t.Fatalf("Error connecting to controller: %s", err)
 				}
 				for _, remoteNode := range m.GetNodes() {
-					// t.Logf("pinging %s", remoteNode.GetID())
 				retryloop:
 					for i := 30; i > 0; i-- {
 						_, err := controller.Ping(remoteNode.GetID())
 						switch {
 						case err == nil:
-							// t.Logf("%v", response)
 
 							break retryloop
 						case i != 1:
@@ -237,7 +233,6 @@ func TestMeshShutdown(t *testing.T) {
 
 			// Check that the connections are closed
 			pid := os.Getpid()
-			t.Log("Current test pid: %\n", fmt.Sprint(pid))
 			done := false
 			var out bytes.Buffer
 			for timeout := 10 * time.Second; timeout > 0 && !done; {

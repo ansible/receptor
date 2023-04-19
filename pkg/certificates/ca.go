@@ -71,6 +71,12 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 				return nil, err
 			}
 			results = append(results, key)
+		case "PRIVATE KEY":
+			key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, key)
 		case "PUBLIC KEY":
 			key, err := x509.ParsePKIXPublicKey(block.Bytes)
 			if err != nil {

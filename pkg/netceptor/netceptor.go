@@ -70,6 +70,8 @@ func (e *TimeoutError) Temporary() bool { return true }
 // Backend is the interface for back-ends that the Receptor network can run over.
 type Backend interface {
 	Start(context.Context, *sync.WaitGroup) (chan BackendSession, error)
+	GetAddr() string
+	GetType() string
 }
 
 // BackendSession is the interface for a single session of a back-end.
@@ -138,6 +140,7 @@ type Netceptor struct {
 	backendWaitGroup         sync.WaitGroup
 	backendCount             int
 	backendCancel            []context.CancelFunc
+	backendAds               []BackendAd
 	networkName              string
 	serverTLSConfigs         map[string]*tls.Config
 	clientTLSConfigs         map[string]*tls.Config
@@ -237,6 +240,11 @@ type WorkCommand struct {
 	Secure bool
 }
 
+type BackendAd struct {
+	Address string
+	Type    string
+}
+
 // ServiceAdvertisement is the data associated with a service advertisement.
 type ServiceAdvertisement struct {
 	NodeID       string
@@ -245,6 +253,7 @@ type ServiceAdvertisement struct {
 	ConnType     byte
 	Tags         map[string]string
 	WorkCommands []WorkCommand
+	Backends     []BackendAd
 }
 
 // serviceAdvertisementFull is the whole message from the network.
@@ -336,6 +345,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		backendWaitGroup:         sync.WaitGroup{},
 		backendCount:             0,
 		backendCancel:            nil,
+		backendAds:               make([]BackendAd, 0),
 		networkName:              makeNetworkName(nodeID),
 		clientTLSConfigs:         make(map[string]*tls.Config),
 		clientPinnedFingerprints: make(map[string][][]byte),
@@ -492,6 +502,17 @@ func BackendAllowedPeers(peers []string) func(*BackendInfo) {
 
 // AddBackend adds a backend to the Netceptor system.
 func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*BackendInfo)) error {
+	backendAd := BackendAd{Address: backend.GetAddr(), Type: backend.GetType()}
+	if len(backendAd.Address) > 0 {
+		// make sure this backend hasn't already been added
+		for _, existingBackend := range s.backendAds {
+			if backendAd == existingBackend {
+				return fmt.Errorf("backend %s %s already added", backendAd.Type, backendAd.Address)
+			}
+		}
+		s.backendAds = append(s.backendAds, backendAd)
+	}
+
 	bi := &BackendInfo{
 		connectionCost: 1.0,
 		nodeCost:       nil,
@@ -599,13 +620,14 @@ func (s *Netceptor) Status() Status {
 	for n := range s.serviceAdsReceived {
 		for _, ad := range s.serviceAdsReceived[n] {
 			adCopy := *ad
-			if adCopy.NodeID == s.nodeID {
+			if adCopy.NodeID == s.nodeID && adCopy.Service == "control" {
 				adCopy.Time = time.Now()
 				s.workCommandsLock.RLock()
 				if len(s.workCommands) > 0 {
 					adCopy.WorkCommands = s.workCommands
 				}
 				s.workCommandsLock.RUnlock()
+				adCopy.Backends = s.backendAds
 			}
 			serviceAds = append(serviceAds, &adCopy)
 		}
@@ -740,6 +762,7 @@ func (s *Netceptor) sendServiceAds() {
 						sa.WorkCommands = s.workCommands
 					}
 					s.workCommandsLock.RUnlock()
+					sa.Backends = s.backendAds
 				}
 			}
 			ads = append(ads, sa)

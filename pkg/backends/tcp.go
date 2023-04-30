@@ -47,6 +47,10 @@ func (b *TCPDialer) GetTLS() *tls.Config {
 	return b.tls
 }
 
+func (b *TCPDialer) GetType() string {
+	return "tcp-peer"
+}
+
 // Start runs the given session function over this backend service.
 func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, wg, b.redial, 5*time.Second, b.logger,
@@ -91,6 +95,9 @@ func NewTCPListener(address string, tls *tls.Config, logger *logger.ReceptorLogg
 
 // Addr returns the network address the listener is listening on.
 func (b *TCPListener) GetAddr() string {
+	if b.li == nil {
+		return b.address
+	}
 	return b.li.Addr().String()
 }
 
@@ -100,6 +107,10 @@ func (b *TCPListener) GetCost() string {
 
 func (b *TCPListener) GetTLS() *tls.Config {
 	return b.TLS
+}
+
+func (b *TCPListener) GetType() string {
+	return "tcp-listener"
 }
 
 // Start runs the given session function over the TCPListener backend.

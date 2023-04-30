@@ -35,6 +35,10 @@ func (b *UDPDialer) GetTLS() *tls.Config {
 	return nil
 }
 
+func (b *UDPDialer) GetType() string {
+	return "udp-peer"
+}
+
 // NewUDPDialer instantiates a new UDPDialer backend.
 func NewUDPDialer(address string, redial bool, logger *logger.ReceptorLogger) (*UDPDialer, error) {
 	_, err := net.ResolveUDPAddr("udp", address)
@@ -142,6 +146,10 @@ func (b *UDPListener) GetAddr() string {
 
 func (b *UDPListener) GetTLS() *tls.Config {
 	return &tls.Config{}
+}
+
+func (b *UDPListener) GetType() string {
+	return "udp-listener"
 }
 
 // NewUDPListener instantiates a new UDPListener backend.

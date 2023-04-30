@@ -38,6 +38,10 @@ func (b *WebsocketDialer) GetTLS() *tls.Config {
 	return b.tlscfg
 }
 
+func (b *WebsocketDialer) GetType() string {
+	return "ws-peer"
+}
+
 // NewWebsocketDialer instantiates a new WebsocketDialer backend.
 func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, redial bool, logger *logger.ReceptorLogger) (*WebsocketDialer, error) {
 	addrURL, err := url.Parse(address)
@@ -98,11 +102,18 @@ type WebsocketListener struct {
 }
 
 func (b *WebsocketListener) GetAddr() string {
-	return b.Addr().String()
+	if b.li == nil {
+		return b.address
+	}
+	return b.li.Addr().String()
 }
 
 func (b *WebsocketListener) GetTLS() *tls.Config {
 	return b.tlscfg
+}
+
+func (b *WebsocketListener) GetType() string {
+	return "ws-listener"
 }
 
 // NewWebsocketListener instantiates a new WebsocketListener backend.

@@ -158,6 +158,14 @@ func (b *ExternalBackend) Start(ctx context.Context, _ *sync.WaitGroup) (chan Ba
 	return b.sessChan, nil
 }
 
+func (b *ExternalBackend) GetAddr() string {
+	return ""
+}
+
+func (b *ExternalBackend) GetType() string {
+	return "external"
+}
+
 // ExternalSession implements BackendSession for external backends.
 type ExternalSession struct {
 	eb          *ExternalBackend

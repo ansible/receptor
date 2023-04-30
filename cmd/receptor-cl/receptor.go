@@ -42,6 +42,10 @@ func (cfg *nullBackendCfg) GetTLS() *tls.Config {
 	return nil
 }
 
+func (cfg *nullBackendCfg) GetType() string {
+	return ""
+}
+
 func (cfg nullBackendCfg) Reload() error {
 	return cfg.Run()
 }

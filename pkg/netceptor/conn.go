@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go" //nolint:typecheck
+	"github.com/quic-go/quic-go" //nolint:typecheck
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.

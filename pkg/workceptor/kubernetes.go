@@ -321,6 +321,15 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		// resuming from a previously created pod
 		var err error
 		for retries := 5; retries > 0; retries-- {
+			// check if the kw.ctx is already cancel
+			select {
+			case <-kw.ctx.Done():
+				errMsg := fmt.Sprintf("Context Done while getting pod %s/%s. Error: %s", podNamespace, podName, kw.ctx.Err())
+				kw.Warning(errMsg)
+				return
+			default:
+			}
+
 			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
 			if err == nil {
 				break

@@ -252,21 +252,26 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 
 	if err == ErrPodCompleted {
 		// Hao: shouldn't we also call kw.Cancel() in these cases?
-		if len(kw.pod.Status.ContainerStatuses) != 1 {
-			return fmt.Errorf("expected 1 container in pod but there were %d", len(kw.pod.Status.ContainerStatuses))
-		}
+		for _, cstat := range kw.pod.Status.ContainerStatuses {
+			if cstat.Name == "worker" {
+				if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
+					return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
+				}
 
-		cstat := kw.pod.Status.ContainerStatuses[0]
-		if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
-			return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
+				break
+			}
 		}
 
 		return err
 	} else if err != nil { // any other error besides ErrPodCompleted
 		kw.Cancel()
-		if len(kw.pod.Status.ContainerStatuses) == 1 {
-			if kw.pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				return fmt.Errorf("%s, %s", err.Error(), kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)
+		for _, cstat := range kw.pod.Status.ContainerStatuses {
+			if cstat.Name == "worker" {
+				if cstat.State.Waiting != nil {
+					return fmt.Errorf("%s, %s", err.Error(), cstat.State.Waiting.Reason)
+				}
+
+				break
 			}
 		}
 

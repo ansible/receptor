@@ -1418,7 +1418,7 @@ func (cfg KubeWorkerCfg) Prepare() error {
 	if cfg.Pod != "" && (cfg.Image != "" || cfg.Command != "" || cfg.Params != "") {
 		return fmt.Errorf("can only provide Pod when Image, Command, and Params are empty")
 	}
-	if cfg.Image == "" && !cfg.AllowRuntimeCommand && !cfg.AllowRuntimePod {
+	if cfg.Pod == "" && cfg.Image == "" && !cfg.AllowRuntimeCommand && !cfg.AllowRuntimePod {
 		return fmt.Errorf("must specify a container image to run")
 	}
 	method := strings.ToLower(cfg.StreamMethod)

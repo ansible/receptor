@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +49,7 @@ func TestWorkSubmitWithTLSClient(t *testing.T) {
 
 // Tests that submitting work with wrong cert CN immediately fails the job
 // also tests that releasing a job that has not been started on remote
-// will not attempt to connect to remote
+// will not attempt to connect to remote.
 func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 	t.Parallel()
 
@@ -63,7 +62,6 @@ func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 
 			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclientwrongCN","node":"node2","params":""}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -240,7 +238,6 @@ func TestWorkSubmitWhileRemoteNodeIsDown(t *testing.T) {
 
 			nodes["node3"].Shutdown()
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleepshort")
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -453,7 +450,6 @@ func TestRuntimeParams(t *testing.T) {
 	}
 
 	err := m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -476,7 +472,6 @@ func TestRuntimeParams(t *testing.T) {
 
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"localhost","params":"it worked!"}`
 	unitID, err := controllers["node1"].WorkSubmitJSON(command)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -524,7 +519,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
-	var submitJSON = new(bytes.Buffer)
+	submitJSON := new(bytes.Buffer)
 	err = json.Compact(submitJSON, []byte(`{
 		"command": "work",
 		"subcommand": "submit",
@@ -538,8 +533,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kubeConfigBytes, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config"))
-
+	kubeConfigBytes, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -547,8 +541,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	// is there a better way to do this?
 	kubeConfig := strings.ReplaceAll(string(kubeConfigBytes), "\n", "\\n")
 
-	echoPodBytes, err := ioutil.ReadFile("testdata/echo-pod.yml")
-
+	echoPodBytes, err := os.ReadFile("testdata/echo-pod.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -559,7 +552,6 @@ func TestKubeRuntimeParams(t *testing.T) {
 	command := fmt.Sprintf(submitJSON.String(), echoPod, kubeConfig)
 
 	unitID, err := controllers["node1"].WorkSubmitJSON(command)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -589,7 +581,6 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	}
 
 	err := m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -638,7 +629,6 @@ func TestKubeContainerFailure(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
 	err := m.WaitForReady(ctx)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -661,7 +651,6 @@ func TestKubeContainerFailure(t *testing.T) {
 	}
 
 	status, err := controllers["node1"].GetWorkStatus(unitID)
-
 	if err != nil {
 		t.Fatal("Could not check status")
 	}

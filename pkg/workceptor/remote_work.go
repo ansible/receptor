@@ -219,7 +219,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 
 // cancelOrReleaseRemoteUnit makes a single attempt to cancel or release a remote unit.
 func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader,
-	release bool, force bool,
+	release bool, _ bool,
 ) error {
 	defer conn.(interface{ CloseConnection() error }).CloseConnection()
 	red := rw.Status().ExtraData.(*remoteExtraData)

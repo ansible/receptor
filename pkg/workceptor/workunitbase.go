@@ -117,7 +117,7 @@ func (bwu *BaseWorkUnit) Debug(format string, v ...interface{}) {
 }
 
 // SetFromParams sets the in-memory state from parameters.
-func (bwu *BaseWorkUnit) SetFromParams(params map[string]string) error {
+func (bwu *BaseWorkUnit) SetFromParams(_ map[string]string) error {
 	return nil
 }
 
@@ -436,11 +436,10 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 				time.Sleep(time.Second)
 
 				continue
-			} else {
-				bwu.w.nc.Logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
-
-				return err
 			}
+			bwu.w.nc.Logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+
+			return err
 		}
 
 		break

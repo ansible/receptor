@@ -51,7 +51,6 @@ func TestFirewall(t *testing.T) {
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 			err := m.Start(t.Name())
-
 			if err != nil {
 				t.Fatal(err)
 			}

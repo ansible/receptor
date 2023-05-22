@@ -20,7 +20,7 @@ import (
 type nullBackendCfg struct{}
 
 // make the nullBackendCfg object be usable as a do-nothing Backend.
-func (cfg nullBackendCfg) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
+func (cfg nullBackendCfg) Start(_ context.Context, _ *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return make(chan netceptor.BackendSession), nil
 }
 

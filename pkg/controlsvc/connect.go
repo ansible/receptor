@@ -74,7 +74,7 @@ func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (Contro
 	return c, nil
 }
 
-func (c *connectCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *connectCommand) ControlFunc(_ context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	tlscfg, err := nc.GetClientTLSConfig(c.tlsConfigName, c.targetNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return nil, err

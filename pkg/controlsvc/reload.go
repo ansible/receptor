@@ -137,13 +137,13 @@ func checkReload() error {
 	return parseConfigForReload(configPath, true)
 }
 
-func (t *reloadCommandType) InitFromString(params string) (ControlCommand, error) {
+func (t *reloadCommandType) InitFromString(_ string) (ControlCommand, error) {
 	c := &reloadCommand{}
 
 	return c, nil
 }
 
-func (t *reloadCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
+func (t *reloadCommandType) InitFromJSON(_ map[string]interface{}) (ControlCommand, error) {
 	c := &reloadCommand{}
 
 	return c, nil
@@ -158,7 +158,7 @@ func handleError(err error, errorcode int, logger *logger.ReceptorLogger) (map[s
 	return cfr, nil
 }
 
-func (c *reloadCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *reloadCommand) ControlFunc(_ context.Context, nc *netceptor.Netceptor, _ ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
 	nc.Logger.Debug("Reloading")

@@ -1904,9 +1904,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 							}
 							// This is a late initialization request from the remote node, so don't process it as a routing update.
 							continue
-						} else {
-							remoteEstablished = true
 						}
+						remoteEstablished = true
 						if ok && remoteCost != connectionCost {
 							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
 						}

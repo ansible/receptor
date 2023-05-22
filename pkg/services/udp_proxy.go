@@ -35,7 +35,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 		for {
 			n, addr, err := uc.ReadFrom(buffer)
 			if err != nil {
-				logger.Error("Error reading from UDP: %s\n", err)
+				s.Logger.Error("Error reading from UDP: %s\n", err)
 
 				return
 			}
@@ -44,22 +44,22 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 			if !ok {
 				pc, err = s.ListenPacket("")
 				if err != nil {
-					logger.Error("Error listening on Receptor network: %s\n", err)
+					s.Logger.Error("Error listening on Receptor network: %s\n", err)
 
 					return
 				}
-				logger.Debug("Received new UDP connection from %s\n", raddrStr)
+				s.Logger.Debug("Received new UDP connection from %s\n", raddrStr)
 				connMap[raddrStr] = pc
-				go runNetceptorToUDPInbound(pc, uc, addr, s.NewAddr(node, service))
+				go runNetceptorToUDPInbound(pc, uc, addr, s.NewAddr(node, service), s.Logger)
 			}
 			wn, err := pc.WriteTo(buffer[:n], ncAddr)
 			if err != nil {
-				logger.Error("Error sending packet on Receptor network: %s\n", err)
+				s.Logger.Error("Error sending packet on Receptor network: %s\n", err)
 
 				continue
 			}
 			if wn != n {
-				logger.Debug("Not all bytes written on Receptor network\n")
+				s.Logger.Debug("Not all bytes written on Receptor network\n")
 
 				continue
 			}
@@ -69,7 +69,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 	return nil
 }
 
-func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr net.Addr, expectedAddr netceptor.Addr) {
+func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr net.Addr, expectedAddr netceptor.Addr, logger *logger.ReceptorLogger) {
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		n, addr, err := pc.ReadFrom(buf)
@@ -116,7 +116,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 		for {
 			n, addr, err := pc.ReadFrom(buffer)
 			if err != nil {
-				logger.Error("Error reading from Receptor network: %s\n", err)
+				s.Logger.Error("Error reading from Receptor network: %s\n", err)
 
 				return
 			}
@@ -125,22 +125,22 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 			if !ok {
 				uc, err = net.DialUDP("udp", nil, udpAddr)
 				if err != nil {
-					logger.Error("Error connecting via UDP: %s\n", err)
+					s.Logger.Error("Error connecting via UDP: %s\n", err)
 
 					return
 				}
-				logger.Debug("Opened new UDP connection to %s\n", raddrStr)
+				s.Logger.Debug("Opened new UDP connection to %s\n", raddrStr)
 				connMap[raddrStr] = uc
-				go runUDPToNetceptorOutbound(uc, pc, addr)
+				go runUDPToNetceptorOutbound(uc, pc, addr, s.Logger)
 			}
 			wn, err := uc.Write(buffer[:n])
 			if err != nil {
-				logger.Error("Error writing to UDP: %s\n", err)
+				s.Logger.Error("Error writing to UDP: %s\n", err)
 
 				continue
 			}
 			if wn != n {
-				logger.Debug("Not all bytes written to UDP\n")
+				s.Logger.Debug("Not all bytes written to UDP\n")
 
 				continue
 			}
@@ -150,7 +150,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 	return nil
 }
 
-func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr net.Addr) {
+func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr net.Addr, logger *logger.ReceptorLogger) {
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		n, err := uc.Read(buf)
@@ -183,7 +183,7 @@ type udpProxyInboundCfg struct {
 
 // Run runs the action.
 func (cfg udpProxyInboundCfg) Run() error {
-	logger.Debug("Running UDP inbound proxy service %v\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running UDP inbound proxy service %v\n", cfg)
 
 	return UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService)
 }
@@ -196,7 +196,7 @@ type udpProxyOutboundCfg struct {
 
 // Run runs the action.
 func (cfg udpProxyOutboundCfg) Run() error {
-	logger.Debug("Running UDP outbound proxy service %s\n", cfg)
+	netceptor.MainInstance.Logger.Debug("Running UDP outbound proxy service %s\n", cfg)
 
 	return UDPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, cfg.Address)
 }

@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.17, 1.18, 1.19]
+        go-version: [1.18, 1.19]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -97,7 +97,6 @@ jobs:
         with:
           name: receptor
           path: /usr/local/bin/receptor
-
   receptorctl:
     name: receptorctl (Python ${{ matrix.python-version }})
     needs: receptor
@@ -130,7 +129,6 @@ jobs:
 
       - name: Run receptorctl tests
         run: make receptorctl-test
-
   container:
     name: container
     runs-on: ubuntu-latest

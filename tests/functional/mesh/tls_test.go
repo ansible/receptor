@@ -2,27 +2,24 @@ package mesh
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/functional/lib/mesh"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/ansible/receptor/tests/functional/lib/utils"
-	_ "github.com/fortytw2/leaktest"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/tests/utils"
 )
 
 func TestTCPSSLConnections(t *testing.T) {
 	t.Parallel()
-	testTable := []struct {
-		listener string
-	}{
-		{"tcp-listener"},
-		{"ws-listener"},
-	}
-	for _, data := range testTable {
-		listener := data.listener
-		t.Run(listener, func(t *testing.T) {
+
+	for _, proto := range []string{"tcp", "ws"} {
+		proto := proto
+		t.Run(proto, func(t *testing.T) {
 			t.Parallel()
+
+			m := NewLibMesh()
+
 			caKey, caCrt, err := utils.GenerateCA("ca", "localhost")
 			if err != nil {
 				t.Fatal(err)
@@ -35,84 +32,71 @@ func TestTCPSSLConnections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			key3, crt3, err := utils.GenerateCertWithCA("node3", caKey, caCrt, "localhost", []string{"localhost"}, []string{"node3"})
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			// Setup our mesh yaml data
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
 
-			// Generate a mesh where each node n is connected to only n+1 and n-1
-			// if they exist
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-server": map[interface{}]interface{}{
-							"name":              "cert1",
-							"key":               key1,
-							"cert":              crt1,
-							"requireclientcert": true,
-							"clientcas":         caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{
-							"tls": "cert1",
-						},
-					},
+			node1 := m.NewLibNode("node1")
+			node1.TLSServerConfigs = []*netceptor.TLSServerConfig{
+				{
+					Name:              "server",
+					Key:               key1,
+					Cert:              crt1,
+					RequireClientCert: true,
+					ClientCAs:         caCrt,
 				},
 			}
-			data.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node1": {
-						Index: 1,
-						TLS:   "client-cert2",
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-server": map[interface{}]interface{}{
-							"name": "server-cert2",
-							"key":  key2,
-							"cert": crt2,
-						},
-					},
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":    "client-cert2",
-							"key":     key2,
-							"cert":    crt2,
-							"rootcas": caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{
-							"tls": "server-cert2",
-						},
-					},
+			node1.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "server", 1, nil),
+			}
+			m.GetNodes()[node1.GetID()] = node1
+
+			node2 := m.NewLibNode("node2")
+			node2.Connections = []Connection{
+				{RemoteNode: node1, Protocol: proto, TLS: "client"},
+			}
+			node2.TLSServerConfigs = []*netceptor.TLSServerConfig{
+				{
+					Name:              "server",
+					Key:               key2,
+					Cert:              crt2,
+					RequireClientCert: true,
+					ClientCAs:         caCrt,
 				},
 			}
-			data.Nodes["node3"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node2": {
-						Index: 2,
-						TLS:   "client-secure",
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":    "client-secure",
-							"key":     "",
-							"cert":    "",
-							"rootcas": caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
+			node2.TLSClientConfigs = []*netceptor.TLSClientConfig{
+				{
+					Name:    "client",
+					Key:     key2,
+					Cert:    crt2,
+					RootCAs: caCrt,
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+			node2.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "server", 1, nil),
+			}
+			m.GetNodes()[node2.GetID()] = node2
+
+			node3 := m.NewLibNode("node3")
+			node3.Connections = []Connection{
+				{RemoteNode: node2, Protocol: proto, TLS: "client"},
+			}
+			node3.TLSClientConfigs = []*netceptor.TLSClientConfig{
+				{
+					Name:    "client",
+					Key:     key3,
+					Cert:    crt3,
+					RootCAs: caCrt,
+				},
+			}
+			m.GetNodes()[node3.GetID()] = node3
+
+			err = m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -124,14 +108,15 @@ func TestTCPSSLConnections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			// Test that each Node can ping each Node
-			for _, nodeSender := range m.Nodes() {
-				controller := receptorcontrol.New()
-				err = controller.Connect(nodeSender.ControlSocket())
+			for _, nodeSender := range m.GetNodes() {
+				controller := NewReceptorControl()
+				err = controller.Connect(nodeSender.GetControlSocket())
 				if err != nil {
 					t.Fatal(err)
 				}
-				for nodeIDResponder := range m.Nodes() {
+				for nodeIDResponder := range m.GetNodes() {
 					response, err := controller.Ping(nodeIDResponder)
 					if err != nil {
 						t.Error(err)
@@ -146,15 +131,9 @@ func TestTCPSSLConnections(t *testing.T) {
 
 func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 	t.Parallel()
-	testTable := []struct {
-		listener string
-	}{
-		{"tcp-listener"},
-		{"ws-listener"},
-	}
-	for _, data := range testTable {
-		listener := data.listener
-		t.Run(listener, func(t *testing.T) {
+	for _, proto := range []string{"tcp", "ws"} {
+		proto := proto
+		t.Run(proto, func(t *testing.T) {
 			t.Parallel()
 
 			_, caCrt, err := utils.GenerateCA("ca", "localhost")
@@ -166,63 +145,57 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Setup our mesh yaml data
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
+			m := NewLibMesh()
 
-			// Generate a mesh where each node n is connected to only n+1 and n-1
-			// if they exist
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-server": map[interface{}]interface{}{
-							"name":              "cert1",
-							"key":               key1,
-							"cert":              crt1,
-							"requireclientcert": true,
-							"clientcas":         caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{
-							"tls": "cert1",
-						},
-					},
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			node1 := m.NewLibNode("node1")
+			node1.TLSServerConfigs = []*netceptor.TLSServerConfig{
+				{
+					Name:              "cert1",
+					Key:               key1,
+					Cert:              crt1,
+					RequireClientCert: true,
+					ClientCAs:         caCrt,
 				},
 			}
-			data.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node1": {
-						Index: 1,
-						TLS:   "client-insecure",
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":               "client-insecure",
-							"key":                "",
-							"cert":               "",
-							"insecureskipverify": true,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
+			node1.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "cert1", 1, nil),
+			}
+			m.GetNodes()[node1.GetID()] = node1
+
+			node2 := m.NewLibNode("node2")
+			node2.Connections = []Connection{
+				{RemoteNode: node1, Protocol: proto, TLS: "client-insecure"},
+			}
+			node2.TLSClientConfigs = []*netceptor.TLSClientConfig{
+				{
+					Name: "client-insecure",
+					Key:  "",
+					Cert: "",
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+			m.GetNodes()[node2.GetID()] = node2
+
+			err = m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
-			if err == nil {
-				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			sleepInterval := 100 * time.Millisecond
+			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+				linuxTLSError := strings.Contains(m.LogWriter.String(), "certificate signed by unknown authority")
+				macTLSError := strings.Contains(m.LogWriter.String(), "certificate is not trusted")
+
+				return linuxTLSError || macTLSError
+			}) {
+				t.Fatal("Expected connection to fail but it succeeded")
 			}
 		})
 	}
@@ -230,15 +203,11 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 
 func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 	t.Parallel()
-	testTable := []struct {
-		listener string
-	}{
-		{"tcp-listener"},
-		{"ws-listener"},
-	}
-	for _, data := range testTable {
-		listener := data.listener
-		t.Run(listener, func(t *testing.T) {
+
+	for _, proto := range []string{"tcp", "ws"} {
+		proto := proto
+
+		t.Run(proto, func(t *testing.T) {
 			t.Parallel()
 
 			_, caCrt, err := utils.GenerateCA("ca", "localhost")
@@ -255,63 +224,56 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Setup our mesh yaml data
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
+			m := NewLibMesh()
 
-			// Generate a mesh where each node n is connected to only n+1 and n-1
-			// if they exist
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-server": map[interface{}]interface{}{
-							"name":              "cert1",
-							"key":               key1,
-							"cert":              crt1,
-							"requireclientcert": true,
-							"clientcas":         caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{
-							"tls": "cert1",
-						},
-					},
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			node1 := m.NewLibNode("node1")
+			node1.TLSServerConfigs = []*netceptor.TLSServerConfig{
+				{
+					Name:              "cert1",
+					Key:               key1,
+					Cert:              crt1,
+					RequireClientCert: true,
+					ClientCAs:         caCrt,
 				},
 			}
-			data.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node1": {
-						Index: 1,
-						TLS:   "client-insecure",
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":               "client-insecure",
-							"key":                key2,
-							"cert":               crt2,
-							"insecureskipverify": true,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
+			node1.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "cert1", 1, nil),
+			}
+			m.GetNodes()[node1.GetID()] = node1
+
+			node2 := m.NewLibNode("node2")
+			node2.Connections = []Connection{
+				{RemoteNode: node1, Protocol: proto, TLS: "client-insecure"},
+			}
+			node2.TLSClientConfigs = []*netceptor.TLSClientConfig{
+				{
+					Name: "client-insecure",
+					Key:  key2,
+					Cert: crt2,
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+			m.GetNodes()[node2.GetID()] = node2
+
+			err = m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
-			if err == nil {
-				t.Fatal("Receptor client auth was expected to fail but it succeeded")
+			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			sleepInterval := 100 * time.Millisecond
+			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+				linuxTLSError := strings.Contains(m.LogWriter.String(), "certificate signed by unknown authority")
+				macTLSError := strings.Contains(m.LogWriter.String(), "certificate is not trusted")
+
+				return linuxTLSError || macTLSError
+			}) {
+				t.Fatal("Expected connection to fail but it succeeded")
 			}
 		})
 	}
@@ -319,73 +281,63 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 
 func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 	t.Parallel()
-	testTable := []struct {
-		listener string
-	}{
-		{"tcp-listener"},
-		{"ws-listener"},
-	}
-	for _, data := range testTable {
-		listener := data.listener
-		t.Run(listener, func(t *testing.T) {
+	for _, proto := range []string{"tcp", "ws"} {
+		proto := proto
+		t.Run(proto, func(t *testing.T) {
 			t.Parallel()
 
 			_, caCrt, err := utils.GenerateCA("ca", "localhost")
+
 			if err != nil {
 				t.Fatal(err)
 			}
-			// receptorName needs to be "node2" here because this cert is consumed by netceptor.MainInstance.nodeID=Node2 below
+
 			key1, crt1, err := utils.GenerateCert("node2", "localhost", []string{"localhost"}, []string{"node2"})
+
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			// Setup our mesh yaml data
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
+			m := NewLibMesh()
 
-			// Generate a mesh where each node n is connected to only n+1 and n-1
-			// if they exist
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
+
+			node1 := m.NewLibNode("node1")
+			node1.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "", 1, nil),
+			}
+			m.GetNodes()[node1.GetID()] = node1
+
+			node2 := m.NewLibNode("node2")
+			node2.Connections = []Connection{
+				{RemoteNode: node1, Protocol: proto, TLS: "client"},
+			}
+			node2.TLSClientConfigs = []*netceptor.TLSClientConfig{
+				{
+					Name:    "client",
+					Key:     key1,
+					Cert:    crt1,
+					RootCAs: caCrt,
 				},
 			}
-			data.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node1": {
-						Index: 1,
-						TLS:   "client-secure",
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":    "client-secure",
-							"key":     key1,
-							"cert":    crt1,
-							"rootcas": caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
-				},
-			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+			m.GetNodes()[node2.GetID()] = node2
+
+			err = m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
-			if err == nil {
-				t.Fatal("Receptor server auth was expected to fail but it succeeded")
+			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			sleepInterval := 100 * time.Millisecond
+			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+				return strings.Contains(m.LogWriter.String(), "first record does not look like a TLS handshake")
+			}) {
+				t.Fatal("Expected connection to fail but it succeeded")
 			}
 		})
 	}
@@ -393,15 +345,9 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 
 func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 	t.Parallel()
-	testTable := []struct {
-		listener string
-	}{
-		{"tcp-listener"},
-		{"ws-listener"},
-	}
-	for _, data := range testTable {
-		listener := data.listener
-		t.Run(listener, func(t *testing.T) {
+	for _, proto := range []string{"tcp", "ws"} {
+		proto := proto
+		t.Run(proto, func(t *testing.T) {
 			t.Parallel()
 
 			_, caCrt, err := utils.GenerateCA("ca", "localhost")
@@ -417,62 +363,56 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			m := NewLibMesh()
 
-			// Setup our mesh yaml data
-			data := mesh.YamlData{}
-			data.Nodes = make(map[string]*mesh.YamlNode)
+			defer func() {
+				t.Log(m.LogWriter.String())
+			}()
 
-			// Generate a mesh where each node n is connected to only n+1 and n-1
-			// if they exist
-			data.Nodes["node1"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-server": map[interface{}]interface{}{
-							"name": "cert1",
-							"key":  key1,
-							"cert": crt1,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{
-							"tls": "cert1",
-						},
-					},
+			node1 := m.NewLibNode("node1")
+			node1.TLSServerConfigs = []*netceptor.TLSServerConfig{
+				{
+					Name:              "cert1",
+					Key:               key1,
+					Cert:              crt1,
+					RequireClientCert: true,
+					ClientCAs:         caCrt,
 				},
 			}
-			data.Nodes["node2"] = &mesh.YamlNode{
-				Connections: map[string]mesh.YamlConnection{
-					"node1": {
-						Index: 1,
-						TLS:   "client-secure",
-					},
-				},
-				NodedefBase: []interface{}{
-					map[interface{}]interface{}{
-						"tls-client": map[interface{}]interface{}{
-							"name":    "client-secure",
-							"key":     key2,
-							"cert":    crt2,
-							"rootcas": caCrt,
-						},
-					},
-					map[interface{}]interface{}{
-						listener: map[interface{}]interface{}{},
-					},
+			node1.ListenerCfgs = map[listenerName]ListenerCfg{
+				listenerName(proto): newListenerCfg(proto, "cert1", 1, nil),
+			}
+			m.GetNodes()[node1.GetID()] = node1
+
+			node2 := m.NewLibNode("node2")
+			node2.Connections = []Connection{
+				{RemoteNode: node1, Protocol: proto, TLS: "client-insecure"},
+			}
+			node2.TLSClientConfigs = []*netceptor.TLSClientConfig{
+				{
+					Name: "client-insecure",
+					Key:  key2,
+					Cert: crt2,
 				},
 			}
-			m, err := mesh.NewCLIMeshFromYaml(data, t.Name())
+			m.GetNodes()[node2.GetID()] = node2
+
+			err = m.Start(t.Name())
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
-			if err == nil {
-				t.Fatal("Receptor server auth was expected to fail but it succeeded")
+			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			sleepInterval := 100 * time.Millisecond
+			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+				linuxTLSError := strings.Contains(m.LogWriter.String(), "certificate signed by unknown authority")
+				macTLSError := strings.Contains(m.LogWriter.String(), "certificate is not trusted")
+
+				return linuxTLSError || macTLSError
+			}) {
+				t.Fatal("Expected connection to fail but it succeeded")
 			}
 		})
 	}

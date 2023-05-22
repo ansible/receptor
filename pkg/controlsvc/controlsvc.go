@@ -32,14 +32,14 @@ func (s *sockControl) RemoteAddr() net.Addr {
 }
 
 // BridgeConn bridges the socket to another socket.
-func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string) error {
+func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
 		if err != nil {
 			return err
 		}
 	}
-	utils.BridgeConns(s.conn, "control service", bc, bcName)
+	utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
 
 	return nil
 }
@@ -129,20 +129,20 @@ func errorNormal(err error) bool {
 
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
-	logger.Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
+	s.nc.Logger.Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
 	defer func() {
-		logger.Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
+		s.nc.Logger.Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
 		if conn != nil {
 			err := conn.Close()
 			if err != nil {
-				logger.Warning("Could not close connection: %s\n", err)
+				s.nc.Logger.Warning("Could not close connection: %s\n", err)
 			}
 		}
 	}()
 	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
 	if err != nil {
 		if !errorNormal(err) {
-			logger.Error("Could not write in control service: %s\n", err)
+			s.nc.Logger.Error("Could not write in control service: %s\n", err)
 		}
 
 		return
@@ -156,13 +156,13 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		for {
 			n, err := conn.Read(buf)
 			if err == io.EOF {
-				logger.Debug("Control service closed\n")
+				s.nc.Logger.Debug("Control service closed\n")
 				done = true
 
 				break
 			} else if err != nil {
 				if !errorNormal(err) {
-					logger.Warning("Could not read in control service: %s\n", err)
+					s.nc.Logger.Warning("Could not read in control service: %s\n", err)
 				}
 
 				return
@@ -199,7 +199,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					if !errorNormal(err) {
-						logger.Error("Write error in control service: %s\n", err)
+						s.nc.Logger.Error("Write error in control service: %s\n", err)
 					}
 
 					return
@@ -236,18 +236,18 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				cc, err = ct.InitFromJSON(jsonData)
 			}
 			if err == nil {
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(s.nc.Context())
 				defer cancel()
 				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
 			}
 			if err != nil {
 				if !errorNormal(err) {
-					logger.Error(err.Error())
+					s.nc.Logger.Error(err.Error())
 				}
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					if !errorNormal(err) {
-						logger.Error("Write error in control service: %s\n", err)
+						s.nc.Logger.Error("Write error in control service: %s\n", err)
 					}
 
 					return
@@ -258,7 +258,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 					_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
 					if err != nil {
 						if !errorNormal(err) {
-							logger.Error("Write error in control service: %s\n", err)
+							s.nc.Logger.Error("Write error in control service: %s\n", err)
 						}
 
 						return
@@ -268,7 +268,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				_, err = conn.Write(rbytes)
 				if err != nil {
 					if !errorNormal(err) {
-						logger.Error("Write error in control service: %s\n", err)
+						s.nc.Logger.Error("Write error in control service: %s\n", err)
 					}
 
 					return
@@ -278,7 +278,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			_, err = conn.Write([]byte("ERROR: Unknown command\n"))
 			if err != nil {
 				if !errorNormal(err) {
-					logger.Error("Write error in control service: %s\n", err)
+					s.nc.Logger.Error("Write error in control service: %s\n", err)
 				}
 
 				return
@@ -334,7 +334,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	if uli == nil && li == nil {
 		return fmt.Errorf("no listeners specified")
 	}
-	logger.Info("Running control service %s\n", service)
+	s.nc.Logger.Info("Running control service %s\n", service)
 	go func() {
 		<-ctx.Done()
 		if uli != nil {
@@ -358,7 +358,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 					}
 					if err != nil {
 						if !strings.HasSuffix(err.Error(), "normal close") {
-							logger.Error("Error accepting connection: %s\n", err)
+							s.nc.Logger.Error("Error accepting connection: %s\n", err)
 						}
 
 						continue
@@ -370,19 +370,19 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 							// Explicitly run server TLS handshake so we can deal with timeout and errors here
 							err = conn.SetDeadline(time.Now().Add(10 * time.Second))
 							if err != nil {
-								logger.Error("Error setting timeout: %s. Closing socket.\n", err)
+								s.nc.Logger.Error("Error setting timeout: %s. Closing socket.\n", err)
 
 								return
 							}
 							err = tlsConn.Handshake()
 							if err != nil {
-								logger.Error("TLS handshake error: %s. Closing socket.\n", err)
+								s.nc.Logger.Error("TLS handshake error: %s. Closing socket.\n", err)
 
 								return
 							}
 							err = conn.SetDeadline(time.Time{})
 							if err != nil {
-								logger.Error("Error clearing timeout: %s. Closing socket.\n", err)
+								s.nc.Logger.Error("Error clearing timeout: %s. Closing socket.\n", err)
 
 								return
 							}
@@ -422,7 +422,7 @@ type cmdlineConfigUnix struct {
 // Run runs the action.
 func (cfg cmdlineConfigUnix) Run() error {
 	if cfg.TLS != "" && cfg.TCPListen != "" && cfg.TCPTLS == "" {
-		logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
+		netceptor.MainInstance.Logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
 	}
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -435,7 +435,7 @@ func (cfg cmdlineConfigUnix) Run() error {
 			return err
 		}
 	}
-	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
+	err = MainInstance.RunControlSvc(netceptor.MainInstance.Context(), cfg.Service, tlscfg, cfg.Filename,
 		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@
 package workceptor
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
 )
@@ -42,10 +42,10 @@ func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 	case <-doneChan:
 		return
 	case <-time.After(10 * time.Second):
-		logger.Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
+		MainInstance.nc.Logger.Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
 	}
 	if cmd.Process != nil {
-		logger.Info("sending SIGKILL to pid %d", cmd.Process.Pid)
+		MainInstance.nc.Logger.Info("sending SIGKILL to pid %d", cmd.Process.Pid)
 		_ = cmd.Process.Kill()
 	}
 }
@@ -64,7 +64,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	statusFilename := path.Join(unitdir, "status")
 	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
 	if err != nil {
-		logger.Error("Error updating status file %s: %s", statusFilename, err)
+		MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 	}
 	var cmd *exec.Cmd
 	if params == "" {
@@ -105,16 +105,16 @@ loop:
 			termThenKill(cmd, doneChan)
 			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
 			if err != nil {
-				logger.Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 			}
 			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
-				logger.Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 				writeStatusFailures++
 				if writeStatusFailures > 3 {
-					logger.Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
+					MainInstance.nc.Logger.Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
 					os.Exit(-1)
 				}
 			} else {
@@ -125,7 +125,7 @@ loop:
 	if err != nil {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
 		if err != nil {
-			logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
 
 		return err
@@ -133,12 +133,12 @@ loop:
 	if cmd.ProcessState.Success() {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
 	} else {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
@@ -226,10 +226,20 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
-	level := logger.GetLogLevel()
-	levelName, _ := logger.LogLevelToName(level)
+	level := cw.w.nc.Logger.GetLogLevel()
+	levelName, _ := cw.w.nc.Logger.LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
-	cmd := exec.Command(os.Args[0], "--node", "id=worker",
+
+	// TODO: This is another place where we rely on a pre-built binary for testing.
+	// Consider invoking the commandRunner directly?
+	var receptorBin string
+	if flag.Lookup("test.v") == nil {
+		receptorBin = os.Args[0]
+	} else {
+		receptorBin = "receptor"
+	}
+
+	cmd := exec.Command(receptorBin, "--node", "id=worker",
 		"--log-level", levelName,
 		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
@@ -282,6 +292,8 @@ func (cw *commandUnit) Cancel() error {
 
 	proc.Wait()
 
+	cw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
+
 	return nil
 }
 
@@ -299,8 +311,8 @@ func (cw *commandUnit) Release(force bool) error {
 // Command line
 // **************************************************************************
 
-// commandCfg is the cmdline configuration object for a worker that runs a command.
-type commandCfg struct {
+// CommandWorkerCfg is the cmdline configuration object for a worker that runs a command.
+type CommandWorkerCfg struct {
 	WorkType           string `required:"true" description:"Name for this worker type"`
 	Command            string `required:"true" description:"Command to run to process units of work"`
 	Params             string `description:"Command-line parameters"`
@@ -308,7 +320,7 @@ type commandCfg struct {
 	VerifySignature    bool   `description:"Verify a signed work submission" default:"false"`
 }
 
-func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{
@@ -324,12 +336,20 @@ func (cfg commandCfg) newWorker(w *Workceptor, unitID string, workType string) W
 	return cw
 }
 
+func (cfg CommandWorkerCfg) GetWorkType() string {
+	return cfg.WorkType
+}
+
+func (cfg CommandWorkerCfg) GetVerifySignature() bool {
+	return cfg.VerifySignature
+}
+
 // Run runs the action.
-func (cfg commandCfg) Run() error {
-	if cfg.VerifySignature && MainInstance.verifyingKey == "" {
+func (cfg CommandWorkerCfg) Run() error {
+	if cfg.VerifySignature && MainInstance.VerifyingKey == "" {
 		return fmt.Errorf("VerifySignature for work command '%s' is true, but the work verification public key is not specified", cfg.WorkType)
 	}
-	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.newWorker, cfg.VerifySignature)
+	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, cfg.VerifySignature)
 
 	return err
 }
@@ -348,9 +368,9 @@ func (cfg commandRunnerCfg) Run() error {
 		statusFilename := path.Join(cfg.UnitDir, "status")
 		err = (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
 		if err != nil {
-			logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
 		}
-		logger.Error("Command runner exited with error: %s\n", err)
+		MainInstance.nc.Logger.Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
 	} else {
 		os.Exit(0)
@@ -359,12 +379,12 @@ func (cfg commandRunnerCfg) Run() error {
 	return nil
 }
 
-type signingKeyPrivateCfg struct {
+type SigningKeyPrivateCfg struct {
 	PrivateKey      string `description:"Private key to sign work submissions" barevalue:"yes" default:""`
 	TokenExpiration string `description:"Expiration of the signed json web token, e.g. 3h or 3h30m" default:""`
 }
 
-type verifyingKeyPublicCfg struct {
+type VerifyingKeyPublicCfg struct {
 	PublicKey string `description:"Public key to verify signed work submissions" barevalue:"yes" default:""`
 }
 
@@ -380,40 +400,63 @@ func filenameExists(filename string) error {
 	return nil
 }
 
-func (cfg signingKeyPrivateCfg) Prepare() error {
-	err := filenameExists(cfg.PrivateKey)
+func (cfg SigningKeyPrivateCfg) Prepare() error {
+	duration, err := cfg.PrepareSigningKeyPrivateCfg()
+
 	if err != nil {
-		return err
+		return fmt.Errorf(err.Error())
 	}
-	if cfg.TokenExpiration != "" {
-		duration, err := time.ParseDuration(cfg.TokenExpiration)
-		if err != nil {
-			return fmt.Errorf("failed to parse TokenExpiration -- valid examples include '1.5h', '30m', '30m10s'")
-		}
-		MainInstance.signingExpiration = duration
-	}
-	MainInstance.signingKey = cfg.PrivateKey
+
+	MainInstance.SigningExpiration = *duration
+	MainInstance.SigningKey = cfg.PrivateKey
 
 	return nil
 }
 
-func (cfg verifyingKeyPublicCfg) Prepare() error {
+func (cfg SigningKeyPrivateCfg) PrepareSigningKeyPrivateCfg() (*time.Duration, error) {
+	err := filenameExists(cfg.PrivateKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.TokenExpiration != "" {
+		duration, err := time.ParseDuration(cfg.TokenExpiration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse TokenExpiration -- valid examples include '1.5h', '30m', '30m10s'")
+		}
+		return &duration, nil
+	}
+
+	return nil, nil
+}
+
+func (cfg VerifyingKeyPublicCfg) Prepare() error {
 	err := filenameExists(cfg.PublicKey)
 	if err != nil {
 		return err
 	}
-	MainInstance.verifyingKey = cfg.PublicKey
+	MainInstance.VerifyingKey = cfg.PublicKey
+
+	return nil
+}
+
+func (cfg VerifyingKeyPublicCfg) PrepareVerifyingKeyPublicCfg() error {
+	err := filenameExists(cfg.PublicKey)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-signing", "Private key to sign work submissions", signingKeyPrivateCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
+		"work-signing", "Private key to sign work submissions", SigningKeyPrivateCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-verification", "Public key to verify work submissions", verifyingKeyPublicCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
+		"work-verification", "Public key to verify work submissions", VerifyingKeyPublicCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-command", "Run a worker using an external command", commandCfg{}, cmdline.Section(workersSection))
+		"work-command", "Run a worker using an external command", CommandWorkerCfg{}, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"command-runner", "Wrapper around a process invocation", commandRunnerCfg{}, cmdline.Hidden)
 }

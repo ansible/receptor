@@ -4,9 +4,14 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   promote:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
         uses: actions/checkout@v2
@@ -28,7 +33,7 @@ jobs:
 
       - name: Build receptorctl and upload to pypi
         run: |
-          make receptorctl_wheel receptorctl_sdist VERSION=${{ github.event.release.tag_name }}
+          make receptorctl_wheel receptorctl_sdist VERSION=$TAG
           twine upload \
             -r ${{ env.pypi_repo }} \
             -u ${{ secrets.PYPI_USERNAME }} \
@@ -46,9 +51,51 @@ jobs:
       - name: Copy Image to Quay
         uses: akhilerm/tag-push-action@v2.0.0
         with:
-          src: ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+          src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: |
-            quay.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+            quay.io/${{ github.repository }}:${{env.TAG}}
             quay.io/${{ github.repository }}:latest
 
+      - name: Check if floating tag is needed
+        run: |
+          if [[ $TAG == *"dev"* ]];
+          then
+           echo "FLOATING_TAG=$(echo $TAG | sed 's/[0-9]\+$//')" >> $GITHUB_ENV
+          else
+           echo "FLOATING_TAG=$TAG" >> $GITHUB_ENV
+          fi
 
+      - name: Push floating tag to Quay
+        uses: akhilerm/tag-push-action@v2.0.0
+        with:
+          src: ghcr.io/${{ github.repository }}:${{env.TAG}}
+          dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
+
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{github.event.release.tag_name}}
+    steps:
+      - name: Checkout Receptor
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Build packages
+        run: |
+          make build-package GOOS=linux GOARCH=amd64 BINNAME=receptor
+          make build-package GOOS=linux GOARCH=arm64 BINNAME=receptor
+          make build-package GOOS=darwin GOARCH=amd64 BINNAME=receptor
+          make build-package GOOS=darwin GOARCH=arm64 BINNAME=receptor
+          make build-package GOOS=windows GOARCH=amd64 BINNAME=receptor.exe
+          make build-package GOOS=windows GOARCH=arm64 BINNAME=receptor.exe
+
+      - name: Publish packages
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |-
+            dist/checksums.txt
+            dist/*.tar.gz

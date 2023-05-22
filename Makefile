@@ -47,7 +47,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -71,6 +71,14 @@ build-all:
 	go build -o receptor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth ./cmd/receptor-cl && \
 	go build -o receptor ./cmd/receptor-cl
 
+DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
+build-package:
+	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
+	mkdir -p dist/$(DIST) && \
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o dist/$(DIST)/$(BINNAME) $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl && \
+	tar -C dist/$(DIST) -zcf dist/$(DIST).tar.gz $(BINNAME) && \
+	cd dist/ && sha256sum $(DIST).tar.gz >> checksums.txt
+
 RUNTEST ?=
 ifeq ($(RUNTEST),)
 TESTCMD =
@@ -79,15 +87,15 @@ TESTCMD = -run $(RUNTEST)
 endif
 
 test: receptor
-	PATH=${PWD}:${PATH} \
-	go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1 -race
+	PATH="${PWD}:${PATH}" \
+	go test ./... $(TESTCMD) -count=1 -race -timeout 5m
 
 receptorctl-test: receptorctl/.VERSION
 	@cd receptorctl && tox -e py3
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
-	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
+	  make test; do \
 	  i=$$((i+1)); done
 
 kubectl:
@@ -156,6 +164,7 @@ clean:
 	@rm -fv receptor-python-worker/dist/*
 	@rm -fv packaging/container/receptor
 	@rm -fv packaging/container/*.whl
+	@rm -rfv dist/
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv receptorctl-test-venv/

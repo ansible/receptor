@@ -16,7 +16,7 @@ import (
 	"github.com/google/shlex"
 )
 
-func runCommand(qc net.Conn, command string) error {
+func runCommand(qc net.Conn, command string, logger *logger.ReceptorLogger) error {
 	args, err := shlex.Split(command)
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func runCommand(qc net.Conn, command string) error {
 	if err != nil {
 		return err
 	}
-	utils.BridgeConns(tty, "external command", qc, "command service")
+	utils.BridgeConns(tty, "external command", qc, "command service", logger)
 
 	return nil
 }
@@ -37,21 +37,21 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 		"type": "Command Service",
 	})
 	if err != nil {
-		logger.Error("Error listening on Receptor network: %s\n", err)
+		s.Logger.Error("Error listening on Receptor network: %s\n", err)
 
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
-			logger.Error("Error accepting connection on Receptor network: %s\n", err)
+			s.Logger.Error("Error accepting connection on Receptor network: %s\n", err)
 
 			return
 		}
 		go func() {
-			err := runCommand(qc, command)
+			err := runCommand(qc, command, s.Logger)
 			if err != nil {
-				logger.Error("Error running command: %s\n", err)
+				s.Logger.Error("Error running command: %s\n", err)
 			}
 			_ = qc.Close()
 		}()
@@ -67,7 +67,7 @@ type commandSvcCfg struct {
 
 // Run runs the action.
 func (cfg commandSvcCfg) Run() error {
-	logger.Info("Running command service %s\n", cfg)
+	netceptor.MainInstance.Logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err

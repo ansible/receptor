@@ -16,8 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
-	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go" //nolint:typecheck
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
@@ -38,7 +37,7 @@ type acceptResult struct {
 type Listener struct {
 	s          *Netceptor
 	pc         *PacketConn
-	ql         quic.Listener
+	ql         quic.Listener //nolint:typecheck
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
@@ -72,7 +71,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				clientTLSCfg := tlscfg.Clone()
 				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
-				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient)
+				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
 
 				return clientTLSCfg, nil
 			}
@@ -88,12 +87,13 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		hopsToLive:   s.maxForwardingHops,
 	}
 	pc.startUnreachable()
+	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
-	cfg := &quic.Config{
+	cfg := &quic.Config{ //nolint:typecheck
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := quic.Listen(pc, tlscfg, cfg)
+	ql, err := quic.Listen(pc, tlscfg, cfg) //nolint:typecheck
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		doneOnce:   &sync.Once{},
 	}
 
-	go li.acceptLoop()
+	go li.acceptLoop(ctx)
 
 	return li, nil
 }
@@ -128,23 +128,12 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(context.Background(), service, tlscfg, false, nil)
+	return s.listen(s.context, service, tlscfg, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(context.Background(), service, tlscfg, true, tags)
-}
-
-// ListenContext returns a stream listener compatible with Go's net.Listener.
-// If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) ListenContext(ctx context.Context, service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(ctx, service, tlscfg, false, nil)
-}
-
-// ListenContextAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
-func (s *Netceptor) ListenContextAndAdvertise(ctx context.Context, service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(ctx, service, tlscfg, true, tags)
+	return s.listen(s.context, service, tlscfg, true, tags)
 }
 
 func (li *Listener) sendResult(conn net.Conn, err error) {
@@ -157,14 +146,16 @@ func (li *Listener) sendResult(conn net.Conn, err error) {
 	}
 }
 
-func (li *Listener) acceptLoop() {
+func (li *Listener) acceptLoop(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-li.doneChan:
 			return
 		default:
 		}
-		qc, err := li.ql.Accept(context.Background())
+		qc, err := li.ql.Accept(ctx)
 		select {
 		case <-li.doneChan:
 			return
@@ -176,7 +167,7 @@ func (li *Listener) acceptLoop() {
 			continue
 		}
 		go func() {
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, _ := context.WithTimeout(ctx, 60*time.Second)
 			qs, err := qc.AcceptStream(ctx)
 			select {
 			case <-li.doneChan:
@@ -271,8 +262,8 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
-	qc       quic.Connection
-	qs       quic.Stream
+	qc       quic.Connection //nolint:typecheck
+	qs       quic.Stream     //nolint:typecheck
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
@@ -280,7 +271,7 @@ type Conn struct {
 
 // Dial returns a stream connection compatible with Go's net.Conn.
 func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn, error) {
-	return s.DialContext(context.Background(), node, service, tlscfg)
+	return s.DialContext(s.Context(), node, service, tlscfg)
 }
 
 // DialContext is like Dial but uses a context to allow timeout or cancellation.
@@ -292,7 +283,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	rAddr := s.NewAddr(node, service)
-	cfg := &quic.Config{
+	cfg := &quic.Config{ //nolint:typecheck
 		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
 	}
@@ -328,7 +319,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
+	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg) //nolint:typecheck
 	if err != nil {
 		close(okChan)
 		pcClose()
@@ -399,7 +390,7 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	// read from channel until closed
 	for msg := range msgCh {
 		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-			logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
+			pc.s.Logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
 			cancel()
 		}
 	}
@@ -434,7 +425,7 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

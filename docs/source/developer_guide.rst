@@ -40,7 +40,7 @@ As an example, in tcp.go
 .. code-block:: go
 
     cmdline.RegisterConfigTypeForApp("receptor-backends",
-      "tcp-peer", "Make an outbound backend connection to a TCP peer", tcpDialerCfg{}, cmdline.Section(backendSection))
+      "tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, cmdline.Section(backendSection))
 
 
 "tcp-peer" is a top-level key (action item) in receptor.conf
@@ -50,7 +50,7 @@ As an example, in tcp.go
     - tcp-peer:
         address: localhost:2222
 
-``RegisterConfigTypeForApp`` tells the cmdline parser that "tcp-peer" is mapped to the ``tcpDialerCfg{}`` structure.
+``RegisterConfigTypeForApp`` tells the cmdline parser that "tcp-peer" is mapped to the ``TCPDialerCfg{}`` structure.
 
 ``main()`` in receptor.go is the entry point for a running receptor process.
 
@@ -64,12 +64,12 @@ A receptor config file has many action items, such as "node", "work-command", an
 
 Specifically, ParseAndRun will run the Init, Prepare, and Run methods associated with each action item.
 
-Here is the Prepare method for ``tcpDialerCfg``. By the time this code executes, the cfg structure has already been populated with the data provided in the config file.
+Here is the Prepare method for ``TCPDialerCfg``. By the time this code executes, the cfg structure has already been populated with the data provided in the config file.
 
 .. code-block:: go
 
     // Prepare verifies the parameters are correct.
-    func (cfg tcpDialerCfg) Prepare() error {
+    func (cfg TCPDialerCfg) Prepare() error {
     	if cfg.Cost <= 0.0 {
     		return fmt.Errorf("connection cost must be positive")
     	}
@@ -79,12 +79,12 @@ Here is the Prepare method for ``tcpDialerCfg``. By the time this code executes,
 
 This simply does a check to make sure the provided Cost is valid.
 
-The Run method for the ``tcpDialerCfg`` object:
+The Run method for the ``TCPDialerCfg`` object:
 
 .. code-block:: go
 
     // Run runs the action.
-    func (cfg tcpDialerCfg) Run() error {
+    func (cfg TCPDialerCfg) Run() error {
     	logger.Debug("Running TCP peer connection %s\n", cfg.Address)
     	host, _, err := net.SplitHostPort(cfg.Address)
     	if err != nil {

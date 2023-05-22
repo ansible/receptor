@@ -6,7 +6,7 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 )
 
-func ParseReceptorNamesFromCert(cert *x509.Certificate, expectedHostname string) (bool, []string, error) {
+func ParseReceptorNamesFromCert(cert *x509.Certificate, expectedHostname string, logger *logger.ReceptorLogger) (bool, []string, error) {
 	var receptorNames []string
 	receptorNames, err := ReceptorNames(cert.Extensions)
 	if err != nil {

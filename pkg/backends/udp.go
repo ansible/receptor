@@ -5,6 +5,7 @@ package backends
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"sync"
@@ -23,10 +24,19 @@ const UDPMaxPacketLen = 65507
 type UDPDialer struct {
 	address string
 	redial  bool
+	logger  *logger.ReceptorLogger
+}
+
+func (b *UDPDialer) GetAddr() string {
+	return b.address
+}
+
+func (b *UDPDialer) GetTLS() *tls.Config {
+	return nil
 }
 
 // NewUDPDialer instantiates a new UDPDialer backend.
-func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
+func NewUDPDialer(address string, redial bool, logger *logger.ReceptorLogger) (*UDPDialer, error) {
 	_, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return nil, err
@@ -34,6 +44,7 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 	nd := UDPDialer{
 		address: address,
 		redial:  redial,
+		logger:  logger,
 	}
 
 	return &nd, nil
@@ -41,7 +52,7 @@ func NewUDPDialer(address string, redial bool) (*UDPDialer, error) {
 
 // Start runs the given session function over this backend service.
 func (b *UDPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
-	return dialerSession(ctx, wg, b.redial, 5*time.Second,
+	return dialerSession(ctx, wg, b.redial, 5*time.Second, b.logger,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 			dialer := net.Dialer{}
 			conn, err := dialer.DialContext(ctx, "udp", b.address)
@@ -122,10 +133,19 @@ type UDPListener struct {
 	sessChan        chan *UDPListenerSession
 	sessRegLock     sync.RWMutex
 	sessionRegistry map[string]*UDPListenerSession
+	logger          *logger.ReceptorLogger
+}
+
+func (b *UDPListener) GetAddr() string {
+	return b.LocalAddr().String()
+}
+
+func (b *UDPListener) GetTLS() *tls.Config {
+	return &tls.Config{}
 }
 
 // NewUDPListener instantiates a new UDPListener backend.
-func NewUDPListener(address string) (*UDPListener, error) {
+func NewUDPListener(address string, logger *logger.ReceptorLogger) (*UDPListener, error) {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return nil, err
@@ -140,6 +160,7 @@ func NewUDPListener(address string) (*UDPListener, error) {
 		sessChan:        make(chan *UDPListenerSession),
 		sessRegLock:     sync.RWMutex{},
 		sessionRegistry: make(map[string]*UDPListenerSession),
+		logger:          logger,
 	}
 
 	return &ul, nil
@@ -171,7 +192,7 @@ func (b *UDPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netce
 			}
 			err := b.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 			if err != nil {
-				logger.Error("Error setting UDP timeout: %s\n", err)
+				b.logger.Error("Error setting UDP timeout: %s\n", err)
 
 				return
 			}
@@ -180,7 +201,7 @@ func (b *UDPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netce
 				continue
 			}
 			if err != nil {
-				logger.Error("UDP read error: %s\n", err)
+				b.logger.Error("UDP read error: %s\n", err)
 
 				return
 			}
@@ -217,7 +238,7 @@ func (b *UDPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netce
 		}
 	}()
 	if b.conn != nil {
-		logger.Debug("Listening on UDP %s\n", b.LocalAddr().String())
+		b.logger.Debug("Listening on UDP %s\n", b.LocalAddr().String())
 	}
 
 	return sessChan, nil
@@ -265,8 +286,9 @@ func (ns *UDPListenerSession) Close() error {
 // Command line
 // **************************************************************************
 
-// udpListenerCfg is the cmdline configuration object for a UDP listener.
-type udpListenerCfg struct {
+// TODO make these fields private
+// UDPListenerCfg is the cmdline configuration object for a UDP listener.
+type UDPListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
 	Port         int                `description:"Local UDP port to listen on" barevalue:"yes" required:"yes"`
 	Cost         float64            `description:"Connection cost (weight)" default:"1.0"`
@@ -274,8 +296,28 @@ type udpListenerCfg struct {
 	AllowedPeers []string           `description:"Peer node IDs to allow via this connection"`
 }
 
+func (cfg UDPListenerCfg) GetCost() float64 {
+	return cfg.Cost
+}
+
+func (cfg UDPListenerCfg) GetNodeCost() map[string]float64 {
+	return cfg.NodeCost
+}
+
+func (cfg UDPListenerCfg) GetAddr() string {
+	return cfg.BindAddr
+}
+
+func (cfg UDPListenerCfg) GetPort() int {
+	return cfg.Port
+}
+
+func (cfg UDPListenerCfg) GetTLS() string {
+	return ""
+}
+
 // Prepare verifies the parameters are correct.
-func (cfg udpListenerCfg) Prepare() error {
+func (cfg UDPListenerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -289,11 +331,11 @@ func (cfg udpListenerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg udpListenerCfg) Run() error {
+func (cfg UDPListenerCfg) Run() error {
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
-	b, err := NewUDPListener(address)
+	b, err := NewUDPListener(address, netceptor.MainInstance.Logger)
 	if err != nil {
-		logger.Error("Error creating listener %s: %s\n", address, err)
+		netceptor.MainInstance.Logger.Error("Error creating listener %s: %s\n", address, err)
 
 		return err
 	}
@@ -302,7 +344,7 @@ func (cfg udpListenerCfg) Run() error {
 		netceptor.BackendNodeCost(cfg.NodeCost),
 		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
-		logger.Error("Error creating backend for %s: %s\n", address, err)
+		netceptor.MainInstance.Logger.Error("Error creating backend for %s: %s\n", address, err)
 
 		return err
 	}
@@ -329,10 +371,10 @@ func (cfg udpDialerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg udpDialerCfg) Run() error {
-	logger.Debug("Running UDP peer connection %s\n", cfg.Address)
-	b, err := NewUDPDialer(cfg.Address, cfg.Redial)
+	netceptor.MainInstance.Logger.Debug("Running UDP peer connection %s\n", cfg.Address)
+	b, err := NewUDPDialer(cfg.Address, cfg.Redial, netceptor.MainInstance.Logger)
 	if err != nil {
-		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+		netceptor.MainInstance.Logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 
 		return err
 	}
@@ -340,7 +382,7 @@ func (cfg udpDialerCfg) Run() error {
 		netceptor.BackendConnectionCost(cfg.Cost),
 		netceptor.BackendAllowedPeers(cfg.AllowedPeers))
 	if err != nil {
-		logger.Error("Error creating backend for %s: %s\n", cfg.Address, err)
+		netceptor.MainInstance.Logger.Error("Error creating backend for %s: %s\n", cfg.Address, err)
 
 		return err
 	}
@@ -352,7 +394,7 @@ func (cfg udpDialerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg udpListenerCfg) PreReload() error {
+func (cfg UDPListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
@@ -360,13 +402,13 @@ func (cfg udpDialerCfg) Reload() error {
 	return cfg.Run()
 }
 
-func (cfg udpListenerCfg) Reload() error {
+func (cfg UDPListenerCfg) Reload() error {
 	return cfg.Run()
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"UDP-listener", "Run a backend listener on a UDP port", udpListenerCfg{}, cmdline.Section(backendSection))
+		"UDP-listener", "Run a backend listener on a UDP port", UDPListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"UDP-peer", "Make an outbound backend connection to a UDP peer", udpDialerCfg{}, cmdline.Section(backendSection))
 }

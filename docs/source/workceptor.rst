@@ -179,7 +179,7 @@ to the receptor command as positional arguments immediately after the ``workType
     helloworld.sh
 
 Passing options or flags to the work command needs to be done using the ``--param`` parameter to
-override the ``params`` work command setting. The ``--all`` flag can be passed to the work command this way:
+extend the ``params`` work command setting. The ``--all`` flag can be passed to the work command this way:
 
 .. code::
 
@@ -254,7 +254,7 @@ Signed work
 
 Remote work submissions can be digitally signed by the sender. The target node will verify the signature of the work command before starting the work unit.
 
-A pair of RSA public and private keys are created offline and distributed to the nodes. The public key should be on the node receiving work (PKIX format). The private key should be on the node submitting work (PKCS1 format).
+A *single* pair of RSA public and private keys is created offline and distributed to the nodes. Distribute the public key (PKIX format) to any node that should receive work. Distribute the private key (PKCS1 format) to any node that needs authority to submit work.
 
 The following commands can be used to create keys for signing work:
 

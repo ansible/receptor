@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ansible/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/tests/utils"
 )
 
 // setup handle using hardcoded PEMs.
@@ -187,11 +187,11 @@ func useUtilsSetupSuiteWithGenerateWithCA(t *testing.T, name string) (string, st
 	}
 }
 
-func TestPrepareGoodTlsServerCfg(t *testing.T) {
+func TestPrepareGoodTLSServerConfig(t *testing.T) {
 	tempCertFile, tempCertKey, tempCA, teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	cfg := &tlsServerCfg{
+	cfg := &TLSServerConfig{
 		Name:              "foobar",
 		Cert:              tempCertFile.Name(),
 		Key:               tempCertKey.Name(),
@@ -210,7 +210,7 @@ func TestNodeIDMismatch(t *testing.T) {
 	tempCertFile, tempCertKey, tempCA, teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	cfg := &tlsServerCfg{
+	cfg := &TLSServerConfig{
 		Name:              "foobar",
 		Cert:              tempCertFile.Name(),
 		Key:               tempCertKey.Name(),
@@ -229,7 +229,7 @@ func TestNodeIDWithUtilsGenerateCert(t *testing.T) {
 	tempCa, tempCertKey, tempCert, tearDownSuite := useUtilsSetupSuite(t, "foobar")
 	defer tearDownSuite(t)
 
-	cfg := tlsServerCfg{
+	cfg := TLSServerConfig{
 		Name:              "foobar",
 		Cert:              tempCert,
 		Key:               tempCertKey,
@@ -248,7 +248,7 @@ func TestBadNodeIDWithUtilsGenerateCert(t *testing.T) {
 	tempCa, tempCertKey, tempCert, tearDownSuite := useUtilsSetupSuite(t, "foobar")
 	defer tearDownSuite(t)
 
-	cfg := tlsServerCfg{
+	cfg := TLSServerConfig{
 		Name:              "foobar",
 		Cert:              tempCert,
 		Key:               tempCertKey,
@@ -267,7 +267,7 @@ func TestNodeIDWithUtilsGenerateCertWithCA(t *testing.T) {
 	caCert, tempCert, tempCertKey, tearDownSuite := useUtilsSetupSuiteWithGenerateWithCA(t, "foobar")
 	defer tearDownSuite(t)
 
-	cfg := &tlsClientConfig{
+	cfg := &TLSClientConfig{
 		Name:               "foobar",
 		Cert:               tempCert,
 		Key:                tempCertKey,
@@ -286,7 +286,7 @@ func TestNodeIDWIthSkipReceptorNamesCheckTrue(t *testing.T) {
 	caCert, tempCert, tempCertKey, tearDownSuite := useUtilsSetupSuiteWithGenerateWithCA(t, "foobaz")
 	defer tearDownSuite(t)
 
-	clientCfg := &tlsClientConfig{
+	clientCfg := &TLSClientConfig{
 		Name:                   "foobaz-client",
 		Cert:                   tempCert,
 		Key:                    tempCertKey,
@@ -295,7 +295,7 @@ func TestNodeIDWIthSkipReceptorNamesCheckTrue(t *testing.T) {
 		SkipReceptorNamesCheck: true,
 	}
 
-	serverCfg := &tlsServerCfg{
+	serverCfg := &TLSServerConfig{
 		Name:                   "foobaz-server",
 		Cert:                   tempCert,
 		Key:                    tempCertKey,

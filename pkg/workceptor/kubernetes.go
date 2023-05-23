@@ -325,6 +325,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			case <-kw.ctx.Done():
 				errMsg := fmt.Sprintf("Context Done while getting pod %s/%s. Error: %s", podNamespace, podName, kw.ctx.Err())
 				kw.Warning(errMsg)
+
 				return
 			default:
 			}
@@ -466,7 +467,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 			var err error
 			for retries := 5; retries > 0; retries-- {
-				err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+				err = exec.StreamWithContext(kw.ctx, remotecommand.StreamOptions{
 					Stdin: stdin,
 					Tty:   false,
 				})

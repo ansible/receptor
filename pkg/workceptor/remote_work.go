@@ -219,7 +219,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 
 // cancelOrReleaseRemoteUnit makes a single attempt to cancel or release a remote unit.
 func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader,
-	release bool, _ bool,
+	release bool,
 ) error {
 	defer conn.(interface{ CloseConnection() error }).CloseConnection()
 	red := rw.Status().ExtraData.(*remoteExtraData)
@@ -605,7 +605,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 		return rw.runAndMonitor(rw.topJC, false, rw.startRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
 		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
-			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased, false)
+			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased)
 		})
 	}
 	go func() {
@@ -656,7 +656,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	}
 	if release && force {
 		_ = rw.connectAndRun(rw.w.ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
-			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true, true)
+			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true)
 		})
 
 		return rw.BaseWorkUnit.Release(true)
@@ -664,7 +664,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	rw.topJC.NewJob(rw.w.ctx, 1, false)
 
 	return rw.runAndMonitor(rw.topJC, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
-		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release, false)
+		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release)
 	})
 }
 

@@ -446,6 +446,11 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
 }
 
+// GetLogger returns the logger of this Netceptor instance.
+func (s *Netceptor) GetLogger() *logger.ReceptorLogger {
+	return s.Logger
+}
+
 // Sets the MaxConnectionIdleTime object on the Netceptor instance.
 func (s *Netceptor) SetMaxConnectionIdleTime(userDefinedMaxIdleConnectionTimeout string) error {
 	// before we instantiate a new instance of Netceptor, let's verify that the user defined maxidleconnectiontimeout value is parseable

@@ -5,6 +5,7 @@ package workceptor
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"os"
@@ -16,17 +17,28 @@ import (
 
 	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/randstr"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/golang-jwt/jwt/v4"
 )
 
+// NetceptorForWorkceptor is a interface to decouple workceptor from netceptor.
+// it includes only the functions that workceptor uses.
+type NetceptorForWorkceptor interface {
+	NodeID() string
+	AddWorkCommand(typeName string, verifySignature bool) error
+	GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType netceptor.ExpectedHostnameType) (*tls.Config, error) // have a common pkg for types
+	GetLogger() *logger.ReceptorLogger
+	DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error) // create an interface for Conn
+}
+
 // Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
 	ctx               context.Context
 	Cancel            context.CancelFunc
-	nc                *netceptor.Netceptor
+	nc                NetceptorForWorkceptor
 	dataDir           string
 	workTypesLock     *sync.RWMutex
 	workTypes         map[string]*workType
@@ -44,7 +56,7 @@ type workType struct {
 }
 
 // New constructs a new Workceptor instance.
-func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workceptor, error) {
+func New(ctx context.Context, nc NetceptorForWorkceptor, dataDir string) (*Workceptor, error) {
 	if dataDir == "" {
 		dataDir = path.Join(os.TempDir(), "receptor")
 	}
@@ -271,12 +283,12 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, t
 	if ttl != "" {
 		duration, err := time.ParseDuration(ttl)
 		if err != nil {
-			w.nc.Logger.Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
+			w.nc.GetLogger().Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
 
 			return nil, err
 		}
 		if signWork && duration > w.SigningExpiration {
-			w.nc.Logger.Warning("json web token expires before ttl")
+			w.nc.GetLogger().Warning("json web token expires before ttl")
 		}
 		expiration = time.Now().Add(duration)
 	} else {
@@ -301,7 +313,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	unitdir := path.Join(w.dataDir, unitID)
 	fi, _ := os.Stat(unitdir)
 	if fi == nil || !fi.IsDir() {
-		w.nc.Logger.Error("Error locating unit: %s", unitID)
+		w.nc.GetLogger().Error("Error locating unit: %s", unitID)
 
 		return
 	}
@@ -323,18 +335,18 @@ func (w *Workceptor) scanForUnit(unitID string) {
 			worker = newUnknownWorker(w, ident, sfd.WorkType)
 		}
 		if _, err := os.Stat(statusFilename); os.IsNotExist(err) {
-			w.nc.Logger.Error("Status file has disappeared for %s.", ident)
+			w.nc.GetLogger().Error("Status file has disappeared for %s.", ident)
 
 			return
 		}
 		err := worker.Load()
 		if err != nil {
-			w.nc.Logger.Warning("Failed to restart worker %s due to read error: %s", unitdir, err)
+			w.nc.GetLogger().Warning("Failed to restart worker %s due to read error: %s", unitdir, err)
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
 		}
 		err = worker.Restart()
 		if err != nil && !IsPending(err) {
-			w.nc.Logger.Warning("Failed to restart worker %s: %s", unitdir, err)
+			w.nc.GetLogger().Warning("Failed to restart worker %s: %s", unitdir, err)
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
 		}
 		w.activeUnitsLock.Lock()
@@ -471,7 +483,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 		defer func() {
 			err = stdout.Close()
 			if err != nil {
-				w.nc.Logger.Error("Error closing stdout %s", stdoutFilename)
+				w.nc.GetLogger().Error("Error closing stdout %s", stdoutFilename)
 			}
 			resultClose()
 			cancel()
@@ -484,7 +496,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			case err == nil:
 			case os.IsNotExist(err):
 				if IsComplete(unit.Status().State) {
-					w.nc.Logger.Warning("Unit completed without producing any stdout\n")
+					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
 					return
 				}
@@ -494,7 +506,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 
 				continue
 			default:
-				w.nc.Logger.Error("Error accessing stdout file: %s\n", err)
+				w.nc.GetLogger().Error("Error accessing stdout file: %s\n", err)
 
 				return
 			}
@@ -514,7 +526,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 					if os.IsNotExist(err) {
 						failures++
 						if failures > 3 {
-							w.nc.Logger.Error("Exceeded retries for reading stdout %s", stdoutFilename)
+							w.nc.GetLogger().Error("Exceeded retries for reading stdout %s", stdoutFilename)
 							statChan <- struct{}{}
 
 							return
@@ -539,12 +551,12 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 					var newPos int64
 					newPos, err = stdout.Seek(filePos, 0)
 					if err != nil {
-						w.nc.Logger.Warning("Seek error processing stdout: %s\n", err)
+						w.nc.GetLogger().Warning("Seek error processing stdout: %s\n", err)
 
 						return
 					}
 					if newPos != filePos {
-						w.nc.Logger.Warning("Seek error processing stdout\n")
+						w.nc.GetLogger().Warning("Seek error processing stdout\n")
 
 						return
 					}
@@ -567,12 +579,12 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			if err == io.EOF {
 				unitStatus := unit.Status()
 				if IsComplete(unitStatus.State) && filePos >= unitStatus.StdoutSize {
-					w.nc.Logger.Debug("Stdout complete - closing channel for: %s \n", unitID)
+					w.nc.GetLogger().Debug("Stdout complete - closing channel for: %s \n", unitID)
 
 					return
 				}
 			} else if err != nil {
-				w.nc.Logger.Error("Error reading stdout: %s\n", err)
+				w.nc.GetLogger().Error("Error reading stdout: %s\n", err)
 
 				return
 			}

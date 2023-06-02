@@ -236,7 +236,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				cc, err = ct.InitFromJSON(jsonData)
 			}
 			if err == nil {
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(s.nc.Context())
 				defer cancel()
 				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
 			}
@@ -353,8 +353,11 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 			go func(listener net.Listener) {
 				for {
 					conn, err := listener.Accept()
-					if ctx.Err() != nil {
+					select {
+					case <-ctx.Done():
+
 						return
+					default:
 					}
 					if err != nil {
 						if !strings.HasSuffix(err.Error(), "normal close") {
@@ -366,6 +369,12 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 					go func() {
 						defer conn.Close()
 						tlsConn, ok := conn.(*tls.Conn)
+						select {
+						case <-ctx.Done():
+
+							return
+						default:
+						}
 						if ok {
 							// Explicitly run server TLS handshake so we can deal with timeout and errors here
 							err = conn.SetDeadline(time.Now().Add(10 * time.Second))
@@ -435,7 +444,7 @@ func (cfg cmdlineConfigUnix) Run() error {
 			return err
 		}
 	}
-	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
+	err = MainInstance.RunControlSvc(netceptor.MainInstance.Context(), cfg.Service, tlscfg, cfg.Filename,
 		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)
 	if err != nil {
 		return err

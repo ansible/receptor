@@ -55,6 +55,12 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 			}
 			_ = qc.Close()
 		}()
+		select {
+		case <-s.Context().Done():
+
+			return
+		default:
+		}
 	}
 }
 

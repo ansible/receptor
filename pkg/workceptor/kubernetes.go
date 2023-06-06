@@ -16,10 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/http2"
-
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"golang.org/x/net/http2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -146,16 +145,15 @@ func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool) (io.ReadCloser
 		logStream, err = logReq.Stream(kw.ctx)
 		if err == nil {
 			break
-		} else {
-			kw.Warning(
-				"Error opening log stream for pod %s/%s. Will retry %d more times. Error: %s",
-				podNamespace,
-				podName,
-				retries,
-				err,
-			)
-			time.Sleep(time.Second)
 		}
+		kw.Warning(
+			"Error opening log stream for pod %s/%s. Will retry %d more times. Error: %s",
+			podNamespace,
+			podName,
+			retries,
+			err,
+		)
+		time.Sleep(time.Second)
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -214,16 +212,15 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
 			if err == nil {
 				break
-			} else {
-				kw.Warning(
-					"Error getting pod %s/%s. Will retry %d more times. Error: %s",
-					podNamespace,
-					podName,
-					retries,
-					err,
-				)
-				time.Sleep(time.Second)
 			}
+			kw.Warning(
+				"Error getting pod %s/%s. Will retry %d more times. Error: %s",
+				podNamespace,
+				podName,
+				retries,
+				err,
+			)
+			time.Sleep(time.Second)
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -540,6 +537,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			case <-kw.ctx.Done():
 				errMsg := fmt.Sprintf("Context Done while getting pod %s/%s. Error: %s", podNamespace, podName, kw.ctx.Err())
 				kw.Warning(errMsg)
+
 				return
 			default:
 			}
@@ -547,16 +545,15 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
 			if err == nil {
 				break
-			} else {
-				kw.Warning(
-					"Error getting pod %s/%s. Will retry %d more times. Retrying: %s",
-					podNamespace,
-					podName,
-					retries,
-					err,
-				)
-				time.Sleep(200 * time.Millisecond)
 			}
+			kw.Warning(
+				"Error getting pod %s/%s. Will retry %d more times. Retrying: %s",
+				podNamespace,
+				podName,
+				retries,
+				err,
+			)
+			time.Sleep(200 * time.Millisecond)
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -682,7 +679,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 			var err error
 			for retries := 5; retries > 0; retries-- {
-				err = exec.Stream(remotecommand.StreamOptions{
+				err = exec.StreamWithContext(kw.ctx, remotecommand.StreamOptions{
 					Stdin: stdin,
 					Tty:   false,
 				})

@@ -42,7 +42,7 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 	return c, nil
 }
 
-func (c *tracerouteCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *tracerouteCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, _ ControlFuncOperations) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
 	results := nc.Traceroute(ctx, c.target)
 	i := 0

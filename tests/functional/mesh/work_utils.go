@@ -17,7 +17,6 @@ func workSetup(workPluginName workPlugin, t *testing.T) (map[string]*ReceptorCon
 	m := workTestMesh(workPluginName)
 
 	err := m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err)
 	}

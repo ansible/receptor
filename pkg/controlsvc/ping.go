@@ -41,7 +41,7 @@ func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCo
 	return c, nil
 }
 
-func (c *pingCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *pingCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, _ ControlFuncOperations) (map[string]interface{}, error) {
 	pingTime, pingRemote, err := nc.Ping(ctx, c.target, nc.MaxForwardingHops())
 	cfr := make(map[string]interface{})
 	if err == nil {

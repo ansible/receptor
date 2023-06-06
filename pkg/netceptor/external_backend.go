@@ -92,7 +92,7 @@ func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration
 }
 
 // SetReadDeadline sets the deadline by which a message must be read from the connection.
-func (mc *netMessageConn) SetReadDeadline(t time.Time) error {
+func (mc *netMessageConn) SetReadDeadline(_ time.Time) error {
 	panic("implement me")
 }
 
@@ -123,7 +123,7 @@ func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) e
 }
 
 // ReadMessage reads a message from the connection.
-func (mc *websocketMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
+func (mc *websocketMessageConn) ReadMessage(ctx context.Context, _ time.Duration) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("session closed: %s", ctx.Err())
 	}

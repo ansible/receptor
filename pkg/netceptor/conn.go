@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go" //nolint:typecheck
+	"github.com/quic-go/quic-go"
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
@@ -37,7 +37,7 @@ type acceptResult struct {
 type Listener struct {
 	s          *Netceptor
 	pc         *PacketConn
-	ql         quic.Listener //nolint:typecheck
+	ql         quic.Listener
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
@@ -89,11 +89,11 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	pc.startUnreachable()
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
-	cfg := &quic.Config{ //nolint:typecheck
+	cfg := &quic.Config{
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := quic.Listen(pc, tlscfg, cfg) //nolint:typecheck
+	ql, err := quic.Listen(pc, tlscfg, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -262,8 +262,8 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
-	qc       quic.Connection //nolint:typecheck
-	qs       quic.Stream     //nolint:typecheck
+	qc       quic.Connection
+	qs       quic.Stream
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
@@ -283,7 +283,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	rAddr := s.NewAddr(node, service)
-	cfg := &quic.Config{ //nolint:typecheck
+	cfg := &quic.Config{
 		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
 	}
@@ -319,7 +319,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg) //nolint:typecheck
+	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
 	if err != nil {
 		close(okChan)
 		pcClose()
@@ -490,7 +490,7 @@ func generateServerTLSConfig() *tls.Config {
 	}
 }
 
-func verifyServerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	for i := 0; i < len(rawCerts); i++ {
 		cert, err := x509.ParseCertificate(rawCerts[i])
 		if err != nil {

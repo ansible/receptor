@@ -372,9 +372,8 @@ func (cfg commandRunnerCfg) Run() error {
 		}
 		MainInstance.nc.Logger.Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
-	} else {
-		os.Exit(0)
 	}
+	os.Exit(0)
 
 	return nil
 }
@@ -402,7 +401,6 @@ func filenameExists(filename string) error {
 
 func (cfg SigningKeyPrivateCfg) Prepare() error {
 	duration, err := cfg.PrepareSigningKeyPrivateCfg()
-
 	if err != nil {
 		return fmt.Errorf(err.Error())
 	}
@@ -415,7 +413,6 @@ func (cfg SigningKeyPrivateCfg) Prepare() error {
 
 func (cfg SigningKeyPrivateCfg) PrepareSigningKeyPrivateCfg() (*time.Duration, error) {
 	err := filenameExists(cfg.PrivateKey)
-
 	if err != nil {
 		return nil, err
 	}
@@ -425,6 +422,7 @@ func (cfg SigningKeyPrivateCfg) PrepareSigningKeyPrivateCfg() (*time.Duration, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse TokenExpiration -- valid examples include '1.5h', '30m', '30m10s'")
 		}
+
 		return &duration, nil
 	}
 

@@ -239,7 +239,7 @@ func treeMesh(proto string) *LibMesh {
 	return &m
 }
 
-// used in work_test.go
+// used in work_test.go.
 func workTestMesh(workPluginName workPlugin) *LibMesh {
 	caKey, caCrt, err := utils.GenerateCA("ca", "localhost")
 	if err != nil {

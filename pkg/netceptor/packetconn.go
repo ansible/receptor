@@ -229,7 +229,7 @@ func (pc *PacketConn) SetReadDeadline(t time.Time) error {
 }
 
 // SetWriteDeadline sets the write deadline.
-func (pc *PacketConn) SetWriteDeadline(t time.Time) error {
+func (pc *PacketConn) SetWriteDeadline(_ time.Time) error {
 	// Write deadline doesn't mean anything because Write() implementation is non-blocking.
 	return nil
 }

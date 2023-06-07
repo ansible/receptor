@@ -271,7 +271,7 @@ type Conn struct {
 
 // Dial returns a stream connection compatible with Go's net.Conn.
 func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn, error) {
-	return s.DialContext(s.Context(), node, service, tlscfg)
+	return s.DialContext(context.Background(), node, service, tlscfg)
 }
 
 // DialContext is like Dial but uses a context to allow timeout or cancellation.

@@ -58,7 +58,7 @@ func (cfg NodeCfg) Init() error {
 		}
 	}
 
-	workceptor.MainInstance, err = workceptor.New(netceptor.MainInstance.Context(), netceptor.MainInstance, cfg.DataDir)
+	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
 	if err != nil {
 		return err
 	}

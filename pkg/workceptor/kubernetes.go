@@ -1316,7 +1316,7 @@ func (kw *kubeUnit) Restart() error {
 		if err != nil {
 			kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
-			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(kw.ctx, ked.PodName, metav1.DeleteOptions{})
+			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
 				kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
@@ -1341,7 +1341,7 @@ func (kw *kubeUnit) Cancel() error {
 	kw.cancel()
 	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 	if kw.pod != nil {
-		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(kw.ctx, kw.pod.Name, metav1.DeleteOptions{})
+		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			kw.w.nc.Logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
 		}

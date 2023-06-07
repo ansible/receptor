@@ -236,7 +236,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				cc, err = ct.InitFromJSON(jsonData)
 			}
 			if err == nil {
-				ctx, cancel := context.WithCancel(s.nc.Context())
+				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
 			}
@@ -435,7 +435,7 @@ func (cfg cmdlineConfigUnix) Run() error {
 			return err
 		}
 	}
-	err = MainInstance.RunControlSvc(netceptor.MainInstance.Context(), cfg.Service, tlscfg, cfg.Filename,
+	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
 		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)
 	if err != nil {
 		return err

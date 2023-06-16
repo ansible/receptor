@@ -63,12 +63,12 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	ctxChild, _ := context.WithTimeout(ctx, 5*time.Second)
 	hello, err := utils.ReadStringContext(ctxChild, reader, '\n')
 	if err != nil {
-		conn.CloseConnection()
+		_ = conn.Close()
 
 		return nil, nil, err
 	}
 	if !strings.Contains(hello, red.RemoteNode) {
-		conn.CloseConnection()
+		_ = conn.Close()
 
 		return nil, nil, fmt.Errorf("while expecting node ID %s, got message: %s", red.RemoteNode,
 			strings.TrimRight(hello, "\n"))
@@ -145,7 +145,7 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 
 // startRemoteUnit makes a single attempt to start a remote unit.
 func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
-	defer conn.(interface{ CloseConnection() error }).CloseConnection()
+	defer conn.Close()
 	red := rw.UnredactedStatus().ExtraData.(*remoteExtraData)
 	workSubmitCmd := make(map[string]interface{})
 	for k, v := range red.RemoteParams {
@@ -196,7 +196,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("error sending stdin file: %s", err)
 	}
-	err = conn.Close()
+	err = conn.(interface{ CloseWrite() error }).CloseWrite()
 	if err != nil {
 		return fmt.Errorf("error closing stdin file: %s", err)
 	}
@@ -221,7 +221,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader,
 	release bool,
 ) error {
-	defer conn.(interface{ CloseConnection() error }).CloseConnection()
+	defer conn.Close()
 	red := rw.Status().ExtraData.(*remoteExtraData)
 	var workCmd string
 	if release {
@@ -278,7 +278,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	conn, reader := rw.getConnection(mw)
 	defer func() {
 		if conn != nil {
-			conn.(interface{ CloseConnection() error }).CloseConnection()
+			conn.Close()
 		}
 	}()
 	if conn == nil {
@@ -295,7 +295,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
 		if err != nil {
 			rw.w.nc.Logger.Debug("Write error sending to %s: %s\n", remoteUnitID, err)
-			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+			_ = conn.Close()
 			conn = nil
 
 			continue
@@ -303,7 +303,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
 			rw.w.nc.Logger.Debug("Read error reading from %s: %s\n", remoteNode, err)
-			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+			_ = conn.Close()
 			conn = nil
 
 			continue
@@ -402,7 +402,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			conn, reader := rw.getConnection(mw)
 			defer func() {
 				if conn != nil {
-					_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+					_ = conn.Close()
 				}
 			}()
 			if conn == nil {
@@ -462,7 +462,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					if ok {
 						cr.CancelRead()
 					}
-					_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+					_ = conn.Close()
 
 					return
 				}

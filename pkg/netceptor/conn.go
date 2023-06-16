@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -203,13 +204,14 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			doneChan := make(chan struct{}, 1)
 			cctx, ccancel := context.WithCancel(li.s.context)
 			conn := &Conn{
-				s:        li.s,
-				pc:       li.pc,
-				qc:       qc,
-				qs:       qs,
-				doneChan: doneChan,
-				doneOnce: &sync.Once{},
-				ctx:      cctx,
+				s:            li.s,
+				pc:           li.pc,
+				qc:           qc,
+				qs:           qs,
+				doneChan:     doneChan,
+				doneOnce:     &sync.Once{},
+				ctx:          cctx,
+				fromListener: true,
 			}
 			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
@@ -260,13 +262,14 @@ func (li *Listener) Addr() net.Addr {
 
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
-	s        *Netceptor
-	pc       *PacketConn
-	qc       quic.Connection
-	qs       quic.Stream
-	doneChan chan struct{}
-	doneOnce *sync.Once
-	ctx      context.Context
+	s            *Netceptor
+	pc           *PacketConn
+	qc           quic.Connection
+	qs           quic.Stream
+	doneChan     chan struct{}
+	doneOnce     *sync.Once
+	ctx          context.Context
+	fromListener bool
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -397,8 +400,14 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 }
 
 // Read reads data from the connection.
-func (c *Conn) Read(b []byte) (n int, err error) {
-	return c.qs.Read(b)
+func (c *Conn) Read(b []byte) (int, error) {
+	n, err := c.qs.Read(b)
+	aerr, ok := err.(*quic.ApplicationError)
+	if ok && aerr.ErrorMessage == "normal close" {
+		err = io.EOF
+	}
+
+	return n, err
 }
 
 // CancelRead cancels a pending read operation.
@@ -407,12 +416,18 @@ func (c *Conn) CancelRead() {
 }
 
 // Write writes data to the connection.
-func (c *Conn) Write(b []byte) (n int, err error) {
-	return c.qs.Write(b)
+func (c *Conn) Write(b []byte) (int, error) {
+	n, err := c.qs.Write(b)
+	aerr, ok := err.(*quic.ApplicationError)
+	if ok && aerr.ErrorMessage == "normal close" {
+		err = net.ErrClosed
+	}
+
+	return n, err
 }
 
-// Close closes the writer side of the connection.
-func (c *Conn) Close() error {
+// CloseWrite closes the writer side of the connection.
+func (c *Conn) CloseWrite() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
@@ -420,14 +435,30 @@ func (c *Conn) Close() error {
 	return c.qs.Close()
 }
 
-func (c *Conn) CloseConnection() error {
-	c.pc.cancel()
+// Close closes the connection.
+func (c *Conn) Close() error {
+	if !c.fromListener {
+		c.pc.cancel()
+	}
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
 	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
 
-	return c.qc.CloseWithError(0, "normal close")
+	go func() {
+		// Add a delay to allow outgoing data to be transmitted before killing QUIC connection
+		// See: https://github.com/lucas-clemente/quic-go/issues/3291
+		t := time.NewTimer(time.Second)
+		select {
+		case <-c.ctx.Done():
+			t.Stop()
+		case <-t.C:
+		}
+		time.Sleep(time.Second)
+		_ = c.qc.CloseWithError(0, "normal close")
+	}()
+
+	return c.qs.Close()
 }
 
 // LocalAddr returns the local address of this connection.

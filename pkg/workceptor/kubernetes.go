@@ -763,7 +763,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
 	semver, err := version.ParseSemantic(versionStr)
 	if err != nil {
-		kw.w.nc.Logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
+		kw.w.nc.GetLogger().Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
 
 		return false
 	}
@@ -787,11 +787,11 @@ func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		kw.w.nc.Logger.Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
+		kw.w.nc.GetLogger().Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
 
 		return true
 	}
-	kw.w.nc.Logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
+	kw.w.nc.GetLogger().Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
 
 	return false
 }
@@ -828,7 +828,7 @@ func shouldUseReconnect(kw *kubeUnit) bool {
 
 	serverVerInfo, err := kw.clientset.ServerVersion()
 	if err != nil {
-		kw.w.nc.Logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
+		kw.w.nc.GetLogger().Warning("could not detect Kubernetes server version, will not use reconnect support")
 
 		return false
 	}
@@ -898,7 +898,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error listening: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 
 		return
 	}
@@ -922,7 +922,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		if err != nil {
 			errMsg := fmt.Sprintf("Error accepting: %s", err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-			kw.w.nc.Logger.Error(errMsg)
+			kw.w.nc.GetLogger().Error(errMsg)
 			cancel()
 
 			return
@@ -935,7 +935,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error creating pod: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		cancel()
 
 		return
@@ -954,7 +954,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	stdin, err = newStdinReader(kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -965,7 +965,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	stdout, err := newStdoutWriter(kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -983,7 +983,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		_ = conn.CloseWrite()
 		if err != nil {
 			errMsg := fmt.Sprintf("Error sending stdin to pod: %s", err)
-			kw.w.nc.Logger.Error(errMsg)
+			kw.w.nc.GetLogger().Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			cancel()
 
@@ -1015,7 +1015,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error reading stdout from pod: %s", err)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -1231,7 +1231,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	if podPendingTimeoutString != "" {
 		podPendingTimeout, err := time.ParseDuration(podPendingTimeoutString)
 		if err != nil {
-			kw.w.nc.Logger.Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
+			kw.w.nc.GetLogger().Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
 
 			return err
 		}
@@ -1314,11 +1314,11 @@ func (kw *kubeUnit) Restart() error {
 	if kw.deletePodOnRestart {
 		err := kw.connectToKube()
 		if err != nil {
-			kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+			kw.w.nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
 			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
-				kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+				kw.w.nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
 		}
 	}
@@ -1343,7 +1343,7 @@ func (kw *kubeUnit) Cancel() error {
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
-			kw.w.nc.Logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
+			kw.w.nc.GetLogger().Error("Error deleting pod %s: %s", kw.pod.Name, err)
 		}
 	}
 	if kw.cancel != nil {

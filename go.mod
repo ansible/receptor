@@ -23,7 +23,7 @@ require (
 	golang.org/x/net v0.9.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.27.1
-	k8s.io/apimachinery v0.27.1
+	k8s.io/apimachinery v0.27.4
 	k8s.io/client-go v0.27.1
 )
 
@@ -36,7 +36,6 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

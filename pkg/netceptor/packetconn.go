@@ -7,8 +7,27 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/utils"
 )
+
+type PacketConnInterface interface {
+	SetHopsToLive(hopsToLive byte)
+	SubscribeUnreachable(doneChan chan struct{}) chan UnreachableNotification
+	ReadFrom(p []byte) (int, net.Addr, error)
+	WriteTo(p []byte, addr net.Addr) (n int, err error)
+	LocalAddr() net.Addr
+	Close() error
+	SetDeadline(t time.Time) error
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+
+	getNetceptorLogger() *logger.ReceptorLogger
+	getCancel() *context.CancelFunc
+	getLocalService() string
+	setAdvertise(isAdvertise bool)
+	setAdTags(tags map[string]string)
+}
 
 // PacketConn implements the net.PacketConn interface via the Receptor network.
 type PacketConn struct {
@@ -25,9 +44,26 @@ type PacketConn struct {
 	cancel          context.CancelFunc
 }
 
+func NewPacketConn(s *Netceptor, service string, ConnTypeDatagram byte) (PacketConnInterface, error) {
+	npc := &PacketConn{
+		s:            s,
+		localService: service,
+		recvChan:     make(chan *MessageData),
+		advertise:    false,
+		adTags:       nil,
+		connType:     ConnTypeDatagram,
+		hopsToLive:   s.maxForwardingHops,
+	}
+
+	npc.startUnreachable()
+	s.listenerRegistry[service] = npc
+
+	return npc, nil
+}
+
 // ListenPacket returns a datagram connection compatible with Go's net.PacketConn.
 // If service is blank, generates and uses an ephemeral service name.
-func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
+func (s *Netceptor) ListenPacket(service string) (PacketConnInterface, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
@@ -42,30 +78,43 @@ func (s *Netceptor) ListenPacket(service string) (*PacketConn, error) {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
 	_ = s.addNameHash(service)
-	pc := &PacketConn{
-		s:            s,
-		localService: service,
-		recvChan:     make(chan *MessageData),
-		advertise:    false,
-		adTags:       nil,
-		connType:     ConnTypeDatagram,
-		hopsToLive:   s.maxForwardingHops,
+	pc, err := NewPacketConn(s, service, ConnTypeDatagram)
+	if err != nil {
+
 	}
-	pc.startUnreachable()
-	s.listenerRegistry[service] = pc
 
 	return pc, nil
 }
 
+func (pc *PacketConn) setAdvertise(isAdvertise bool) {
+	pc.advertise = isAdvertise
+}
+
+func (pc *PacketConn) setAdTags(tags map[string]string) {
+	pc.adTags = tags
+}
+
+func (pc *PacketConn) getNetceptorLogger() *logger.ReceptorLogger {
+	return pc.s.Logger
+}
+
+func (pc *PacketConn) getCancel() *context.CancelFunc {
+	return &pc.cancel
+}
+
+func (pc *PacketConn) getLocalService() string {
+	return pc.localService
+}
+
 // ListenPacketAndAdvertise returns a datagram listener, and also broadcasts service
 // advertisements to the Receptor network as long as the listener remains open.
-func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]string) (*PacketConn, error) {
+func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]string) (PacketConnInterface, error) {
 	pc, err := s.ListenPacket(service)
 	if err != nil {
 		return nil, err
 	}
-	pc.advertise = true
-	pc.adTags = tags
+	pc.setAdvertise(true)
+	pc.setAdTags(tags)
 	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
 
 	return pc, nil

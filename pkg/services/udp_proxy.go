@@ -15,7 +15,7 @@ import (
 
 // UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service.
 func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node string, service string) error {
-	connMap := make(map[string]*netceptor.PacketConn)
+	connMap := make(map[string]netceptor.PacketConnInterface)
 	buffer := make([]byte, utils.NormalBufferSize)
 
 	addrStr := fmt.Sprintf("%s:%d", host, port)
@@ -69,7 +69,7 @@ func UDPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, node 
 	return nil
 }
 
-func runNetceptorToUDPInbound(pc *netceptor.PacketConn, uc *net.UDPConn, udpAddr net.Addr, expectedAddr netceptor.Addr, logger *logger.ReceptorLogger) {
+func runNetceptorToUDPInbound(pc netceptor.PacketConnInterface, uc *net.UDPConn, udpAddr net.Addr, expectedAddr netceptor.Addr, logger *logger.ReceptorLogger) {
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		n, addr, err := pc.ReadFrom(buf)
@@ -150,7 +150,7 @@ func UDPProxyServiceOutbound(s *netceptor.Netceptor, service string, address str
 	return nil
 }
 
-func runUDPToNetceptorOutbound(uc *net.UDPConn, pc *netceptor.PacketConn, addr net.Addr, logger *logger.ReceptorLogger) {
+func runUDPToNetceptorOutbound(uc *net.UDPConn, pc netceptor.PacketConnInterface, addr net.Addr, logger *logger.ReceptorLogger) {
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		n, err := uc.Read(buf)

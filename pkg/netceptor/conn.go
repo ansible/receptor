@@ -36,7 +36,7 @@ type acceptResult struct {
 // Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
 	s          *Netceptor
-	pc         *PacketConn
+	pc         PacketConnInterface
 	ql         quic.Listener
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
@@ -261,7 +261,7 @@ func (li *Listener) Addr() net.Addr {
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
-	pc       *PacketConn
+	pc       PacketConnInterface
 	qc       quic.Connection
 	qs       quic.Stream
 	doneChan chan struct{}
@@ -380,7 +380,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 
 // monitorUnreachable receives unreachable messages from the underlying PacketConn, and ends the connection
 // if the remote service has gone away.
-func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
+func monitorUnreachable(pc PacketConnInterface, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
 	msgCh := pc.SubscribeUnreachable(doneChan)
 	if msgCh == nil {
 		cancel()
@@ -390,7 +390,7 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	// read from channel until closed
 	for msg := range msgCh {
 		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-			pc.s.Logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
+			pc.getNetceptorLogger().Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
 			cancel()
 		}
 	}
@@ -421,11 +421,11 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) CloseConnection() error {
-	c.pc.cancel()
+	c.pc.getCancel()
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.getLocalService(), c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

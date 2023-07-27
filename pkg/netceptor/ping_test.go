@@ -2,6 +2,7 @@ package netceptor_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/netceptor"
@@ -17,6 +18,18 @@ func TestPing(t *testing.T) {
 	mockPacketConnInterface := mock_netceptor.NewMockPacketConnInterface(ctrl)
 	n := netceptor.New(ctx, "test")
 
+	factoryFunc := func(netceptor *netceptor.Netceptor, service string, ConnTypeDatagram byte) (netceptor.PacketConnInterface, error) {
+		return mockPacketConnInterface, nil
+	}
+
+	n.PacketConnFactoryFunc = factoryFunc
+
+	mockPacketConnInterface.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Times(1)
+	mockPacketConnInterface.EXPECT().SetHopsToLive(gomock.Any()).AnyTimes()
+	mockPacketConnInterface.EXPECT().Close().AnyTimes()
+	mockPacketConnInterface.EXPECT().SubscribeUnreachable(gomock.Any()).AnyTimes()
+	mockPacketConnInterface.EXPECT().ReadFrom(gomock.Any()).AnyTimes()
+
 	// Test Ping doesn't return an error
 	var b byte = 10
 	_, _, err := n.Ping(ctx, "test", b)
@@ -24,6 +37,10 @@ func TestPing(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	mockPacketConnInterface.EXPECT().SetHopsToLive(gomock.Any()).AnyTimes()
-	mockPacketConnInterface.EXPECT().LocalAddr().Return(mockPacketConnInterface.LocalAddr()).Times(1)
+	mockPacketConnInterface.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(10, errors.New("WriteTo should fail.")).Times(1)
+
+	_, _, err = n.Ping(ctx, "test", b)
+	if err == nil || err.Error() != "WriteTo should fail." {
+		t.Errorf("Expected 'WriteTo should fail.', got: %v", err)
+	}
 }

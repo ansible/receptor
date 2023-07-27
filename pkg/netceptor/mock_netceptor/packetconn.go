@@ -52,6 +52,48 @@ func (mr *MockPacketConnInterfaceMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockPacketConnInterface)(nil).Close))
 }
 
+// GetCancel mocks base method.
+func (m *MockPacketConnInterface) GetCancel() *context.CancelFunc {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCancel")
+	ret0, _ := ret[0].(*context.CancelFunc)
+	return ret0
+}
+
+// GetCancel indicates an expected call of GetCancel.
+func (mr *MockPacketConnInterfaceMockRecorder) GetCancel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCancel", reflect.TypeOf((*MockPacketConnInterface)(nil).GetCancel))
+}
+
+// GetLocalService mocks base method.
+func (m *MockPacketConnInterface) GetLocalService() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLocalService")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetLocalService indicates an expected call of GetLocalService.
+func (mr *MockPacketConnInterfaceMockRecorder) GetLocalService() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLocalService", reflect.TypeOf((*MockPacketConnInterface)(nil).GetLocalService))
+}
+
+// GetNetceptorLogger mocks base method.
+func (m *MockPacketConnInterface) GetNetceptorLogger() *logger.ReceptorLogger {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNetceptorLogger")
+	ret0, _ := ret[0].(*logger.ReceptorLogger)
+	return ret0
+}
+
+// GetNetceptorLogger indicates an expected call of GetNetceptorLogger.
+func (mr *MockPacketConnInterfaceMockRecorder) GetNetceptorLogger() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetceptorLogger", reflect.TypeOf((*MockPacketConnInterface)(nil).GetNetceptorLogger))
+}
+
 // LocalAddr mocks base method.
 func (m *MockPacketConnInterface) LocalAddr() net.Addr {
 	m.ctrl.T.Helper()
@@ -80,6 +122,30 @@ func (m *MockPacketConnInterface) ReadFrom(p []byte) (int, net.Addr, error) {
 func (mr *MockPacketConnInterfaceMockRecorder) ReadFrom(p interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFrom", reflect.TypeOf((*MockPacketConnInterface)(nil).ReadFrom), p)
+}
+
+// SetAdTags mocks base method.
+func (m *MockPacketConnInterface) SetAdTags(tags map[string]string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetAdTags", tags)
+}
+
+// SetAdTags indicates an expected call of SetAdTags.
+func (mr *MockPacketConnInterfaceMockRecorder) SetAdTags(tags interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAdTags", reflect.TypeOf((*MockPacketConnInterface)(nil).SetAdTags), tags)
+}
+
+// SetAdvertise mocks base method.
+func (m *MockPacketConnInterface) SetAdvertise(isAdvertise bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetAdvertise", isAdvertise)
+}
+
+// SetAdvertise indicates an expected call of SetAdvertise.
+func (mr *MockPacketConnInterfaceMockRecorder) SetAdvertise(isAdvertise interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAdvertise", reflect.TypeOf((*MockPacketConnInterface)(nil).SetAdvertise), isAdvertise)
 }
 
 // SetDeadline mocks base method.
@@ -163,70 +229,4 @@ func (m *MockPacketConnInterface) WriteTo(p []byte, addr net.Addr) (int, error) 
 func (mr *MockPacketConnInterfaceMockRecorder) WriteTo(p, addr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteTo", reflect.TypeOf((*MockPacketConnInterface)(nil).WriteTo), p, addr)
-}
-
-// getCancel mocks base method.
-func (m *MockPacketConnInterface) getCancel() *context.CancelFunc {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getCancel")
-	ret0, _ := ret[0].(*context.CancelFunc)
-	return ret0
-}
-
-// getCancel indicates an expected call of getCancel.
-func (mr *MockPacketConnInterfaceMockRecorder) getCancel() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getCancel", reflect.TypeOf((*MockPacketConnInterface)(nil).getCancel))
-}
-
-// getLocalService mocks base method.
-func (m *MockPacketConnInterface) getLocalService() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getLocalService")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// getLocalService indicates an expected call of getLocalService.
-func (mr *MockPacketConnInterfaceMockRecorder) getLocalService() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getLocalService", reflect.TypeOf((*MockPacketConnInterface)(nil).getLocalService))
-}
-
-// getNetceptorLogger mocks base method.
-func (m *MockPacketConnInterface) getNetceptorLogger() *logger.ReceptorLogger {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getNetceptorLogger")
-	ret0, _ := ret[0].(*logger.ReceptorLogger)
-	return ret0
-}
-
-// getNetceptorLogger indicates an expected call of getNetceptorLogger.
-func (mr *MockPacketConnInterfaceMockRecorder) getNetceptorLogger() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getNetceptorLogger", reflect.TypeOf((*MockPacketConnInterface)(nil).getNetceptorLogger))
-}
-
-// setAdTags mocks base method.
-func (m *MockPacketConnInterface) setAdTags(tags map[string]string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "setAdTags", tags)
-}
-
-// setAdTags indicates an expected call of setAdTags.
-func (mr *MockPacketConnInterfaceMockRecorder) setAdTags(tags interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "setAdTags", reflect.TypeOf((*MockPacketConnInterface)(nil).setAdTags), tags)
-}
-
-// setAdvertise mocks base method.
-func (m *MockPacketConnInterface) setAdvertise(isAdvertise bool) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "setAdvertise", isAdvertise)
-}
-
-// setAdvertise indicates an expected call of setAdvertise.
-func (mr *MockPacketConnInterfaceMockRecorder) setAdvertise(isAdvertise interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "setAdvertise", reflect.TypeOf((*MockPacketConnInterface)(nil).setAdvertise), isAdvertise)
 }

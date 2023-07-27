@@ -147,6 +147,7 @@ type Netceptor struct {
 	firewallLock             *sync.RWMutex
 	firewallRules            []FirewallRuleFunc
 	Logger                   *logger.ReceptorLogger
+	PacketConnFactoryFunc    func(s *Netceptor, service string, ConnTypeDatagram byte) (PacketConnInterface, error)
 }
 
 // ConnStatus holds information about a single connection in the Status struct.

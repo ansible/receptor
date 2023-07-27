@@ -22,11 +22,11 @@ type PacketConnInterface interface {
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
 
-	getNetceptorLogger() *logger.ReceptorLogger
-	getCancel() *context.CancelFunc
-	getLocalService() string
-	setAdvertise(isAdvertise bool)
-	setAdTags(tags map[string]string)
+	GetNetceptorLogger() *logger.ReceptorLogger
+	GetCancel() *context.CancelFunc
+	GetLocalService() string
+	SetAdvertise(isAdvertise bool)
+	SetAdTags(tags map[string]string)
 }
 
 // PacketConn implements the net.PacketConn interface via the Receptor network.
@@ -78,31 +78,42 @@ func (s *Netceptor) ListenPacket(service string) (PacketConnInterface, error) {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
 	_ = s.addNameHash(service)
-	pc, err := NewPacketConn(s, service, ConnTypeDatagram)
-	if err != nil {
 
+	factoryFunc := s.PacketConnFactoryFunc
+	if factoryFunc == nil {
+		factoryFunc = NewPacketConn
+	}
+
+	pc, err := factoryFunc(s, service, ConnTypeDatagram)
+	if err != nil {
+		return nil, err
+	}
+
+	// pc, err := NewPacketConn(s, service, ConnTypeDatagram)
+	if err != nil {
+		return nil, err
 	}
 
 	return pc, nil
 }
 
-func (pc *PacketConn) setAdvertise(isAdvertise bool) {
+func (pc *PacketConn) SetAdvertise(isAdvertise bool) {
 	pc.advertise = isAdvertise
 }
 
-func (pc *PacketConn) setAdTags(tags map[string]string) {
+func (pc *PacketConn) SetAdTags(tags map[string]string) {
 	pc.adTags = tags
 }
 
-func (pc *PacketConn) getNetceptorLogger() *logger.ReceptorLogger {
+func (pc *PacketConn) GetNetceptorLogger() *logger.ReceptorLogger {
 	return pc.s.Logger
 }
 
-func (pc *PacketConn) getCancel() *context.CancelFunc {
+func (pc *PacketConn) GetCancel() *context.CancelFunc {
 	return &pc.cancel
 }
 
-func (pc *PacketConn) getLocalService() string {
+func (pc *PacketConn) GetLocalService() string {
 	return pc.localService
 }
 
@@ -113,8 +124,8 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	if err != nil {
 		return nil, err
 	}
-	pc.setAdvertise(true)
-	pc.setAdTags(tags)
+	pc.SetAdvertise(true)
+	pc.SetAdTags(tags)
 	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
 
 	return pc, nil

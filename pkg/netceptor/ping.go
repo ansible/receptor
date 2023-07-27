@@ -7,8 +7,21 @@ import (
 	"time"
 )
 
+// NetceptorForPing should include all methods of Netceptor needed by the Ping function
+type NetceptorForPing interface {
+	ListenPacket(service string) (PacketConner, error)
+	NewAddr(target string, service string) Addr
+	NodeID() string
+	Context() context.Context
+}
+
 // Ping sends a single test packet and waits for a reply or error.
 func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
+	return Pinger(s, ctx, target, hopsToLive)
+}
+
+// Ping sends a single test packet and waits for a reply or error.
+func Pinger(s NetceptorForPing, ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return 0, "", err
@@ -49,7 +62,7 @@ func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (t
 			select {
 			case replyChan <- fromNode:
 			case <-ctxPing.Done():
-			case <-s.context.Done():
+			case <-s.Context().Done():
 			}
 		} else {
 			select {
@@ -58,7 +71,7 @@ func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (t
 				fromNode: fromNode,
 			}:
 			case <-ctx.Done():
-			case <-s.context.Done():
+			case <-s.Context().Done():
 			}
 		}
 	}()
@@ -75,7 +88,7 @@ func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (t
 		return time.Since(startTime), "", fmt.Errorf("timeout")
 	case <-ctxPing.Done():
 		return time.Since(startTime), "", fmt.Errorf("user cancelled")
-	case <-s.context.Done():
+	case <-s.Context().Done():
 		return time.Since(startTime), "", fmt.Errorf("netceptor shutdown")
 	}
 }

@@ -44,14 +44,14 @@ type PacketConn struct {
 	cancel          context.CancelFunc
 }
 
-func NewPacketConn(s *Netceptor, service string, ConnTypeDatagram byte) (PacketConnInterface, error) {
+func NewPacketConn(s *Netceptor, service string, connTypeDatagram byte) (PacketConnInterface, error) {
 	npc := &PacketConn{
 		s:            s,
 		localService: service,
 		recvChan:     make(chan *MessageData),
 		advertise:    false,
 		adTags:       nil,
-		connType:     ConnTypeDatagram,
+		connType:     connTypeDatagram,
 		hopsToLive:   s.maxForwardingHops,
 	}
 

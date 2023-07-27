@@ -37,10 +37,10 @@ func TestPing(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	mockPacketConnInterface.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(10, errors.New("WriteTo should fail.")).Times(1)
+	mockPacketConnInterface.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(10, errors.New("writeTo should fail")).Times(1)
 
 	_, _, err = n.Ping(ctx, "test", b)
-	if err == nil || err.Error() != "WriteTo should fail." {
-		t.Errorf("Expected 'WriteTo should fail.', got: %v", err)
+	if err == nil || err.Error() != "writeTo should fail" {
+		t.Errorf("Expected 'writeTo should fail', got: %v", err)
 	}
 }

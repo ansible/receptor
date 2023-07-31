@@ -47,6 +47,37 @@ func TestWorkSubmitWithTLSClient(t *testing.T) {
 	}
 }
 
+func BenchmarkWorkSubmitWithTLSClient(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for _, plugin := range workPlugins {
+			plugin := plugin
+
+			b.Run(string(plugin), func(b *testing.B) {
+				controllers, m, expectedResults := benchWorkSetup(plugin, b)
+
+				defer m.WaitForShutdown()
+				defer m.Destroy()
+
+				command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"client","node":"node2","params":"", "ttl":"10h"}`
+				unitID, err := controllers["node1"].WorkSubmitJSON(command)
+				if err != nil {
+					b.Fatal(err, m.DataDir)
+				}
+				ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+				err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+				if err != nil {
+					b.Fatal(err, m.DataDir)
+				}
+
+				err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
+				if err != nil {
+					b.Fatal(err, m.GetDataDir())
+				}
+			})
+		}
+	}
+}
+
 // Tests that submitting work with wrong cert CN immediately fails the job
 // also tests that releasing a job that has not been started on remote
 // will not attempt to connect to remote.
@@ -490,7 +521,9 @@ func TestRuntimeParams(t *testing.T) {
 }
 
 func TestKubeRuntimeParams(t *testing.T) {
-	checkSkipKube(t)
+	if checkSkipKube() {
+		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
+	}
 
 	m := NewLibMesh()
 	node1 := m.NewLibNode("node1")
@@ -610,7 +643,9 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 }
 
 func TestKubeContainerFailure(t *testing.T) {
-	checkSkipKube(t)
+	if checkSkipKube() {
+		t.Skip("Kubernetes tests are set to skip, unset SKIP_KUBE to run them")
+	}
 
 	m := NewLibMesh()
 	node1 := m.NewLibNode("node1")

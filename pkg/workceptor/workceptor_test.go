@@ -17,12 +17,9 @@ func TestAllocateUnit(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockWorkUnit := mock_workceptor.NewMockWorkUnit(ctrl)
-	mockWorkUnit.EXPECT().SetFromParams(gomock.Any()).Return(nil).Times(1)
-	mockWorkUnit.EXPECT().Save().Return(nil).Times(1)
 	ctx := context.Background()
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 
-	// attach logger to the mock netceptor and return any number of times
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
@@ -35,33 +32,79 @@ func TestAllocateUnit(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error while creating Workceptor: %v", err)
 	}
+	const testType = "testType"
 
 	mockNetceptor.EXPECT().AddWorkCommand(gomock.Any(), gomock.Any()).Return(nil)
-	w.RegisterWorker("testType", workFunc, false)
-	// Test a normal case
-	_, err = w.AllocateUnit("testType", map[string]string{"param": "value"})
-	if err != nil {
-		t.Errorf("Expected no error, got: %v", err)
+	w.RegisterWorker(testType, workFunc, false)
+
+	const paramError = "SetFromParams error"
+	const saveError = "Save error"
+	testCases := []struct {
+		name               string
+		workType           string
+		setFromParamsError error
+		saveError          error
+		mockSetParam       bool
+		mockSave           bool
+		expectedError      string
+	}{
+		{
+			name:               "normal case",
+			workType:           testType,
+			setFromParamsError: nil,
+			saveError:          nil,
+			mockSetParam:       true,
+			mockSave:           true,
+			expectedError:      "",
+		},
+		{
+			name:               "work type doesn't exist",
+			workType:           "nonexistentType",
+			setFromParamsError: nil,
+			saveError:          nil,
+			mockSetParam:       false,
+			mockSave:           false,
+			expectedError:      fmt.Sprintf("unknown work type %s", "nonexistentType"),
+		},
+		{
+			name:               paramError,
+			workType:           testType,
+			setFromParamsError: errors.New(paramError),
+			saveError:          nil,
+			mockSetParam:       true,
+			mockSave:           false,
+			expectedError:      paramError,
+		},
+		{
+			name:               saveError,
+			workType:           testType,
+			setFromParamsError: nil,
+			saveError:          errors.New(saveError),
+			mockSetParam:       true,
+			mockSave:           true,
+			expectedError:      saveError,
+		},
 	}
 
-	// Test with a work type that doesn't exist
-	_, err = w.AllocateUnit("nonexistentType", map[string]string{"param": "value"})
-	if err == nil || err.Error() != fmt.Errorf("unknown work type %s", "nonexistentType").Error() {
-		t.Errorf("Expected 'unknown work type %s', got: %v", "nonexistentType", err)
+	checkError := func(err error, expectedError string, t *testing.T) {
+		if expectedError == "" && err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		} else if expectedError != "" && (err == nil || err.Error() != expectedError) {
+			t.Errorf("Expected error: %s, got: %v", expectedError, err)
+		}
 	}
 
-	// Test with a SetFromParams that returns an error
-	mockWorkUnit.EXPECT().SetFromParams(gomock.Any()).Return(errors.New("SetFromParams error"))
-	_, err = w.AllocateUnit("testType", map[string]string{"param": "value"})
-	if err == nil || err.Error() != "SetFromParams error" {
-		t.Errorf("Expected 'SetFromParams error', got: %v", err)
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.mockSetParam {
+				mockWorkUnit.EXPECT().SetFromParams(gomock.Any()).Return(tc.setFromParamsError).Times(1)
+			}
+			if tc.mockSave {
+				mockWorkUnit.EXPECT().Save().Return(tc.saveError).Times(1)
+			}
 
-	// Test with a Save that returns an error
-	mockWorkUnit.EXPECT().SetFromParams(gomock.Any()).Return(nil)
-	mockWorkUnit.EXPECT().Save().Return(errors.New("Save error"))
-	_, err = w.AllocateUnit("testType", map[string]string{"param": "value"})
-	if err == nil || err.Error() != "Save error" {
-		t.Errorf("Expected 'Save error', got: %v", err)
+			_, err := w.AllocateUnit(tc.workType, map[string]string{"param": "value"})
+			checkError(err, tc.expectedError, t)
+		})
 	}
 }

@@ -452,7 +452,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 
 		return err
 	} else if err != nil { // any other error besides ErrPodCompleted
-		stdout, err2 := newStdoutWriter(kw.UnitDir())
+		stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 		if err2 != nil {
 			errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
 			kw.Error(errMsg)
@@ -609,7 +609,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	var stdin *stdinReader
 	if !skipStdin {
 		var err error
-		stdin, err = newStdinReader(kw.UnitDir())
+		stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
 		if err != nil {
 			if errors.Is(err, errFileSizeZero) {
 				skipStdin = true
@@ -637,7 +637,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	}
 
 	// open stdout writer that writes to work unit's data directory
-	stdout, err := newStdoutWriter(kw.UnitDir())
+	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
 		kw.Error(errMsg)
@@ -951,7 +951,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 
 	// Open stdin reader
 	var stdin *stdinReader
-	stdin, err = newStdinReader(kw.UnitDir())
+	stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
 		kw.w.nc.GetLogger().Error(errMsg)
@@ -962,7 +962,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 
 	// Open stdout writer
-	stdout, err := newStdoutWriter(kw.UnitDir())
+	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
 		kw.w.nc.GetLogger().Error(errMsg)

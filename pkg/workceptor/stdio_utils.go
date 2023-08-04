@@ -11,6 +11,41 @@ import (
 	"sync"
 )
 
+// FileSystemer represents a filesystem.
+type FileSystemer interface {
+	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
+	Stat(name string) (os.FileInfo, error)
+	Open(name string) (*os.File, error)
+}
+
+// FileSystem represents the real filesystem.
+type FileSystem struct{}
+
+// OpenFile opens a file on the filesystem.
+func (FileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
+// Stat retrieves the FileInfo for a given file name.
+func (FileSystem) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
+}
+
+// Open opens a file.
+func (FileSystem) Open(name string) (*os.File, error) {
+	return os.Open(name)
+}
+
+// FileWriteCloser wraps io.WriteCloser.
+type FileWriteCloser interface {
+	io.WriteCloser
+}
+
+// FileReadCloser wraps io.ReadCloser.
+type FileReadCloser interface {
+	io.ReadCloser
+}
+
 // saveStdoutSize only the stdout size in the status metadata file in the unitdir.
 func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	statusFilename := path.Join(unitdir, "status")
@@ -21,16 +56,16 @@ func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	})
 }
 
-// stdoutWriter writes to a stdout file while also updating the status file.
+// StdoutWriter writes to a stdout file while also updating the status file.
 type stdoutWriter struct {
 	unitdir      string
-	writer       io.WriteCloser
+	writer       FileWriteCloser
 	bytesWritten int64
 }
 
-// newStdoutWriter allocates a new stdoutWriter, which writes to both the stdout and status files.
-func newStdoutWriter(unitdir string) (*stdoutWriter, error) {
-	writer, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
+// NewStdoutWriter allocates a new stdoutWriter, which writes to both the stdout and status files.
+func NewStdoutWriter(fs FileSystemer, unitdir string) (*stdoutWriter, error) {
+	writer, err := fs.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +97,14 @@ func (sw *stdoutWriter) Size() int64 {
 	return sw.bytesWritten
 }
 
+// SetWriter sets the writer var.
+func (sw *stdoutWriter) SetWriter(writer FileWriteCloser) {
+	sw.writer = writer
+}
+
 // stdinReader reads from a stdin file and provides a Done function.
 type stdinReader struct {
-	reader   io.ReadCloser
+	reader   FileReadCloser
 	lasterr  error
 	doneChan chan struct{}
 	doneOnce sync.Once
@@ -72,17 +112,17 @@ type stdinReader struct {
 
 var errFileSizeZero = errors.New("file is empty")
 
-// newStdinReader allocates a new stdinReader, which reads from a stdin file and provides a Done function.
-func newStdinReader(unitdir string) (*stdinReader, error) {
+// NewStdinReader allocates a new stdinReader, which reads from a stdin file and provides a Done function.
+func NewStdinReader(fs FileSystemer, unitdir string) (*stdinReader, error) {
 	stdinpath := path.Join(unitdir, "stdin")
-	stat, err := os.Stat(stdinpath)
+	stat, err := fs.Stat(stdinpath)
 	if err != nil {
 		return nil, err
 	}
 	if stat.Size() == 0 {
 		return nil, errFileSizeZero
 	}
-	reader, err := os.Open(stdinpath)
+	reader, err := fs.Open(stdinpath)
 	if err != nil {
 		return nil, err
 	}
@@ -116,4 +156,9 @@ func (sr *stdinReader) Done() <-chan struct{} {
 // Error returns the most recent error encountered in the reader.
 func (sr *stdinReader) Error() error {
 	return sr.lasterr
+}
+
+// SetReader sets the reader var.
+func (sr *stdinReader) SetReader(reader FileReadCloser) {
+	sr.reader = reader
 }

@@ -166,7 +166,7 @@ func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool) (io.ReadCloser
 	return logStream, nil
 }
 
-func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *stdoutWriter, stdoutErr *error) {
+func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdoutErr *error) {
 	// Legacy method, for use on k8s < v1.23.14
 	// uses io.Copy to stream data from pod to stdout file
 	// known issues around this, as logstream can terminate due to log rotation
@@ -190,7 +190,7 @@ func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *s
 	}
 }
 
-func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *stdoutWriter, stdinErr *error, stdoutErr *error) {
+func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdinErr *error, stdoutErr *error) {
 	// preferred method for k8s >= 1.23.14
 	defer streamWait.Done()
 	var sinceTime time.Time
@@ -606,7 +606,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	stdinErrChan := make(chan struct{}) // signal that stdin goroutine have errored and stop stdout goroutine
 
 	// open stdin reader that reads from the work unit's data directory
-	var stdin *stdinReader
+	var stdin *STDinReader
 	if !skipStdin {
 		var err error
 		stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
@@ -950,7 +950,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 
 	// Open stdin reader
-	var stdin *stdinReader
+	var stdin *STDinReader
 	stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)

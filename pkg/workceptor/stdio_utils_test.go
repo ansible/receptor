@@ -11,30 +11,58 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
+const errorMsgFmt = "Expected error: %s, got: %v"
+
 // checkErrorAndNum checks common return types against expected values.
 func checkErrorAndNum(err error, expectedErr string, num int, expectedNum int, t *testing.T) {
 	if expectedErr == "" && err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	} else if expectedErr != "" && (err == nil || err.Error() != expectedErr) {
-		t.Errorf("Expected error: %s, got: %v", expectedErr, err)
+		t.Errorf(errorMsgFmt, expectedErr, err)
 	}
 	if num != expectedNum {
 		t.Errorf("Expected num to be %d, got: %d", expectedNum, num)
 	}
 }
 
-func TestWrite(t *testing.T) {
+func setup(t *testing.T) (*gomock.Controller, *mock_workceptor.MockFileSystemer) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-	mockfilewc := mock_workceptor.NewMockFileWriteCloser(ctrl)
 
+	return ctrl, mockfilesystemer
+}
+
+func setupWriter(t *testing.T) (*gomock.Controller, *workceptor.STDoutWriter) {
+	ctrl, mockfilesystemer := setup(t)
 	mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil)
 	wc, err := workceptor.NewStdoutWriter(mockfilesystemer, "")
 	if err != nil {
 		t.Errorf("Error while creating std writer: %v", err)
 	}
+
+	return ctrl, wc
+}
+
+func setupReader(t *testing.T) (*gomock.Controller, *workceptor.STDinReader) {
+	ctrl, mockfilesystemer := setup(t)
+	statObj := NewInfo("test", 1, 0, time.Now())
+
+	mockfilesystemer.EXPECT().Stat(gomock.Any()).Return(statObj, nil)
+	mockfilesystemer.EXPECT().Open(gomock.Any()).Return(&os.File{}, nil)
+
+	wc, err := workceptor.NewStdinReader(mockfilesystemer, "")
+	if err != nil {
+		t.Errorf(stdinError)
+	}
+
+	return ctrl, wc
+}
+
+func TestWrite(t *testing.T) {
+	ctrl, wc := setupWriter(t)
+	mockfilewc := mock_workceptor.NewMockFileWriteCloser(ctrl)
 	wc.SetWriter(mockfilewc)
 
 	writeTestCases := []struct {
@@ -59,16 +87,7 @@ func TestWrite(t *testing.T) {
 }
 
 func TestWriteSize(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-
-	mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil)
-	wc, err := workceptor.NewStdoutWriter(mockfilesystemer, "")
-	if err != nil {
-		t.Errorf("Error while creating std writer: %v", err)
-	}
+	_, wc := setupWriter(t)
 
 	sizeTestCases := []struct {
 		name         string
@@ -130,19 +149,7 @@ func (i *Info) Sys() interface{} {
 const stdinError = "Error creating stdinReader"
 
 func TestRead(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-	statObj := NewInfo("test", 1, 0, time.Now())
-
-	mockfilesystemer.EXPECT().Stat(gomock.Any()).Return(statObj, nil)
-	mockfilesystemer.EXPECT().Open(gomock.Any()).Return(&os.File{}, nil)
-
-	wc, err := workceptor.NewStdinReader(mockfilesystemer, "")
-	if err != nil {
-		t.Errorf(stdinError)
-	}
+	ctrl, wc := setupReader(t)
 
 	mockReadClose := mock_workceptor.NewMockFileReadCloser(ctrl)
 	wc.SetReader(mockReadClose)
@@ -168,19 +175,7 @@ func TestRead(t *testing.T) {
 }
 
 func TestDone(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-	statObj := NewInfo("test", 1, 0, time.Now())
-
-	mockfilesystemer.EXPECT().Stat(gomock.Any()).Return(statObj, nil)
-	mockfilesystemer.EXPECT().Open(gomock.Any()).Return(&os.File{}, nil)
-
-	wc, err := workceptor.NewStdinReader(mockfilesystemer, "")
-	if err != nil {
-		t.Errorf(stdinError)
-	}
+	_, wc := setupReader(t)
 
 	channel := wc.Done()
 	if channel == nil {
@@ -189,22 +184,80 @@ func TestDone(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	_, wc := setupReader(t)
 
-	mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-	statObj := NewInfo("test", 1, 0, time.Now())
-
-	mockfilesystemer.EXPECT().Stat(gomock.Any()).Return(statObj, nil)
-	mockfilesystemer.EXPECT().Open(gomock.Any()).Return(&os.File{}, nil)
-
-	wc, err := workceptor.NewStdinReader(mockfilesystemer, "")
-	if err != nil {
-		t.Errorf(stdinError)
-	}
-
-	err = wc.Error()
+	err := wc.Error()
 	if err != nil {
 		t.Errorf("Unexpected error returned from stdreader")
+	}
+}
+
+func TestNewStdoutWriter(t *testing.T) {
+	_, mockfilesystemer := setup(t)
+
+	newWriterTestCases := []struct {
+		name        string
+		returnErr   error
+		expectedErr string
+	}{
+		{"Create Writer OK", nil, ""},
+		{"Create Writer Error", errors.New("Create Write error"), "Create Write error"},
+	}
+
+	for _, testCase := range newWriterTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, testCase.returnErr)
+			_, err := workceptor.NewStdoutWriter(mockfilesystemer, "")
+			checkErrorAndNum(err, testCase.expectedErr, 0, 0, t)
+		})
+	}
+}
+
+func checkErrorsReader(err error, expectedStatErr string, expectedOpenErr string, expectedStatSize int, t *testing.T) {
+	switch {
+	case expectedStatErr == "" && expectedOpenErr == "" && expectedStatSize > 0 && err != nil:
+		t.Errorf("Expected no error, got: %v", err)
+
+	case expectedStatErr != "" && (err == nil || err.Error() != expectedStatErr):
+		t.Errorf(errorMsgFmt, expectedStatErr, err)
+
+	case expectedOpenErr != "" && (err == nil || err.Error() != expectedOpenErr):
+		t.Errorf(errorMsgFmt, expectedOpenErr, err)
+
+	case expectedStatSize < 1 && (err == nil || err.Error() != "file is empty"):
+		t.Errorf(errorMsgFmt, "file is empty", err)
+	}
+}
+
+func TestNewStdinReader(t *testing.T) {
+	_, mockfilesystemer := setup(t)
+
+	readTestCases := []struct {
+		name             string
+		returnStatSize   int
+		returnStatErr    error
+		expectedStatSize int
+		expectedStatErr  string
+		returnOpenErr    error
+		expectedOpenErr  string
+		mockOpen         bool
+	}{
+		{"Create Read ok", 1, nil, 1, "", nil, "", true},
+		{"Create Read Stat Error", 1, errors.New("Create Read Stat error"), 1, "Create Read Stat error", nil, "", false},
+		{"Create Read Size Error", 0, nil, 0, "", nil, "", false},
+		{"Create Read Open Error", 1, nil, 1, "", errors.New("Create Read Open error"), "Create Read Open error", true},
+	}
+
+	for _, testCase := range readTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			statObj := NewInfo("test", int64(testCase.returnStatSize), 0, time.Now())
+			mockfilesystemer.EXPECT().Stat(gomock.Any()).Return(statObj, testCase.returnStatErr)
+			if testCase.mockOpen {
+				mockfilesystemer.EXPECT().Open(gomock.Any()).Return(&os.File{}, testCase.returnOpenErr)
+			}
+
+			_, err := workceptor.NewStdinReader(mockfilesystemer, "")
+			checkErrorsReader(err, testCase.expectedStatErr, testCase.expectedOpenErr, testCase.expectedStatSize, t)
+		})
 	}
 }

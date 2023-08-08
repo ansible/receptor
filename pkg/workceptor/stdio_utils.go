@@ -56,21 +56,21 @@ func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	})
 }
 
-// StdoutWriter writes to a stdout file while also updating the status file.
-type stdoutWriter struct {
+// STDoutWriter writes to a stdout file while also updating the status file.
+type STDoutWriter struct {
 	unitdir      string
 	writer       FileWriteCloser
 	bytesWritten int64
 }
 
 // NewStdoutWriter allocates a new stdoutWriter, which writes to both the stdout and status files.
-func NewStdoutWriter(fs FileSystemer, unitdir string) (*stdoutWriter, error) {
+func NewStdoutWriter(fs FileSystemer, unitdir string) (*STDoutWriter, error) {
 	writer, err := fs.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
 	if err != nil {
 		return nil, err
 	}
 
-	return &stdoutWriter{
+	return &STDoutWriter{
 		unitdir:      unitdir,
 		writer:       writer,
 		bytesWritten: 0,
@@ -78,7 +78,7 @@ func NewStdoutWriter(fs FileSystemer, unitdir string) (*stdoutWriter, error) {
 }
 
 // Write writes data to the stdout file and status file, implementing io.Writer.
-func (sw *stdoutWriter) Write(p []byte) (n int, err error) {
+func (sw *STDoutWriter) Write(p []byte) (n int, err error) {
 	wn, werr := sw.writer.Write(p)
 	var serr error
 	if wn > 0 {
@@ -93,17 +93,17 @@ func (sw *stdoutWriter) Write(p []byte) (n int, err error) {
 }
 
 // Size returns the current size of the stdout file.
-func (sw *stdoutWriter) Size() int64 {
+func (sw *STDoutWriter) Size() int64 {
 	return sw.bytesWritten
 }
 
 // SetWriter sets the writer var.
-func (sw *stdoutWriter) SetWriter(writer FileWriteCloser) {
+func (sw *STDoutWriter) SetWriter(writer FileWriteCloser) {
 	sw.writer = writer
 }
 
-// stdinReader reads from a stdin file and provides a Done function.
-type stdinReader struct {
+// STDinReader reads from a stdin file and provides a Done function.
+type STDinReader struct {
 	reader   FileReadCloser
 	lasterr  error
 	doneChan chan struct{}
@@ -113,7 +113,7 @@ type stdinReader struct {
 var errFileSizeZero = errors.New("file is empty")
 
 // NewStdinReader allocates a new stdinReader, which reads from a stdin file and provides a Done function.
-func NewStdinReader(fs FileSystemer, unitdir string) (*stdinReader, error) {
+func NewStdinReader(fs FileSystemer, unitdir string) (*STDinReader, error) {
 	stdinpath := path.Join(unitdir, "stdin")
 	stat, err := fs.Stat(stdinpath)
 	if err != nil {
@@ -127,7 +127,7 @@ func NewStdinReader(fs FileSystemer, unitdir string) (*stdinReader, error) {
 		return nil, err
 	}
 
-	return &stdinReader{
+	return &STDinReader{
 		reader:   reader,
 		lasterr:  nil,
 		doneChan: make(chan struct{}),
@@ -136,7 +136,7 @@ func NewStdinReader(fs FileSystemer, unitdir string) (*stdinReader, error) {
 }
 
 // Read reads data from the stdout file, implementing io.Reader.
-func (sr *stdinReader) Read(p []byte) (n int, err error) {
+func (sr *STDinReader) Read(p []byte) (n int, err error) {
 	n, err = sr.reader.Read(p)
 	if err != nil {
 		sr.lasterr = err
@@ -149,16 +149,16 @@ func (sr *stdinReader) Read(p []byte) (n int, err error) {
 }
 
 // Done returns a channel that will be closed on error (including EOF) in the reader.
-func (sr *stdinReader) Done() <-chan struct{} {
+func (sr *STDinReader) Done() <-chan struct{} {
 	return sr.doneChan
 }
 
 // Error returns the most recent error encountered in the reader.
-func (sr *stdinReader) Error() error {
+func (sr *STDinReader) Error() error {
 	return sr.lasterr
 }
 
 // SetReader sets the reader var.
-func (sr *stdinReader) SetReader(reader FileReadCloser) {
+func (sr *STDinReader) SetReader(reader FileReadCloser) {
 	sr.reader = reader
 }

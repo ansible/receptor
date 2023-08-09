@@ -38,6 +38,20 @@ func (m *MockPacketConner) EXPECT() *MockPacketConnerMockRecorder {
 	return m.recorder
 }
 
+// Cancel mocks base method.
+func (m *MockPacketConner) Cancel() *context.CancelFunc {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Cancel")
+	ret0, _ := ret[0].(*context.CancelFunc)
+	return ret0
+}
+
+// Cancel indicates an expected call of Cancel.
+func (mr *MockPacketConnerMockRecorder) Cancel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cancel", reflect.TypeOf((*MockPacketConner)(nil).Cancel))
+}
+
 // Close mocks base method.
 func (m *MockPacketConner) Close() error {
 	m.ctrl.T.Helper()
@@ -50,20 +64,6 @@ func (m *MockPacketConner) Close() error {
 func (mr *MockPacketConnerMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockPacketConner)(nil).Close))
-}
-
-// GetCancel mocks base method.
-func (m *MockPacketConner) GetCancel() *context.CancelFunc {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCancel")
-	ret0, _ := ret[0].(*context.CancelFunc)
-	return ret0
-}
-
-// GetCancel indicates an expected call of GetCancel.
-func (mr *MockPacketConnerMockRecorder) GetCancel() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCancel", reflect.TypeOf((*MockPacketConner)(nil).GetCancel))
 }
 
 // GetLocalService mocks base method.
@@ -80,18 +80,18 @@ func (mr *MockPacketConnerMockRecorder) GetLocalService() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLocalService", reflect.TypeOf((*MockPacketConner)(nil).GetLocalService))
 }
 
-// GetNetceptorLogger mocks base method.
-func (m *MockPacketConner) GetNetceptorLogger() *logger.ReceptorLogger {
+// GetLogger mocks base method.
+func (m *MockPacketConner) GetLogger() *logger.ReceptorLogger {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNetceptorLogger")
+	ret := m.ctrl.Call(m, "GetLogger")
 	ret0, _ := ret[0].(*logger.ReceptorLogger)
 	return ret0
 }
 
-// GetNetceptorLogger indicates an expected call of GetNetceptorLogger.
-func (mr *MockPacketConnerMockRecorder) GetNetceptorLogger() *gomock.Call {
+// GetLogger indicates an expected call of GetLogger.
+func (mr *MockPacketConnerMockRecorder) GetLogger() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetceptorLogger", reflect.TypeOf((*MockPacketConner)(nil).GetNetceptorLogger))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogger", reflect.TypeOf((*MockPacketConner)(nil).GetLogger))
 }
 
 // LocalAddr mocks base method.

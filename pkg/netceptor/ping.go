@@ -15,13 +15,13 @@ type NetceptorForPing interface {
 	Context() context.Context
 }
 
-// Ping sends a single test packet and waits for a reply or error.
+// Ping calls CreatePing to sends a single test packet and waits for a reply or error.
 func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
-	return Pinger(s, ctx, target, hopsToLive)
+	return CreatePing(ctx, s, target, hopsToLive)
 }
 
-// Ping sends a single test packet and waits for a reply or error.
-func Pinger(s NetceptorForPing, ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
+// CreatePin creates Ping by sending a single test packet and waits for a replay or error.
+func CreatePing(ctx context.Context, s NetceptorForPing, target string, hopsToLive byte) (time.Duration, string, error) {
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return 0, "", err

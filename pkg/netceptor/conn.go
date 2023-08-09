@@ -390,7 +390,7 @@ func monitorUnreachable(pc PacketConner, doneChan chan struct{}, remoteAddr Addr
 	// read from channel until closed
 	for msg := range msgCh {
 		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-			pc.GetNetceptorLogger().Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
+			pc.GetLogger().Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
 			cancel()
 		}
 	}
@@ -421,7 +421,7 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) CloseConnection() error {
-	c.pc.GetCancel()
+	c.pc.Cancel()
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})

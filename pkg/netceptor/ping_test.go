@@ -31,7 +31,7 @@ func TestPing(t *testing.T) {
 	// Now you can call Ping and it will use your mock Netceptor and PacketConn
 	ctx := context.Background()
 	// dur, nodeID, err := mockNetceptor.Ping(ctx, "target", 1)
-	dur, nodeID, err := netceptor.Pinger(mockNetceptor, ctx, "target", 1)
+	dur, nodeID, err := netceptor.CreatePing(ctx, mockNetceptor, "target", 1)
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

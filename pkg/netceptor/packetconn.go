@@ -21,9 +21,9 @@ type PacketConner interface {
 	SetDeadline(t time.Time) error
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
-	GetCancel() *context.CancelFunc
+	Cancel() *context.CancelFunc
 	GetLocalService() string
-	GetNetceptorLogger() *logger.ReceptorLogger
+	GetLogger() *logger.ReceptorLogger
 }
 
 // PacketConn implements the net.PacketConn interface via the Receptor network.
@@ -90,6 +90,19 @@ func (s *Netceptor) ListenPacket(service string) (PacketConner, error) {
 // ListenPacketAndAdvertise returns a datagram listener, and also broadcasts service
 // advertisements to the Receptor network as long as the listener remains open.
 func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]string) (PacketConner, error) {
+	if len(service) > 8 {
+		return nil, fmt.Errorf("service name %s too long", service)
+	}
+	if service == "" {
+		service = s.getEphemeralService()
+	}
+	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
+	_, isReserved := s.reservedServices[service]
+	_, isListening := s.listenerRegistry[service]
+	if isReserved || isListening {
+		return nil, fmt.Errorf("service %s is already listening", service)
+	}
 	pc, err := NewPacketConnWithConst(s, service, true, tags, ConnTypeDatagram)
 	if err != nil {
 		return nil, err
@@ -99,7 +112,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	return pc, nil
 }
 
-func (pc *PacketConn) GetCancel() *context.CancelFunc {
+func (pc *PacketConn) Cancel() *context.CancelFunc {
 	return &pc.cancel
 }
 
@@ -107,7 +120,7 @@ func (pc *PacketConn) GetLocalService() string {
 	return pc.localService
 }
 
-func (pc *PacketConn) GetNetceptorLogger() *logger.ReceptorLogger {
+func (pc *PacketConn) GetLogger() *logger.ReceptorLogger {
 	return pc.s.Logger
 }
 

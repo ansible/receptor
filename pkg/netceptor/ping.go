@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// NetceptorForPing should include all methods of Netceptor needed by the Ping function
+// NetceptorForPing should include all methods of Netceptor needed by the Ping function.
 type NetceptorForPing interface {
 	ListenPacket(service string) (PacketConner, error)
 	NewAddr(target string, service string) Addr

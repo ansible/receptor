@@ -41,7 +41,7 @@ type PacketConn struct {
 	cancel          context.CancelFunc
 }
 
-func NewPacketConnWithConst(s *Netceptor, service string, advertise bool, adtags map[string]string, connTypeDatagram byte) (*PacketConn, error) {
+func NewPacketConnWithConst(s *Netceptor, service string, advertise bool, adtags map[string]string, connTypeDatagram byte) *PacketConn {
 	npc := &PacketConn{
 		s:            s,
 		localService: service,
@@ -55,10 +55,10 @@ func NewPacketConnWithConst(s *Netceptor, service string, advertise bool, adtags
 	npc.startUnreachable()
 	s.listenerRegistry[service] = npc
 
-	return npc, nil
+	return npc
 }
 
-func NewPacketConn(s *Netceptor, service string, connTypeDatagram byte) (*PacketConn, error) {
+func NewPacketConn(s *Netceptor, service string, connTypeDatagram byte) *PacketConn {
 	return NewPacketConnWithConst(s, service, false, nil, connTypeDatagram)
 }
 
@@ -79,10 +79,7 @@ func (s *Netceptor) ListenPacket(service string) (PacketConner, error) {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
 	_ = s.addNameHash(service)
-	pc, err := NewPacketConn(s, service, ConnTypeDatagram)
-	if err != nil {
-		return nil, err
-	}
+	pc := NewPacketConn(s, service, ConnTypeDatagram)
 
 	return pc, nil
 }
@@ -103,10 +100,8 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	if isReserved || isListening {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
-	pc, err := NewPacketConnWithConst(s, service, true, tags, ConnTypeDatagram)
-	if err != nil {
-		return nil, err
-	}
+	pc := NewPacketConnWithConst(s, service, true, tags, ConnTypeDatagram)
+
 	s.addLocalServiceAdvertisement(service, ConnTypeDatagram, tags)
 
 	return pc, nil

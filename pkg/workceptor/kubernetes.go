@@ -18,7 +18,6 @@ import (
 
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"golang.org/x/net/http2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -239,43 +238,22 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 		streamReader := bufio.NewReader(logStream)
 		for *stdinErr == nil { // check between every line read to see if we need to stop reading
 			line, err := streamReader.ReadString('\n')
-			if err == io.EOF {
-				kw.Debug(
-					"Detected EOF for pod %s/%s. Will retry %d more times. Error: %s",
-					podNamespace,
-					podName,
-					remainingRetries,
-					err,
-				)
-				successfulWrite = false
-				remainingRetries--
-				if remainingRetries > 0 {
-					time.Sleep(200 * time.Millisecond)
-
-					break
-				}
-
-				return
-			} else if _, ok := err.(http2.GoAwayError); ok {
-				// GOAWAY is sent by the server to indicate that the server is gracefully shutting down
-				// this happens if the kube API server we are connected to is being restarted or is shutting down
-				// for example during a cluster upgrade and rolling restart of the master node
-				kw.Info(
-					"Detected http2.GoAwayError for pod %s/%s. Will retry %d more times. Error: %s",
-					podNamespace,
-					podName,
-					remainingRetries,
-					err,
-				)
-				successfulWrite = false
-				remainingRetries--
-				if remainingRetries > 0 {
-					time.Sleep(200 * time.Millisecond)
-
-					break
-				}
-			}
 			if err != nil {
+				kw.Info(
+					"Detected Error: %s for pod %s/%s. Will retry %d more times.",
+					err,
+					podNamespace,
+					podName,
+					remainingRetries,
+				)
+
+				successfulWrite = false
+				remainingRetries--
+				if remainingRetries > 0 {
+					time.Sleep(200 * time.Millisecond)
+
+					break
+				}
 				*stdoutErr = err
 				kw.Error("Error reading from pod %s/%s: %s", podNamespace, podName, err)
 

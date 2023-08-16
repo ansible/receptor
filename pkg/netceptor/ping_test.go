@@ -175,6 +175,7 @@ func TestUserCancel(t *testing.T) {
 	mockPacketConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, nil)
 	mockNetceptor.EXPECT().Context().DoAndReturn(func() context.Context {
 		time.Sleep(time.Second * 1)
+
 		return context.Background()
 	}).Times(2)
 

@@ -20,7 +20,7 @@ func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (t
 	return CreatePing(ctx, s, target, hopsToLive)
 }
 
-// CreatePin creates Ping by sending a single test packet and waits for a replay or error.
+// CreatePing creates Ping by sending a single test packet and waits for a replay or error.
 func CreatePing(ctx context.Context, s NetceptorForPing, target string, hopsToLive byte) (time.Duration, string, error) {
 	pc, err := s.ListenPacket("")
 	if err != nil {

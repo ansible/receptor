@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// NetceptorForPing should include all methods of Netceptor needed by the Ping function.
-type NetceptorForPing interface {
+// NetcForPing should include all methods of Netceptor needed by the Ping function.
+type NetcForPing interface {
 	ListenPacket(service string) (PacketConner, error)
 	NewAddr(target string, service string) Addr
 	NodeID() string
@@ -21,7 +21,7 @@ func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (t
 }
 
 // CreatePing creates Ping by sending a single test packet and waits for a replay or error.
-func CreatePing(ctx context.Context, s NetceptorForPing, target string, hopsToLive byte) (time.Duration, string, error) {
+func CreatePing(ctx context.Context, s NetcForPing, target string, hopsToLive byte) (time.Duration, string, error) {
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return 0, "", err

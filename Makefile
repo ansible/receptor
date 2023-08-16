@@ -98,6 +98,10 @@ testloop: receptor
 	  make test; do \
 	  i=$$((i+1)); done
 
+coverage:
+	PATH="${PWD}:${PATH}" \
+	go test ./... $(TESTCMD) -count=1 -race -timeout 5m -coverprofile=coverage.txt -covermode=atomic
+
 kubectl:
 	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
 	chmod a+x kubectl

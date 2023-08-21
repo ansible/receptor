@@ -22,6 +22,12 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
+type NetceptorForControlsvc interface {
+	ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*netceptor.Listener, error)
+	GetLogger() *logger.ReceptorLogger
+	NodeID() string
+}
+
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions.
 type sockControl struct {
 	conn net.Conn
@@ -84,13 +90,13 @@ func (s *sockControl) Close() error {
 
 // Server is an instance of a control service.
 type Server struct {
-	nc              *netceptor.Netceptor
+	nc              NetceptorForControlsvc
 	controlFuncLock sync.RWMutex
 	controlTypes    map[string]ControlCommandType
 }
 
 // New returns a new instance of a control service.
-func New(stdServices bool, nc *netceptor.Netceptor) *Server {
+func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 	s := &Server{
 		nc:              nc,
 		controlFuncLock: sync.RWMutex{},
@@ -129,20 +135,20 @@ func errorNormal(err error) bool {
 
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
-	s.nc.Logger.Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
+	s.nc.GetLogger().Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
 	defer func() {
-		s.nc.Logger.Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
+		s.nc.GetLogger().Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
 		if conn != nil {
 			err := conn.Close()
 			if err != nil {
-				s.nc.Logger.Warning("Could not close connection: %s\n", err)
+				s.nc.GetLogger().Warning("Could not close connection: %s\n", err)
 			}
 		}
 	}()
 	_, err := conn.Write([]byte(fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())))
 	if err != nil {
 		if !errorNormal(err) {
-			s.nc.Logger.Error("Could not write in control service: %s\n", err)
+			s.nc.GetLogger().Error("Could not write in control service: %s\n", err)
 		}
 
 		return
@@ -156,13 +162,13 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		for {
 			n, err := conn.Read(buf)
 			if err == io.EOF {
-				s.nc.Logger.Debug("Control service closed\n")
+				s.nc.GetLogger().Debug("Control service closed\n")
 				done = true
 
 				break
 			} else if err != nil {
 				if !errorNormal(err) {
-					s.nc.Logger.Warning("Could not read in control service: %s\n", err)
+					s.nc.GetLogger().Warning("Could not read in control service: %s\n", err)
 				}
 
 				return
@@ -199,7 +205,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					if !errorNormal(err) {
-						s.nc.Logger.Error("Write error in control service: %s\n", err)
+						s.nc.GetLogger().Error("Write error in control service: %s\n", err)
 					}
 
 					return
@@ -242,12 +248,12 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			}
 			if err != nil {
 				if !errorNormal(err) {
-					s.nc.Logger.Error(err.Error())
+					s.nc.GetLogger().Error(err.Error())
 				}
 				_, err = conn.Write([]byte(fmt.Sprintf("ERROR: %s\n", err)))
 				if err != nil {
 					if !errorNormal(err) {
-						s.nc.Logger.Error("Write error in control service: %s\n", err)
+						s.nc.GetLogger().Error("Write error in control service: %s\n", err)
 					}
 
 					return
@@ -258,7 +264,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 					_, err = conn.Write([]byte(fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)))
 					if err != nil {
 						if !errorNormal(err) {
-							s.nc.Logger.Error("Write error in control service: %s\n", err)
+							s.nc.GetLogger().Error("Write error in control service: %s\n", err)
 						}
 
 						return
@@ -268,7 +274,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				_, err = conn.Write(rbytes)
 				if err != nil {
 					if !errorNormal(err) {
-						s.nc.Logger.Error("Write error in control service: %s\n", err)
+						s.nc.GetLogger().Error("Write error in control service: %s\n", err)
 					}
 
 					return
@@ -278,7 +284,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			_, err = conn.Write([]byte("ERROR: Unknown command\n"))
 			if err != nil {
 				if !errorNormal(err) {
-					s.nc.Logger.Error("Write error in control service: %s\n", err)
+					s.nc.GetLogger().Error("Write error in control service: %s\n", err)
 				}
 
 				return
@@ -334,7 +340,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	if uli == nil && li == nil {
 		return fmt.Errorf("no listeners specified")
 	}
-	s.nc.Logger.Info("Running control service %s\n", service)
+	s.nc.GetLogger().Info("Running control service %s\n", service)
 	go func() {
 		<-ctx.Done()
 		if uli != nil {
@@ -358,7 +364,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 					}
 					if err != nil {
 						if !strings.HasSuffix(err.Error(), "normal close") {
-							s.nc.Logger.Error("Error accepting connection: %s\n", err)
+							s.nc.GetLogger().Error("Error accepting connection: %s\n", err)
 						}
 
 						continue
@@ -370,19 +376,19 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 							// Explicitly run server TLS handshake so we can deal with timeout and errors here
 							err = conn.SetDeadline(time.Now().Add(10 * time.Second))
 							if err != nil {
-								s.nc.Logger.Error("Error setting timeout: %s. Closing socket.\n", err)
+								s.nc.GetLogger().Error("Error setting timeout: %s. Closing socket.\n", err)
 
 								return
 							}
 							err = tlsConn.Handshake()
 							if err != nil {
-								s.nc.Logger.Error("TLS handshake error: %s. Closing socket.\n", err)
+								s.nc.GetLogger().Error("TLS handshake error: %s. Closing socket.\n", err)
 
 								return
 							}
 							err = conn.SetDeadline(time.Time{})
 							if err != nil {
-								s.nc.Logger.Error("Error clearing timeout: %s. Closing socket.\n", err)
+								s.nc.GetLogger().Error("Error clearing timeout: %s. Closing socket.\n", err)
 
 								return
 							}

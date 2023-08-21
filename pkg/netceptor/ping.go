@@ -93,6 +93,12 @@ func CreatePing(ctx context.Context, s NetcForPing, target string, hopsToLive by
 	}
 }
 
+type NetcForTraceroute interface {
+	MaxForwardingHops() byte
+	Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error)
+	Context() context.Context
+}
+
 // TracerouteResult is the result of one hop of a traceroute.
 type TracerouteResult struct {
 	From string
@@ -100,8 +106,12 @@ type TracerouteResult struct {
 	Err  error
 }
 
-// Traceroute returns a channel which will receive a series of hops between this node and the target.
 func (s *Netceptor) Traceroute(ctx context.Context, target string) <-chan *TracerouteResult {
+	return CreateTraceroute(ctx, s, target)
+}
+
+// Traceroute returns a channel which will receive a series of hops between this node and the target.
+func CreateTraceroute(ctx context.Context, s NetcForTraceroute, target string) <-chan *TracerouteResult {
 	results := make(chan *TracerouteResult)
 	go func() {
 		defer close(results)
@@ -118,7 +128,7 @@ func (s *Netceptor) Traceroute(ctx context.Context, target string) <-chan *Trace
 			case results <- res:
 			case <-ctx.Done():
 				return
-			case <-s.context.Done():
+			case <-s.Context().Done():
 				return
 			}
 			if res.Err != nil || err == nil {

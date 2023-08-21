@@ -11,11 +11,11 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-func setupTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetceptorForPing, *mock_netceptor.MockPacketConner, context.Context) {
+func setupTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetcForPing, *mock_netceptor.MockPacketConner, context.Context) {
 	ctrl := gomock.NewController(t)
 
 	// Prepare mocks
-	mockNetceptor := mock_netceptor.NewMockNetceptorForPing(ctrl)
+	mockNetceptor := mock_netceptor.NewMockNetcForPing(ctrl)
 	mockPacketConn := mock_netceptor.NewMockPacketConner(ctrl)
 
 	// Now you can call Ping and it will use your mock Netceptor and PacketConn
@@ -171,7 +171,7 @@ func TestUserCancel(t *testing.T) {
 	// Set up the mock behaviours
 	mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(mockPacketConn, nil)
 	mockPacketConn.EXPECT().SubscribeUnreachable(gomock.Any()).Return(make(chan netceptor.UnreachableNotification))
-	mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Return(0, &netceptor.Addr{}, nil).Times(1)
+	mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, nil).Times(1)
 	mockPacketConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, nil)
 	mockNetceptor.EXPECT().Context().DoAndReturn(func() context.Context {
 		time.Sleep(time.Second * 1)
@@ -186,5 +186,46 @@ func TestUserCancel(t *testing.T) {
 	_, _, err := netceptor.CreatePing(newCtx, mockNetceptor, "target", 1)
 	if err.Error() != "user cancelled" {
 		t.Fatalf("Expected error to be 'user cancelled' but got %v", err)
+	}
+}
+
+func TestNetceptorShutdown(t *testing.T) {
+	ctrl, mockNetceptor, mockPacketConn, ctx := setupTest(t)
+	defer ctrl.Finish()
+	defer ctx.Done()
+
+	// Set up the mock behaviours
+	mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(mockPacketConn, nil)
+	mockPacketConn.EXPECT().SubscribeUnreachable(gomock.Any()).Return(make(chan netceptor.UnreachableNotification))
+	mockPacketConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, nil)
+	// mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, nil).MaxTimes(1)
+	mockNetceptor.EXPECT().Context().DoAndReturn(func() context.Context {
+		newCtx, ctxCancel := context.WithCancel(context.Background())
+		ctxCancel()
+
+		return newCtx
+	}).Times(1)
+
+	_, _, err := netceptor.CreatePing(ctx, mockNetceptor, "target", 1)
+	if err.Error() != "netceptor shutdown" {
+		t.Fatalf("Expected error to be 'netceptor shutdown' but got %v", err)
+	}
+}
+
+func TestCreateTraceroute(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	mockNetceptor := mock_netceptor.NewMockNetcForTraceroute(ctrl)
+	ctx := context.Background()
+
+	mockNetceptor.EXPECT().Context().Return(context.Background())
+	mockNetceptor.EXPECT().MaxForwardingHops().Return(byte(1))
+	mockNetceptor.EXPECT().Ping(ctx, "target", byte(0)).Return(time.Since(time.Now()), "target", nil)
+
+	result := netceptor.CreateTraceroute(ctx, mockNetceptor, "target")
+	for res := range result {
+		if res.Err != nil {
+			t.Fatalf("Unexpected error %v", res.Err)
+		}
 	}
 }

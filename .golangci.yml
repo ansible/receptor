@@ -56,7 +56,7 @@ linters:
     #- testpackage # TODO: Put tests in their dedicated test packages.
     #- thelper # TODO: Requires test refactoring.
     - tparallel
-    - typecheck
+    #- typecheck # Has become flakey and is no better than the compiler
     - unconvert
     #- unparam # TODO: This breaks something, look at it!
     - unused

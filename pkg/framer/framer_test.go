@@ -34,10 +34,88 @@ func TestSendData(t *testing.T) {
 	}
 
 	for _, testCase := range framedBufferTestCases {
-		result := f.SendData(testCase.inputBuffer)
+		t.Run(testCase.name, func(t *testing.T) {
+			result := f.SendData(testCase.inputBuffer)
 
-		if !bytes.Equal(testCase.expectedBuffer, result) {
-			t.Errorf("%s - expected: %+v, received: %+v", testCase.name, testCase.expectedBuffer, result)
-		}
+			if !bytes.Equal(testCase.expectedBuffer, result) {
+				t.Errorf("%s - expected: %+v, received: %+v", testCase.name, testCase.expectedBuffer, result)
+			}
+		})
+	}
+}
+
+func TestMessageReady(t *testing.T) {
+	buffer := []byte{1, 2, 3}
+
+	messageReadyTestCases := []struct {
+		name           string
+		inputBuffer    []byte
+		expectedResult bool
+	}{
+		{
+			name:           "message ready",
+			inputBuffer:    append([]byte{3, 0}, buffer...),
+			expectedResult: true,
+		},
+		{
+			name:           "message not ready",
+			inputBuffer:    buffer,
+			expectedResult: false,
+		},
+	}
+
+	for _, testCase := range messageReadyTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			f := framer.New()
+			f.RecvData(testCase.inputBuffer)
+			receivedResult := f.MessageReady()
+
+			if testCase.expectedResult != receivedResult {
+				t.Errorf("%s - expected: %+v, received: %+v", testCase.name, testCase.expectedResult, receivedResult)
+			}
+		})
+	}
+}
+
+func TestGetMessage(t *testing.T) {
+	buffer := []byte{1, 2, 3}
+	framedBuffer := append([]byte{3, 0}, buffer...)
+
+	getMessageTestCases := []struct {
+		name          string
+		inputBuffer   []byte
+		expectedError bool
+	}{
+		{
+			name:          "message read",
+			inputBuffer:   framedBuffer,
+			expectedError: false,
+		},
+		{
+			name:          "message not read with sending non framed buffer",
+			inputBuffer:   buffer,
+			expectedError: true,
+		},
+		{
+			name:          "message not read with sending insufficient buffer length",
+			inputBuffer:   []byte{1},
+			expectedError: true,
+		},
+	}
+
+	for _, testCase := range getMessageTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			f := framer.New()
+			f.RecvData(testCase.inputBuffer)
+
+			receivedResult, err := f.GetMessage()
+
+			if testCase.expectedError && err == nil {
+				t.Error(testCase.name)
+			}
+			if !testCase.expectedError && !bytes.Equal(buffer, receivedResult) {
+				t.Errorf("expected: %+v, received: %+v", buffer, receivedResult)
+			}
+		})
 	}
 }

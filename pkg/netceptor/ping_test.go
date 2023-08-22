@@ -28,7 +28,7 @@ func setupTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetcForPin
 	return ctrl, mockNetceptor, mockPacketConn, ctx
 }
 
-func teardownTest(t *testing.T, mockNetceptor *mock_netceptor.MockNetcForPing, mockPacketConn *mock_netceptor.MockPacketConner) {
+func teardownTest(mockNetceptor *mock_netceptor.MockNetcForPing, mockPacketConn *mock_netceptor.MockPacketConner) {
 	mockPacketConn.EXPECT().SetHopsToLive(gomock.Any()).Times(0)
 	mockPacketConn.EXPECT().Close().Times(0)
 	mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Times(0)
@@ -73,7 +73,7 @@ func TestListenSubscribeUnreachableErr(t *testing.T) {
 		t.Fatal("SubscribeUnreachable expected to return error but returned nil")
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -106,7 +106,7 @@ func TestCreatePing(t *testing.T) {
 		t.Errorf("expected node ID %s, got %s", expectedNodeID, nodeID)
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -122,7 +122,7 @@ func TestListenPacketErr(t *testing.T) {
 		t.Fatal("ListenPacker expected to return error but returned nil")
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -143,7 +143,7 @@ func TestReadFromErr(t *testing.T) {
 		t.Fatal("ReadFrom expected to return error but returned nil")
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -165,7 +165,7 @@ func TestWriteToErr(t *testing.T) {
 		t.Fatal("ReadFrom expected to return error but returned nil")
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -188,7 +188,7 @@ func TestTimeOutErr(t *testing.T) {
 		t.Fatalf("Expected error to be 'timeout' but got %v", err)
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -217,7 +217,7 @@ func TestUserCancel(t *testing.T) {
 		t.Fatalf("Expected error to be 'user cancelled' but got %v", err)
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 
@@ -244,7 +244,7 @@ func TestNetceptorShutdown(t *testing.T) {
 		t.Fatalf("Expected error to be 'netceptor shutdown' but got %v", err)
 	}
 
-	teardownTest(t, mockNetceptor, mockPacketConn)
+	teardownTest(mockNetceptor, mockPacketConn)
 	ctrl.Finish()
 }
 

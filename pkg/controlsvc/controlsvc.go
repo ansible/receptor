@@ -24,8 +24,7 @@ import (
 
 type NetceptorForControlsvc interface {
 	ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*netceptor.Listener, error)
-	GetLogger() *logger.ReceptorLogger
-	NodeID() string
+	NetceptorForControlCommand
 }
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions.

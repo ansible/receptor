@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {
@@ -221,7 +220,7 @@ func getSignWorkFromStatus(status *StatusFileData) bool {
 }
 
 // Worker function called by the control service to process a "work" command.
-func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.NetceptorForControlCommand, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	addr := cfo.RemoteAddr()
 	connIsUnix := false
 	if addr.Network() == "unix" {

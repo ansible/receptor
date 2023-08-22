@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ansible/receptor/pkg/logger"
-	"github.com/ansible/receptor/pkg/netceptor"
 	"gopkg.in/yaml.v2"
 )
 
@@ -158,34 +157,34 @@ func handleError(err error, errorcode int, logger *logger.ReceptorLogger) (map[s
 	return cfr, nil
 }
 
-func (c *reloadCommand) ControlFunc(_ context.Context, nc *netceptor.Netceptor, _ ControlFuncOperations) (map[string]interface{}, error) {
+func (c *reloadCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
-	nc.Logger.Debug("Reloading")
+	nc.GetLogger().Debug("Reloading")
 
 	// Do a quick check to catch any yaml errors before canceling backends
 	err := reloadParseAndRun([]string{"PreReload"})
 	if err != nil {
-		return handleError(err, 4, nc.Logger)
+		return handleError(err, 4, nc.GetLogger())
 	}
 
 	// check if non-reloadable items have been added or modified
 	err = checkReload()
 	if err != nil {
-		return handleError(err, 3, nc.Logger)
+		return handleError(err, 3, nc.GetLogger())
 	}
 
 	// check if non-reloadable items have been removed
 	err = cfgAbsent()
 	if err != nil {
-		return handleError(err, 3, nc.Logger)
+		return handleError(err, 3, nc.GetLogger())
 	}
 
 	nc.CancelBackends()
 	// reloadParseAndRun is a ParseAndRun closure, set in receptor.go/main()
 	err = reloadParseAndRun([]string{"PreReload", "Reload"})
 	if err != nil {
-		return handleError(err, 4, nc.Logger)
+		return handleError(err, 4, nc.GetLogger())
 	}
 
 	cfr := make(map[string]interface{})

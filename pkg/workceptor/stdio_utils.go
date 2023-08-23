@@ -16,6 +16,7 @@ type FileSystemer interface {
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	Stat(name string) (os.FileInfo, error)
 	Open(name string) (*os.File, error)
+	RemoveAll(path string) error
 }
 
 // FileSystem represents the real filesystem.
@@ -36,6 +37,11 @@ func (FileSystem) Open(name string) (*os.File, error) {
 	return os.Open(name)
 }
 
+// RemoveAll removes path and any children it contains.
+func (FileSystem) RemoveAll(path string) error {
+	return os.RemoveAll(path)
+}
+
 // FileWriteCloser wraps io.WriteCloser.
 type FileWriteCloser interface {
 	io.WriteCloser
@@ -51,7 +57,7 @@ func saveStdoutSize(unitdir string, stdoutSize int64) error {
 	statusFilename := path.Join(unitdir, "status")
 	si := &StatusFileData{}
 
-	return si.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
+	return si.UpdateFullStatus(statusFilename, FileSystem{}, func(status *StatusFileData) {
 		status.StdoutSize = stdoutSize
 	})
 }

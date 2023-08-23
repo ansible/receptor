@@ -324,7 +324,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	if !ok {
 		statusFilename := path.Join(unitdir, "status")
 		sfd := &StatusFileData{}
-		_ = sfd.Load(statusFilename)
+		_ = sfd.Load(statusFilename, FileSystem{})
 		w.workTypesLock.RLock()
 		wt, ok := w.workTypes[sfd.WorkType]
 		w.workTypesLock.RUnlock()

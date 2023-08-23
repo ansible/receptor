@@ -34,7 +34,7 @@ func TestStatusFileLock(t *testing.T) {
 		totalWaitTime += waitTime
 		go func(iter int, waitTime time.Duration) {
 			sfd := StatusFileData{}
-			sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
+			sfd.UpdateFullStatus(statusFilename, FileSystem{}, func(status *StatusFileData) {
 				time.Sleep(waitTime)
 				status.State = iter
 				status.StdoutSize = int64(iter)
@@ -56,7 +56,7 @@ func TestStatusFileLock(t *testing.T) {
 
 					return
 				}
-				err := sfd.Load(statusFilename)
+				err := sfd.Load(statusFilename, FileSystem{})
 				if os.IsNotExist(err) && !fileHasExisted {
 					continue
 				}

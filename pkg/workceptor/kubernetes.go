@@ -1148,7 +1148,7 @@ func readFileToString(filename string) (string, error) {
 
 // SetFromParams sets the in-memory state from parameters.
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
-	ked := kw.status.ExtraData.(*kubeExtraData)
+	ked := kw.status.GetExtraData().(*kubeExtraData)
 	type value struct {
 		name       string
 		permission bool
@@ -1251,7 +1251,7 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	kw.statusLock.RLock()
 	defer kw.statusLock.RUnlock()
 	status := kw.getStatus()
-	ked, ok := kw.status.ExtraData.(*kubeExtraData)
+	ked, ok := kw.status.GetExtraData().(*kubeExtraData)
 	if ok {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
@@ -1368,7 +1368,7 @@ type KubeWorkerCfg struct {
 func (cfg KubeWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
-			status: StatusFileData{
+			status: &StatusFileData{
 				ExtraData: &kubeExtraData{
 					Image:         cfg.Image,
 					Command:       cfg.Command,
@@ -1388,7 +1388,7 @@ func (cfg KubeWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string
 		deletePodOnRestart:  cfg.DeletePodOnRestart,
 		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
-	ku.BaseWorkUnit.Init(w, unitID, workType)
+	ku.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return ku
 }

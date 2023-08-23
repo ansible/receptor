@@ -62,7 +62,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	status := StatusFileData{}
 	status.ExtraData = &commandExtraData{}
 	statusFilename := path.Join(unitdir, "status")
-	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
+	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0, FileSystem{})
 	if err != nil {
 		MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 	}
@@ -103,13 +103,13 @@ loop:
 			break loop
 		case <-termChan:
 			termThenKill(cmd, doneChan)
-			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
+			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir), FileSystem{})
 			if err != nil {
 				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 			}
 			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
-			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
+			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir), FileSystem{})
 			if err != nil {
 				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 				writeStatusFailures++
@@ -123,7 +123,7 @@ loop:
 		}
 	}
 	if err != nil {
-		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
+		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir), FileSystem{})
 		if err != nil {
 			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
@@ -131,12 +131,12 @@ loop:
 		return err
 	}
 	if cmd.ProcessState.Success() {
-		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
+		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir), FileSystem{})
 		if err != nil {
 			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
 	} else {
-		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
+		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir), FileSystem{})
 		if err != nil {
 			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
@@ -169,7 +169,13 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	if cmdParams != "" && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
-	cw.status.ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+
+	data, ok := cw.status.GetExtraData().(*commandExtraData)
+	if !ok {
+		data = &commandExtraData{}
+	}
+	data.Params = combineParams(cw.baseParams, cmdParams)
+	cw.status.SetExtraData(data)
 
 	return nil
 }
@@ -184,10 +190,11 @@ func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 	cw.statusLock.RLock()
 	defer cw.statusLock.RUnlock()
 	status := cw.getStatus()
-	ed, ok := cw.status.ExtraData.(*commandExtraData)
+	data := cw.status.GetExtraData()
+	ed, ok := data.(*commandExtraData)
 	if ok {
 		edCopy := *ed
-		status.ExtraData = &edCopy
+		cw.status.SetExtraData(edCopy)
 	}
 
 	return status
@@ -323,7 +330,7 @@ type CommandWorkerCfg struct {
 func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnit: BaseWorkUnit{
-			status: StatusFileData{
+			status: &StatusFileData{
 				ExtraData: &commandExtraData{},
 			},
 		},
@@ -331,7 +338,7 @@ func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType str
 		baseParams:         cfg.Params,
 		allowRuntimeParams: cfg.AllowRuntimeParams,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType)
+	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }
@@ -366,7 +373,7 @@ func (cfg commandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
 		statusFilename := path.Join(cfg.UnitDir, "status")
-		err = (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
+		err = (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir), FileSystem{})
 		if err != nil {
 			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}

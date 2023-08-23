@@ -500,10 +500,11 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 
 // SetFromParams sets the in-memory state from parameters.
 func (rw *remoteUnit) SetFromParams(params map[string]string) error {
+	data := rw.status.GetExtraData().(*remoteExtraData)
 	for k, v := range params {
-		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
+		data.RemoteParams[k] = v
 	}
-
+	rw.status.SetExtraData(data)
 	return nil
 }
 
@@ -531,7 +532,7 @@ func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 	rw.statusLock.RLock()
 	defer rw.statusLock.RUnlock()
 	status := rw.getStatus()
-	ed, ok := rw.status.ExtraData.(*remoteExtraData)
+	ed, ok := rw.status.GetExtraData().(*remoteExtraData)
 	if ok {
 		edCopy := *ed
 		edCopy.RemoteParams = make(map[string]string)
@@ -680,10 +681,10 @@ func (rw *remoteUnit) Release(force bool) error {
 
 func newRemoteWorker(w *Workceptor, unitID, workType string) WorkUnit {
 	rw := &remoteUnit{logger: w.nc.GetLogger()}
-	rw.BaseWorkUnit.Init(w, unitID, workType)
+	rw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
 	red := &remoteExtraData{}
 	red.RemoteParams = make(map[string]string)
-	rw.status.ExtraData = red
+	rw.status.SetExtraData(red)
 	rw.topJC = &utils.JobContext{}
 
 	return rw

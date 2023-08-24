@@ -12,7 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-// setupTest sets up TestPing tests
+// setupTest sets up TestPing tests.
 func setupTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetcForPing, *mock_netceptor.MockPacketConner) {
 	ctrl := gomock.NewController(t)
 
@@ -27,7 +27,7 @@ func setupTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetcForPin
 	return ctrl, mockNetceptor, mockPacketConn
 }
 
-// teardownTest tears down TestPing tests
+// teardownTest tears down TestPing tests.
 func teardownTest(ctrl *gomock.Controller, mockNetceptor *mock_netceptor.MockNetcForPing, mockPacketConn *mock_netceptor.MockPacketConner) {
 	mockPacketConn.EXPECT().SetHopsToLive(gomock.Any()).Times(0)
 	mockPacketConn.EXPECT().Close().Times(0)
@@ -40,7 +40,7 @@ func teardownTest(ctrl *gomock.Controller, mockNetceptor *mock_netceptor.MockNet
 	ctrl.Finish()
 }
 
-// createChannel creates a channel that passes an error to errorChan inside of createPing
+// createChannel creates a channel that passes an error to errorChan inside of createPing.
 func createChannel(mockPacketConn *mock_netceptor.MockPacketConner) {
 	mockUnreachableMessage := netceptor.UnreachableMessage{
 		FromNode:    "",
@@ -62,7 +62,7 @@ func createChannel(mockPacketConn *mock_netceptor.MockPacketConner) {
 	}()
 }
 
-// checkPing checks TestPing tests by comparing return values to expected values
+// checkPing checks TestPing tests by comparing return values to expected values.
 func checkPing(duration time.Duration, expectedDuration int, remote string, expectedRemote string, err error, expectedError error, t *testing.T) {
 	if expectedError == nil && err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -105,7 +105,7 @@ type readFromReturn struct {
 	returnType string
 }
 
-// TestCreatePing tests CreatePing inside ping.go
+// TestCreatePing tests CreatePing inside ping.go.
 func TestCreatePing(t *testing.T) {
 	ctrl, mockNetceptor, mockPacketConn := setupTest(t)
 
@@ -154,13 +154,14 @@ func TestCreatePing(t *testing.T) {
 					return newCtx
 				}).Times(testCase.returnContext.times)
 			}
-			if testCase.returnReadFrom.returnType == "return" {
+			switch {
+			case testCase.returnReadFrom.returnType == "return":
 				mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Return(0, testCase.returnReadFrom.address, testCase.returnReadFrom.err).MaxTimes(testCase.returnReadFrom.times)
-			} else if testCase.returnReadFrom.returnType == "do" {
+			case testCase.returnReadFrom.returnType == "do":
 				mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Do(func([]byte) {
 					time.Sleep(time.Second * 11)
 				}).Times(testCase.returnReadFrom.times)
-			} else if testCase.returnReadFrom.returnType == "doAndReturn" {
+			case testCase.returnReadFrom.returnType == "doAndReturn":
 				mockPacketConn.EXPECT().ReadFrom(gomock.Any()).DoAndReturn(func([]byte) (int, net.Addr, error) {
 					time.Sleep(time.Second * 2)
 
@@ -175,20 +176,20 @@ func TestCreatePing(t *testing.T) {
 			if testCase.name == "WriteTo Error" {
 				mockNetceptor.EXPECT().NodeID().Return("nodeID")
 			}
-			if testCase.name == "User Cancel Error" {
+			switch {
+			case testCase.name == "User Cancel Error":
 				newCtx, ctxCancel := context.WithCancel(ctx)
 
 				time.AfterFunc(1*time.Second, ctxCancel)
 
 				duration, remote, err := netceptor.CreatePing(newCtx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
-			} else if testCase.name == "NetceptorShutdown Error" {
+			case testCase.name == "NetceptorShutdown Error":
 				time.Sleep(time.Second * 1)
 
 				duration, remote, err := netceptor.CreatePing(ctx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
-
-			} else {
+			default:
 				duration, remote, err := netceptor.CreatePing(ctx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
 			}
@@ -211,7 +212,7 @@ type expectedResult struct {
 	err  error
 }
 
-// TestCreateTraceroute tests CreateTraceroute inside ping.go
+// TestCreateTraceroute tests CreateTraceroute inside ping.go.
 func TestCreateTraceroute(t *testing.T) {
 	ctrl := gomock.NewController(t)
 

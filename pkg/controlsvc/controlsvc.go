@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"runtime"
@@ -25,6 +26,41 @@ import (
 type NetceptorForControlsvc interface {
 	ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*netceptor.Listener, error)
 	NetceptorForControlCommand
+}
+
+type UtilerIF interface {
+	BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger)
+	UnixSocketListen(filename string, permissions fs.FileMode) (net.Listener, *utils.FLock, error)
+}
+
+type UtilStruct struct{}
+
+func (u *UtilStruct) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
+	utils.BridgeConns(c1, c1Name, c2, c2Name, logger)
+}
+
+func (u *UtilStruct) UnixSocketListen(filename string, permissions fs.FileMode) (net.Listener, *utils.FLock, error) {
+	return utils.UnixSocketListen(filename, permissions)
+}
+
+type NeterIF interface {
+	Listen(network string, address string) (net.Listener, error)
+}
+
+type NetStruct struct{}
+
+func (n *NetStruct) Listen(network string, address string) (net.Listener, error) {
+	return net.Listen(network, address)
+}
+
+type TlserIF interface {
+	NewListener(inner net.Listener, config *tls.Config) net.Listener
+}
+
+type TlsStruct struct{}
+
+func (t *TlsStruct) NewListener(inner net.Listener, config *tls.Config) net.Listener {
+	return tls.NewListener(inner, config)
 }
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions.
@@ -92,6 +128,10 @@ type Server struct {
 	nc              NetceptorForControlsvc
 	controlFuncLock sync.RWMutex
 	controlTypes    map[string]ControlCommandType
+	// new stuff
+	serverUtils UtilerIF
+	serverNet   NeterIF
+	serverTls   TlserIF
 }
 
 // New returns a new instance of a control service.
@@ -100,6 +140,9 @@ func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 		nc:              nc,
 		controlFuncLock: sync.RWMutex{},
 		controlTypes:    make(map[string]ControlCommandType),
+		serverUtils:     &UtilStruct{},
+		serverNet:       &NetStruct{},
+		serverTls:       &TlsStruct{},
 	}
 	if stdServices {
 		s.controlTypes["ping"] = &pingCommandType{}
@@ -110,6 +153,18 @@ func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 	}
 
 	return s
+}
+
+func (s *Server) SetServerUtils(u *UtilStruct) {
+	s.serverUtils = u
+}
+
+func (s *Server) SetServerNet(n *NetStruct) {
+	s.serverNet = n
+}
+
+func (s *Server) SetServerTls(t *TlsStruct) {
+	s.serverTls = t
 }
 
 // MainInstance is the global instance of the control service instantiated by the command-line main() function.
@@ -300,7 +355,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	var lock *utils.FLock
 	var err error
 	if unixSocket != "" {
-		uli, lock, err = utils.UnixSocketListen(unixSocket, unixSocketPermissions)
+		uli, lock, err = s.serverUtils.UnixSocketListen(unixSocket, unixSocketPermissions)
 		if err != nil {
 			return fmt.Errorf("error opening Unix socket: %s", err)
 		}
@@ -315,12 +370,12 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		} else {
 			listenAddr = fmt.Sprintf("0.0.0.0:%s", tcpListen)
 		}
-		tli, err = net.Listen("tcp", listenAddr)
+		tli, err = s.serverNet.Listen("tcp", listenAddr)
 		if err != nil {
 			return fmt.Errorf("error listening on TCP socket: %s", err)
 		}
 		if tcptls != nil {
-			tli = tls.NewListener(tli, tcptls)
+			tli = s.serverTls.NewListener(tli, tcptls)
 		}
 	} else {
 		tli = nil

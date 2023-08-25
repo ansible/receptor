@@ -98,7 +98,7 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	_, isReserved := s.reservedServices[service]
 	_, isListening := s.listenerRegistry[service]
 	if isReserved || isListening {
-		return nil, fmt.Errorf("service %s is already listening", service)
+		return nil, fmt.Errorf("service %s is already listening and advertising", service)
 	}
 	pc := NewPacketConnWithConst(s, service, true, tags, ConnTypeDatagram)
 

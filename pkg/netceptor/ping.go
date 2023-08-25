@@ -15,13 +15,13 @@ type NetcForPing interface {
 	Context() context.Context
 }
 
-// Ping calls CreatePing to sends a single test packet and waits for a reply or error.
+// Ping calls SendPing to sends a single test packet and waits for a reply or error.
 func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
-	return CreatePing(ctx, s, target, hopsToLive)
+	return SendPing(ctx, s, target, hopsToLive)
 }
 
-// CreatePing creates Ping by sending a single test packet and waits for a replay or error.
-func CreatePing(ctx context.Context, s NetcForPing, target string, hopsToLive byte) (time.Duration, string, error) {
+// SendPing creates Ping by sending a single test packet and waits for a replay or error.
+func SendPing(ctx context.Context, s NetcForPing, target string, hopsToLive byte) (time.Duration, string, error) {
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return 0, "", err
@@ -110,7 +110,7 @@ func (s *Netceptor) Traceroute(ctx context.Context, target string) <-chan *Trace
 	return CreateTraceroute(ctx, s, target)
 }
 
-// Traceroute returns a channel which will receive a series of hops between this node and the target.
+// CreateTraceroute returns a channel which will receive a series of hops between this node and the target.
 func CreateTraceroute(ctx context.Context, s NetcForTraceroute, target string) <-chan *TracerouteResult {
 	results := make(chan *TracerouteResult)
 	go func() {

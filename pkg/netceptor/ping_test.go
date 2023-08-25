@@ -200,7 +200,6 @@ func TestCreatePing(t *testing.T) {
 
 				duration, remote, err := netceptor.CreatePing(newCtx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
-
 			} else {
 				duration, remote, err := netceptor.CreatePing(ctx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)

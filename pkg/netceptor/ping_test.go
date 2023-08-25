@@ -77,6 +77,57 @@ func checkPing(duration time.Duration, expectedDuration int, remote string, expe
 	}
 }
 
+func setupTestExpects(args ...interface{}) {
+	mockNetceptor := args[0].(*mock_netceptor.MockNetcForPing)
+	mockPacketConn := args[1].(*mock_netceptor.MockPacketConner)
+	testCase := args[2].(pingTestCaseStruct)
+
+	testExpects := map[string]func(){
+		"ListenPacketReturn": func() {
+			mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(testCase.returnListenPacket.packetConn, testCase.returnListenPacket.err).Times(testCase.returnListenPacket.times)
+		},
+		"SubscribeUnreachableReturn": func() {
+			mockPacketConn.EXPECT().SubscribeUnreachable(gomock.Any()).Return(make(chan netceptor.UnreachableNotification))
+		},
+		"WriteToReturn": func() {
+			mockPacketConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(testCase.returnWriteTo.packetLen, testCase.returnWriteTo.err).Times(testCase.returnWriteTo.times)
+		},
+		"ReadFromReturn": func() {
+			mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Return(0, testCase.returnReadFrom.address, testCase.returnReadFrom.err).MaxTimes(testCase.returnReadFrom.times)
+		},
+		"ReadFromDo": func() {
+			mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Do(func([]byte) {
+				time.Sleep(time.Second * 11)
+			}).Times(testCase.returnReadFrom.times)
+		},
+		"ReadFromDoAndReturn": func() {
+			mockPacketConn.EXPECT().ReadFrom(gomock.Any()).DoAndReturn(func([]byte) (int, net.Addr, error) {
+				time.Sleep(time.Second * 2)
+
+				return 0, testCase.returnReadFrom.address, testCase.returnReadFrom.err
+			}).Times(testCase.returnReadFrom.times)
+		},
+		"ContextReturn": func() {
+			mockNetceptor.EXPECT().Context().Return(testCase.returnContext.ctx).MaxTimes(testCase.returnContext.times)
+		},
+		"ContextDoAndReturn": func() {
+			mockNetceptor.EXPECT().Context().DoAndReturn(func() context.Context {
+				newCtx, ctxCancel := context.WithCancel(context.Background())
+				ctxCancel()
+
+				return newCtx
+			}).MaxTimes(testCase.returnContext.times)
+		},
+		"NodeID":         func() { mockNetceptor.EXPECT().NodeID().Return("nodeID") },
+		"CreateChannel":  func() { createChannel(mockPacketConn) },
+		"SleepOneSecond": func() { time.Sleep(time.Second * 1) },
+	}
+
+	for _, expect := range testCase.expects {
+		testExpects[expect]()
+	}
+}
+
 type listenPacketReturn struct {
 	packetConn netceptor.PacketConner
 	err        error
@@ -105,91 +156,52 @@ type readFromReturn struct {
 	returnType string
 }
 
+type pingTestCaseStruct struct {
+	name               string
+	pingTarget         string
+	pingHopsToLive     byte
+	returnListenPacket listenPacketReturn
+	returnWriteTo      writeToReturn
+	returnContext      contextReturn
+	returnReadFrom     readFromReturn
+	expects            []string
+	setupTestExpects   func(args ...interface{})
+	expectedDuration   int
+	expectedRemote     string
+	expectedError      error
+}
+
 // TestCreatePing tests CreatePing inside ping.go.
 func TestCreatePing(t *testing.T) {
 	ctrl, mockNetceptor, mockPacketConn := setupTest(t)
 
-	pingTestCases := []struct {
-		name               string
-		pingTarget         string
-		pingHopsToLive     byte
-		returnListenPacket listenPacketReturn
-		returnWriteTo      writeToReturn
-		returnContext      contextReturn
-		returnReadFrom     readFromReturn
-		expectedDuration   int
-		expectedRemote     string
-		expectedError      error
-	}{
-		{"NetceptorShutdown Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "doAndReturn"}, readFromReturn{0, nil, nil, 1, "return"}, 0, "", errors.New("netceptor shutdown")},
-		{"ListenSubscribeUnreachable Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, 0, "", errors.New("test")},
-		{"CreatePing Success", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 1, "return"}, 0, ":", nil},
-		{"ListenPacket Error", "target", byte(1), listenPacketReturn{nil, errors.New("Catch ListenPacket error"), 1, "return"}, writeToReturn{0, nil, 0, "return"}, contextReturn{context.Background(), 0, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 0, "return"}, 0, "", errors.New("Catch ListenPacket error")},
-		{"ReadFrom Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, errors.New("ReadFrom error"), 1, "return"}, 0, "", errors.New("ReadFrom error")},
-		{"WriteTo Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, errors.New("WriteTo error"), 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, 0, "", errors.New("WriteTo error")},
-		{"Timeout Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "do"}, 0, "", errors.New("timeout")},
-		{"User Cancel Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "doAndReturn"}, 0, "", errors.New("user cancelled")},
+	pingTestCases := []pingTestCaseStruct{
+		{"NetceptorShutdown Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "doAndReturn"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextDoAndReturn", "SleepOneSecond"}, setupTestExpects, 0, "", errors.New("netceptor shutdown")},
+		{"ListenSubscribeUnreachable Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn", "CreateChannel", "SleepOneSecond", "SleepOneSecond"}, setupTestExpects, 0, "", errors.New("test")},
+		{"CreatePing Success", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn"}, setupTestExpects, 0, ":", nil},
+		{"ListenPacket Error", "target", byte(1), listenPacketReturn{nil, errors.New("Catch ListenPacket error"), 1, "return"}, writeToReturn{0, nil, 0, "return"}, contextReturn{context.Background(), 0, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 0, "return"}, []string{"ListenPacketReturn"}, setupTestExpects, 0, "", errors.New("Catch ListenPacket error")},
+		{"ReadFrom Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, errors.New("ReadFrom error"), 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn"}, setupTestExpects, 0, "", errors.New("ReadFrom error")},
+		{"WriteTo Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, errors.New("WriteTo error"), 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn", "NodeID"}, setupTestExpects, 0, "", errors.New("WriteTo error")},
+		{"Timeout Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "do"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromDo", "ContextReturn"}, setupTestExpects, 0, "", errors.New("timeout")},
+		{"User Cancel Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "doAndReturn"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromDoAndReturn", "ContextReturn"}, setupTestExpects, 0, "", errors.New("user cancelled")},
 	}
 
 	for _, testCase := range pingTestCases {
 		ctx := context.Background()
 		t.Run(testCase.name, func(t *testing.T) {
-			// Set up the mock behaviours
-			if testCase.name != "ListenSubscribeUnreachable Error" {
-				mockPacketConn.EXPECT().SubscribeUnreachable(gomock.Any()).Return(make(chan netceptor.UnreachableNotification))
-			}
-			if testCase.returnListenPacket.returnType == "return" {
-				mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(testCase.returnListenPacket.packetConn, testCase.returnListenPacket.err).Times(testCase.returnListenPacket.times)
-			}
-			if testCase.returnWriteTo.returnType == "return" {
-				mockPacketConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(testCase.returnWriteTo.packetLen, testCase.returnWriteTo.err).Times(testCase.returnWriteTo.times)
-			}
-			if testCase.returnContext.returnType == "return" {
-				mockNetceptor.EXPECT().Context().Return(testCase.returnContext.ctx).MaxTimes(testCase.returnContext.times)
-			} else if testCase.returnContext.returnType == "doAndReturn" && testCase.name == "NetceptorShutdown Error" {
-				mockNetceptor.EXPECT().Context().DoAndReturn(func() context.Context {
-					newCtx, ctxCancel := context.WithCancel(context.Background())
-					ctxCancel()
-
-					return newCtx
-				}).Times(testCase.returnContext.times)
-			}
-			switch {
-			case testCase.returnReadFrom.returnType == "return":
-				mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Return(0, testCase.returnReadFrom.address, testCase.returnReadFrom.err).MaxTimes(testCase.returnReadFrom.times)
-			case testCase.returnReadFrom.returnType == "do":
-				mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Do(func([]byte) {
-					time.Sleep(time.Second * 11)
-				}).Times(testCase.returnReadFrom.times)
-			case testCase.returnReadFrom.returnType == "doAndReturn":
-				mockPacketConn.EXPECT().ReadFrom(gomock.Any()).DoAndReturn(func([]byte) (int, net.Addr, error) {
-					time.Sleep(time.Second * 2)
-
-					return 0, testCase.returnReadFrom.address, testCase.returnReadFrom.err
-				}).Times(testCase.returnReadFrom.times)
-			}
-
-			if testCase.name == "ListenSubscribeUnreachable Error" {
-				createChannel(mockPacketConn)
+			testCase.setupTestExpects(mockNetceptor, mockPacketConn, testCase)
+			if testCase.name == "NetceptorShutdown Error" {
 				time.Sleep(time.Second * 1)
 			}
-			if testCase.name == "WriteTo Error" {
-				mockNetceptor.EXPECT().NodeID().Return("nodeID")
-			}
-			switch {
-			case testCase.name == "User Cancel Error":
+			if testCase.name == "User Cancel Error" {
 				newCtx, ctxCancel := context.WithCancel(ctx)
 
 				time.AfterFunc(1*time.Second, ctxCancel)
 
 				duration, remote, err := netceptor.CreatePing(newCtx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
-			case testCase.name == "NetceptorShutdown Error":
-				time.Sleep(time.Second * 1)
 
-				duration, remote, err := netceptor.CreatePing(ctx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
-				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
-			default:
+			} else {
 				duration, remote, err := netceptor.CreatePing(ctx, mockNetceptor, testCase.pingTarget, testCase.pingHopsToLive)
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
 			}

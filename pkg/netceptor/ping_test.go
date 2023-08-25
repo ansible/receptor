@@ -20,24 +20,7 @@ func setupTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetcForPin
 	mockNetceptor := mock_netceptor.NewMockNetcForPing(ctrl)
 	mockPacketConn := mock_netceptor.NewMockPacketConner(ctrl)
 
-	mockPacketConn.EXPECT().SetHopsToLive(gomock.Any()).AnyTimes()
-	mockPacketConn.EXPECT().Close().Return(nil).AnyTimes()
-	mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{}).AnyTimes()
-
 	return ctrl, mockNetceptor, mockPacketConn
-}
-
-// teardownTest tears down TestPing tests.
-func teardownTest(ctrl *gomock.Controller, mockNetceptor *mock_netceptor.MockNetcForPing, mockPacketConn *mock_netceptor.MockPacketConner) {
-	mockPacketConn.EXPECT().SetHopsToLive(gomock.Any()).Times(0)
-	mockPacketConn.EXPECT().Close().Times(0)
-	mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Times(0)
-	mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Times(0)
-	mockPacketConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Times(0)
-	mockNetceptor.EXPECT().Context().Times(0)
-	mockPacketConn.EXPECT().ReadFrom(gomock.Any()).Times(0)
-	mockPacketConn.EXPECT().SubscribeUnreachable(gomock.Any()).Times(0)
-	ctrl.Finish()
 }
 
 // createChannel creates a channel that passes an error to errorChan inside of createPing.
@@ -118,6 +101,11 @@ func setupTestExpects(args ...interface{}) {
 				return newCtx
 			}).MaxTimes(testCase.returnContext.times)
 		},
+		"SetHopsToLiveReturn": func() { mockPacketConn.EXPECT().SetHopsToLive(gomock.Any()).Times(testCase.returnSetHopsToLiveTimes) },
+		"CloseReturn":         func() { mockPacketConn.EXPECT().Close().Return(nil).Times(testCase.returnCloseTimes) },
+		"NewAddrReturn": func() {
+			mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{}).Times(testCase.returnNewAddrTimes)
+		},
 		"NodeID":         func() { mockNetceptor.EXPECT().NodeID().Return("nodeID") },
 		"CreateChannel":  func() { createChannel(mockPacketConn) },
 		"SleepOneSecond": func() { time.Sleep(time.Second * 1) },
@@ -157,18 +145,21 @@ type readFromReturn struct {
 }
 
 type pingTestCaseStruct struct {
-	name               string
-	pingTarget         string
-	pingHopsToLive     byte
-	returnListenPacket listenPacketReturn
-	returnWriteTo      writeToReturn
-	returnContext      contextReturn
-	returnReadFrom     readFromReturn
-	expects            []string
-	setupTestExpects   func(args ...interface{})
-	expectedDuration   int
-	expectedRemote     string
-	expectedError      error
+	name                     string
+	pingTarget               string
+	pingHopsToLive           byte
+	returnSetHopsToLiveTimes int
+	returnCloseTimes         int
+	returnNewAddrTimes       int
+	returnListenPacket       listenPacketReturn
+	returnWriteTo            writeToReturn
+	returnContext            contextReturn
+	returnReadFrom           readFromReturn
+	expects                  []string
+	setupTestExpects         func(args ...interface{})
+	expectedDuration         int
+	expectedRemote           string
+	expectedError            error
 }
 
 // TestCreatePing tests CreatePing inside ping.go.
@@ -176,14 +167,14 @@ func TestCreatePing(t *testing.T) {
 	ctrl, mockNetceptor, mockPacketConn := setupTest(t)
 
 	pingTestCases := []pingTestCaseStruct{
-		{"NetceptorShutdown Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "doAndReturn"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextDoAndReturn", "SleepOneSecond"}, setupTestExpects, 0, "", errors.New("netceptor shutdown")},
-		{"ListenSubscribeUnreachable Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn", "CreateChannel", "SleepOneSecond", "SleepOneSecond"}, setupTestExpects, 0, "", errors.New("test")},
-		{"CreatePing Success", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn"}, setupTestExpects, 0, ":", nil},
-		{"ListenPacket Error", "target", byte(1), listenPacketReturn{nil, errors.New("Catch ListenPacket error"), 1, "return"}, writeToReturn{0, nil, 0, "return"}, contextReturn{context.Background(), 0, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 0, "return"}, []string{"ListenPacketReturn"}, setupTestExpects, 0, "", errors.New("Catch ListenPacket error")},
-		{"ReadFrom Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, errors.New("ReadFrom error"), 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn"}, setupTestExpects, 0, "", errors.New("ReadFrom error")},
-		{"WriteTo Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, errors.New("WriteTo error"), 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn", "NodeID"}, setupTestExpects, 0, "", errors.New("WriteTo error")},
-		{"Timeout Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "do"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromDo", "ContextReturn"}, setupTestExpects, 0, "", errors.New("timeout")},
-		{"User Cancel Error", "target", byte(1), listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "doAndReturn"}, []string{"ListenPacketReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromDoAndReturn", "ContextReturn"}, setupTestExpects, 0, "", errors.New("user cancelled")},
+		{"NetceptorShutdown Error", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "doAndReturn"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextDoAndReturn", "SleepOneSecond"}, setupTestExpects, 0, "", errors.New("netceptor shutdown")},
+		{"ListenSubscribeUnreachable Error", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn", "CreateChannel", "SleepOneSecond", "SleepOneSecond"}, setupTestExpects, 0, "", errors.New("test")},
+		{"CreatePing Success", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 1, "return"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn"}, setupTestExpects, 0, ":", nil},
+		{"ListenPacket Error", "target", byte(1), 1, 1, 1, listenPacketReturn{nil, errors.New("Catch ListenPacket error"), 1, "return"}, writeToReturn{0, nil, 0, "return"}, contextReturn{context.Background(), 0, "return"}, readFromReturn{0, &netceptor.Addr{}, nil, 0, "return"}, []string{"ListenPacketReturn"}, setupTestExpects, 0, "", errors.New("Catch ListenPacket error")},
+		{"ReadFrom Error", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, errors.New("ReadFrom error"), 1, "return"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn"}, setupTestExpects, 0, "", errors.New("ReadFrom error")},
+		{"WriteTo Error", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, errors.New("WriteTo error"), 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "return"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromReturn", "ContextReturn", "NodeID"}, setupTestExpects, 0, "", errors.New("WriteTo error")},
+		{"Timeout Error", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "do"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromDo", "ContextReturn"}, setupTestExpects, 0, "", errors.New("timeout")},
+		{"User Cancel Error", "target", byte(1), 1, 1, 1, listenPacketReturn{mockPacketConn, nil, 1, "return"}, writeToReturn{0, nil, 1, "return"}, contextReturn{context.Background(), 2, "return"}, readFromReturn{0, nil, nil, 1, "doAndReturn"}, []string{"ListenPacketReturn", "SetHopsToLiveReturn", "CloseReturn", "NewAddrReturn", "SubscribeUnreachableReturn", "WriteToReturn", "ReadFromDoAndReturn", "ContextReturn"}, setupTestExpects, 0, "", errors.New("user cancelled")},
 	}
 
 	for _, testCase := range pingTestCases {
@@ -205,7 +196,7 @@ func TestCreatePing(t *testing.T) {
 				checkPing(duration, testCase.expectedDuration, remote, testCase.expectedRemote, err, testCase.expectedError, t)
 			}
 
-			teardownTest(ctrl, mockNetceptor, mockPacketConn)
+			ctrl.Finish()
 			ctx.Done()
 		})
 	}

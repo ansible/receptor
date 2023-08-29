@@ -28,38 +28,38 @@ type NetceptorForControlsvc interface {
 	NetceptorForControlCommand
 }
 
-type UtilerIF interface {
+type Utiler interface {
 	BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger)
 	UnixSocketListen(filename string, permissions fs.FileMode) (net.Listener, *utils.FLock, error)
 }
 
-type UtilStruct struct{}
+type Util struct{}
 
-func (u *UtilStruct) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
+func (u *Util) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
 	utils.BridgeConns(c1, c1Name, c2, c2Name, logger)
 }
 
-func (u *UtilStruct) UnixSocketListen(filename string, permissions fs.FileMode) (net.Listener, *utils.FLock, error) {
+func (u *Util) UnixSocketListen(filename string, permissions fs.FileMode) (net.Listener, *utils.FLock, error) {
 	return utils.UnixSocketListen(filename, permissions)
 }
 
-type NeterIF interface {
+type Neter interface {
 	Listen(network string, address string) (net.Listener, error)
 }
 
-type NetStruct struct{}
+type Net struct{}
 
-func (n *NetStruct) Listen(network string, address string) (net.Listener, error) {
+func (n *Net) Listen(network string, address string) (net.Listener, error) {
 	return net.Listen(network, address)
 }
 
-type TlserIF interface {
+type Tlser interface {
 	NewListener(inner net.Listener, config *tls.Config) net.Listener
 }
 
-type TlsStruct struct{}
+type Tls struct{}
 
-func (t *TlsStruct) NewListener(inner net.Listener, config *tls.Config) net.Listener {
+func (t *Tls) NewListener(inner net.Listener, config *tls.Config) net.Listener {
 	return tls.NewListener(inner, config)
 }
 
@@ -129,9 +129,9 @@ type Server struct {
 	controlFuncLock sync.RWMutex
 	controlTypes    map[string]ControlCommandType
 	// new stuff
-	serverUtils UtilerIF
-	serverNet   NeterIF
-	serverTls   TlserIF
+	serverUtils Utiler
+	serverNet   Neter
+	serverTls   Tlser
 }
 
 // New returns a new instance of a control service.
@@ -140,9 +140,9 @@ func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 		nc:              nc,
 		controlFuncLock: sync.RWMutex{},
 		controlTypes:    make(map[string]ControlCommandType),
-		serverUtils:     &UtilStruct{},
-		serverNet:       &NetStruct{},
-		serverTls:       &TlsStruct{},
+		serverUtils:     &Util{},
+		serverNet:       &Net{},
+		serverTls:       &Tls{},
 	}
 	if stdServices {
 		s.controlTypes["ping"] = &pingCommandType{}
@@ -155,15 +155,15 @@ func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 	return s
 }
 
-func (s *Server) SetServerUtils(u *UtilStruct) {
+func (s *Server) SetServerUtils(u Utiler) {
 	s.serverUtils = u
 }
 
-func (s *Server) SetServerNet(n *NetStruct) {
+func (s *Server) SetServerNet(n Neter) {
 	s.serverNet = n
 }
 
-func (s *Server) SetServerTls(t *TlsStruct) {
+func (s *Server) SetServerTls(t Tlser) {
 	s.serverTls = t
 }
 
@@ -380,7 +380,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	} else {
 		tli = nil
 	}
-	var li *netceptor.Listener
+	var li net.Listener
 	if service != "" {
 		li, err = s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{
 			"type": "Control Service",
@@ -391,7 +391,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	} else {
 		li = nil
 	}
-	if uli == nil && li == nil {
+	if uli == nil && tli == nil && li == nil {
 		return fmt.Errorf("no listeners specified")
 	}
 	s.nc.GetLogger().Info("Running control service %s\n", service)
@@ -412,10 +412,10 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		if listener != nil {
 			go func(listener net.Listener) {
 				for {
-					conn, err := listener.Accept()
 					if ctx.Err() != nil {
 						return
 					}
+					conn, err := listener.Accept()
 					if err != nil {
 						if !strings.HasSuffix(err.Error(), "normal close") {
 							s.nc.GetLogger().Error("Error accepting connection: %s\n", err)

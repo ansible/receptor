@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"os"
 	"testing"
 
@@ -19,14 +18,12 @@ func TestAddControlFunc(t *testing.T) {
 
 }
 
-func TestRunControlSvc(t *testing.T) {
+func TestOne(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	s := controlsvc.New(false, mock_netceptor)
 
-	// test 1
 	mock_netceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("the world blew up"))
 
 	err := s.RunControlSvc(context.Background(), "test", &tls.Config{}, "", os.FileMode(0o600), "", &tls.Config{})
@@ -36,35 +33,105 @@ func TestRunControlSvc(t *testing.T) {
 		t.Errorf("expected error %s, got %s", errorString, err.Error())
 	}
 
-	// test 2
+}
+
+func TestTwo(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	s := controlsvc.New(false, mock_netceptor)
+
 	mock_netceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&netceptor.Listener{}, nil)
 
 	mock_netceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test"))
-	err = s.RunControlSvc(context.Background(), "test", &tls.Config{}, "", os.FileMode(0o600), "", &tls.Config{})
+	err := s.RunControlSvc(context.Background(), "test", &tls.Config{}, "", os.FileMode(0o600), "", &tls.Config{})
 
 	if err != nil {
 		t.Errorf("it blew up the second time")
 	}
+}
 
-	// test 3
-	err = s.RunControlSvc(context.Background(), "", &tls.Config{}, "", os.FileMode(0o600), "", &tls.Config{})
+func TestThree(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	s := controlsvc.New(false, mock_netceptor)
 
-	errorString = "no listeners specified"
+	err := s.RunControlSvc(context.Background(), "", &tls.Config{}, "", os.FileMode(0o600), "", &tls.Config{})
+
+	errorString := "no listeners specified"
 	if err == nil || err.Error() != errorString {
 		t.Errorf("expected error: %+v, got: %+v", errorString, err.Error())
 	}
+}
 
-	// test 4
-	invalidAddr := "u81u9u21:"
+func TestFour(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	s := controlsvc.New(false, mock_netceptor)
+	mock_unix := mock_controlsvc.NewMockUtiler(ctrl)
+	s.SetServerUtils(mock_unix)
 
-	mock_netceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
-	err = s.RunControlSvc(context.Background(), "", &tls.Config{}, "", os.FileMode(0o600), invalidAddr, &tls.Config{})
+	mock_unix.EXPECT().UnixSocketListen(gomock.Any(), gomock.Any()).Return(nil, nil, errors.New("unix blargh"))
 
-	errorString = fmt.Sprintf("error listening on TCP socket: listen tcp: lookup %s no such host", invalidAddr)
+	err := s.RunControlSvc(context.Background(), "", &tls.Config{}, "unixSocket", os.FileMode(0o600), "", &tls.Config{})
 
+	errorString := "error opening Unix socket: unix blargh"
 	if err == nil || err.Error() != errorString {
 		t.Errorf("expected error: %+v, got: %+v", errorString, err.Error())
 	}
+}
 
-	fmt.Println(err)
+func TestFive(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	s := controlsvc.New(false, mock_netceptor)
+	mock_net := mock_controlsvc.NewMockNeter(ctrl)
+	s.SetServerNet(mock_net)
+
+	mock_net.EXPECT().Listen(gomock.Any(), gomock.Any()).Return(nil, errors.New("net blargh"))
+
+	err := s.RunControlSvc(context.Background(), "", &tls.Config{}, "", os.FileMode(0o600), "tcpListen", &tls.Config{})
+
+	errorString := "error listening on TCP socket: net blargh"
+	if err == nil || err.Error() != errorString {
+		t.Errorf("expected error: %+v, got: %+v", errorString, err.Error())
+	}
+}
+
+func TestSix(t *testing.T) {
+
+}
+
+func TestSeven(t *testing.T) {
+
+}
+func TestRunControlSvc(t *testing.T) {
+	// ctrl := gomock.NewController(t)
+	// defer ctrl.Finish()
+
+	// mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	// s := controlsvc.New(false, mock_netceptor)
+	// mock_unix := mock_controlsvc.NewMockUtiler(ctrl)
+	// s.SetServerUtils(mock_unix)
+
+	// mock_net_listener := mock_controlsvc.NewMockListener(ctrl)
+	// mock_unix.EXPECT().UnixSocketListen(gomock.Any(), gomock.Any()).Return(mock_net_listener, nil, nil)
+
+	// newCtx, ctxCancel := context.WithTimeout(context.Background(), time.Millisecond*1)
+	// defer ctxCancel()
+
+	// logger := logger.NewReceptorLogger("test")
+	// mock_net_listener.EXPECT().Accept().Return(nil, errors.New("blargh"))
+	// // mock_net_listener.EXPECT().Close()
+	// mock_netceptor.EXPECT().GetLogger().Return(logger)
+	// err := s.RunControlSvc(newCtx, "", &tls.Config{}, "unixSocket", os.FileMode(0o600), "", &tls.Config{})
+	// errorString := "Error accepting connection: blargh"
+	// fmt.Println(err, errorString)
+	// if err == nil || err.Error() != errorString {
+	// 	t.Errorf("expected error: %+v, got: %+v", errorString, err.Error())
+	// }
+
 }

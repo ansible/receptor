@@ -65,7 +65,15 @@ func (t *Tls) NewListener(inner net.Listener, config *tls.Config) net.Listener {
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions.
 type sockControl struct {
-	conn net.Conn
+	conn  net.Conn
+	utils Utiler
+}
+
+func NewSockControl(conn net.Conn, utils Utiler) *sockControl {
+	return &sockControl{
+		conn:  conn,
+		utils: utils,
+	}
 }
 
 func (s *sockControl) RemoteAddr() net.Addr {
@@ -80,7 +88,7 @@ func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName s
 			return err
 		}
 	}
-	utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
+	s.utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
 
 	return nil
 }
@@ -285,9 +293,8 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		}
 		s.controlFuncLock.RUnlock()
 		if ct != nil {
-			cfo := &sockControl{
-				conn: conn,
-			}
+			cfo := NewSockControl(conn, &Util{})
+
 			var cfr map[string]interface{}
 			var cc ControlCommand
 			if jsonData == nil {

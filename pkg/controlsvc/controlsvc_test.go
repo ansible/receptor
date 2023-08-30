@@ -102,7 +102,6 @@ func TestFive(t *testing.T) {
 }
 
 func TestSix(t *testing.T) {
-
 }
 
 func TestSeven(t *testing.T) {
@@ -133,5 +132,72 @@ func TestRunControlSvc(t *testing.T) {
 	// if err == nil || err.Error() != errorString {
 	// 	t.Errorf("expected error: %+v, got: %+v", errorString, err.Error())
 	// }
+
+}
+
+func TestSockControlRemoteAddr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	mock_con := mock_controlsvc.NewMockConn(ctrl)
+	mock_addr := mock_controlsvc.NewMockAddr(ctrl)
+	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
+	sockControl := controlsvc.NewSockControl(mock_con, mockUtil)
+	localhost := "127.0.0.1"
+
+	mock_con.EXPECT().RemoteAddr().Return(mock_addr)
+	mock_addr.EXPECT().String().Return(localhost)
+	remoteAddr := sockControl.RemoteAddr()
+
+	if remoteAddr.String() != localhost {
+		t.Errorf("expected: %s, received: %s", localhost, remoteAddr)
+	}
+}
+
+func TestSockControlBridgeConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
+	mockRWCloser := mock_controlsvc.NewMockReadWriteCloser(ctrl)
+	sockControl := controlsvc.NewSockControl(mockCon, mockUtil)
+	logger := logger.NewReceptorLogger("")
+
+	bridgeConnTestCases := []struct {
+		name          string
+		message       string
+		expectedCalls func()
+	}{
+		{
+			name:    "without message",
+			message: "",
+			expectedCalls: func() {
+				mockUtil.EXPECT().BridgeConns(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
+			},
+		},
+		{
+			name:    "with message",
+			message: "message",
+			expectedCalls: func() {
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("blargh"))
+			},
+		},
+	}
+
+	for _, testCase := range bridgeConnTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testCase.expectedCalls()
+			err := sockControl.BridgeConn(testCase.message, mockRWCloser, "test", logger)
+
+			if testCase.message == "" {
+				if err != nil {
+					t.Errorf("should be nil")
+				}
+			} else {
+				if err.Error() == "" {
+					t.Errorf("should be nil")
+				}
+			}
+		})
+
+	}
 
 }

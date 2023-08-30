@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ansible/receptor/pkg/utils"	//nolint:depguard
-	"github.com/stretchr/testify/assert"	//nolint:depguard
+	"github.com/ansible/receptor/pkg/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetSysCPUCount(t *testing.T) {

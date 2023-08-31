@@ -23,6 +23,22 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
+// type ReadWriteCloser interface {
+// 	Read(p []byte) (n int, err error)
+// 	Write(p []byte) (n int, err error)
+// 	Close() error
+// }
+
+type Copier interface {
+	Copy(dst io.Writer, src io.Reader) (written int64, err error)
+}
+
+type SocketConnIO struct{}
+
+func (s *SocketConnIO) Copy(dst io.Writer, src io.Reader) (written int64, err error) {
+	return io.Copy(dst, src)
+}
+
 type NetceptorForControlsvc interface {
 	ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*netceptor.Listener, error)
 	NetceptorForControlCommand
@@ -67,12 +83,14 @@ func (t *Tls) NewListener(inner net.Listener, config *tls.Config) net.Listener {
 type sockControl struct {
 	conn  net.Conn
 	utils Utiler
+	io    Copier
 }
 
-func NewSockControl(conn net.Conn, utils Utiler) *sockControl {
+func NewSockControl(conn net.Conn, utils Utiler, copier Copier) *sockControl {
 	return &sockControl{
 		conn:  conn,
 		utils: utils,
+		io:    copier,
 	}
 }
 
@@ -102,7 +120,7 @@ func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 		}
 	}
 
-	if _, err := io.Copy(out, s.conn); err != nil {
+	if _, err := s.io.Copy(out, s.conn); err != nil {
 		return err
 	}
 
@@ -293,7 +311,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		}
 		s.controlFuncLock.RUnlock()
 		if ct != nil {
-			cfo := NewSockControl(conn, &Util{})
+			cfo := NewSockControl(conn, &Util{}, &SocketConnIO{})
 
 			var cfr map[string]interface{}
 			var cc ControlCommand

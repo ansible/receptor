@@ -12,7 +12,7 @@ import (
 
 func TestGetSysCPUCount(t *testing.T) {
 	got := utils.GetSysCPUCount()
-	if ( got <= 0 ) {
+	if got <= 0 {
 		t.Fail()
 	}
 
@@ -22,7 +22,7 @@ func TestGetSysCPUCount(t *testing.T) {
 		commandOutputWithout := strings.TrimSpace(string(commandOutput))
 		want, _ := strconv.Atoi(commandOutputWithout)
 
-		if ( got != want) {
+		if got != want {
 			t.Fail()
 		}
 	}
@@ -30,7 +30,7 @@ func TestGetSysCPUCount(t *testing.T) {
 
 func TestGetSysMemoryMiB(t *testing.T) {
 	got := utils.GetSysMemoryMiB()
-	if ( got <= 0 ) {
+	if got <= 0 {
 		t.Fail()
 	}
 
@@ -41,7 +41,7 @@ func TestGetSysMemoryMiB(t *testing.T) {
 		wantKb, _ := strconv.ParseUint(commandOutputWithout, 10, 64)
 
 		want := wantKb / 1024
-		if ( got != want) {
+		if got != want {
 			t.Fail()
 		}
 	}

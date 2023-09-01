@@ -68,18 +68,18 @@ func (mr *MockPacketConnerMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockPacketConner)(nil).Close))
 }
 
-// GetLocalService mocks base method.
-func (m *MockPacketConner) GetLocalService() string {
+// GetHopsToLive mocks base method.
+func (m *MockPacketConner) GetHopsToLive() byte {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLocalService")
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "GetHopsToLive")
+	ret0, _ := ret[0].(byte)
 	return ret0
 }
 
-// GetLocalService indicates an expected call of GetLocalService.
-func (mr *MockPacketConnerMockRecorder) GetLocalService() *gomock.Call {
+// GetHopsToLive indicates an expected call of GetHopsToLive.
+func (mr *MockPacketConnerMockRecorder) GetHopsToLive() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLocalService", reflect.TypeOf((*MockPacketConner)(nil).GetLocalService))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHopsToLive", reflect.TypeOf((*MockPacketConner)(nil).GetHopsToLive))
 }
 
 // GetLogger mocks base method.
@@ -108,6 +108,20 @@ func (m *MockPacketConner) LocalAddr() net.Addr {
 func (mr *MockPacketConnerMockRecorder) LocalAddr() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LocalAddr", reflect.TypeOf((*MockPacketConner)(nil).LocalAddr))
+}
+
+// LocalService mocks base method.
+func (m *MockPacketConner) LocalService() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LocalService")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// LocalService indicates an expected call of LocalService.
+func (mr *MockPacketConnerMockRecorder) LocalService() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LocalService", reflect.TypeOf((*MockPacketConner)(nil).LocalService))
 }
 
 // ReadFrom mocks base method.

@@ -425,7 +425,7 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.GetLocalService(), c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

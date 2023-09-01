@@ -14,6 +14,7 @@ import (
 
 type PacketConner interface {
 	SetHopsToLive(hopsToLive byte)
+	GetHopsToLive() byte
 	SubscribeUnreachable(doneChan chan struct{}) chan UnreachableNotification
 	ReadFrom(p []byte) (int, net.Addr, error)
 	WriteTo(p []byte, addr net.Addr) (n int, err error)
@@ -23,7 +24,7 @@ type PacketConner interface {
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
 	Cancel() *context.CancelFunc
-	GetLocalService() string
+	LocalService() string
 	GetLogger() *logger.ReceptorLogger
 	StartUnreachable()
 }
@@ -89,8 +90,8 @@ func (s *Netceptor) ListenPacket(service string) (PacketConner, error) {
 	if service == "" {
 		service = s.GetEphemeralService()
 	}
-	s.GetListenerLock().Lock()
-	defer s.GetListenerLock().Unlock()
+	s.listenerLock.Lock()
+	defer s.listenerLock.Unlock()
 	_, isReserved := s.reservedServices[service]
 	_, isListening := s.listenerRegistry[service]
 	if isReserved || isListening {
@@ -127,10 +128,6 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 
 func (pc *PacketConn) Cancel() *context.CancelFunc {
 	return &pc.cancel
-}
-
-func (pc *PacketConn) GetLocalService() string {
-	return pc.localService
 }
 
 func (pc *PacketConn) GetLogger() *logger.ReceptorLogger {
@@ -246,6 +243,10 @@ func (pc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 // SetHopsToLive sets the HopsToLive value for future outgoing packets on this connection.
 func (pc *PacketConn) SetHopsToLive(hopsToLive byte) {
 	pc.hopsToLive = hopsToLive
+}
+
+func (pc *PacketConn) GetHopsToLive() byte {
+	return pc.hopsToLive
 }
 
 // LocalService returns the local service name of the connection.

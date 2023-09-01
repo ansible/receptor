@@ -39,7 +39,7 @@ type NetcForPacketConn interface {
 	NodeID() string
 	GetNetworkName() string
 	GetListenerLock() *sync.RWMutex
-	GetListenerRegistery() map[string]*PacketConn
+	GetListenerRegistry() map[string]*PacketConn
 	GetUnreachableBroker() *utils.Broker
 	MaxForwardingHops() byte
 	Context() context.Context
@@ -72,7 +72,7 @@ func NewPacketConnWithConst(s NetcForPacketConn, service string, advertise bool,
 	}
 
 	npc.StartUnreachable()
-	s.GetListenerRegistery()[service] = npc
+	s.GetListenerRegistry()[service] = npc
 
 	return npc
 }
@@ -267,7 +267,7 @@ func (pc *PacketConn) LocalAddr() net.Addr {
 func (pc *PacketConn) Close() error {
 	pc.s.GetListenerLock().Lock()
 	defer pc.s.GetListenerLock().Unlock()
-	delete(pc.s.GetListenerRegistery(), pc.localService)
+	delete(pc.s.GetListenerRegistry(), pc.localService)
 	if pc.cancel != nil {
 		pc.cancel()
 	}

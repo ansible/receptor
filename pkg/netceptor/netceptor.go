@@ -451,8 +451,8 @@ func (s *Netceptor) GetLogger() *logger.ReceptorLogger {
 	return s.Logger
 }
 
-// GetListenerRegistery returns listener registery map.
-func (s *Netceptor) GetListenerRegistery() map[string]*PacketConn {
+// GetListenerRegistry returns listener registry map.
+func (s *Netceptor) GetListenerRegistry() map[string]*PacketConn {
 	return s.listenerRegistry
 }
 

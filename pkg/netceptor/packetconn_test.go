@@ -32,7 +32,7 @@ func TestNewPacketConn(t *testing.T) {
 	mockNetceptorForPacketConn.EXPECT().MaxForwardingHops().Return(byte(1))
 	mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
 	mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-	mockNetceptorForPacketConn.EXPECT().GetListenerRegistery().Return(map[string]*netceptor.PacketConn{})
+	mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
 
 	t.Run("NewPacketConn Success", func(t *testing.T) {
 		pc := netceptor.NewPacketConn(mockNetceptorForPacketConn, "test", 0)
@@ -165,7 +165,7 @@ func TestPacketConn(t *testing.T) {
 			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
 			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
-			mockNetceptorForPacketConn.EXPECT().GetListenerRegistery().Return(map[string]*netceptor.PacketConn{})
+			mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
 		}, func(pc netceptor.PacketConner) interface{} {
 			return pc.Close()
 		}, nil, "Expected no error, but got %v"},
@@ -174,7 +174,7 @@ func TestPacketConn(t *testing.T) {
 			mockNetceptorForPacketConn.EXPECT().RemoveLocalServiceAdvertisement("test").Return(errors.New("Close Error"))
 			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
-			mockNetceptorForPacketConn.EXPECT().GetListenerRegistery().Return(map[string]*netceptor.PacketConn{})
+			mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
 		}, func(pc netceptor.PacketConner) interface{} {
 			return pc.Close().Error()
 		}, "Close Error", "Expected error to be Close Error, but got %v"},
@@ -202,7 +202,7 @@ func TestPacketConn(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockNetceptorForPacketConn.EXPECT().MaxForwardingHops().Return(byte(1))
-			mockNetceptorForPacketConn.EXPECT().GetListenerRegistery().Return(map[string]*netceptor.PacketConn{})
+			mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
 
 			testCase.expectedCall(ctx)
 

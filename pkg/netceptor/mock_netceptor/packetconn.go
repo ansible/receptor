@@ -326,18 +326,18 @@ func (mr *MockNetcForPacketConnMockRecorder) GetListenerLock() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerLock", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerLock))
 }
 
-// GetListenerRegistery mocks base method.
-func (m *MockNetcForPacketConn) GetListenerRegistery() map[string]*netceptor.PacketConn {
+// GetListenerRegistry mocks base method.
+func (m *MockNetcForPacketConn) GetListenerRegistry() map[string]*netceptor.PacketConn {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetListenerRegistery")
+	ret := m.ctrl.Call(m, "GetListenerRegistry")
 	ret0, _ := ret[0].(map[string]*netceptor.PacketConn)
 	return ret0
 }
 
-// GetListenerRegistery indicates an expected call of GetListenerRegistery.
-func (mr *MockNetcForPacketConnMockRecorder) GetListenerRegistery() *gomock.Call {
+// GetListenerRegistry indicates an expected call of GetListenerRegistry.
+func (mr *MockNetcForPacketConnMockRecorder) GetListenerRegistry() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerRegistery", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerRegistery))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerRegistry", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerRegistry))
 }
 
 // GetLogger mocks base method.

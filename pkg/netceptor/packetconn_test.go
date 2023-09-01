@@ -94,7 +94,6 @@ func TestListenPacketAndAdvertise(t *testing.T) {
 	}
 
 	for _, testCase := range listenPacketTestCases {
-
 		ctx := context.Background()
 		netc := netceptor.New(ctx, "node")
 
@@ -144,6 +143,7 @@ func TestPacketConn(t *testing.T) {
 			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(newCtx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 		}, func(pc netceptor.PacketConner) interface{} {
 			_, _, err := pc.ReadFrom([]byte{})
+
 			return err.Error()
 		}, "connection context closed", "Expected ReadFrom error to be connection context closed, but got %v"},
 		{"SetHopsToLive Success", "test", func(ctx context.Context) {
@@ -151,6 +151,7 @@ func TestPacketConn(t *testing.T) {
 			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 		}, func(pc netceptor.PacketConner) interface{} {
 			pc.SetHopsToLive(byte(2))
+
 			return pc.GetHopsToLive()
 		}, byte(2), "Expected hopsToLive to be 2, but got %v"},
 		{"LocalAddr Success", "test", func(ctx context.Context) {

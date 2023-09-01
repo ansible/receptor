@@ -58,25 +58,21 @@ func TestListenPacket(t *testing.T) {
 	}
 
 	for _, testCase := range listenPacketTestCases {
-
 		ctx := context.Background()
 		netc := netceptor.New(ctx, "node")
 
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := netc.ListenPacket(testCase.service)
-			if testCase.expectedErr == "" {
-				if err != nil {
-					t.Errorf(testCase.failedTestString, err)
-				}
-			} else if err != nil {
-				if err.Error() != testCase.expectedErr {
-					t.Errorf(testCase.failedTestString, err)
-				}
-			} else {
+			if testCase.expectedErr == "" && err != nil {
+				t.Errorf(testCase.failedTestString, err)
+			}
+			if testCase.expectedErr != "" && err != nil && err.Error() != testCase.expectedErr {
+				t.Errorf(testCase.failedTestString, err)
+			}
+			if testCase.expectedErr != "" && err == nil {
 				t.Errorf(testCase.failedTestString, err)
 			}
 		})
-
 	}
 }
 
@@ -104,19 +100,16 @@ func TestListenPacketAndAdvertise(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := netc.ListenPacketAndAdvertise(testCase.service, testCase.tags)
-			if testCase.expectedErr == "" {
-				if err != nil {
-					t.Errorf(testCase.failedTestString, err)
-				}
-			} else if err != nil {
-				if err.Error() != testCase.expectedErr {
-					t.Errorf(testCase.failedTestString, err)
-				}
-			} else {
+			if testCase.expectedErr == "" && err != nil {
+				t.Errorf(testCase.failedTestString, err)
+			}
+			if testCase.expectedErr != "" && err != nil && err.Error() != testCase.expectedErr {
+				t.Errorf(testCase.failedTestString, err)
+			}
+			if testCase.expectedErr != "" && err == nil {
 				t.Errorf(testCase.failedTestString, err)
 			}
 		})
-
 	}
 }
 
@@ -218,7 +211,6 @@ func TestPacketConn(t *testing.T) {
 			if testCase.name == "Close Error" {
 				pc := netceptor.NewPacketConnWithConst(mockNetceptorForPacketConn, testCase.service, true, map[string]string{}, byte(0))
 				returnVal = testCase.funcCall(pc)
-
 			} else {
 				pc := netceptor.NewPacketConn(mockNetceptorForPacketConn, testCase.service, 0)
 				returnVal = testCase.funcCall(pc)

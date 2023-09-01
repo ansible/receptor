@@ -451,21 +451,22 @@ func (s *Netceptor) GetLogger() *logger.ReceptorLogger {
 	return s.Logger
 }
 
-// GetListenerRegistery returns listener registery map
+// GetListenerRegistery returns listener registery map.
 func (s *Netceptor) GetListenerRegistery() map[string]*PacketConn {
 	return s.listenerRegistry
 }
 
-// GetNetworkName returns networkName
+// GetNetworkName returns networkName.
 func (s *Netceptor) GetNetworkName() string {
 	return s.networkName
 }
 
-// GetListenerLock returns listenerLock
+// GetListenerLock returns listenerLock.
 func (s *Netceptor) GetListenerLock() *sync.RWMutex {
 	return s.listenerLock
 }
 
+// GetUnreachableBroker returns unreachableBroker.
 func (s *Netceptor) GetUnreachableBroker() *utils.Broker {
 	return s.unreachableBroker
 }

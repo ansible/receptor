@@ -15,20 +15,14 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-func setupPacketConnTest(t *testing.T) (*gomock.Controller, *mock_netceptor.MockNetcForPacketConn) {
-	ctrl := gomock.NewController(t)
-
-	// Prepare mocks
-	mockNetceptorForPacketConn := mock_netceptor.NewMockNetcForPacketConn(ctrl)
-
-	return ctrl, mockNetceptorForPacketConn
-}
-
+// TestNewPacketConn tests the NewPacketConn method.
 func TestNewPacketConn(t *testing.T) {
-	ctrl, mockNetceptorForPacketConn := setupPacketConnTest(t)
+	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	ctx := context.Background()
+
+	mockNetceptorForPacketConn := mock_netceptor.NewMockNetcForPacketConn(ctrl)
 	mockNetceptorForPacketConn.EXPECT().MaxForwardingHops().Return(byte(1))
 	mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
 	mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
@@ -42,8 +36,9 @@ func TestNewPacketConn(t *testing.T) {
 	})
 }
 
+// TestListenPacket tests the ListenPacket method.
 func TestListenPacket(t *testing.T) {
-	ctrl, _ := setupPacketConnTest(t)
+	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	listenPacketTestCases := []struct {
@@ -76,8 +71,9 @@ func TestListenPacket(t *testing.T) {
 	}
 }
 
+// TestListenPacketAndAdvertise test the ListenPacketAndAdvertise method.
 func TestListenPacketAndAdvertise(t *testing.T) {
-	ctrl, _ := setupPacketConnTest(t)
+	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	listenPacketTestCases := []struct {
@@ -112,8 +108,12 @@ func TestListenPacketAndAdvertise(t *testing.T) {
 	}
 }
 
+// TestPacketConn tests both NewPacketConnWithConst and NewPacketConn methods.
 func TestPacketConn(t *testing.T) {
-	ctrl, mockNetceptorForPacketConn := setupPacketConnTest(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockNetceptorForPacketConn := mock_netceptor.NewMockNetcForPacketConn(ctrl)
 
 	packetConnTestCases := []struct {
 		name                   string
@@ -123,80 +123,150 @@ func TestPacketConn(t *testing.T) {
 		expectedReturnVal      interface{}
 		unexpectedReturnValMsg string
 	}{
-		{"GetLocalService Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.LocalService()
-		}, "test", "Expected GetLocalService to be test, but got %v"},
-		{"GetLogger Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test"))
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{}))).Times(4)
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.GetLogger().Logger.Prefix()
-		}, "test", "Expected Logger prefix to be test, but got %v"},
-		{"ReadFrom Error", "", func(ctx context.Context) {
-			newCtx, ctxCancel := context.WithCancel(context.Background())
-			time.AfterFunc(time.Microsecond*200, ctxCancel)
-			mockNetceptorForPacketConn.EXPECT().Context().Return(newCtx)
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(newCtx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-		}, func(pc netceptor.PacketConner) interface{} {
-			_, _, err := pc.ReadFrom([]byte{})
+		{
+			"GetLocalService Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.LocalService()
+			},
+			"test",
+			"Expected GetLocalService to be test, but got %v",
+		},
+		{
+			"GetLogger Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test"))
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{}))).Times(4)
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.GetLogger().Logger.Prefix()
+			},
+			"test",
+			"Expected Logger prefix to be test, but got %v",
+		},
+		{
+			"ReadFrom Error",
+			"",
+			func(ctx context.Context) {
+				newCtx, ctxCancel := context.WithCancel(context.Background())
+				time.AfterFunc(time.Microsecond*200, ctxCancel)
+				mockNetceptorForPacketConn.EXPECT().Context().Return(newCtx)
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(newCtx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				_, _, err := pc.ReadFrom([]byte{})
 
-			return err.Error()
-		}, "connection context closed", "Expected ReadFrom error to be connection context closed, but got %v"},
-		{"SetHopsToLive Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-		}, func(pc netceptor.PacketConner) interface{} {
-			pc.SetHopsToLive(byte(2))
+				return err.Error()
+			},
+			"connection context closed",
+			"Expected ReadFrom error to be connection context closed, but got %v",
+		},
+		{
+			"SetHopsToLive Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				pc.SetHopsToLive(byte(2))
 
-			return pc.GetHopsToLive()
-		}, byte(2), "Expected hopsToLive to be 2, but got %v"},
-		{"LocalAddr Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-			mockNetceptorForPacketConn.EXPECT().GetNetworkName().Return("test")
-			mockNetceptorForPacketConn.EXPECT().NodeID().Return("test")
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.LocalAddr().Network()
-		}, "test", "Expected LocalAddr Network to be test, but got %v"},
-		{"Close Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-			mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
-			mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.Close()
-		}, nil, "Expected no error, but got %v"},
-		{"Close Error", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().RemoveLocalServiceAdvertisement("test").Return(errors.New("Close Error"))
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-			mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
-			mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.Close().Error()
-		}, "Close Error", "Expected error to be Close Error, but got %v"},
-		{"SetDeadline Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.SetDeadline(time.Now().Add(time.Millisecond * 100))
-		}, nil, "Expected no error, but got %v"},
-		{"SetReadDeadline Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
-		}, nil, "Expected no error, but got %v"},
-		{"SetWriteDeadline Success", "test", func(ctx context.Context) {
-			mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-			mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
-		}, func(pc netceptor.PacketConner) interface{} {
-			return pc.SetWriteDeadline(time.Now().Add(time.Millisecond * 100))
-		}, nil, "Expected no error, but got %v"},
+				return pc.GetHopsToLive()
+			},
+			byte(2),
+			"Expected hopsToLive to be 2, but got %v",
+		},
+		{
+			"LocalAddr Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+				mockNetceptorForPacketConn.EXPECT().GetNetworkName().Return("test")
+				mockNetceptorForPacketConn.EXPECT().NodeID().Return("test")
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.LocalAddr().Network()
+			},
+			"test",
+			"Expected LocalAddr Network to be test, but got %v",
+		},
+		{
+			"Close Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+				mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
+				mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.Close()
+			},
+			nil,
+			"Expected no error, but got %v",
+		},
+		{
+			"Close Error",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().RemoveLocalServiceAdvertisement("test").Return(errors.New("Close Error"))
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+				mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
+				mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.Close().Error()
+			},
+			"Close Error",
+			"Expected error to be Close Error, but got %v",
+		},
+		{
+			"SetDeadline Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.SetDeadline(time.Now().Add(time.Millisecond * 100))
+			},
+			nil,
+			"Expected no error, but got %v",
+		},
+		{
+			"SetReadDeadline Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+			},
+			nil,
+			"Expected no error, but got %v",
+		},
+		{
+			"SetWriteDeadline Success",
+			"test",
+			func(ctx context.Context) {
+				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
+			},
+			func(pc netceptor.PacketConner) interface{} {
+				return pc.SetWriteDeadline(time.Now().Add(time.Millisecond * 100))
+			},
+			nil,
+			"Expected no error, but got %v",
+		},
 	}
 
 	for _, testCase := range packetConnTestCases {

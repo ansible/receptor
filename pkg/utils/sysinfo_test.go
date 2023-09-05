@@ -13,7 +13,7 @@ import (
 func TestGetSysCPUCount(t *testing.T) {
 	got := utils.GetSysCPUCount()
 	if got <= 0 {
-		t.Fail()
+		t.Errorf("Non-positive CPU count: %d\n", got)
 	}
 
 	if runtime.GOOS == "linux" {
@@ -23,7 +23,7 @@ func TestGetSysCPUCount(t *testing.T) {
 		want, _ := strconv.Atoi(commandOutputWithout)
 
 		if got != want {
-			t.Fail()
+			t.Errorf("Expected CPU count: %d, got %d\n", want, got)
 		}
 	}
 }
@@ -31,7 +31,7 @@ func TestGetSysCPUCount(t *testing.T) {
 func TestGetSysMemoryMiB(t *testing.T) {
 	got := utils.GetSysMemoryMiB()
 	if got <= 0 {
-		t.Fail()
+		t.Errorf( "Non-positive Memory: %d\n", got)
 	}
 
 	if runtime.GOOS == "linux" {
@@ -42,7 +42,7 @@ func TestGetSysMemoryMiB(t *testing.T) {
 
 		want := wantKb / 1024
 		if got != want {
-			t.Fail()
+			t.Errorf( "Expected Memory: %d, got %d\n", want, got )
 		}
 	}
 }

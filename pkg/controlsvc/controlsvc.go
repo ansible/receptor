@@ -23,12 +23,6 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
-// type ReadWriteCloser interface {
-// 	Read(p []byte) (n int, err error)
-// 	Write(p []byte) (n int, err error)
-// 	Close() error
-// }
-
 type Copier interface {
 	Copy(dst io.Writer, src io.Reader) (written int64, err error)
 }
@@ -79,32 +73,39 @@ func (t *Tls) NewListener(inner net.Listener, config *tls.Config) net.Listener {
 	return tls.NewListener(inner, config)
 }
 
-// sockControl implements the ControlFuncOperations interface that is passed back to control functions.
-type sockControl struct {
+// SockControl implements the ControlFuncOperations interface that is passed back to control functions.
+type SockControl struct {
 	conn  net.Conn
 	utils Utiler
 	io    Copier
 }
 
-func NewSockControl(conn net.Conn, utils Utiler, copier Copier) *sockControl {
-	return &sockControl{
+func NewSockControl(conn net.Conn, utils Utiler, copier Copier) *SockControl {
+	return &SockControl{
 		conn:  conn,
 		utils: utils,
 		io:    copier,
 	}
 }
 
-func (s *sockControl) RemoteAddr() net.Addr {
+func (s *SockControl) RemoteAddr() net.Addr {
 	return s.conn.RemoteAddr()
 }
 
-// BridgeConn bridges the socket to another socket.
-func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error {
+func (s *SockControl) WriteMessage(message string) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// BridgeConn bridges the socket to another socket.
+func (s *SockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error {
+	if err := s.WriteMessage(message); err != nil {
+		return err
 	}
 	s.utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
 
@@ -112,14 +113,10 @@ func (s *sockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName s
 }
 
 // ReadFromConn copies from the socket to an io.Writer, until EOF.
-func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
-	if message != "" {
-		_, err := s.conn.Write([]byte(message))
-		if err != nil {
-			return err
-		}
+func (s *SockControl) ReadFromConn(message string, out io.Writer) error {
+	if err := s.WriteMessage(message); err != nil {
+		return err
 	}
-
 	if _, err := s.io.Copy(out, s.conn); err != nil {
 		return err
 	}
@@ -128,12 +125,9 @@ func (s *sockControl) ReadFromConn(message string, out io.Writer) error {
 }
 
 // WriteToConn writes an initial string, and then messages to a channel, to the connection.
-func (s *sockControl) WriteToConn(message string, in chan []byte) error {
-	if message != "" {
-		_, err := s.conn.Write([]byte(message))
-		if err != nil {
-			return err
-		}
+func (s *SockControl) WriteToConn(message string, in chan []byte) error {
+	if err := s.WriteMessage(message); err != nil {
+		return err
 	}
 	for bytes := range in {
 		_, err := s.conn.Write(bytes)
@@ -145,7 +139,7 @@ func (s *sockControl) WriteToConn(message string, in chan []byte) error {
 	return nil
 }
 
-func (s *sockControl) Close() error {
+func (s *SockControl) Close() error {
 	return s.conn.Close()
 }
 

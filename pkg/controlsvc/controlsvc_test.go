@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
@@ -155,11 +156,52 @@ func TestSockControlRemoteAddr(t *testing.T) {
 	}
 }
 
+func TestSockControlWriteMessage(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
+	mockCopier := mock_controlsvc.NewMockCopier(ctrl)
+
+	sockControl := controlsvc.NewSockControl(mockCon, mockUtil, mockCopier)
+
+	writeMessageTestCases := []struct {
+		name          string
+		message       string
+		expectedCalls func()
+	}{
+		{
+			name:          "without message",
+			message:       "",
+			expectedCalls: func() {},
+		},
+		{
+			name:    "with message",
+			message: "message",
+			expectedCalls: func() {
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("cannot write message"))
+			},
+		},
+	}
+
+	for _, testCase := range writeMessageTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testCase.expectedCalls()
+			err := sockControl.WriteMessage(testCase.message)
+
+			if testCase.message == "" && err != nil {
+				t.Errorf("should be nil")
+			}
+			if testCase.message != "" && err.Error() != "cannot write message" {
+				t.Errorf("%s %s", testCase.name, err)
+			}
+		})
+	}
+}
+
 func TestSockControlBridgeConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockCon := mock_controlsvc.NewMockConn(ctrl)
 	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
-	mockRWCloser := mock_controlsvc.NewMockReadWriteCloser(ctrl)
 	mockCopier := mock_controlsvc.NewMockCopier(ctrl)
 	logger := logger.NewReceptorLogger("")
 
@@ -171,14 +213,14 @@ func TestSockControlBridgeConn(t *testing.T) {
 		expectedCalls func()
 	}{
 		{
-			name:    "without message",
+			name:    "without message and no error",
 			message: "",
 			expectedCalls: func() {
 				mockUtil.EXPECT().BridgeConns(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
 			},
 		},
 		{
-			name:    "with message",
+			name:    "with message and error",
 			message: "message",
 			expectedCalls: func() {
 				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("blargh"))
@@ -189,7 +231,7 @@ func TestSockControlBridgeConn(t *testing.T) {
 	for _, testCase := range bridgeConnTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			testCase.expectedCalls()
-			err := sockControl.BridgeConn(testCase.message, mockRWCloser, "test", logger)
+			err := sockControl.BridgeConn(testCase.message, mockCon, "test", logger)
 
 			if testCase.message == "" && err != nil {
 				t.Errorf("should be nil")
@@ -205,7 +247,6 @@ func TestSockControlReadFromConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockCon := mock_controlsvc.NewMockConn(ctrl)
 	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
-	mockRWCloser := mock_controlsvc.NewMockReadWriteCloser(ctrl)
 	mockCopier := mock_controlsvc.NewMockCopier(ctrl)
 
 	sockControl := controlsvc.NewSockControl(mockCon, mockUtil, mockCopier)
@@ -218,7 +259,7 @@ func TestSockControlReadFromConn(t *testing.T) {
 		errorMessage  string
 	}{
 		{
-			name:    "without message with copier error",
+			name:    "without message and copier error",
 			message: "",
 			expectedCalls: func() {
 				mockCopier.EXPECT().Copy(gomock.Any(), gomock.Any()).Return(int64(0), errors.New("read from conn copy error"))
@@ -227,7 +268,7 @@ func TestSockControlReadFromConn(t *testing.T) {
 			errorMessage:  "read from conn copy error",
 		},
 		{
-			name:    "with message",
+			name:    "with message and no error",
 			message: "message",
 			expectedCalls: func() {
 				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("read from conn write error"))
@@ -236,7 +277,7 @@ func TestSockControlReadFromConn(t *testing.T) {
 			errorMessage:  "read from conn write error",
 		},
 		{
-			name:    "without message without copier error",
+			name:    "without message and no copier error",
 			message: "",
 			expectedCalls: func() {
 				mockCopier.EXPECT().Copy(gomock.Any(), gomock.Any()).Return(int64(0), nil)
@@ -249,7 +290,7 @@ func TestSockControlReadFromConn(t *testing.T) {
 	for _, testCase := range bridgeConnTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			testCase.expectedCalls()
-			err := sockControl.ReadFromConn(testCase.message, mockRWCloser)
+			err := sockControl.ReadFromConn(testCase.message, mockCon)
 
 			if testCase.expectedError {
 				if err == nil && err.Error() != testCase.errorMessage {
@@ -261,5 +302,96 @@ func TestSockControlReadFromConn(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSockControlWriteToConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
+	mockCopier := mock_controlsvc.NewMockCopier(ctrl)
+
+	sockControl := controlsvc.NewSockControl(mockCon, mockUtil, mockCopier)
+
+	bridgeConnTestCases := []struct {
+		name          string
+		message       string
+		input         chan []byte
+		expectedCalls func()
+		expectedError bool
+		errorMessage  string
+	}{
+		{
+			name:    "without message and error",
+			message: "",
+			expectedCalls: func() {
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("write to conn chan error"))
+			},
+			expectedError: true,
+			errorMessage:  "write to conn chan error",
+		},
+		{
+			name:    "with message and error",
+			message: "message",
+			expectedCalls: func() {
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("write to conn write message error"))
+			},
+			expectedError: true,
+			errorMessage:  "write to conn write message error",
+		},
+		{
+			name:    "without message and error",
+			message: "",
+			expectedCalls: func() {
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, nil)
+			},
+			expectedError: false,
+			errorMessage:  "write to conn write message error",
+		},
+	}
+
+	for _, testCase := range bridgeConnTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testCase.expectedCalls()
+			c := make(chan []byte)
+			go func() {
+				c <- []byte{7}
+			}()
+			if !testCase.expectedError {
+
+				time.AfterFunc(time.Millisecond*100, func() {
+					close(c)
+				})
+			}
+			err := sockControl.WriteToConn(testCase.message, c)
+
+			if testCase.expectedError {
+				if err == nil && err.Error() != testCase.errorMessage {
+					t.Errorf("expected error: %s", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected error %s", err)
+				}
+			}
+		})
+	}
+}
+
+func TestSockControlClose(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
+	mockCopier := mock_controlsvc.NewMockCopier(ctrl)
+
+	sockControl := controlsvc.NewSockControl(mockCon, mockUtil, mockCopier)
+
+	errorMessage := "cannot close connection"
+
+	mockCon.EXPECT().Close().Return(errors.New(errorMessage))
+
+	err := sockControl.Close()
+	if err == nil && err.Error() != errorMessage {
+		t.Errorf("expected error: %s", errorMessage)
 	}
 }

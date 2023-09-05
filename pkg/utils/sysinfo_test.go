@@ -31,7 +31,7 @@ func TestGetSysCPUCount(t *testing.T) {
 func TestGetSysMemoryMiB(t *testing.T) {
 	got := utils.GetSysMemoryMiB()
 	if got <= 0 {
-		t.Errorf( "Non-positive Memory: %d\n", got)
+		t.Errorf("Non-positive Memory: %d\n", got)
 	}
 
 	if runtime.GOOS == "linux" {
@@ -42,7 +42,7 @@ func TestGetSysMemoryMiB(t *testing.T) {
 
 		want := wantKb / 1024
 		if got != want {
-			t.Errorf( "Expected Memory: %d, got %d\n", want, got )
+			t.Errorf("Expected Memory: %d, got %d\n", want, got)
 		}
 	}
 }

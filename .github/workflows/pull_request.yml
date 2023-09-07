@@ -21,9 +21,6 @@ jobs:
   lint-receptorctl:
     name: lint-receptorctl
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.8, 3.9]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -33,7 +30,7 @@ jobs:
       - name: Setup up python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.9
 
       - name: Install tox
         run: pip install tox
@@ -146,9 +143,6 @@ jobs:
   container:
     name: container
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.8, 3.9]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -158,7 +152,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.9
 
       - name: Install python dependencies
         run: pip install build

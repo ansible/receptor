@@ -58,4 +58,4 @@ Receptor can also take its configuration from a file in YAML format.  The allowe
 
 ## Python Receptor and the 0.6 versions
 
-As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at https://github.com/ansible/python-receptor.
+As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at https://github.com/project-receptor/python-receptor.

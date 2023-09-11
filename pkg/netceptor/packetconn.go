@@ -60,7 +60,7 @@ type PacketConn struct {
 	cancel          context.CancelFunc
 }
 
-func NewPacketConnWithConst(s NetcForPacketConn, service string, advertise bool, adtags map[string]string, connTypeDatagram byte) PacketConner {
+func NewPacketConnWithConst(s NetcForPacketConn, service string, advertise bool, adtags map[string]string, connTypeDatagram byte) *PacketConn {
 	npc := &PacketConn{
 		s:            s,
 		localService: service,
@@ -77,7 +77,7 @@ func NewPacketConnWithConst(s NetcForPacketConn, service string, advertise bool,
 	return npc
 }
 
-func NewPacketConn(s NetcForPacketConn, service string, connTypeDatagram byte) PacketConner {
+func NewPacketConn(s NetcForPacketConn, service string, connTypeDatagram byte) *PacketConn {
 	return NewPacketConnWithConst(s, service, false, nil, connTypeDatagram)
 }
 

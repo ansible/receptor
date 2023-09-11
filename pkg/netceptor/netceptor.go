@@ -766,18 +766,18 @@ func (s *Netceptor) monitorConnectionAging() {
 		case <-time.After(5 * time.Second):
 			timedOut := make(map[string]context.CancelFunc, 0)
 			s.connLock.RLock()
-			for i := range s.connections {
-				conn := s.connections[i]
-				conn.lastReceivedLock.RLock()
-				if time.Since(conn.lastReceivedData) > s.maxConnectionIdleTime {
-					timedOut[i] = s.connections[i].CancelFunc
+			for conn := range s.connections {
+				connInfo := s.connections[conn]
+				connInfo.lastReceivedLock.RLock()
+				if time.Since(connInfo.lastReceivedData) > s.maxConnectionIdleTime {
+					timedOut[conn] = s.connections[conn].CancelFunc
 				}
-				conn.lastReceivedLock.RUnlock()
+				connInfo.lastReceivedLock.RUnlock()
 			}
 			s.connLock.RUnlock()
-			for i := range timedOut {
-				s.Logger.Warning("Timing out connection from %s to %s, idle for the past %s\n", s.nodeID, i, s.maxConnectionIdleTime)
-				timedOut[i]()
+			for conn := range timedOut {
+				s.Logger.Warning("Timing out connection from %s to %s, idle for the past %s\n", s.nodeID, conn, s.maxConnectionIdleTime)
+				timedOut[conn]()
 			}
 		case <-s.context.Done():
 			return

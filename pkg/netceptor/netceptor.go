@@ -764,19 +764,19 @@ func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			timedOut := make([]context.CancelFunc, 0)
+			timedOut := make(map[string]context.CancelFunc, 0)
 			s.connLock.RLock()
 			for i := range s.connections {
 				conn := s.connections[i]
 				conn.lastReceivedLock.RLock()
 				if time.Since(conn.lastReceivedData) > s.maxConnectionIdleTime {
-					timedOut = append(timedOut, s.connections[i].CancelFunc)
+					timedOut[i] = s.connections[i].CancelFunc
 				}
 				conn.lastReceivedLock.RUnlock()
 			}
 			s.connLock.RUnlock()
 			for i := range timedOut {
-				s.Logger.Warning("Timing out connection, idle for the past %s\n", s.maxConnectionIdleTime)
+				s.Logger.Warning("Timing out connection from %s to %s, idle for the past %s\n", s.nodeID, i, s.maxConnectionIdleTime)
 				timedOut[i]()
 			}
 		case <-s.context.Done():
@@ -902,13 +902,13 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 	defer s.connLock.RUnlock()
 	for conn, ci := range s.connections {
 		if conn != excludeConn {
-			go func(ci *connInfo) {
+			go func(conn string, ci *connInfo) {
 				select {
 				case ci.WriteChan <- message:
 				case <-ci.Context.Done():
-					s.Logger.Debug("connInfo cancelled during flood write")
+					s.Logger.Debug("connInfo for connection %s cancelled during flood write", conn)
 				}
-			}(ci)
+			}(conn, ci)
 		}
 	}
 }

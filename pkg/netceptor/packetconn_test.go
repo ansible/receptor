@@ -275,14 +275,14 @@ func TestPacketConn(t *testing.T) {
 			testCase.expectedCall(ctx)
 
 			var returnVal interface{}
+			var pc *netceptor.PacketConn
 
 			if testCase.name != "Close Error" {
-				pc := netceptor.NewPacketConn(mockNetceptorForPacketConn, testCase.service, 0)
-				returnVal = testCase.funcCall(pc)
+				pc = netceptor.NewPacketConn(mockNetceptorForPacketConn, testCase.service, 0)
 			} else {
-				pc := netceptor.NewPacketConnWithConst(mockNetceptorForPacketConn, testCase.service, true, map[string]string{}, byte(0))
-				returnVal = testCase.funcCall(pc)
+				pc = netceptor.NewPacketConnWithConst(mockNetceptorForPacketConn, testCase.service, true, map[string]string{}, byte(0))
 			}
+			returnVal = testCase.funcCall(pc)
 
 			if returnVal != testCase.expectedReturnVal {
 				t.Errorf(testCase.unexpectedReturnValMsg, returnVal)

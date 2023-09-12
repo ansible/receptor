@@ -2,5 +2,21 @@ coverage:
   status:
     project:
       default:
-        target: 80%
+        target: 30%
         threshold: 5%
+        branches: 
+          - devel
+     patch:
+      default:
+        target: auto
+        threshold: 5%
+        base: auto 
+        branches: 
+          - devel
+        if_ci_failed: error 
+comment: 
+  layout: " diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true

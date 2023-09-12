@@ -2,17 +2,13 @@ coverage:
   status:
     project:
       default:
-        target: 30%
+        target: auto
         threshold: 5%
-        branches: 
-          - devel
-     patch:
+    patch:
       default:
         target: auto
         threshold: 5%
         base: auto 
-        branches: 
-          - devel
         if_ci_failed: error 
 comment: 
   layout: " diff, flags, files"
@@ -20,3 +16,8 @@ comment:
   require_changes: false
   require_base: false
   require_head: true
+  after_n_builds: 1
+codecov:
+  notify:
+    wait_for_ci: false
+    after_n_builds: 1

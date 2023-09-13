@@ -796,7 +796,7 @@ func (s *Netceptor) monitorConnectionAging() {
 			}
 			s.connLock.RUnlock()
 			for conn := range timedOut {
-				s.Logger.Warning("Timing out connection from %s to %s, idle for the past %s\n", s.nodeID, conn, s.maxConnectionIdleTime)
+				s.Logger.Warning("Timing out connection %s, idle for the past %s\n", conn, s.maxConnectionIdleTime)
 				timedOut[conn]()
 			}
 		case <-s.context.Done():

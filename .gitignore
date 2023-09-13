@@ -20,4 +20,5 @@ kubectl
 .vagrant/
 /docs/build
 /dist
+/test-configs
 coverage.txt

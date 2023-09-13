@@ -354,7 +354,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	s.clientTLSConfigs["default"] = &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	s.addNameHash(nodeID)
+	s.AddNameHash(nodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -449,6 +449,26 @@ func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 // GetLogger returns the logger of this Netceptor instance.
 func (s *Netceptor) GetLogger() *logger.ReceptorLogger {
 	return s.Logger
+}
+
+// GetListenerRegistry returns listener registry map.
+func (s *Netceptor) GetListenerRegistry() map[string]*PacketConn {
+	return s.listenerRegistry
+}
+
+// GetNetworkName returns networkName.
+func (s *Netceptor) GetNetworkName() string {
+	return s.networkName
+}
+
+// GetListenerLock returns listenerLock.
+func (s *Netceptor) GetListenerLock() *sync.RWMutex {
+	return s.listenerLock
+}
+
+// GetUnreachableBroker returns unreachableBroker.
+func (s *Netceptor) GetUnreachableBroker() *utils.Broker {
+	return s.unreachableBroker
 }
 
 // Sets the MaxConnectionIdleTime object on the Netceptor instance.
@@ -659,7 +679,7 @@ func (s *Netceptor) AddFirewallRules(rules []FirewallRuleFunc, clearExisting boo
 	return nil
 }
 
-func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
+func (s *Netceptor) AddLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
 	s.serviceAdsLock.Lock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
 	if !ok {
@@ -682,7 +702,7 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 	}
 }
 
-func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
+func (s *Netceptor) RemoveLocalServiceAdvertisement(service string) error {
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
@@ -1167,7 +1187,7 @@ func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config, pinnedFi
 var zerokey = make([]byte, 32)
 
 // Hash a name and add it to the lookup table.
-func (s *Netceptor) addNameHash(name string) uint64 {
+func (s *Netceptor) AddNameHash(name string) uint64 {
 	if strings.EqualFold(name, "localhost") {
 		name = s.nodeID
 	}
@@ -1185,7 +1205,7 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 }
 
 // Looks up a name given a hash received from the network.
-func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
+func (s *Netceptor) GetNameFromHash(namehash uint64) (string, error) {
 	s.hashLock.RLock()
 	defer s.hashLock.RUnlock()
 	name, ok := s.nameHashes[namehash]
@@ -1222,11 +1242,11 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*MessageData, error) {
 	if len(data) < 36 {
 		return nil, fmt.Errorf("data too short to be a valid message")
 	}
-	fromNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[4:12]))
+	fromNode, err := s.GetNameFromHash(binary.BigEndian.Uint64(data[4:12]))
 	if err != nil {
 		return nil, err
 	}
-	toNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[12:20]))
+	toNode, err := s.GetNameFromHash(binary.BigEndian.Uint64(data[12:20]))
 	if err != nil {
 		return nil, err
 	}
@@ -1249,8 +1269,8 @@ func (s *Netceptor) translateDataFromMessage(msg *MessageData) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	buf.Write([]byte{MsgTypeData, msg.HopsToLive, 0, 0})
 
-	binary.Write(buf, binary.BigEndian, s.addNameHash(msg.FromNode))
-	binary.Write(buf, binary.BigEndian, s.addNameHash(msg.ToNode))
+	binary.Write(buf, binary.BigEndian, s.AddNameHash(msg.FromNode))
+	binary.Write(buf, binary.BigEndian, s.AddNameHash(msg.ToNode))
 
 	buf.Write(fixedLenBytesFromString(msg.FromService, 8))
 	buf.Write(fixedLenBytesFromString(msg.ToService, 8))
@@ -1303,7 +1323,7 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 }
 
 // Generates and sends a message over the Receptor network, specifying HopsToLive.
-func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
+func (s *Netceptor) SendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
 	if len(fromService) > 8 || len(toService) > 8 {
 		return fmt.Errorf("service name too long")
 	}
@@ -1326,11 +1346,11 @@ func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string,
 
 // Generates and sends a message over the Receptor network.
 func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
-	return s.sendMessageWithHopsToLive(fromService, toNode, toService, data, s.maxForwardingHops)
+	return s.SendMessageWithHopsToLive(fromService, toNode, toService, data, s.maxForwardingHops)
 }
 
 // Returns an unused random service name to use as the equivalent of a TCP/IP ephemeral port number.
-func (s *Netceptor) getEphemeralService() string {
+func (s *Netceptor) GetEphemeralService() string {
 	s.listenerLock.RLock()
 	defer s.listenerLock.RUnlock()
 	for {
@@ -1511,7 +1531,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		_, ok = s.knownNodeInfo[ri.NodeID]
 		if !ok {
-			_ = s.addNameHash(ri.NodeID)
+			_ = s.AddNameHash(ri.NodeID)
 		}
 		s.knownNodeInfo[ri.NodeID] = ni
 		if changed {
@@ -1990,7 +2010,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						return nil
 					}
 					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
-					s.addNameHash(remoteNodeID)
+					s.AddNameHash(remoteNodeID)
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]
 					if !ok {

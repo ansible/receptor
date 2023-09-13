@@ -15,8 +15,8 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-var expectNoErrorReturnString string = "Expected no error, but got: %v"
-var closeErrorString string = "Close Error"
+var expectNoErrorReturnString = "Expected no error, but got: %v"
+var closeErrorString = "Close Error"
 
 // checkPacketConn checks for TestNewPacketConn and TestListenPacket tests.
 func checkPacketConn(t *testing.T, expectedErr string, failedTestString string, err error) {

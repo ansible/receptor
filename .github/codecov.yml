@@ -18,6 +18,7 @@ comment:
   require_head: true
   after_n_builds: 1
 codecov:
+  branch: devel
   notify:
     wait_for_ci: false
     after_n_builds: 1

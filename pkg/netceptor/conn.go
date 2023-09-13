@@ -49,7 +49,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
 	if service == "" {
-		service = s.getEphemeralService()
+		service = s.GetEphemeralService()
 	}
 	s.listenerLock.Lock()
 	defer s.listenerLock.Unlock()
@@ -58,7 +58,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	if isReserved || isListening {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
-	_ = s.addNameHash(service)
+	_ = s.AddNameHash(service)
 	var connType byte
 	if tlscfg == nil {
 		connType = ConnTypeStream
@@ -86,7 +86,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		connType:     connType,
 		hopsToLive:   s.maxForwardingHops,
 	}
-	pc.startUnreachable()
+	pc.StartUnreachable()
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
@@ -98,7 +98,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		return nil, err
 	}
 	if advertise {
-		s.addLocalServiceAdvertisement(service, connType, adTags)
+		s.AddLocalServiceAdvertisement(service, connType, adTags)
 	}
 	doneChan := make(chan struct{})
 	go func() {
@@ -276,8 +276,8 @@ func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn
 
 // DialContext is like Dial but uses a context to allow timeout or cancellation.
 func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*Conn, error) {
-	_ = s.addNameHash(node)
-	_ = s.addNameHash(service)
+	_ = s.AddNameHash(node)
+	_ = s.AddNameHash(service)
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return nil, err
@@ -425,7 +425,7 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.GetLocalService(), c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

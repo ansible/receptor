@@ -1,3 +1,4 @@
+---
 coverage:
   status:
     project:
@@ -8,9 +9,9 @@ coverage:
       default:
         target: auto
         threshold: 5%
-        base: auto 
-        if_ci_failed: error 
-comment: 
+        base: auto
+        if_ci_failed: error
+comment:
   layout: " diff, flags, files"
   behavior: default
   require_changes: false

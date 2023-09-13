@@ -15,6 +15,9 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
+var expectNoErrorReturnString string = "Expected no error, but got: %v"
+var closeErrorString string = "Close Error"
+
 // checkPacketConn checks for TestNewPacketConn and TestListenPacket tests.
 func checkPacketConn(t *testing.T, expectedErr string, failedTestString string, err error) {
 	if expectedErr == "" && err != nil {
@@ -60,7 +63,7 @@ func TestListenPacket(t *testing.T) {
 		expectedErr      string
 		failedTestString string
 	}{
-		{"Success", "test", "", "Expected no error, but got: %v"},
+		{"Success", "test", "", expectNoErrorReturnString},
 		{"Service Too Long Error", "123456789", "service name 123456789 too long", "Expected service name too long error, but got %v"},
 		{"Service Already Listening Error", "ping", "service ping is already listening", "Expected service ping is already listening, but got: %v"},
 	}
@@ -88,8 +91,8 @@ func TestListenPacketAndAdvertise(t *testing.T) {
 		expectedErr      string
 		failedTestString string
 	}{
-		{"Success", "test", map[string]string{}, "", "Expected no error, but got: %v"},
-		{"Success empty service", "", map[string]string{}, "", "Expected no error, but got: %v"},
+		{"Success", "test", map[string]string{}, "", expectNoErrorReturnString},
+		{"Success empty service", "", map[string]string{}, "", expectNoErrorReturnString},
 		{"Service Too Long Error", "123456789", map[string]string{}, "service name 123456789 too long", "Expected service name too long error, but got %v"},
 		{"Service Already Listening Error", "ping", map[string]string{}, "service ping is already listening and advertising", "Expected service ping is already listening and advertising, but got: %v"},
 	}
@@ -207,14 +210,14 @@ func TestPacketConn(t *testing.T) {
 				return pc.Close()
 			},
 			nil,
-			"Expected no error, but got %v",
+			expectNoErrorReturnString,
 		},
 		{
-			"Close Error",
+			closeErrorString,
 			"test",
 			func(ctx context.Context) {
 				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
-				mockNetceptorForPacketConn.EXPECT().RemoveLocalServiceAdvertisement("test").Return(errors.New("Close Error"))
+				mockNetceptorForPacketConn.EXPECT().RemoveLocalServiceAdvertisement("test").Return(errors.New(closeErrorString))
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 				mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
 				mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
@@ -222,7 +225,7 @@ func TestPacketConn(t *testing.T) {
 			func(pc netceptor.PacketConner) interface{} {
 				return pc.Close().Error()
 			},
-			"Close Error",
+			closeErrorString,
 			"Expected error to be Close Error, but got %v",
 		},
 		{
@@ -236,7 +239,7 @@ func TestPacketConn(t *testing.T) {
 				return pc.SetDeadline(time.Now().Add(time.Millisecond * 100))
 			},
 			nil,
-			"Expected no error, but got %v",
+			expectNoErrorReturnString,
 		},
 		{
 			"SetReadDeadline Success",
@@ -249,7 +252,7 @@ func TestPacketConn(t *testing.T) {
 				return pc.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
 			},
 			nil,
-			"Expected no error, but got %v",
+			expectNoErrorReturnString,
 		},
 		{
 			"SetWriteDeadline Success",
@@ -262,7 +265,7 @@ func TestPacketConn(t *testing.T) {
 				return pc.SetWriteDeadline(time.Now().Add(time.Millisecond * 100))
 			},
 			nil,
-			"Expected no error, but got %v",
+			expectNoErrorReturnString,
 		},
 	}
 
@@ -277,7 +280,7 @@ func TestPacketConn(t *testing.T) {
 			var returnVal interface{}
 			var pc *netceptor.PacketConn
 
-			if testCase.name != "Close Error" {
+			if testCase.name != closeErrorString {
 				pc = netceptor.NewPacketConn(mockNetceptorForPacketConn, testCase.service, 0)
 			} else {
 				pc = netceptor.NewPacketConnWithConst(mockNetceptorForPacketConn, testCase.service, true, map[string]string{}, byte(0))

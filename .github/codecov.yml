@@ -1,6 +1,23 @@
+---
 coverage:
   status:
     project:
       default:
-        target: 80%
+        target: auto
         threshold: 5%
+    patch:
+      default:
+        target: auto
+        threshold: 5%
+comment:
+  layout: " diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  after_n_builds: 1
+codecov:
+  branch: devel
+  notify:
+    wait_for_ci: false
+    after_n_builds: 1

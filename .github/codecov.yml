@@ -9,7 +9,6 @@ coverage:
       default:
         target: auto
         threshold: 5%
-        if_ci_failed: error
 comment:
   layout: " diff, flags, files"
   behavior: default

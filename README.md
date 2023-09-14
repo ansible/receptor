@@ -7,7 +7,7 @@ Receptor is an overlay network intended to ease the distribution of work across 
 
 See the readthedocs page for Receptor at:
 
-https://receptor.readthedocs.io/en/latest
+https://ansible.readthedocs.io/projects/receptor/
 
 ## Terminology and Concepts
 

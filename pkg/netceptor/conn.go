@@ -36,7 +36,7 @@ type acceptResult struct {
 // Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
 	s          *Netceptor
-	pc         *PacketConn
+	pc         PacketConner
 	ql         quic.Listener
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
@@ -49,7 +49,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
 	if service == "" {
-		service = s.getEphemeralService()
+		service = s.GetEphemeralService()
 	}
 	s.listenerLock.Lock()
 	defer s.listenerLock.Unlock()
@@ -58,7 +58,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	if isReserved || isListening {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
-	_ = s.addNameHash(service)
+	_ = s.AddNameHash(service)
 	var connType byte
 	if tlscfg == nil {
 		connType = ConnTypeStream
@@ -86,7 +86,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		connType:     connType,
 		hopsToLive:   s.maxForwardingHops,
 	}
-	pc.startUnreachable()
+	pc.StartUnreachable()
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
@@ -98,7 +98,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		return nil, err
 	}
 	if advertise {
-		s.addLocalServiceAdvertisement(service, connType, adTags)
+		s.AddLocalServiceAdvertisement(service, connType, adTags)
 	}
 	doneChan := make(chan struct{})
 	go func() {
@@ -261,7 +261,7 @@ func (li *Listener) Addr() net.Addr {
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
-	pc       *PacketConn
+	pc       PacketConner
 	qc       quic.Connection
 	qs       quic.Stream
 	doneChan chan struct{}
@@ -276,8 +276,8 @@ func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn
 
 // DialContext is like Dial but uses a context to allow timeout or cancellation.
 func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*Conn, error) {
-	_ = s.addNameHash(node)
-	_ = s.addNameHash(service)
+	_ = s.AddNameHash(node)
+	_ = s.AddNameHash(service)
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return nil, err
@@ -380,7 +380,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 
 // monitorUnreachable receives unreachable messages from the underlying PacketConn, and ends the connection
 // if the remote service has gone away.
-func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
+func monitorUnreachable(pc PacketConner, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
 	msgCh := pc.SubscribeUnreachable(doneChan)
 	if msgCh == nil {
 		cancel()
@@ -390,7 +390,7 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	// read from channel until closed
 	for msg := range msgCh {
 		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-			pc.s.Logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
+			pc.GetLogger().Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
 			cancel()
 		}
 	}
@@ -421,11 +421,11 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) CloseConnection() error {
-	c.pc.cancel()
+	c.pc.Cancel()
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

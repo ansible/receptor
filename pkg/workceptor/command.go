@@ -42,10 +42,10 @@ func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 	case <-doneChan:
 		return
 	case <-time.After(10 * time.Second):
-		MainInstance.nc.Logger.Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
+		MainInstance.nc.GetLogger().Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
 	}
 	if cmd.Process != nil {
-		MainInstance.nc.Logger.Info("sending SIGKILL to pid %d", cmd.Process.Pid)
+		MainInstance.nc.GetLogger().Info("sending SIGKILL to pid %d", cmd.Process.Pid)
 		_ = cmd.Process.Kill()
 	}
 }
@@ -64,7 +64,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	statusFilename := path.Join(unitdir, "status")
 	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
 	if err != nil {
-		MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+		MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 	}
 	var cmd *exec.Cmd
 	if params == "" {
@@ -105,16 +105,16 @@ loop:
 			termThenKill(cmd, doneChan)
 			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
 			if err != nil {
-				MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 			}
 			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
-				MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 				writeStatusFailures++
 				if writeStatusFailures > 3 {
-					MainInstance.nc.Logger.Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
+					MainInstance.nc.GetLogger().Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
 					os.Exit(-1)
 				}
 			} else {
@@ -125,7 +125,7 @@ loop:
 	if err != nil {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
 
 		return err
@@ -133,12 +133,12 @@ loop:
 	if cmd.ProcessState.Success() {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
 	} else {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
@@ -226,8 +226,8 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
-	level := cw.w.nc.Logger.GetLogLevel()
-	levelName, _ := cw.w.nc.Logger.LogLevelToName(level)
+	level := cw.w.nc.GetLogger().GetLogLevel()
+	levelName, _ := cw.w.nc.GetLogger().LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
 
 	// TODO: This is another place where we rely on a pre-built binary for testing.
@@ -368,9 +368,9 @@ func (cfg commandRunnerCfg) Run() error {
 		statusFilename := path.Join(cfg.UnitDir, "status")
 		err = (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
-		MainInstance.nc.Logger.Error("Command runner exited with error: %s\n", err)
+		MainInstance.nc.GetLogger().Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
 	}
 	os.Exit(0)

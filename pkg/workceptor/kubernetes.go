@@ -18,7 +18,6 @@ import (
 
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"golang.org/x/net/http2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,7 +165,7 @@ func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool) (io.ReadCloser
 	return logStream, nil
 }
 
-func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *stdoutWriter, stdoutErr *error) {
+func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdoutErr *error) {
 	// Legacy method, for use on k8s < v1.23.14
 	// uses io.Copy to stream data from pod to stdout file
 	// known issues around this, as logstream can terminate due to log rotation
@@ -190,7 +189,7 @@ func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *s
 	}
 }
 
-func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *stdoutWriter, stdinErr *error, stdoutErr *error) {
+func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdinErr *error, stdoutErr *error) {
 	// preferred method for k8s >= 1.23.14
 	defer streamWait.Done()
 	var sinceTime time.Time
@@ -239,43 +238,22 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 		streamReader := bufio.NewReader(logStream)
 		for *stdinErr == nil { // check between every line read to see if we need to stop reading
 			line, err := streamReader.ReadString('\n')
-			if err == io.EOF {
-				kw.Debug(
-					"Detected EOF for pod %s/%s. Will retry %d more times. Error: %s",
-					podNamespace,
-					podName,
-					remainingRetries,
-					err,
-				)
-				successfulWrite = false
-				remainingRetries--
-				if remainingRetries > 0 {
-					time.Sleep(200 * time.Millisecond)
-
-					break
-				}
-
-				return
-			} else if _, ok := err.(http2.GoAwayError); ok {
-				// GOAWAY is sent by the server to indicate that the server is gracefully shutting down
-				// this happens if the kube API server we are connected to is being restarted or is shutting down
-				// for example during a cluster upgrade and rolling restart of the master node
-				kw.Info(
-					"Detected http2.GoAwayError for pod %s/%s. Will retry %d more times. Error: %s",
-					podNamespace,
-					podName,
-					remainingRetries,
-					err,
-				)
-				successfulWrite = false
-				remainingRetries--
-				if remainingRetries > 0 {
-					time.Sleep(200 * time.Millisecond)
-
-					break
-				}
-			}
 			if err != nil {
+				kw.Info(
+					"Detected Error: %s for pod %s/%s. Will retry %d more times.",
+					err,
+					podNamespace,
+					podName,
+					remainingRetries,
+				)
+
+				successfulWrite = false
+				remainingRetries--
+				if remainingRetries > 0 {
+					time.Sleep(200 * time.Millisecond)
+
+					break
+				}
 				*stdoutErr = err
 				kw.Error("Error reading from pod %s/%s: %s", podNamespace, podName, err)
 
@@ -452,7 +430,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 
 		return err
 	} else if err != nil { // any other error besides ErrPodCompleted
-		stdout, err2 := newStdoutWriter(kw.UnitDir())
+		stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 		if err2 != nil {
 			errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
 			kw.Error(errMsg)
@@ -606,10 +584,10 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	stdinErrChan := make(chan struct{}) // signal that stdin goroutine have errored and stop stdout goroutine
 
 	// open stdin reader that reads from the work unit's data directory
-	var stdin *stdinReader
+	var stdin *STDinReader
 	if !skipStdin {
 		var err error
-		stdin, err = newStdinReader(kw.UnitDir())
+		stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
 		if err != nil {
 			if errors.Is(err, errFileSizeZero) {
 				skipStdin = true
@@ -637,7 +615,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	}
 
 	// open stdout writer that writes to work unit's data directory
-	stdout, err := newStdoutWriter(kw.UnitDir())
+	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
 		kw.Error(errMsg)
@@ -763,7 +741,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
 	semver, err := version.ParseSemantic(versionStr)
 	if err != nil {
-		kw.w.nc.Logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
+		kw.w.nc.GetLogger().Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
 
 		return false
 	}
@@ -787,11 +765,11 @@ func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
 	}
 
 	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
-		kw.w.nc.Logger.Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
+		kw.w.nc.GetLogger().Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
 
 		return true
 	}
-	kw.w.nc.Logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
+	kw.w.nc.GetLogger().Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
 
 	return false
 }
@@ -828,7 +806,7 @@ func shouldUseReconnect(kw *kubeUnit) bool {
 
 	serverVerInfo, err := kw.clientset.ServerVersion()
 	if err != nil {
-		kw.w.nc.Logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
+		kw.w.nc.GetLogger().Warning("could not detect Kubernetes server version, will not use reconnect support")
 
 		return false
 	}
@@ -898,7 +876,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error listening: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 
 		return
 	}
@@ -922,7 +900,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		if err != nil {
 			errMsg := fmt.Sprintf("Error accepting: %s", err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-			kw.w.nc.Logger.Error(errMsg)
+			kw.w.nc.GetLogger().Error(errMsg)
 			cancel()
 
 			return
@@ -935,7 +913,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error creating pod: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		cancel()
 
 		return
@@ -950,11 +928,11 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 
 	// Open stdin reader
-	var stdin *stdinReader
-	stdin, err = newStdinReader(kw.UnitDir())
+	var stdin *STDinReader
+	stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -962,10 +940,10 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 
 	// Open stdout writer
-	stdout, err := newStdoutWriter(kw.UnitDir())
+	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -983,7 +961,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		_ = conn.CloseWrite()
 		if err != nil {
 			errMsg := fmt.Sprintf("Error sending stdin to pod: %s", err)
-			kw.w.nc.Logger.Error(errMsg)
+			kw.w.nc.GetLogger().Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			cancel()
 
@@ -1015,7 +993,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error reading stdout from pod: %s", err)
-		kw.w.nc.Logger.Error(errMsg)
+		kw.w.nc.GetLogger().Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -1231,7 +1209,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	if podPendingTimeoutString != "" {
 		podPendingTimeout, err := time.ParseDuration(podPendingTimeoutString)
 		if err != nil {
-			kw.w.nc.Logger.Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
+			kw.w.nc.GetLogger().Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
 
 			return err
 		}
@@ -1314,11 +1292,11 @@ func (kw *kubeUnit) Restart() error {
 	if kw.deletePodOnRestart {
 		err := kw.connectToKube()
 		if err != nil {
-			kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+			kw.w.nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
 			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
-				kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+				kw.w.nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
 		}
 	}
@@ -1343,7 +1321,7 @@ func (kw *kubeUnit) Cancel() error {
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
-			kw.w.nc.Logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
+			kw.w.nc.GetLogger().Error("Error deleting pod %s: %s", kw.pod.Name, err)
 		}
 	}
 	if kw.cancel != nil {

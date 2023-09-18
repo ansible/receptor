@@ -95,25 +95,25 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 // Error logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Error(format string, v ...interface{}) {
 	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
-	bwu.w.nc.Logger.Error(format, v...)
+	bwu.w.nc.GetLogger().Error(format, v...)
 }
 
 // Warning logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Warning(format string, v ...interface{}) {
 	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
-	bwu.w.nc.Logger.Warning(format, v...)
+	bwu.w.nc.GetLogger().Warning(format, v...)
 }
 
 // Info logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Info(format string, v ...interface{}) {
 	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
-	bwu.w.nc.Logger.Info(format, v...)
+	bwu.w.nc.GetLogger().Info(format, v...)
 }
 
 // Debug logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Debug(format string, v ...interface{}) {
 	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
-	bwu.w.nc.Logger.Debug(format, v...)
+	bwu.w.nc.GetLogger().Debug(format, v...)
 }
 
 // SetFromParams sets the in-memory state from parameters.
@@ -155,7 +155,7 @@ func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, er
 // unlockStatusFile releases the lock on the status file.
 func (sfd *StatusFileData) unlockStatusFile(filename string, lockFile *lockedfile.File) {
 	if err := lockFile.Close(); err != nil {
-		MainInstance.nc.Logger.Error("Error closing %s.lock: %s", filename, err)
+		MainInstance.nc.GetLogger().Error("Error closing %s.lock: %s", filename, err)
 	}
 }
 
@@ -254,7 +254,7 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error closing %s: %s", filename, err)
+			MainInstance.nc.GetLogger().Error("Error closing %s: %s", filename, err)
 		}
 	}()
 	size, err := file.Seek(0, 2)
@@ -300,7 +300,7 @@ func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	bwu.lastUpdateError = err
 
 	if err != nil {
-		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
+		bwu.w.nc.GetLogger().Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
 }
 
@@ -328,7 +328,7 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 	bwu.lastUpdateError = err
 
 	if err != nil {
-		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
+		bwu.w.nc.GetLogger().Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
 }
 
@@ -376,7 +376,7 @@ loop:
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				err = bwu.Load()
 				if err != nil {
-					bwu.w.nc.Logger.Error("Error reading %s: %s", statusFile, err)
+					bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
 				}
 			}
 		case <-time.After(time.Second):
@@ -386,7 +386,7 @@ loop:
 					fi = newFi
 					err = bwu.Load()
 					if err != nil {
-						bwu.w.nc.Logger.Error("Error reading %s: %s", statusFile, err)
+						bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
 					}
 				}
 			}
@@ -432,12 +432,12 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 			attemptsLeft--
 
 			if attemptsLeft > 0 {
-				bwu.w.nc.Logger.Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
+				bwu.w.nc.GetLogger().Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
 				time.Sleep(time.Second)
 
 				continue
 			}
-			bwu.w.nc.Logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+			bwu.w.nc.GetLogger().Error("Error removing directory for %s. No more retries left.", bwu.unitID)
 
 			return err
 		}

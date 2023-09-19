@@ -37,7 +37,7 @@ jobs:
         run: docker run --rm quay.io/${{ github.repository }}:devel receptor --version
 
       - name: Login To Quay
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}

@@ -39,7 +39,7 @@ type IPRouterService struct {
 	destIP          net.IP
 	tunIf           *water.Interface
 	link            netlink.Link
-	nConn           *netceptor.PacketConn
+	nConn           netceptor.PacketConner
 	knownRoutes     []ipRoute
 	knownRoutesLock *sync.RWMutex
 }

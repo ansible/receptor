@@ -131,8 +131,11 @@ class ReceptorControl:
                                 context.load_cert_chain(
                                     certfile=self._cert, keyfile=self._key
                                 )
-                            if self._insecureskipverify:
+                            if not self._insecureskipverify:
+                                context.check_hostname = True
+                            else:
                                 context.check_hostname = False
+
                             self._socket = context.wrap_socket(
                                 self._socket, server_hostname=host
                             )

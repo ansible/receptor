@@ -118,11 +118,11 @@ func TestHopCountLimit(t *testing.T) {
 	}
 
 	// Inject a fake node3 that both nodes think the other node has a route to
-	n1.addNameHash("node3")
+	n1.AddNameHash("node3")
 	n1.routingTableLock.Lock()
 	n1.routingTable["node3"] = "node2"
 	n1.routingTableLock.Unlock()
-	n2.addNameHash("node3")
+	n2.AddNameHash("node3")
 	n2.routingTableLock.Lock()
 	n2.routingTable["node3"] = "node1"
 	n2.routingTableLock.Unlock()

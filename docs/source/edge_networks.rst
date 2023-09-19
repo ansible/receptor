@@ -1,7 +1,7 @@
 Support for Edge Networks
 =========================
 
-Recptor out-of-the-box has the ability to support complicated networking environments including edge networks.
+Receptor out-of-the-box has the ability to support complicated networking environments including edge networks.
 
 Consider the following environment:
 

@@ -83,7 +83,7 @@ func (c *connectCommand) ControlFunc(_ context.Context, nc NetceptorForControlCo
 	if err != nil {
 		return nil, err
 	}
-	err = cfo.BridgeConn("Connecting\n", rc, "connected service", nc.GetLogger())
+	err = cfo.BridgeConn("Connecting\n", rc, "connected service", nc.GetLogger(), &Util{})
 	if err != nil {
 		return nil, err
 	}

@@ -73,24 +73,20 @@ type Tlser interface {
 	NewListener(inner net.Listener, config *tls.Config) net.Listener
 }
 
-type Tls struct{}
+type TLS struct{}
 
-func (t *Tls) NewListener(inner net.Listener, config *tls.Config) net.Listener {
+func (t *TLS) NewListener(inner net.Listener, config *tls.Config) net.Listener {
 	return tls.NewListener(inner, config)
 }
 
 // SockControl implements the ControlFuncOperations interface that is passed back to control functions.
 type SockControl struct {
-	conn  net.Conn
-	utils Utiler
-	io    Copier
+	conn net.Conn
 }
 
-func NewSockControl(conn net.Conn, utils Utiler, copier Copier) *SockControl {
+func NewSockControl(conn net.Conn) *SockControl {
 	return &SockControl{
-		conn:  conn,
-		utils: utils,
-		io:    copier,
+		conn: conn,
 	}
 }
 
@@ -98,7 +94,7 @@ func (s *SockControl) RemoteAddr() net.Addr {
 	return s.conn.RemoteAddr()
 }
 
-// WriteMessage attempts to write a message to a connection
+// WriteMessage attempts to write a message to a connection.
 func (s *SockControl) WriteMessage(message string) error {
 	if message != "" {
 		_, err := s.conn.Write([]byte(message))
@@ -106,25 +102,26 @@ func (s *SockControl) WriteMessage(message string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // BridgeConn bridges the socket to another socket.
-func (s *SockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error {
+func (s *SockControl) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger, utils Utiler) error {
 	if err := s.WriteMessage(message); err != nil {
 		return err
 	}
-	s.utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
+	utils.BridgeConns(s.conn, "control service", bc, bcName, logger)
 
 	return nil
 }
 
 // ReadFromConn copies from the socket to an io.Writer, until EOF.
-func (s *SockControl) ReadFromConn(message string, out io.Writer) error {
+func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) error {
 	if err := s.WriteMessage(message); err != nil {
 		return err
 	}
-	if _, err := s.io.Copy(out, s.conn); err != nil {
+	if _, err := io.Copy(out, s.conn); err != nil {
 		return err
 	}
 
@@ -155,10 +152,9 @@ type Server struct {
 	nc              NetceptorForControlsvc
 	controlFuncLock sync.RWMutex
 	controlTypes    map[string]ControlCommandType
-	// new stuff
-	serverUtils Utiler
-	serverNet   Neter
-	serverTls   Tlser
+	serverUtils     Utiler
+	serverNet       Neter
+	serverTLS       Tlser
 }
 
 // New returns a new instance of a control service.
@@ -169,7 +165,7 @@ func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 		controlTypes:    make(map[string]ControlCommandType),
 		serverUtils:     &Util{},
 		serverNet:       &Net{},
-		serverTls:       &Tls{},
+		serverTLS:       &TLS{},
 	}
 	if stdServices {
 		s.controlTypes["ping"] = &pingCommandType{}
@@ -190,8 +186,8 @@ func (s *Server) SetServerNet(n Neter) {
 	s.serverNet = n
 }
 
-func (s *Server) SetServerTls(t Tlser) {
-	s.serverTls = t
+func (s *Server) SetServerTLS(t Tlser) {
+	s.serverTLS = t
 }
 
 // MainInstance is the global instance of the control service instantiated by the command-line main() function.
@@ -217,11 +213,13 @@ func errorNormal(nc NetceptorForControlsvc, logMessage string, err error) bool {
 	if !strings.HasSuffix(err.Error(), normalCloseError) {
 		nc.GetLogger().Error("%s: %s\n", logMessage, err)
 	}
+
 	return true
 }
 
 func writeToConnWithLog(conn net.Conn, nc NetceptorForControlsvc, writeMessage string, logMessage string) bool {
 	_, err := conn.Write([]byte(writeMessage))
+
 	return errorNormal(nc, logMessage, err)
 }
 
@@ -293,7 +291,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				}
 			}
 			if err != nil {
-				writeMsg := fmt.Sprintf("ERROR: %s", err)
+				writeMsg := fmt.Sprintf("ERROR: %s\n", err)
 				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 					return
 				}
@@ -318,7 +316,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		}
 		s.controlFuncLock.RUnlock()
 		if ct != nil {
-			cfo := NewSockControl(conn, &Util{}, &SocketConnIO{})
+			cfo := NewSockControl(conn)
 
 			var cfr map[string]interface{}
 			var cc ControlCommand
@@ -336,14 +334,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			if err != nil {
 				errorNormal(s.nc, "", err)
 
-				writeMsg := fmt.Sprintf("ERROR: %s", err)
+				writeMsg := fmt.Sprintf("ERROR: %s\n", err)
 				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 					return
 				}
 			} else if cfr != nil {
 				rbytes, err := json.Marshal(cfr)
 				if err != nil {
-					writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s", err)
+					writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
 					if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 						return
 					}
@@ -355,7 +353,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				}
 			}
 		} else {
-			writeMsg := "ERROR: Unknown command"
+			writeMsg := "ERROR: Unknown command\n"
 			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 				return
 			}
@@ -435,7 +433,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 			return fmt.Errorf("error listening on TCP socket: %s", err)
 		}
 		if tcptls != nil {
-			tli = s.serverTls.NewListener(tli, tcptls)
+			tli = s.serverTLS.NewListener(tli, tcptls)
 		}
 	} else {
 		tli = nil
@@ -469,12 +467,10 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		}
 	}()
 	for _, listener := range []net.Listener{uli, tli, li} {
-		if reflect.ValueOf(listener).IsNil() {
+		if listener == nil || reflect.ValueOf(listener).IsNil() {
 			continue
 		}
-		if listener != nil {
-			go s.ConnectionListener(ctx, listener)
-		}
+		go s.ConnectionListener(ctx, listener)
 	}
 
 	return nil

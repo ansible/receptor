@@ -36,8 +36,8 @@ type ControlCommand interface {
 
 // ControlFuncOperations provides callbacks for control services to take actions.
 type ControlFuncOperations interface {
-	BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger) error
-	ReadFromConn(message string, out io.Writer) error
+	BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger, utils Utiler) error
+	ReadFromConn(message string, out io.Writer, io Copier) error
 	WriteToConn(message string, in chan []byte) error
 	Close() error
 	RemoteAddr() net.Addr

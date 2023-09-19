@@ -44,7 +44,7 @@ jobs:
           ref: ${{ github.event.inputs.ref }}
 
       - name: Install python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
 
       - name: Install dependencies
         run: |

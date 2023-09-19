@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"net"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -362,6 +363,50 @@ func (s *Server) RunControlSession(conn net.Conn) {
 	}
 }
 
+func (s *Server) ConnectionListener(ctx context.Context, listener net.Listener) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		conn, err := listener.Accept()
+		if err != nil {
+			if !strings.HasSuffix(err.Error(), "normal close") {
+				s.nc.GetLogger().Error("Error accepting connection: %s\n", err)
+			}
+
+			continue
+		}
+		go s.SetupConnection(conn)
+	}
+}
+
+func (s *Server) SetupConnection(conn net.Conn) {
+	defer conn.Close()
+	tlsConn, ok := conn.(*tls.Conn)
+	if ok {
+		// Explicitly run server TLS handshake so we can deal with timeout and errors here
+		err := conn.SetDeadline(time.Now().Add(10 * time.Second))
+		if err != nil {
+			s.nc.GetLogger().Error("Error setting timeout: %s. Closing socket.\n", err)
+
+			return
+		}
+		err = tlsConn.Handshake()
+		if err != nil {
+			s.nc.GetLogger().Error("TLS handshake error: %s. Closing socket.\n", err)
+
+			return
+		}
+		err = conn.SetDeadline(time.Time{})
+		if err != nil {
+			s.nc.GetLogger().Error("Error clearing timeout: %s. Closing socket.\n", err)
+
+			return
+		}
+	}
+	s.RunControlSession(conn)
+}
+
 // RunControlSvc runs the main accept loop of the control service.
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
 	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
@@ -395,7 +440,7 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	} else {
 		tli = nil
 	}
-	var li net.Listener
+	var li *netceptor.Listener
 	if service != "" {
 		li, err = s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{
 			"type": "Control Service",
@@ -424,48 +469,11 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		}
 	}()
 	for _, listener := range []net.Listener{uli, tli, li} {
+		if reflect.ValueOf(listener).IsNil() {
+			continue
+		}
 		if listener != nil {
-			go func(listener net.Listener) {
-				for {
-					if ctx.Err() != nil {
-						return
-					}
-					conn, err := listener.Accept()
-					if err != nil {
-						if !strings.HasSuffix(err.Error(), "normal close") {
-							s.nc.GetLogger().Error("Error accepting connection: %s\n", err)
-						}
-
-						continue
-					}
-					go func() {
-						defer conn.Close()
-						tlsConn, ok := conn.(*tls.Conn)
-						if ok {
-							// Explicitly run server TLS handshake so we can deal with timeout and errors here
-							err = conn.SetDeadline(time.Now().Add(10 * time.Second))
-							if err != nil {
-								s.nc.GetLogger().Error("Error setting timeout: %s. Closing socket.\n", err)
-
-								return
-							}
-							err = tlsConn.Handshake()
-							if err != nil {
-								s.nc.GetLogger().Error("TLS handshake error: %s. Closing socket.\n", err)
-
-								return
-							}
-							err = conn.SetDeadline(time.Time{})
-							if err != nil {
-								s.nc.GetLogger().Error("Error clearing timeout: %s. Closing socket.\n", err)
-
-								return
-							}
-						}
-						s.RunControlSession(conn)
-					}()
-				}
-			}(listener)
+			go s.ConnectionListener(ctx, listener)
 		}
 	}
 

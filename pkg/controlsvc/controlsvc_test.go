@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
@@ -16,13 +15,99 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
+func TestConnectionListener(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	mockListener := mock_controlsvc.NewMockListener(ctrl)
+	logger := logger.NewReceptorLogger("")
+
+	connectionListenerTestCases := []struct {
+		name          string
+		expectedError bool
+		expectedCalls func(context.CancelFunc)
+	}{
+		{
+			name:          "return from context error",
+			expectedError: true,
+			expectedCalls: func(ctx context.CancelFunc) {},
+		},
+		{
+			name:          "error accepting connection",
+			expectedError: false,
+			expectedCalls: func(ctxCancel context.CancelFunc) {
+				mockListener.EXPECT().Accept().DoAndReturn(func() (net.Conn, error) {
+					ctxCancel()
+					return nil, errors.New("terminated")
+				})
+				mockNetceptor.EXPECT().GetLogger().Return(logger)
+			},
+		},
+	}
+
+	for _, testCase := range connectionListenerTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctx, ctxCancel := context.WithCancel(context.Background())
+			defer ctxCancel()
+
+			testCase.expectedCalls(ctxCancel)
+			s := controlsvc.New(false, mockNetceptor)
+
+			if testCase.expectedError {
+				ctxCancel()
+			}
+
+			s.ConnectionListener(ctx, mockListener)
+		})
+	}
+
+}
+
+func TestSetupConnection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	mockConn := mock_controlsvc.NewMockConn(ctrl)
+	logger := logger.NewReceptorLogger("")
+
+	setupConnectionTestCases := []struct {
+		name          string
+		expectedError bool
+		expectedCalls func()
+	}{
+		{
+			name:          "log error - setting timeout",
+			expectedError: true,
+			expectedCalls: func() {
+				mockConn.EXPECT().SetDeadline(gomock.Any()).Return(errors.New("terminated"))
+				mockNetceptor.EXPECT().GetLogger().Return(logger)
+				mockConn.EXPECT().Close()
+			},
+		},
+		{
+			name:          "log error - tls handshake",
+			expectedError: true,
+			expectedCalls: func() {
+				mockConn.EXPECT().SetDeadline(gomock.Any()).Return(nil)
+				mockNetceptor.EXPECT().GetLogger().Return(logger)
+				mockConn.EXPECT().Close().AnyTimes()
+			},
+		},
+	}
+
+	for _, testCase := range setupConnectionTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testCase.expectedCalls()
+			s := controlsvc.New(false, mockNetceptor)
+			tlsConn := tls.Client(mockConn, &tls.Config{})
+			s.SetupConnection(tlsConn)
+		})
+	}
+}
+
 func TestRunControlSvc(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	mockUnix := mock_controlsvc.NewMockUtiler(ctrl)
 	mockNet := mock_controlsvc.NewMockNeter(ctrl)
-	// mockListener := mock_controlsvc.NewMockListener(ctrl)
-	// logger := logger.NewReceptorLogger("")
 
 	runControlSvcTestCases := []struct {
 		name          string
@@ -77,19 +162,6 @@ func TestRunControlSvc(t *testing.T) {
 				"tcpListen":  "",
 			},
 		},
-		// {
-		// 	name:          "idk",
-		// 	expectedError: "",
-		// 	expectedCalls: func() {
-		// 		mockNet.EXPECT().Listen(gomock.Any(), gomock.Any()).Return(mockListener, nil)
-		// 		mockNetceptor.EXPECT().GetLogger().Return(logger)
-		// 	},
-		// 	listeners: map[string]string{
-		// 		"service":    "",
-		// 		"unixSocket": "",
-		// 		"tcpListen":  "tcp listener",
-		// 	},
-		// },
 	}
 
 	for _, testCase := range runControlSvcTestCases {
@@ -102,38 +174,10 @@ func TestRunControlSvc(t *testing.T) {
 			err := s.RunControlSvc(context.Background(), testCase.listeners["service"], &tls.Config{}, testCase.listeners["unixSocket"], os.FileMode(0o600), testCase.listeners["tcpListen"], &tls.Config{})
 
 			if err == nil || err.Error() != testCase.expectedError {
-				t.Errorf("expected error %s, got %s", testCase.expectedError, err.Error())
+				t.Errorf("expected error %s, got %v", testCase.expectedError, err)
 			}
 		})
 	}
-}
-
-func TestRunControlSvcOld(t *testing.T) {
-	// ctrl := gomock.NewController(t)
-	// defer ctrl.Finish()
-
-	// mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
-	// s := controlsvc.New(false, mock_netceptor)
-	// mock_unix := mock_controlsvc.NewMockUtiler(ctrl)
-	// s.SetServerUtils(mock_unix)
-
-	// mock_net_listener := mock_controlsvc.NewMockListener(ctrl)
-	// mock_unix.EXPECT().UnixSocketListen(gomock.Any(), gomock.Any()).Return(mock_net_listener, nil, nil)
-
-	// newCtx, ctxCancel := context.WithTimeout(context.Background(), time.Millisecond*1)
-	// defer ctxCancel()
-
-	// logger := logger.NewReceptorLogger("test")
-	// mock_net_listener.EXPECT().Accept().Return(nil, errors.New("blargh"))
-	// // mock_net_listener.EXPECT().Close()
-	// mock_netceptor.EXPECT().GetLogger().Return(logger)
-	// err := s.RunControlSvc(newCtx, "", &tls.Config{}, "unixSocket", os.FileMode(0o600), "", &tls.Config{})
-	// errorString := "Error accepting connection: blargh"
-	// fmt.Println(err, errorString)
-	// if err == nil || err.Error() != errorString {
-	// 	t.Errorf("expected error: %+v, got: %+v", errorString, err.Error())
-	// }
-
 }
 
 func TestSockControlRemoteAddr(t *testing.T) {
@@ -223,7 +267,7 @@ func TestSockControlBridgeConn(t *testing.T) {
 			name:    "with message and error",
 			message: "message",
 			expectedCalls: func() {
-				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("blargh"))
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("terminated"))
 			},
 		},
 	}
@@ -236,7 +280,7 @@ func TestSockControlBridgeConn(t *testing.T) {
 			if testCase.message == "" && err != nil {
 				t.Errorf("should be nil")
 			}
-			if testCase.message != "" && err.Error() != "blargh" {
+			if testCase.message != "" && err.Error() != "terminated" {
 				t.Errorf("stuff %v", err)
 			}
 		})
@@ -322,7 +366,7 @@ func TestSockControlWriteToConn(t *testing.T) {
 		errorMessage  string
 	}{
 		{
-			name:    "without message and error",
+			name:    "without message and with error",
 			message: "",
 			expectedCalls: func() {
 				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("write to conn chan error"))
@@ -331,7 +375,7 @@ func TestSockControlWriteToConn(t *testing.T) {
 			errorMessage:  "write to conn chan error",
 		},
 		{
-			name:    "with message and error",
+			name:    "with message and with error",
 			message: "message",
 			expectedCalls: func() {
 				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("write to conn write message error"))
@@ -354,15 +398,11 @@ func TestSockControlWriteToConn(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			testCase.expectedCalls()
 			c := make(chan []byte)
-			go func() {
+			go func(c chan []byte) {
 				c <- []byte{7}
-			}()
-			if !testCase.expectedError {
+				defer close(c)
+			}(c)
 
-				time.AfterFunc(time.Millisecond*100, func() {
-					close(c)
-				})
-			}
 			err := sockControl.WriteToConn(testCase.message, c)
 
 			if testCase.expectedError {
@@ -484,6 +524,14 @@ func TestRunControlSession(t *testing.T) {
 			expectedCalls: func() {
 				mockCon.EXPECT().Write(gomock.Any()).Return(0, nil)
 				mockCon.EXPECT().Read(make([]byte, 1)).Return(0, io.EOF)
+				mockCon.EXPECT().Close()
+			},
+		},
+		{
+			name: "logger warning - could not read in control service",
+			expectedCalls: func() {
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, nil)
+				mockCon.EXPECT().Read(make([]byte, 1)).Return(0, errors.New("terminated"))
 				mockCon.EXPECT().Close()
 			},
 		},

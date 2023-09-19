@@ -15,6 +15,14 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
+const (
+	writeToConnError = "write to conn write message err"
+)
+
+func printExpectedError(t *testing.T, err error) {
+	t.Errorf("expected error %s", err)
+}
+
 func TestConnectionListener(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
@@ -29,7 +37,6 @@ func TestConnectionListener(t *testing.T) {
 		{
 			name:          "return from context error",
 			expectedError: true,
-			expectedCalls: func(ctx context.CancelFunc) {},
 		},
 		{
 			name:          "error accepting connection",
@@ -49,7 +56,9 @@ func TestConnectionListener(t *testing.T) {
 			ctx, ctxCancel := context.WithCancel(context.Background())
 			defer ctxCancel()
 
-			testCase.expectedCalls(ctxCancel)
+			if testCase.expectedCalls != nil {
+				testCase.expectedCalls(ctxCancel)
+			}
 			s := controlsvc.New(false, mockNetceptor)
 
 			if testCase.expectedError {
@@ -154,8 +163,6 @@ func TestRunControlSvc(t *testing.T) {
 		{
 			name:          "no listeners error",
 			expectedError: "no listeners specified",
-			expectedCalls: func() {
-			},
 			listeners: map[string]string{
 				"service":    "",
 				"unixSocket": "",
@@ -166,7 +173,9 @@ func TestRunControlSvc(t *testing.T) {
 
 	for _, testCase := range runControlSvcTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			testCase.expectedCalls()
+			if testCase.expectedCalls != nil {
+				testCase.expectedCalls()
+			}
 			s := controlsvc.New(false, mockNetceptor)
 			s.SetServerUtils(mockUnix)
 			s.SetServerNet(mockNet)
@@ -214,9 +223,8 @@ func TestSockControlWriteMessage(t *testing.T) {
 		expectedCalls func()
 	}{
 		{
-			name:          "without message",
-			message:       "",
-			expectedCalls: func() {},
+			name:    "without message",
+			message: "",
 		},
 		{
 			name:    "with message",
@@ -229,7 +237,9 @@ func TestSockControlWriteMessage(t *testing.T) {
 
 	for _, testCase := range writeMessageTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			testCase.expectedCalls()
+			if testCase.expectedCalls != nil {
+				testCase.expectedCalls()
+			}
 			err := sockControl.WriteMessage(testCase.message)
 
 			if testCase.message == "" && err != nil {
@@ -338,11 +348,11 @@ func TestSockControlReadFromConn(t *testing.T) {
 
 			if testCase.expectedError {
 				if err == nil && err.Error() != testCase.errorMessage {
-					t.Errorf("expected error: %s", err)
+					printExpectedError(t, err)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("expected error %s", err)
+					printExpectedError(t, err)
 				}
 			}
 		})
@@ -378,10 +388,10 @@ func TestSockControlWriteToConn(t *testing.T) {
 			name:    "with message and with error",
 			message: "message",
 			expectedCalls: func() {
-				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New("write to conn write message error"))
+				mockCon.EXPECT().Write(gomock.Any()).Return(0, errors.New(writeToConnError))
 			},
 			expectedError: true,
-			errorMessage:  "write to conn write message error",
+			errorMessage:  writeToConnError,
 		},
 		{
 			name:    "without message and error",
@@ -390,7 +400,7 @@ func TestSockControlWriteToConn(t *testing.T) {
 				mockCon.EXPECT().Write(gomock.Any()).Return(0, nil)
 			},
 			expectedError: false,
-			errorMessage:  "write to conn write message error",
+			errorMessage:  writeToConnError,
 		},
 	}
 
@@ -407,11 +417,11 @@ func TestSockControlWriteToConn(t *testing.T) {
 
 			if testCase.expectedError {
 				if err == nil && err.Error() != testCase.errorMessage {
-					t.Errorf("expected error: %s", err)
+					printExpectedError(t, err)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("expected error %s", err)
+					printExpectedError(t, err)
 				}
 			}
 		})
@@ -432,14 +442,14 @@ func TestSockControlClose(t *testing.T) {
 
 	err := sockControl.Close()
 	if err == nil && err.Error() != errorMessage {
-		t.Errorf("expected error: %s", errorMessage)
+		printExpectedError(t, err)
 	}
 }
 
 func TestAddControlFunc(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockCtrlCmd := mock_controlsvc.NewMockControlCommandType(ctrl)
-	mock_netceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
+	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	controlFuncTestsCases := []struct {
 		name          string
 		input         string
@@ -472,7 +482,7 @@ func TestAddControlFunc(t *testing.T) {
 
 	for _, testCase := range controlFuncTestsCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			s := controlsvc.New(true, mock_netceptor)
+			s := controlsvc.New(true, mockNetceptor)
 			err := s.AddControlFunc(testCase.input, mockCtrlCmd)
 			testCase.testCase(testCase.errorMessage, err)
 		})

@@ -24,6 +24,11 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
+const (
+	normalCloseError         = "normal close"
+	writeControlServiceError = "Write error in control service"
+)
+
 type Copier interface {
 	Copy(dst io.Writer, src io.Reader) (written int64, err error)
 }
@@ -209,7 +214,7 @@ func errorNormal(nc NetceptorForControlsvc, logMessage string, err error) bool {
 	if err == nil {
 		return false
 	}
-	if !strings.HasSuffix(err.Error(), "normal close") {
+	if !strings.HasSuffix(err.Error(), normalCloseError) {
 		nc.GetLogger().Error("%s: %s\n", logMessage, err)
 	}
 	return true
@@ -253,7 +258,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 				break
 			} else if err != nil {
-				if !strings.HasSuffix(err.Error(), "normal close") {
+				if !strings.HasSuffix(err.Error(), normalCloseError) {
 					s.nc.GetLogger().Warning("Could not read in control service: %s\n", err)
 				}
 
@@ -289,8 +294,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			}
 			if err != nil {
 				writeMsg := fmt.Sprintf("ERROR: %s", err)
-				logMsg := "Write error in control service"
-				if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 					return
 				}
 			}
@@ -333,30 +337,26 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				errorNormal(s.nc, "", err)
 
 				writeMsg := fmt.Sprintf("ERROR: %s", err)
-				logMsg := "Write error in control service"
-				if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 					return
 				}
 			} else if cfr != nil {
 				rbytes, err := json.Marshal(cfr)
 				if err != nil {
 					writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s", err)
-					logMsg := "Write error in control service"
-					if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+					if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 						return
 					}
 				}
 				rbytes = append(rbytes, '\n')
 				writeMsg := string(rbytes)
-				logMsg := "Write error in control service"
-				if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 					return
 				}
 			}
 		} else {
 			writeMsg := "ERROR: Unknown command"
-			logMsg := "Write error in control service"
-			if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 				return
 			}
 		}
@@ -370,7 +370,7 @@ func (s *Server) ConnectionListener(ctx context.Context, listener net.Listener) 
 		}
 		conn, err := listener.Accept()
 		if err != nil {
-			if !strings.HasSuffix(err.Error(), "normal close") {
+			if !strings.HasSuffix(err.Error(), normalCloseError) {
 				s.nc.GetLogger().Error("Error accepting connection: %s\n", err)
 			}
 

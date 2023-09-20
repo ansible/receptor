@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const newIncrementalDurationMessage string = "NewIncrementalDuration() = %v, want %v"
+
 func TestNewIncrementalDuration(t *testing.T) {
 	type args struct {
 		duration    time.Duration
@@ -30,7 +32,7 @@ func TestNewIncrementalDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewIncrementalDuration(tt.args.duration, tt.args.maxDuration, tt.args.multiplier); got.duration != tt.want {
-				t.Errorf("NewIncrementalDuration() = %v, want %v", got, tt.want)
+				t.Errorf(newIncrementalDurationMessage, got, tt.want)
 			}
 		})
 	}
@@ -40,13 +42,13 @@ func TestIncrementalDurationReset(t *testing.T) {
 	delay := NewIncrementalDuration(1*time.Second, 10*time.Second, 2.0)
 	want1 := 1 * time.Second
 	if delay.duration != want1 {
-		t.Errorf("NewIncrementalDuration() = %v, want %v", delay.duration, want1)
+		t.Errorf(newIncrementalDurationMessage, delay.duration, want1)
 	}
 	<-delay.NextTimeout()
 
 	want2 := 2 * time.Second
 	if delay.duration != want2 {
-		t.Errorf("NewIncrementalDuration() = %v, want %v", delay.duration, want2)
+		t.Errorf(newIncrementalDurationMessage, delay.duration, want2)
 	}
 	delay.Reset()
 	if delay.duration != want1 {
@@ -69,7 +71,7 @@ func TestIncrementalDurationNextTimeout(t *testing.T) {
 	delay := NewIncrementalDuration(1*time.Second, 10*time.Second, 2.0)
 	want1 := 1 * time.Second
 	if delay.duration != want1 {
-		t.Errorf("NewIncrementalDuration() = %v, want %v", delay.duration, want1)
+		t.Errorf(newIncrementalDurationMessage, delay.duration, want1)
 	}
 	<-delay.NextTimeout()
 

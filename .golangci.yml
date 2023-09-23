@@ -49,8 +49,6 @@ linters:
     - prealloc
     - predeclared
     - revive
-    - rowserrcheck
-    - sqlclosecheck
     - staticcheck
     - stylecheck
     #- testpackage # TODO: Put tests in their dedicated test packages.
@@ -60,7 +58,6 @@ linters:
     - unconvert
     #- unparam # TODO: This breaks something, look at it!
     - unused
-    - wastedassign
     - whitespace
     # - wrapcheck # TODO: Errors passed upwards should be wrapped.
 

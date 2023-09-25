@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,6 +29,11 @@ type WebsocketDialer struct {
 	tlscfg      *tls.Config
 	extraHeader string
 	logger      *logger.ReceptorLogger
+}
+
+type GorillaWebsocketDialerForDialer interface {
+	Dial(urlStr string, requestHeader http.Header) (*websocket.Conn, *http.Response, error)
+	DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (*websocket.Conn, *http.Response, error)
 }
 
 func (b *WebsocketDialer) GetAddr() string {
@@ -60,14 +66,18 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 	return &wd, nil
 }
 
+func (b *WebsocketDialer) Dialer(dialer GorillaWebsocketDialerForDialer) GorillaWebsocketDialerForDialer {
+	return dialer
+}
+
 // Start runs the given session function over this backend service.
 func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, wg, b.redial, 5*time.Second, b.logger,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
-			dialer := websocket.Dialer{
+			dialer := b.Dialer(&websocket.Dialer{
 				TLSClientConfig: b.tlscfg,
 				Proxy:           http.ProxyFromEnvironment,
-			}
+			})
 			header := make(http.Header)
 			if b.extraHeader != "" {
 				extraHeaderParts := strings.SplitN(b.extraHeader, ":", 2)
@@ -85,6 +95,15 @@ func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan n
 
 			return ns, nil
 		})
+}
+
+type WebsocketListenerForWebsocket interface {
+	Addr() net.Addr
+	GetAddr() string
+	GetTLS() *tls.Config
+	Path() string
+	SetPath(path string)
+	Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error)
 }
 
 // WebsocketListener implements Backend for inbound Websocket.
@@ -188,7 +207,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener.
 type WebsocketSession struct {
-	conn            *websocket.Conn
+	conn            conner
 	context         context.Context
 	recvChan        chan *recvResult
 	closeChan       chan struct{}
@@ -200,7 +219,34 @@ type recvResult struct {
 	err  error
 }
 
-func newWebsocketSession(ctx context.Context, conn *websocket.Conn, closeChan chan struct{}) *WebsocketSession {
+type conner interface {
+	Close() error
+	CloseHandler() func(code int, text string) error
+	EnableWriteCompression(enable bool)
+	LocalAddr() net.Addr
+	NextReader() (messageType int, r io.Reader, err error)
+	NextWriter(messageType int) (io.WriteCloser, error)
+	PingHandler() func(appData string) error
+	PongHandler() func(appData string) error
+	ReadJSON(v interface{}) error
+	ReadMessage() (messageType int, p []byte, err error)
+	RemoteAddr() net.Addr
+	SetCloseHandler(h func(code int, text string) error)
+	SetCompressionLevel(level int) error
+	SetPingHandler(h func(appData string) error)
+	SetPongHandler(h func(appData string) error)
+	SetReadDeadline(t time.Time) error
+	SetReadLimit(limit int64)
+	SetWriteDeadline(t time.Time) error
+	Subprotocol() string
+	UnderlyingConn() net.Conn
+	WriteControl(messageType int, data []byte, deadline time.Time) error
+	WriteJSON(v interface{}) error
+	WriteMessage(messageType int, data []byte) error
+	WritePreparedMessage(pm *websocket.PreparedMessage) error
+}
+
+func newWebsocketSession(ctx context.Context, conn conner, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
 		context:         ctx,

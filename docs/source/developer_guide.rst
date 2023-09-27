@@ -24,16 +24,18 @@ Additionally, all code must pass a suite of Go linters. There is a pre-commit ya
 
 See https://pre-commit.com/ and https://golangci-lint.run/ for more details on installing and using these tools.
 
-We are using gomock to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by mock_. An example is the package mock_workceptor under pkg/workceptor.
+We are using gomock to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by ``mock_``. An example is the package mock_workceptor under pkg/workceptor.
 
 In order to genenerate a mock for a particular file, you can run:
 
 .. code::
+
     mockgen -source=pkg/filename.go -destination=pkg/mock_pkg/mock_filename.go
 
 For example, to create/update mocks for Workceptor, we can run:
 
 .. code::
+
     mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
 
 Source code

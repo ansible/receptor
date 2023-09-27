@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/ansible/receptor/internal/version"
-	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 )
 
@@ -47,7 +46,7 @@ func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (Control
 	return c, nil
 }
 
-func (c *statusCommand) ControlFunc(_ context.Context, nc *netceptor.Netceptor, _ ControlFuncOperations) (map[string]interface{}, error) {
+func (c *statusCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	status := nc.Status()
 	statusGetters := make(map[string]func() interface{})
 	statusGetters["Version"] = func() interface{} { return version.Version }

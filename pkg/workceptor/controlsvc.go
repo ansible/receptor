@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {
@@ -221,7 +220,7 @@ func getSignWorkFromStatus(status *StatusFileData) bool {
 }
 
 // Worker function called by the control service to process a "work" command.
-func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.NetceptorForControlCommand, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	addr := cfo.RemoteAddr()
 	connIsUnix := false
 	if addr.Network() == "unix" {
@@ -298,7 +297,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 			return nil, err
 		}
 		worker.UpdateBasicStatus(WorkStatePending, "Waiting for Input Data", 0)
-		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin)
+		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin, &controlsvc.SocketConnIO{})
 		if err != nil {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
 

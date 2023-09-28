@@ -7,24 +7,24 @@ import (
 )
 
 type (
-	tracerouteCommandType struct{}
-	tracerouteCommand     struct {
+	TracerouteCommandType struct{}
+	TracerouteCommand     struct {
 		target string
 	}
 )
 
-func (t *tracerouteCommandType) InitFromString(params string) (ControlCommand, error) {
+func (t *TracerouteCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params == "" {
 		return nil, fmt.Errorf("no traceroute target")
 	}
-	c := &tracerouteCommand{
+	c := &TracerouteCommand{
 		target: params,
 	}
 
 	return c, nil
 }
 
-func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
+func (t *TracerouteCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
 	target, ok := config["target"]
 	if !ok {
 		return nil, fmt.Errorf("no traceroute target")
@@ -33,14 +33,14 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 	if !ok {
 		return nil, fmt.Errorf("traceroute target must be string")
 	}
-	c := &tracerouteCommand{
+	c := &TracerouteCommand{
 		target: targetStr,
 	}
 
 	return c, nil
 }
 
-func (c *tracerouteCommand) ControlFunc(ctx context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
+func (c *TracerouteCommand) ControlFunc(ctx context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
 	results := nc.Traceroute(ctx, c.target)
 	i := 0

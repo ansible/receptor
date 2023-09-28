@@ -9,22 +9,22 @@ import (
 )
 
 type (
-	statusCommandType struct{}
-	statusCommand     struct {
+	StatusCommandType struct{}
+	StatusCommand     struct {
 		requestedFields []string
 	}
 )
 
-func (t *statusCommandType) InitFromString(params string) (ControlCommand, error) {
+func (t *StatusCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params != "" {
 		return nil, fmt.Errorf("status command does not take parameters")
 	}
-	c := &statusCommand{}
+	c := &StatusCommand{}
 
 	return c, nil
 }
 
-func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
+func (t *StatusCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
 	requestedFields, ok := config["requested_fields"]
 	var requestedFieldsStr []string
 	if ok {
@@ -39,14 +39,14 @@ func (t *statusCommandType) InitFromJSON(config map[string]interface{}) (Control
 	} else {
 		requestedFieldsStr = nil
 	}
-	c := &statusCommand{
+	c := &StatusCommand{
 		requestedFields: requestedFieldsStr,
 	}
 
 	return c, nil
 }
 
-func (c *statusCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
+func (c *StatusCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	status := nc.Status()
 	statusGetters := make(map[string]func() interface{})
 	statusGetters["Version"] = func() interface{} { return version.Version }

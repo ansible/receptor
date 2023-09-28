@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'receptor'
-copyright = '2021, Red Hat Ansible'
+copyright = 'Red Hat Ansible'
 author = 'Red Hat Ansible'
 
 # The full version, including alpha/beta/rc tags
@@ -45,15 +45,15 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['Thumbs.db', '.DS_Store']
 
-pygments_style = 'sphinx'
-language = None
+pygments_style = 'ansible'
+language = 'en'
 master_doc = 'index'
 source_suffix = '.rst'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'sphinx_ansible_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

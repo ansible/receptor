@@ -168,11 +168,11 @@ func New(stdServices bool, nc NetceptorForControlsvc) *Server {
 		serverTLS:       &TLS{},
 	}
 	if stdServices {
-		s.controlTypes["ping"] = &pingCommandType{}
-		s.controlTypes["status"] = &statusCommandType{}
-		s.controlTypes["connect"] = &connectCommandType{}
-		s.controlTypes["traceroute"] = &tracerouteCommandType{}
-		s.controlTypes["reload"] = &reloadCommandType{}
+		s.controlTypes["ping"] = &PingCommandType{}
+		s.controlTypes["status"] = &StatusCommandType{}
+		s.controlTypes["connect"] = &ConnectCommandType{}
+		s.controlTypes["traceroute"] = &TracerouteCommandType{}
+		s.controlTypes["reload"] = &ReloadCommandType{}
 	}
 
 	return s

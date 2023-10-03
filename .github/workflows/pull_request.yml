@@ -38,12 +38,13 @@ jobs:
       - name: Run receptorctl linters
         run: make receptorctl-lint
   receptor:
-    name: receptor (Go ${{ matrix.go-version }})
-    runs-on: ubuntu-latest
+    name: receptor (Go ${{ matrix.go-version }}) ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         go-version: ["1.19", "1.20"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,12 +103,13 @@ jobs:
           name: receptor
           path: /usr/local/bin/receptor
   receptorctl:
-    name: receptorctl (Python ${{ matrix.python-version }})
+    name: receptorctl (Python ${{ matrix.python-version }}) ${{ matrix.python-os }}
     needs: receptor
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.python-os }}
     strategy:
       matrix:
         python-version: [3.8, 3.9]
+        python-os: [ubuntu-latest, macos-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

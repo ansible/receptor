@@ -11,8 +11,8 @@ import (
 )
 
 type (
-	reloadCommandType struct{}
-	reloadCommand     struct{}
+	ReloadCommandType struct{}
+	ReloadCommand     struct{}
 )
 
 var configPath = ""
@@ -136,14 +136,14 @@ func checkReload() error {
 	return parseConfigForReload(configPath, true)
 }
 
-func (t *reloadCommandType) InitFromString(_ string) (ControlCommand, error) {
-	c := &reloadCommand{}
+func (t *ReloadCommandType) InitFromString(_ string) (ControlCommand, error) {
+	c := &ReloadCommand{}
 
 	return c, nil
 }
 
-func (t *reloadCommandType) InitFromJSON(_ map[string]interface{}) (ControlCommand, error) {
-	c := &reloadCommand{}
+func (t *ReloadCommandType) InitFromJSON(_ map[string]interface{}) (ControlCommand, error) {
+	c := &ReloadCommand{}
 
 	return c, nil
 }
@@ -157,7 +157,7 @@ func handleError(err error, errorcode int, logger *logger.ReceptorLogger) (map[s
 	return cfr, nil
 }
 
-func (c *reloadCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
+func (c *ReloadCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
 	nc.GetLogger().Debug("Reloading")

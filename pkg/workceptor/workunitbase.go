@@ -378,29 +378,26 @@ func (bwu *BaseWorkUnit) LastUpdateError() error {
 // MonitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes.
 func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 	statusFile := path.Join(bwu.UnitDir(), "status")
+	var watcherEvents chan fsnotify.Event
+	watcherEvents = make(chan fsnotify.Event)
+
 	if bwu.watcher != nil {
 		err := bwu.watcher.Add(statusFile)
 		if err == nil {
 			defer func() {
 				_ = bwu.watcher.Close()
 			}()
+			watcherEvents = bwu.watcher.EventChannel()
 		} else {
 			_ = bwu.watcher.Close()
 			bwu.watcher = nil
 		}
-	} else {
-		bwu.watcher = nil
 	}
 	fi, err := bwu.fs.Stat(statusFile)
 	if err != nil {
 		fi = nil
 	}
-	var watcherEvents chan fsnotify.Event
-	if bwu.watcher == nil {
-		watcherEvents = make(chan fsnotify.Event)
-	} else {
-		watcherEvents = bwu.watcher.EventChannel()
-	}
+
 loop:
 	for {
 		select {
@@ -415,13 +412,11 @@ loop:
 			}
 		case <-time.After(time.Second):
 			newFi, err := bwu.fs.Stat(statusFile)
-			if err == nil {
-				if fi == nil || fi.ModTime() != newFi.ModTime() {
-					fi = newFi
-					err = bwu.Load()
-					if err != nil {
-						bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
-					}
+			if err == nil && (fi == nil || fi.ModTime() != newFi.ModTime()) {
+				fi = newFi
+				err = bwu.Load()
+				if err != nil {
+					bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
 				}
 			}
 		}

@@ -144,10 +144,16 @@ func TestSetFromParams(t *testing.T) {
 	ctrl.Finish()
 }
 
+const (
+	rootDir  = "/tmp"
+	testDir  = "NodeID/test"
+	dirError = "no such file or directory"
+)
+
 func TestUnitDir(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
-	expectedUnitDir := path.Join("/tmp", "NodeID/test")
+	expectedUnitDir := path.Join(rootDir, testDir)
 	if unitDir := bwu.UnitDir(); unitDir != expectedUnitDir {
 		t.Errorf("UnitDir returned wrong value: got %s, want %s", unitDir, expectedUnitDir)
 	}
@@ -166,7 +172,7 @@ func TestID(t *testing.T) {
 func TestStatusFileName(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
-	expectedUnitDir := path.Join("/tmp", "NodeID/test")
+	expectedUnitDir := path.Join(rootDir, testDir)
 	expectedStatusFileName := path.Join(expectedUnitDir, "status")
 	if statusFileName := bwu.StatusFileName(); statusFileName != expectedStatusFileName {
 		t.Errorf("StatusFileName returned wrong value: got %s, want %s", statusFileName, expectedStatusFileName)
@@ -177,7 +183,7 @@ func TestStatusFileName(t *testing.T) {
 func TestStdoutFileName(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
-	expectedUnitDir := path.Join("/tmp", "NodeID/test")
+	expectedUnitDir := path.Join(rootDir, testDir)
 	expectedStdoutFileName := path.Join(expectedUnitDir, "stdout")
 	if stdoutFileName := bwu.StdoutFileName(); stdoutFileName != expectedStdoutFileName {
 		t.Errorf("StdoutFileName returned wrong value: got %s, want %s", stdoutFileName, expectedStdoutFileName)
@@ -189,7 +195,7 @@ func TestBaseSave(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
 	err := bwu.Save()
-	if !strings.Contains(err.Error(), "no such file or directory") {
+	if !strings.Contains(err.Error(), dirError) {
 		t.Errorf("Base Work Unit Save, no such file or directory expected, instead %s", err.Error())
 	}
 	ctrl.Finish()
@@ -199,7 +205,7 @@ func TestBaseLoad(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
 	err := bwu.Load()
-	if !strings.Contains(err.Error(), "no such file or directory") {
+	if !strings.Contains(err.Error(), dirError) {
 		t.Errorf("TestBaseLoad, no such file or directory expected, instead %s", err.Error())
 	}
 	ctrl.Finish()
@@ -208,10 +214,12 @@ func TestBaseLoad(t *testing.T) {
 func TestBaseUpdateFullStatus(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
-	sf := func(sfd *workceptor.StatusFileData) { return }
+	sf := func(sfd *workceptor.StatusFileData) {
+		// Do nothing
+	}
 	bwu.UpdateFullStatus(sf)
 	err := bwu.LastUpdateError()
-	if !strings.Contains(err.Error(), "no such file or directory") {
+	if !strings.Contains(err.Error(), dirError) {
 		t.Errorf("TestBaseUpdateFullStatus, no such file or directory expected, instead %s", err.Error())
 	}
 	ctrl.Finish()
@@ -222,7 +230,7 @@ func TestBaseUpdateBasicStatus(t *testing.T) {
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
 	bwu.UpdateBasicStatus(1, "Details", 0)
 	err := bwu.LastUpdateError()
-	if !strings.Contains(err.Error(), "no such file or directory") {
+	if !strings.Contains(err.Error(), dirError) {
 		t.Errorf("TestBaseUpdateBasicStatus, no such file or directory expected, instead %s", err.Error())
 	}
 	ctrl.Finish()
@@ -233,7 +241,7 @@ func TestBaseStatus(t *testing.T) {
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
 	status := bwu.Status()
 	if status.State != workceptor.WorkStatePending {
-		t.Errorf("TestBaseStatus, expected work state pending, recieved %d", status.State)
+		t.Errorf("TestBaseStatus, expected work state pending, received %d", status.State)
 	}
 	ctrl.Finish()
 }
@@ -243,6 +251,7 @@ func TestBaseRelease(t *testing.T) {
 	mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
 	bwu.Init(w, "test", "", mockFileSystem, &workceptor.RealWatcher{})
 
+	const removeError = "RemoveAll Error"
 	testCases := []struct {
 		name  string
 		err   error
@@ -250,10 +259,10 @@ func TestBaseRelease(t *testing.T) {
 		calls func()
 	}{
 		{
-			name:  "RemoveAll Error",
-			err:   errors.New("RemoveAll Error"),
+			name:  removeError,
+			err:   errors.New(removeError),
 			force: false,
-			calls: func() { mockFileSystem.EXPECT().RemoveAll(gomock.Any()).Return(errors.New("RemoveAll Error")).Times(3) },
+			calls: func() { mockFileSystem.EXPECT().RemoveAll(gomock.Any()).Return(errors.New(removeError)).Times(3) },
 		},
 		{
 			name:  "No remote error without force",
@@ -274,7 +283,7 @@ func TestBaseRelease(t *testing.T) {
 			tc.calls()
 			err := bwu.Release(tc.force)
 			if err != nil && err.Error() != tc.err.Error() {
-				t.Errorf("Error returned dosent match, err recieved %s, expected %s", err, tc.err)
+				t.Errorf("Error returned dosent match, err received %s, expected %s", err, tc.err)
 			}
 		})
 	}

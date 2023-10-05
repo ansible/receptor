@@ -104,7 +104,7 @@ jobs:
   receptorctl:
     name: receptorctl (Python ${{ matrix.python-version }})
     needs: receptor
-    runs-on: "${{ matrix.os }}"
+    runs-on: "${{ matrix.os-version }}"
     strategy:
       include:
         - os-version: "ubuntu-22.04"

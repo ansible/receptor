@@ -500,11 +500,12 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 
 // SetFromParams sets the in-memory state from parameters.
 func (rw *remoteUnit) SetFromParams(params map[string]string) error {
-	data := rw.status.GetExtraData().(*remoteExtraData)
+	rw.statusLock.RLock()
 	for k, v := range params {
-		data.RemoteParams[k] = v
+		rw.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*remoteExtraData).RemoteParams[k] = v
 	}
-	rw.status.SetExtraData(data)
+	rw.statusLock.RUnlock()
+
 	return nil
 }
 
@@ -530,9 +531,11 @@ func (rw *remoteUnit) Status() *StatusFileData {
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 	rw.statusLock.RLock()
-	defer rw.statusLock.RUnlock()
-	status := rw.getStatus()
-	ed, ok := rw.status.GetExtraData().(*remoteExtraData)
+	//defer rw.statusLock.RUnlock()
+	//status := rw.getStatus()
+	//ed, ok := rw.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*remoteExtraData)
+	status := rw.GetStatus()
+	ed, ok := status.GetExtraData().(*remoteExtraData)
 	if ok {
 		edCopy := *ed
 		edCopy.RemoteParams = make(map[string]string)
@@ -541,7 +544,7 @@ func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 		}
 		status.ExtraData = &edCopy
 	}
-
+	rw.statusLock.RUnlock()
 	return status
 }
 
@@ -684,7 +687,9 @@ func newRemoteWorker(w *Workceptor, unitID, workType string) WorkUnit {
 	rw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
 	red := &remoteExtraData{}
 	red.RemoteParams = make(map[string]string)
-	rw.status.SetExtraData(red)
+	rw.statusLock.RLock()
+	rw.BaseWorkUnit.Status.(*StatusFileData).ExtraData = red
+	rw.statusLock.RUnlock()
 	rw.topJC = &utils.JobContext{}
 
 	return rw

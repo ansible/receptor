@@ -54,7 +54,7 @@ func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
 			BaseWorkUnit: BaseWorkUnit{
-				status: &StatusFileData{
+				Status: &StatusFileData{
 					ExtraData: &commandExtraData{},
 				},
 			},

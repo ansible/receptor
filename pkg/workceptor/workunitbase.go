@@ -82,7 +82,7 @@ func IsPending(err error) bool {
 // BaseWorkUnit includes data common to all work units, and partially implements the WorkUnit interface.
 type BaseWorkUnit struct {
 	w                   *Workceptor
-	status              StatusFileDataer
+	Status              StatusFileDataer
 	unitID              string
 	unitDir             string
 	statusFileName      string
@@ -106,15 +106,19 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs 
 	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 	bwu.fs = fs
-	var i interface{}
-	status := StatusFileData{
+	status := &StatusFileData{
 		State:      WorkStatePending,
 		Detail:     "Unit Created",
 		StdoutSize: 0,
 		WorkType:   workType,
-		ExtraData:  i,
 	}
-	bwu.status = &status
+
+	status.ExtraData = bwu.GetStatus().GetExtraData()
+	// bwu.Status.(*StatusFileData).State = WorkStatePending
+	// bwu.Status.(*StatusFileData).Detail = "Unit Created"
+	// bwu.Status.(*StatusFileData).StdoutSize = 0
+	// bwu.Status.(*StatusFileData).WorkType = workType
+	bwu.Status = status
 }
 
 // Error logs message with unitID prepended.
@@ -168,7 +172,7 @@ func (bwu *BaseWorkUnit) StdoutFileName() string {
 
 // StdoutFileName returns the full path to the stdout file in the unit dir.
 func (bwu *BaseWorkUnit) SetStatusFileData(status StatusFileDataer) {
-	bwu.status = status
+	bwu.Status = status
 }
 
 // lockStatusFile gains a lock on the status file.
@@ -227,7 +231,7 @@ func (bwu *BaseWorkUnit) Save() error {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()
 
-	return bwu.status.Save(bwu.statusFileName, bwu.fs)
+	return bwu.Status.Save(bwu.statusFileName, bwu.fs)
 }
 
 // loadFromFile loads status from an already open file.
@@ -274,7 +278,7 @@ func (bwu *BaseWorkUnit) Load() error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 
-	return bwu.status.Load(bwu.statusFileName, bwu.fs)
+	return bwu.Status.Load(bwu.statusFileName, bwu.fs)
 }
 
 // UpdateFullStatus atomically updates the status metadata file.  Changes should be made in the callback function.
@@ -332,7 +336,7 @@ func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 
-	err := bwu.status.UpdateFullStatus(bwu.statusFileName, bwu.fs, statusFunc)
+	err := bwu.Status.UpdateFullStatus(bwu.statusFileName, bwu.fs, statusFunc)
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
@@ -360,7 +364,7 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 
-	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize, bwu.fs)
+	err := bwu.Status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize, bwu.fs)
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
@@ -429,7 +433,7 @@ loop:
 				}
 			}
 		}
-		complete := IsComplete(bwu.Status().State)
+		complete := IsComplete(bwu.GetStatus().State)
 		if complete {
 			break
 		}
@@ -438,18 +442,26 @@ loop:
 
 // getStatus returns a copy of the base status (no ExtraData).  The caller must already hold the statusLock.
 func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
-	status := bwu.status
+	//status, ok := bwu.Status.(*StatusFileData)
+	// if !ok {
+	// 	bwu.w.nc.GetLogger().Warning("Unable to get status of work unit %s", bwu.unitID)
+	// }
+	//status.ExtraData = nil
+	if bwu.Status == nil {
+		return &StatusFileData{}
+	}
+	status := bwu.Status.GetStatus()
 
-	return status.GetStatus()
+	return status
 }
 
 func (sfd *StatusFileData) GetStatus() *StatusFileData {
-	sfd.ExtraData = nil
+
 	return sfd
 }
 
 // Status returns a copy of the status currently loaded in memory (use Load to get it from disk).
-func (bwu *BaseWorkUnit) Status() *StatusFileData {
+func (bwu *BaseWorkUnit) GetStatus() *StatusFileData {
 	return bwu.UnredactedStatus()
 }
 
@@ -494,7 +506,10 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 }
 
 func (sfd *StatusFileData) GetExtraData() interface{} {
-	return sfd.ExtraData
+	if sfd != nil {
+		return sfd.ExtraData
+	}
+	return nil
 }
 
 func (sfd *StatusFileData) SetExtraData(data interface{}) {
@@ -531,7 +546,7 @@ func (uu *unknownUnit) Cancel() error {
 }
 
 func (uu *unknownUnit) Status() *StatusFileData {
-	status := uu.BaseWorkUnit.Status()
+	status := uu.BaseWorkUnit.GetStatus()
 	status.ExtraData = "Unknown WorkType"
 
 	return status

@@ -170,12 +170,9 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
 
-	data, ok := cw.status.GetExtraData().(*commandExtraData)
-	if !ok {
-		data = &commandExtraData{}
-	}
-	data.Params = combineParams(cw.baseParams, cmdParams)
-	cw.status.SetExtraData(data)
+	cw.statusLock.RLock()
+	cw.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+	cw.statusLock.RUnlock()
 
 	return nil
 }
@@ -188,14 +185,16 @@ func (cw *commandUnit) Status() *StatusFileData {
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 	cw.statusLock.RLock()
-	defer cw.statusLock.RUnlock()
-	status := cw.getStatus()
-	data := cw.status.GetExtraData()
-	ed, ok := data.(*commandExtraData)
+	//defer cw.statusLock.RUnlock()
+	//status := cw.getStatus()
+	//ed, ok := cw.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*commandExtraData)
+	status := cw.GetStatus()
+	ed, ok := status.GetExtraData().(*commandExtraData)
 	if ok {
 		edCopy := *ed
-		cw.status.SetExtraData(edCopy)
+		status.ExtraData = &edCopy
 	}
+	cw.statusLock.RUnlock()
 
 	return status
 }
@@ -330,7 +329,7 @@ type CommandWorkerCfg struct {
 func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnit: BaseWorkUnit{
-			status: &StatusFileData{
+			Status: &StatusFileData{
 				ExtraData: &commandExtraData{},
 			},
 		},

@@ -14,7 +14,7 @@ import (
 func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnit: BaseWorkUnit{
-			status: &StatusFileData{
+			Status: &StatusFileData{
 				ExtraData: &commandExtraData{},
 			},
 		},
@@ -24,9 +24,6 @@ func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	}
 
 	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
-	data := cw.status.GetExtraData()
-	data = &commandExtraData{}
-	cw.status.SetExtraData(data)
 
 	return cw
 }
@@ -66,8 +63,10 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//ed2, ok := cw2.Status().ExtraData.(*commandExtraData)
-	ed2, ok := cw2.Status().GetExtraData().(*commandExtraData)
+	ed2, ok := cw2.Status().ExtraData.(*commandExtraData)
+	//ed2, ok := cw2.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*commandExtraData)
+
+	//ed2, ok := cw2.status.GetExtraData().(*commandExtraData)
 	if !ok {
 		t.Fatal("ExtraData type assertion failed")
 	}

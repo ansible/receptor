@@ -1148,7 +1148,11 @@ func readFileToString(filename string) (string, error) {
 
 // SetFromParams sets the in-memory state from parameters.
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
-	ked := kw.status.GetExtraData().(*kubeExtraData)
+	kw.statusLock.RLock()
+	status := kw.BaseWorkUnit.Status.GetStatus()
+	//ked := kw.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*kubeExtraData)
+	ked := status.GetExtraData().(*kubeExtraData)
+	kw.statusLock.RUnlock()
 	type value struct {
 		name       string
 		permission bool
@@ -1249,13 +1253,16 @@ func (kw *kubeUnit) Status() *StatusFileData {
 // Status returns a copy of the status currently loaded in memory.
 func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	kw.statusLock.RLock()
-	defer kw.statusLock.RUnlock()
-	status := kw.getStatus()
-	ked, ok := kw.status.GetExtraData().(*kubeExtraData)
+	//defer kw.statusLock.RUnlock()
+	//status := kw.getStatus()
+	status := kw.BaseWorkUnit.Status.GetStatus()
+	ked, ok := status.GetExtraData().(*kubeExtraData)
+	//ked, ok := kw.BaseWorkUnit.Status.(*StatusFileData).ExtraData.(*kubeExtraData)
 	if ok {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
 	}
+	kw.statusLock.RUnlock()
 
 	return status
 }
@@ -1368,7 +1375,7 @@ type KubeWorkerCfg struct {
 func (cfg KubeWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
-			status: &StatusFileData{
+			Status: &StatusFileData{
 				ExtraData: &kubeExtraData{
 					Image:         cfg.Image,
 					Command:       cfg.Command,

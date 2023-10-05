@@ -106,9 +106,8 @@ jobs:
     needs: receptor
     strategy:
       matrix:
-        include:
-          - os-version: "ubuntu-22.04"
-            python-version: [ "3.5-dev", "3.6-dev", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12-dev" ]
+        os-version: ["ubuntu-22.04"]
+        python-version: ["3.5-dev", "3.6-dev", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12-dev"]
     runs-on: "${{ matrix.os-version }}"
     steps:
       - name: Checkout

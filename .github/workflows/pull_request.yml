@@ -137,7 +137,7 @@ jobs:
 
       - name: Install distribute
         run: pip install --upgrade distribute
-        if: ${{ vars.matrix.python-version == "3.12" }}
+        if: ${{ vars.matrix.python-version == '3.12' }}
 
       - name: Install tox
         run: pip install tox

@@ -135,6 +135,10 @@ jobs:
       - name: Install setuptools
         run: pip install --upgrade setuptools
 
+      - name: Install distribute
+        run: pip install --upgrade distribute
+        if: ${{ vars.matrix.python-version == 12 }}
+
       - name: Install tox
         run: pip install tox
 

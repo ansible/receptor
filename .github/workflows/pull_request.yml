@@ -129,6 +129,9 @@ jobs:
         with:
           python-version: "${{ matrix.python-version }}"
 
+      - name: Install setuptools
+        run: pip install setuptools
+  
       - name: Install tox
         run: pip install tox
 

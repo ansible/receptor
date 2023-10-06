@@ -133,7 +133,7 @@ jobs:
         run: pip install --upgrade pip
 
       - name: Install setuptools
-        run: pip install --upgrade distribute setuptools
+        run: pip install --upgrade setuptools
 
       - name: Install tox
         run: pip install tox

@@ -107,7 +107,7 @@ jobs:
     strategy:
       matrix:
         os-version: ["ubuntu-22.04"]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
     runs-on: "${{ matrix.os-version }}"
     steps:
       - name: Checkout
@@ -131,13 +131,6 @@ jobs:
 
       - name: Upgrade pip
         run: pip install --upgrade pip
-
-      - name: Install setuptools
-        run: pip install --upgrade setuptools
-
-      - name: Install distribute
-        run: pip install --upgrade distribute
-        if: ${{ vars.matrix.python-version == '3.12' }}
 
       - name: Install tox
         run: pip install tox

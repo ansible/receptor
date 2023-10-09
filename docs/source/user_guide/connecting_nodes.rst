@@ -1,9 +1,14 @@
 Connecting nodes
 ================
 
+.. contents::
+   :local:
+
+
 Connect nodes via receptor backends. TCP, UDP, and websockets are currently supported. For example, ``tcp-peer`` can be used to connect to another node's ``tcp-listener``, and ``ws-peer`` can be used to connect to another node's ``ws-listener``.
 
 .. image:: mesh.png
+   :alt: Connected nodes as netceptor peers
 
 foo.yml
 
@@ -80,7 +85,7 @@ Logs from `fish` shows a successful connection to `bar` via `foo`.
 
 
 Configuring backends
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 ``redial`` If set to true, receptor will automatically attempt to redial and restore connections that are lost.
 

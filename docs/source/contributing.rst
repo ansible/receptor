@@ -1,3 +1,24 @@
+.. _contributing:
+
+******************
+Contributor guide
+******************
+
+Receptor is an open source project that lives at https://github.com/ansible/receptor
+
+.. contents::
+   :local:
+
+Code of conduct
+================
+
+All project contributors must abide by the `Ansible Code of Conduct <https://docs.ansible.com/ansible/latest/community/code_of_conduct.html>`_.
+
+Contributing
+=============
+
+Receptor welcomes community contributions!  See the :ref:`dev_guide` for details.
+
 Release process
 ===============
 

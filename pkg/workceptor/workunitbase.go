@@ -32,6 +32,7 @@ const (
 	WorkStateCanceled  = 4
 )
 
+// WatcherWrapper is wrapping the fsnofity Watcher struct and exposing the Event chan within.
 type WatcherWrapper interface {
 	Add(name string) error
 	Close() error

@@ -20,31 +20,7 @@ Terminology and Concepts
 - `netceptor`: The component of receptor that handles all networking functionality.
 - `workceptor`: The component of receptor that handles work units.
 
-Installation
-^^^^^^^^^^^^
 
-Download and extract precompiled binary for your OS and platform from `the releases page on GitHub <https://github.com/ansible/receptor/releases>`_
-
-Alternatively, you can compile from source code (Golang 1.19+ required)
-
-.. code::
-
-    make receptor
-
-Test the installation with
-
-.. code::
-
-    receptor --help
-    receptor --version
-
-The preferred way to interact with receptor nodes is to use the receptorctl command line tool
-
-.. code::
-
-    pip install receptorctl
-
-receptorctl will be used in various places throughout this documentation.
 
 Basic usage
 ^^^^^^^^^^^
@@ -116,10 +92,9 @@ In another terminal, issue a basic "status" command to the running receptor proc
 Note: the config file does not specify a node ID, so the hostname (on the container) is chosen as the node ID.
 
 .. toctree::
-   :maxdepth: 3
-   :caption: Contents:
+   :maxdepth: 2
 
-   self
+   installation
    connecting_nodes
    interacting_with_nodes
    workceptor

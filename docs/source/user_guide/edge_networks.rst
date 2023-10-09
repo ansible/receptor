@@ -3,12 +3,15 @@ Support for Edge Networks
 
 Recptor out-of-the-box has the ability to support complicated networking environments including edge networks.
 
+.. contents::
+   :local:
+
 Consider the following environment:
 
 .. image:: edge.png
 
 Configurable-Items
-^^^^^^^^^^^^^^^^^^
+-------------------
 
 Receptor encapsulates the concepts of `below-the-mesh` and `above-the-mesh` connections. Please refer to :doc:`tls` for a better understanding of these networking layers.
 

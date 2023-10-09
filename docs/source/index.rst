@@ -3,22 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Introduction
-============
 
 Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers. Receptor nodes establish peer-to-peer connections with each other via existing networks. Once connected, the receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.
 
-Terminology and Concepts
-^^^^^^^^^^^^^^^^^^^^^^^^
 
-- `receptor`: The receptor application taken as a whole, which typically runs as a daemon.
-- `receptorctl`: A user-facing command line used to interact with receptor, typically over a Unix domain socket.
-- `node`: A single running instance of receptor.
-- `node ID`: An arbitrary string identifying a single node, analogous to an IP address.
-- `backend`: A type of connection that receptor nodes can pass traffic over. Current backends include TCP, UDP and websockets.
-- `control service`: A built-in service that usually runs under the name `control`.  Used to report status and to launch and monitor work.
-- `netceptor`: The component of receptor that handles all networking functionality.
-- `workceptor`: The component of receptor that handles work units.
 
 
 
@@ -95,12 +83,6 @@ Note: the config file does not specify a node ID, so the hostname (on the contai
    :maxdepth: 2
 
    installation
-   connecting_nodes
-   interacting_with_nodes
-   workceptor
-   k8s
-   tls
-   firewall
-   edge_networks
+   user_guide/index
    developer_guide
    release_process

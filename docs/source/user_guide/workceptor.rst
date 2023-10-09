@@ -384,5 +384,6 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 
 .. image:: remote.png
+   :alt: sequence of events during work remote submission
 
 The sequence of events during a work remote submission. Blue lines indicate moments when receptor writes files to disk.

@@ -9,6 +9,7 @@ Recptor out-of-the-box has the ability to support complicated networking environ
 Consider the following environment:
 
 .. image:: edge.png
+   :alt: Network diagram with netceptor peers to edge network
 
 Configurable-Items
 -------------------

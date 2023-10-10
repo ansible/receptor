@@ -1,10 +1,18 @@
+.. _dev_guide:
+
 Developer guide
 ================
 
 Receptor is an open source project that lives at https://github.com/ansible/receptor
 
+.. contents::
+   :local:
+
+See the :ref:`contributing` for more general details.
+
+
 Testing
-^^^^^^^
+--------
 
 Pull requests must pass a suite of integration tests before being merged into ``devel``.
 
@@ -39,12 +47,12 @@ For example, to create/update mocks for Workceptor, we can run:
     mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
 
 Source code
-^^^^^^^^^^^
+-----------
 
 The next couple of sections are aimed to orient developers to the receptor codebase and provide a starting point for understanding how receptor works.
 
 Parsing receptor.conf
-"""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^
 
 Let's see how items in the config file are mapped to Golang internals.
 
@@ -126,7 +134,7 @@ This gets a new TCP dialer object and passes it to the netceptor AddBackend meth
 In general, when studying how the start up process works in receptor, take a look at the Init, Prepare, and Run methods throughout the code, as these are the entry points to running those specific components of receptor.
 
 Ping
-""""
+^^^^
 
 Studying how pings work in receptor will provide a useful glimpse into the internal workings of netceptor -- the main component of receptor that handles connections and data traffic over the mesh.
 

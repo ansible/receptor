@@ -3,6 +3,9 @@
 Workceptor
 ==========
 
+.. contents::
+   :local:
+
 Workceptor is a component of receptor that handles units of work.
 
 ``work-command`` defines a type of work that can run on the node.
@@ -59,7 +62,7 @@ bar.yml
 
 
 Configuring work commands
-^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
 ``worktype`` User-defined name to give this work definition
 
@@ -69,7 +72,7 @@ Configuring work commands
 
 
 Local work
-^^^^^^^^^^
+-----------
 
 Start the work by connecting to the ``control-service`` and issuing a "work submit" command
 
@@ -82,7 +85,7 @@ Start the work by connecting to the ``control-service`` and issuing a "work subm
 Receptor started an instance of this work type, and labeled it with a unique "Unit ID"
 
 Work results
-^^^^^^^^^^^^
+-------------
 
 Use the "Unit ID" to get work results
 
@@ -102,7 +105,8 @@ Use the "Unit ID" to get work results
 
 
 Remote work
-^^^^^^^^^^^
+------------
+
 Although connected to `foo`, by providing the "--node" option the work can be started on node `bar`.
 
 The work type must be defined on the node it is intended to run on, e.g. `bar` must have a ``work-command`` called "echoint", in this case.
@@ -126,7 +130,8 @@ Sequence of events for remote work submission
 .. _work_payload:
 
 Payload
-^^^^^^^^^^^^
+--------
+
 in `bar.yml`
 
 .. code-block:: yaml
@@ -153,7 +158,7 @@ Note: "-f" instructs receptorctl to follow the work unit immediately, i.e. strea
 
 
 Runtime Parameters
-^^^^^^^^^^^^^^^^^^
+-------------------
 
 Work commands can be configured to allow parameters to be passed to commands when work is submitted:
 
@@ -194,7 +199,8 @@ extend the ``params`` work command setting. The ``--all`` flag can be passed to 
 
 
 Work list
-^^^^^^^^^
+----------
+
 "work list" returns information about all work units that have ran on this receptor node. The following shows two work units, ``12L8s8h2`` and ``T0oN0CAp``
 
 .. code::
@@ -226,22 +232,22 @@ Notice that ``T0oN0CAp`` was a remote work submission, therefore its work type i
 
 
 Work cancel
-^^^^^^^^^^^
+------------
 
 Cancel will stop any running work unit. Upon canceling a "remote" work unit, the local node will attempt to connect to the remote node's control service and issue a work cancel. If the remote node is down, receptor will periodically attempt to connect to the remote node to do the cancellation.
 
 Work release
-^^^^^^^^^^^^
+-------------
 
 Release will cancel the work and then delete files on disk associated with that work unit. For remote work submission, release will attempt to delete files both locally and on the remote machine. Like work cancel, the release can be pending if the remote node is down. In that situation, the local files will remain on disk until the remote node can be contacted.
 
 Work force-release
-^^^^^^^^^^^^^^^^^^
+--------------------
 
 It might be preferable to force a release, using the ``work force-release`` command. This will do a one-time attempt to connect to the remote node and issue a work release there. After this one attempt, it will then proceed to delete all local files associated with the work unit.
 
 States
-^^^^^^^^^^^
+---------
 
 A unit of work can be in Pending, Running, Succeeded, or Failed state
 
@@ -250,7 +256,7 @@ For local work, transitioning from Pending to Running occurs the moment the ``co
 For remote work, transitioning from Pending to Running occurs when the status reported from the remote node has a Running state.
 
 Signed work
-^^^^^^^^^^^^^^^^^^
+------------
 
 Remote work submissions can be digitally signed by the sender. The target node will verify the signature of the work command before starting the work unit.
 
@@ -295,7 +301,7 @@ Use the "--signwork" parameter to sign the work.
     $ receptorctl --socket /tmp/foo.sock work submit echoint --node bar --no-payload --signwork
 
 Units on disk
-^^^^^^^^^^^^^^^^^^
+--------------
 
 Netceptor, the main component of receptor that handles mesh connectivity and traffic, operates entirely in memory. That is, it does not store any state information on disk. However, Workceptor functionality is designed to be persistent across receptor restarts. Work units might be running commands that could take hours to complete, and as such needs to store some relevant information on disk in case the receptor process restarts.
 
@@ -378,5 +384,6 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 
 .. image:: remote.png
+   :alt: sequence of events during work remote submission
 
 The sequence of events during a work remote submission. Blue lines indicate moments when receptor writes files to disk.

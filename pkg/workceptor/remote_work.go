@@ -680,7 +680,7 @@ func (rw *remoteUnit) Release(force bool) error {
 
 func newRemoteWorker(w *Workceptor, unitID, workType string) WorkUnit {
 	rw := &remoteUnit{logger: w.nc.GetLogger()}
-	rw.BaseWorkUnit.Init(w, unitID, workType)
+	rw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 	red := &remoteExtraData{}
 	red.RemoteParams = make(map[string]string)
 	rw.status.ExtraData = red

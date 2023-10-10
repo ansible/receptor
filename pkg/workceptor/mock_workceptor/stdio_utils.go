@@ -78,6 +78,20 @@ func (mr *MockFileSystemerMockRecorder) Open(name interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockFileSystemer)(nil).Open), name)
 }
 
+// RemoveAll mocks base method
+func (m *MockFileSystemer) RemoveAll(path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveAll", path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveAll indicates an expected call of RemoveAll
+func (mr *MockFileSystemerMockRecorder) RemoveAll(path interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAll", reflect.TypeOf((*MockFileSystemer)(nil).RemoveAll), path)
+}
+
 // MockFileWriteCloser is a mock of FileWriteCloser interface
 type MockFileWriteCloser struct {
 	ctrl     *gomock.Controller

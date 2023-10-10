@@ -219,7 +219,7 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 		})
 	}()
 	go cmdWaiter(cmd, doneChan)
-	go cw.monitorLocalStatus()
+	go cw.MonitorLocalStatus()
 
 	return nil
 }
@@ -263,7 +263,7 @@ func (cw *commandUnit) Restart() error {
 		// Job never started - mark it failed
 		cw.UpdateBasicStatus(WorkStateFailed, "Pending at restart", stdoutSize(cw.UnitDir()))
 	}
-	go cw.monitorLocalStatus()
+	go cw.MonitorLocalStatus()
 
 	return nil
 }
@@ -331,7 +331,7 @@ func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType str
 		baseParams:         cfg.Params,
 		allowRuntimeParams: cfg.AllowRuntimeParams,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType)
+	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return cw
 }

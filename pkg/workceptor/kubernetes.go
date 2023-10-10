@@ -1272,7 +1272,7 @@ func (kw *kubeUnit) startOrRestart() error {
 	} else {
 		go kw.runWorkUsingLogger()
 	}
-	go kw.monitorLocalStatus()
+	go kw.MonitorLocalStatus()
 
 	return nil
 }
@@ -1388,7 +1388,7 @@ func (cfg KubeWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string
 		deletePodOnRestart:  cfg.DeletePodOnRestart,
 		namePrefix:          fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
-	ku.BaseWorkUnit.Init(w, unitID, workType)
+	ku.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return ku
 }

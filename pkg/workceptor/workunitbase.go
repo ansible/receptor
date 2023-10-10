@@ -32,6 +32,29 @@ const (
 	WorkStateCanceled  = 4
 )
 
+// WatcherWrapper is wrapping the fsnofity Watcher struct and exposing the Event chan within.
+type WatcherWrapper interface {
+	Add(name string) error
+	Close() error
+	EventChannel() chan fsnotify.Event
+}
+
+type RealWatcher struct {
+	watcher *fsnotify.Watcher
+}
+
+func (rw *RealWatcher) Add(name string) error {
+	return rw.watcher.Add(name)
+}
+
+func (rw *RealWatcher) Close() error {
+	return rw.watcher.Close()
+}
+
+func (rw *RealWatcher) EventChannel() chan fsnotify.Event {
+	return rw.watcher.Events
+}
+
 // IsComplete returns true if a given WorkState indicates the job is finished.
 func IsComplete(workState int) bool {
 	return workState == WorkStateSucceeded || workState == WorkStateFailed
@@ -74,10 +97,12 @@ type BaseWorkUnit struct {
 	lastUpdateErrorLock *sync.RWMutex
 	ctx                 context.Context
 	cancel              context.CancelFunc
+	fs                  FileSystemer
+	watcher             WatcherWrapper
 }
 
 // Init initializes the basic work unit data, in memory only.
-func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
+func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper) {
 	bwu.w = w
 	bwu.status.State = WorkStatePending
 	bwu.status.Detail = "Unit Created"
@@ -90,6 +115,17 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusLock = &sync.RWMutex{}
 	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
+	bwu.fs = fs
+	if watcher != nil {
+		bwu.watcher = watcher
+	} else {
+		watcher, err := fsnotify.NewWatcher()
+		if err == nil {
+			bwu.watcher = &RealWatcher{watcher: watcher}
+		} else {
+			bwu.watcher = nil
+		}
+	}
 }
 
 // Error logs message with unitID prepended.
@@ -340,33 +376,29 @@ func (bwu *BaseWorkUnit) LastUpdateError() error {
 	return bwu.lastUpdateError
 }
 
-// monitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes.
-func (bwu *BaseWorkUnit) monitorLocalStatus() {
+// MonitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes.
+func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 	statusFile := path.Join(bwu.UnitDir(), "status")
-	watcher, err := fsnotify.NewWatcher()
-	if err == nil {
-		err = watcher.Add(statusFile)
+	var watcherEvents chan fsnotify.Event
+	watcherEvents = make(chan fsnotify.Event)
+
+	if bwu.watcher != nil {
+		err := bwu.watcher.Add(statusFile)
 		if err == nil {
 			defer func() {
-				_ = watcher.Close()
+				_ = bwu.watcher.Close()
 			}()
+			watcherEvents = bwu.watcher.EventChannel()
 		} else {
-			_ = watcher.Close()
-			watcher = nil
+			_ = bwu.watcher.Close()
+			bwu.watcher = nil
 		}
-	} else {
-		watcher = nil
 	}
-	fi, err := os.Stat(statusFile)
+	fi, err := bwu.fs.Stat(statusFile)
 	if err != nil {
 		fi = nil
 	}
-	var watcherEvents chan fsnotify.Event
-	if watcher == nil {
-		watcherEvents = make(chan fsnotify.Event)
-	} else {
-		watcherEvents = watcher.Events
-	}
+
 loop:
 	for {
 		select {
@@ -380,14 +412,12 @@ loop:
 				}
 			}
 		case <-time.After(time.Second):
-			newFi, err := os.Stat(statusFile)
-			if err == nil {
-				if fi == nil || fi.ModTime() != newFi.ModTime() {
-					fi = newFi
-					err = bwu.Load()
-					if err != nil {
-						bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
-					}
+			newFi, err := bwu.fs.Stat(statusFile)
+			if err == nil && (fi == nil || fi.ModTime() != newFi.ModTime()) {
+				fi = newFi
+				err = bwu.Load()
+				if err != nil {
+					bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
 				}
 			}
 		}
@@ -425,7 +455,7 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 	defer bwu.statusLock.Unlock()
 	attemptsLeft := 3
 	for {
-		err := os.RemoveAll(bwu.UnitDir())
+		err := bwu.fs.RemoveAll(bwu.UnitDir())
 		if force {
 			break
 		} else if err != nil {
@@ -451,11 +481,15 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 	return nil
 }
 
+func (bwu *BaseWorkUnit) CancelContext() {
+	bwu.cancel()
+}
+
 // =============================================================================================== //
 
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	uu := &unknownUnit{}
-	uu.BaseWorkUnit.Init(w, unitID, workType)
+	uu.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return uu
 }

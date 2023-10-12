@@ -49,6 +49,49 @@ endif
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
 
+clean:
+	$(KIND_BINARY) delete cluster
+	@rm -fv .container-flag*
+	@rm -fv .VERSION
+	@rm -rfv dist/
+	@rm -fv $(KUBECTL_BINARY)
+	@rm -fv $(KIND_BINARY)
+	@rm -fv packaging/container/receptor
+	@rm -rfv packaging/container/RPMS/
+	@rm -fv packaging/container/*.whl
+	@rm -fv receptor receptor.exe receptor.app net
+	@rm -fv receptorctl/dist/*
+	@rm -fv receptor-python-worker/dist/*
+	@rm -rfv receptorctl-test-venv/
+
+ARCH='amd64'
+KIND_BINARY='./kind'
+OS='linux'
+STABLE_KIND_VERSION='v0.20.0'
+
+kind: kubectl
+	echo Download kind version $(STABLE_KIND_VERSION)
+	curl \
+		--location \
+		--output $(KIND_BINARY) \
+		https://kind.sigs.k8s.io/dl/$(STABLE_KIND_VERSION)/kind-$(OS)-$(ARCH)
+	chmod 0700 $(KIND_BINARY)
+	echo "Create k8s cluster"
+	$(KIND_BINARY) create cluster \
+							--wait 30s
+	echo "Interact with the cluster"
+	$(KUBECTL_BINARY) get nodes
+
+KUBECTL_BINARY='./kubectl'
+STABLE_KUBERNETES_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+kubectl:
+	echo "Downloading kubectl version $(STABLE_KUBERNETES_VERSION)"
+	curl \
+		--location \
+		--output $(KUBECTL_BINARY) \
+		https://storage.googleapis.com/kubernetes-release/release/$(STABLE_KUBERNETES_VERSION)/bin/$(OS)/$(ARCH)/kubectl
+	chmod 0700 $(KUBECTL_BINARY)
+
 lint:
 	@golint cmd/... pkg/... example/...
 
@@ -86,6 +129,19 @@ else
 TESTCMD = -run $(RUNTEST)
 endif
 
+BLOCKLIST='/tests/'
+COVERAGE_FILE='coverage.txt'
+
+coverage: build-all kind
+	PATH="${PWD}:${PATH}" go test $$(go list ./... | grep -v $(BLOCKLIST)) \
+										$(TESTCMD) \
+										-count=1 \
+										-cover \
+										-covermode=atomic \
+										-coverprofile=$(COVERAGE_FILE) \
+										-race \
+										-timeout 5m
+
 test: receptor
 	PATH="${PWD}:${PATH}" \
 	go test ./... $(TESTCMD) -count=1 -race -timeout 5m
@@ -97,14 +153,6 @@ testloop: receptor
 	@i=1; while echo "------ $$i" && \
 	  make test; do \
 	  i=$$((i+1)); done
-
-coverage:
-	PATH="${PWD}:${PATH}" \
-	go test ./... $(TESTCMD) -count=1 -race -timeout 5m -coverprofile=coverage.txt -covermode=atomic
-
-kubectl:
-	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
-	chmod a+x kubectl
 
 kubetest: kubectl
 	./kubectl get nodes
@@ -160,18 +208,5 @@ $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
-
-clean:
-	@rm -fv receptor receptor.exe receptor.app net
-	@rm -rfv packaging/container/RPMS/
-	@rm -fv receptorctl/dist/*
-	@rm -fv receptor-python-worker/dist/*
-	@rm -fv packaging/container/receptor
-	@rm -fv packaging/container/*.whl
-	@rm -rfv dist/
-	@rm -fv .container-flag*
-	@rm -fv .VERSION
-	@rm -rfv receptorctl-test-venv/
-	@rm -fv kubectl
 
 .PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest

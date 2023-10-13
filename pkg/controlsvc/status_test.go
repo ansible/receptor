@@ -7,7 +7,8 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/golang/mock/gomock"
+
+	gomock "go.uber.org/mock/gomock"
 )
 
 func TestStatusInitFromString(t *testing.T) {

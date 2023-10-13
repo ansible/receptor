@@ -6,7 +6,7 @@ package mock_workceptor
 
 import (
 	workceptor "github.com/ansible/receptor/pkg/workceptor"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	reflect "reflect"
 )
 

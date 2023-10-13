@@ -103,8 +103,8 @@ linters-settings:
           - "github.com/ansible/receptor/tests/utils"
           - "github.com/fortytw2/leaktest"
           - "github.com/gorilla/websocket"
-          - "github.com/golang/mock/gomock"
           - "github.com/prep/socketpair"
+          - "go.uber.org/mock/gomock"
 
 issues:
   # Dont commit the following line.

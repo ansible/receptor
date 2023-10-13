@@ -10,7 +10,7 @@ import (
 	time "time"
 
 	netceptor "github.com/ansible/receptor/pkg/netceptor"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockNetcForPing is a mock of NetcForPing interface.

@@ -15,7 +15,7 @@ import (
 	controlsvc "github.com/ansible/receptor/pkg/controlsvc"
 	logger "github.com/ansible/receptor/pkg/logger"
 	netceptor "github.com/ansible/receptor/pkg/netceptor"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockControlCommandType is a mock of ControlCommandType interface.

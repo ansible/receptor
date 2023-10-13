@@ -5,7 +5,8 @@
 package mock_framer
 
 import (
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
+	
 	reflect "reflect"
 )
 

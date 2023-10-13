@@ -6,7 +6,7 @@ package mock_workceptor
 
 import (
 	fsnotify "github.com/fsnotify/fsnotify"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	reflect "reflect"
 )
 

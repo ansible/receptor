@@ -16,7 +16,8 @@ import (
 	logger "github.com/ansible/receptor/pkg/logger"
 	netceptor "github.com/ansible/receptor/pkg/netceptor"
 	utils "github.com/ansible/receptor/pkg/utils"
-	gomock "github.com/golang/mock/gomock"
+
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockNetceptorForControlsvc is a mock of NetceptorForControlsvc interface.

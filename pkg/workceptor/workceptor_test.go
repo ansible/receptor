@@ -9,7 +9,8 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
-	"github.com/golang/mock/gomock"
+	
+	gomock "go.uber.org/mock/gomock"
 )
 
 func TestAllocateUnit(t *testing.T) {

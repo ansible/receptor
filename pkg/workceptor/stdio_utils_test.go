@@ -8,7 +8,8 @@ import (
 
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
-	"github.com/golang/mock/gomock"
+	
+	gomock "go.uber.org/mock/gomock"
 )
 
 const errorMsgFmt = "Expected error: %s, got: %v"

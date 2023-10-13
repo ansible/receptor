@@ -9,7 +9,8 @@ import (
 
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
-	"github.com/golang/mock/gomock"
+	
+	gomock "go.uber.org/mock/gomock"
 )
 
 // setupTest sets up TestPing tests.

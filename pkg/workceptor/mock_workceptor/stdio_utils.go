@@ -5,7 +5,7 @@
 package mock_workceptor
 
 import (
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	os "os"
 	reflect "reflect"
 )

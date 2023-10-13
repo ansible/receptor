@@ -9,7 +9,7 @@ import (
 	tls "crypto/tls"
 	logger "github.com/ansible/receptor/pkg/logger"
 	netceptor "github.com/ansible/receptor/pkg/netceptor"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	reflect "reflect"
 )
 

@@ -225,6 +225,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
 			kw.Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			
 			break
 		}
 
@@ -243,6 +244,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						"Context was canceled while reading logs for pod %s/%s. Assuming pod has finished",
 						podNamespace,
 						podName)
+					
 					return
 				}
 				kw.Info(

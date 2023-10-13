@@ -50,7 +50,6 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
 
 clean:
-	$(KIND_BINARY) delete cluster
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv dist/
@@ -64,33 +63,51 @@ clean:
 	@rm -fv receptor-python-worker/dist/*
 	@rm -rfv receptorctl-test-venv/
 
-ARCH='amd64'
-KIND_BINARY='./kind'
-OS='linux'
-STABLE_KIND_VERSION='v0.20.0'
+ARCH=amd64
+KIND_BINARY=./kind
+OS=linux
+STABLE_KIND_VERSION=v0.20.0
 
-kind: kubectl
-	echo Download kind version $(STABLE_KIND_VERSION)
-	curl \
-		--location \
-		--output $(KIND_BINARY) \
-		https://kind.sigs.k8s.io/dl/$(STABLE_KIND_VERSION)/kind-$(OS)-$(ARCH)
-	chmod 0700 $(KIND_BINARY)
+kind:
+	if [ "$(wildcard $(KIND_BINARY))" != "" ]; \
+	then \
+		FOUND_KIND_VERSION=$$($(KIND_BINARY) --version); \
+	else \
+		FOUND_KIND_VERSION=; \
+	fi
+	if [ "$(FOUND_KIND_VERSION)" != "$(STABLE_KIND_VERSION)" ]; \
+	then \
+		curl \
+			--location \
+			--output $(KIND_BINARY) \
+			https://kind.sigs.k8s.io/dl/$(STABLE_KIND_VERSION)/kind-$(OS)-$(ARCH); \
+		chmod 0700 $(KIND_BINARY); \
+	fi
+
+kind_cluster: kind kubectl
 	echo "Create k8s cluster"
 	$(KIND_BINARY) create cluster \
 							--wait 30s
 	echo "Interact with the cluster"
 	$(KUBECTL_BINARY) get nodes
 
-KUBECTL_BINARY='./kubectl'
-STABLE_KUBERNETES_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+KUBECTL_BINARY=./kubectl
+STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
 kubectl:
-	echo "Downloading kubectl version $(STABLE_KUBERNETES_VERSION)"
-	curl \
-		--location \
-		--output $(KUBECTL_BINARY) \
-		https://storage.googleapis.com/kubernetes-release/release/$(STABLE_KUBERNETES_VERSION)/bin/$(OS)/$(ARCH)/kubectl
-	chmod 0700 $(KUBECTL_BINARY)
+	if [ "$(wildcard $(KUBECTL_BINARY))" != "" ]; \
+	then \
+		FOUND_KUBECTL_VERSION=$$(./kubectl version --client=true | head --lines=1 | cut --delimiter=' ' --field=3); \
+	else \
+		FOUND_KUBECTL_VERSION=; \
+	fi
+	if [ "${FOUND_KUBECTL_VERSION}" != "$(STABLE_KUBECTL_VERSION)" ]; \
+	then \
+		curl \
+			--location \
+			--output $(KUBECTL_BINARY) \
+			https://storage.googleapis.com/kubernetes-release/release/$(STABLE_KUBECTL_VERSION)/bin/$(OS)/$(ARCH)/kubectl; \
+		chmod 0700 $(KUBECTL_BINARY); \
+	fi
 
 lint:
 	@golint cmd/... pkg/... example/...

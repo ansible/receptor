@@ -46,7 +46,7 @@ func TestUnixSocketListen(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			if tt.name == "Good Test" {
 				f, err := os.CreateTemp("", "")
 				if err != nil {

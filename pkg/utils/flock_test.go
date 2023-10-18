@@ -35,6 +35,8 @@ func TestTryFLock(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	t.Parallel()
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
@@ -74,6 +76,9 @@ func TestFLockUnlock(t *testing.T) {
 			wantErr: true,
 		},
 	}
+
+	t.Parallel()
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {

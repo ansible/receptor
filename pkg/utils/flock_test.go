@@ -1,11 +1,10 @@
-//go:build !windows
+// go:build !windows
 // +build !windows
 
 package utils_test
 
 import (
 	"os"
-	//"reflect"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/utils"
@@ -33,7 +32,6 @@ func TestTryFLock(t *testing.T) {
 			args: args{
 				filename: "",
 			},
-			// want:    nil,
 			wantErr: true,
 		},
 	}
@@ -60,12 +58,8 @@ func TestTryFLock(t *testing.T) {
 }
 
 func TestFLockUnlock(t *testing.T) {
-	type fields struct {
-		fd int
-	}
 	tests := []struct {
 		name    string
-		fields  fields
 		wantErr bool
 	}{
 		{
@@ -73,8 +67,7 @@ func TestFLockUnlock(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "bad",
-
+			name:    "Bad Test",
 			wantErr: true,
 		},
 	}
@@ -87,7 +80,7 @@ func TestFLockUnlock(t *testing.T) {
 			defer os.Remove(f.Name())
 
 			flock, _ := utils.TryFLock(f.Name())
-		
+
 			if tt.name == "Good Test " {
 				if err := flock.Unlock(); (err != nil) != tt.wantErr {
 					t.Errorf("Unlock() error = %v, wantErr %v", err, tt.wantErr)

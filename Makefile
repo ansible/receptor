@@ -54,7 +54,6 @@ clean:
 	@rm -fv .VERSION
 	@rm -rfv dist/
 	@rm -fv $(KUBECTL_BINARY)
-	@rm -fv $(KIND_BINARY)
 	@rm -fv packaging/container/receptor
 	@rm -rfv packaging/container/RPMS/
 	@rm -fv packaging/container/*.whl
@@ -64,32 +63,7 @@ clean:
 	@rm -rfv receptorctl-test-venv/
 
 ARCH=amd64
-KIND_BINARY=./kind
 OS=linux
-STABLE_KIND_VERSION=v0.20.0
-
-kind:
-	if [ "$(wildcard $(KIND_BINARY))" != "" ]; \
-	then \
-		FOUND_KIND_VERSION=$$($(KIND_BINARY) --version); \
-	else \
-		FOUND_KIND_VERSION=; \
-	fi
-	if [ "$(FOUND_KIND_VERSION)" != "$(STABLE_KIND_VERSION)" ]; \
-	then \
-		curl \
-			--location \
-			--output $(KIND_BINARY) \
-			https://kind.sigs.k8s.io/dl/$(STABLE_KIND_VERSION)/kind-$(OS)-$(ARCH); \
-		chmod 0700 $(KIND_BINARY); \
-	fi
-
-kind_cluster: kind kubectl
-	echo "Create k8s cluster"
-	$(KIND_BINARY) create cluster \
-							--wait 30s
-	echo "Interact with the cluster"
-	$(KUBECTL_BINARY) get nodes
 
 KUBECTL_BINARY=./kubectl
 STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
@@ -149,15 +123,15 @@ endif
 BLOCKLIST='/tests/'
 COVERAGE_FILE='coverage.txt'
 
-coverage: build-all kind
+coverage: build-all
 	PATH="${PWD}:${PATH}" go test $$(go list ./... | grep -v $(BLOCKLIST)) \
-										$(TESTCMD) \
-										-count=1 \
-										-cover \
-										-covermode=atomic \
-										-coverprofile=$(COVERAGE_FILE) \
-										-race \
-										-timeout 5m
+	  $(TESTCMD) \
+	  -count=1 \
+	  -cover \
+	  -covermode=atomic \
+	  -coverprofile=$(COVERAGE_FILE) \
+	  -race \
+	  -timeout 5m
 
 test: receptor
 	PATH="${PWD}:${PATH}" \

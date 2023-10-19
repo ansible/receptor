@@ -67,8 +67,8 @@ func TestBridgeConns(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.args.c1.EXPECT().Read( []byte("input") ).Return( 1, nil ).Times(1)
-			tt.args.c2.EXPECT().Write( []byte("input") ).Return( 1, nil ).Times(1)
+			tt.args.c1.EXPECT().Read([]byte("input")).Return(1, nil).Times(1)
+			tt.args.c2.EXPECT().Write([]byte("input")).Return(1, nil).Times(1)
 			utils.BridgeConns(tt.args.c1, tt.args.c1Name, tt.args.c2, tt.args.c2Name, tt.args.logger)
 		})
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
-
 	gomock "go.uber.org/mock/gomock"
 )
 

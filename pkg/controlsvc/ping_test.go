@@ -8,7 +8,6 @@ import (
 
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
-	
 	gomock "go.uber.org/mock/gomock"
 )
 

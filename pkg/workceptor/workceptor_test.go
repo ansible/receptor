@@ -9,7 +9,6 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
-	
 	gomock "go.uber.org/mock/gomock"
 )
 

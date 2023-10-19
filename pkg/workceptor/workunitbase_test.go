@@ -13,7 +13,6 @@ import (
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
 	"github.com/fsnotify/fsnotify"
-	
 	gomock "go.uber.org/mock/gomock"
 )
 

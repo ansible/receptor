@@ -95,8 +95,6 @@ func TestBridgeConns(t *testing.T) {
 			tt.args.c1.EXPECT().Write(gomock.Any()).Return(len(tt.supplied.writeValues), tt.supplied.writeError).AnyTimes()
 			tt.args.c2.EXPECT().Write(gomock.Any()).Return(len(tt.supplied.writeValues), tt.supplied.writeError).AnyTimes()
 
-			tt.args.logger.SetShowTrace(true)
-
 			utils.BridgeConns(tt.args.c1, tt.args.c1Name, tt.args.c2, tt.args.c2Name, tt.args.logger)
 		})
 	}

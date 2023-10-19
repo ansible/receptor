@@ -29,7 +29,7 @@ func TestBridgeConns(t *testing.T) {
 		writeValues []byte
 	}
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	t.Cleanup(func() { ctrl.Finish() })
 
 	tests := []struct {
 		name     string

@@ -51,10 +51,10 @@ func TestBridgeConns(t *testing.T) {
 				closeError: nil,
 
 				readError:  errors.New("EOF"),
-				readValues: make( []byte, 5 ),
+				readValues: make([]byte, 5),
 
 				writeError:  nil,
-				writeValues: make( []byte, 5 ),
+				writeValues: make([]byte, 5),
 			},
 		},
 		{
@@ -69,10 +69,10 @@ func TestBridgeConns(t *testing.T) {
 				logger: logger.NewReceptorLogger("test"),
 			},
 			supplied: supplied{
-				closeError:  nil,
+				closeError: nil,
 
-				readError:   errors.New("EOF"),
-				readValues:  make([]byte, utils.NormalBufferSize),
+				readError:  errors.New("EOF"),
+				readValues: make([]byte, utils.NormalBufferSize),
 
 				writeError:  errors.New("EOF"),
 				writeValues: make([]byte, utils.NormalBufferSize),

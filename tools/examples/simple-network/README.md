@@ -24,6 +24,7 @@ rm -rf ./socks/
 # Examples
 ./ctl.sh ping celebi
 ./ctl.sh ping arceus
+./ctl.sh work submit echo --node arceus --no-payload -f
 ```
 
 ## Config files

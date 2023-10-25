@@ -4,13 +4,22 @@
 package utils_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/utils"
+	"github.com/ansible/receptor/pkg/utils/mock_utils"
+	"go.uber.org/mock/gomock"
 )
 
 func TestTryFLock(t *testing.T) {
+	const goodTest = "Good Test"
+	const closeErrorTest = "Close Error"
+	const flockErrorTest = "Flock Error"
+	const openErrorTest = "Open Error"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	type args struct {
 		filename string
 	}
@@ -21,14 +30,28 @@ func TestTryFLock(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Good Test",
+			name: goodTest,
 			args: args{
 				filename: "",
 			},
 			wantErr: false,
 		},
 		{
-			name: "Bad Test",
+			name: openErrorTest,
+			args: args{
+				filename: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: flockErrorTest,
+			args: args{
+				filename: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: closeErrorTest,
 			args: args{
 				filename: "",
 			},
@@ -42,17 +65,9 @@ func TestTryFLock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if tt.name == "Good Test" {
-				f, err := os.CreateTemp("", "")
-				if err != nil {
-					t.Errorf("CreateTemp returned %v", err)
-				}
-				defer os.Remove(f.Name())
+			mockSys := mock_utils.NewMockSyscaller(ctrl)
 
-				tt.args.filename = f.Name()
-			}
-
-			_, err := utils.TryFLock(tt.args.filename)
+			_, err := utils.TryFLock(utils.SyscallImpl{}, tt.args.filename)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TryFLock() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -63,17 +78,20 @@ func TestTryFLock(t *testing.T) {
 }
 
 func TestFLockUnlock(t *testing.T) {
+	const goodTest = "Good Test"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
-		name    string
-		wantErr bool
+		name             string
+		wantErr          bool
+		wantErrorMessage error
 	}{
 		{
-			name:    "Good Test",
-			wantErr: false,
-		},
-		{
-			name:    "Bad Test",
-			wantErr: true,
+			name:             goodTest,
+			wantErr:          false,
+			wantErrorMessage: nil,
 		},
 	}
 
@@ -84,23 +102,10 @@ func TestFLockUnlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			f, err := os.CreateTemp("", "")
-			if err != nil {
-				t.Errorf("CreateTemp returned %v", err)
-			}
-			defer os.Remove(f.Name())
-
-			flock, _ := utils.TryFLock(f.Name())
-
-			if tt.name == "Good Test " {
-				if err := flock.Unlock(); (err != nil) != tt.wantErr {
-					t.Errorf("Unlock() error = %v, wantErr %v", err, tt.wantErr)
-				}
-			} else if tt.name == "Bad Test " {
-				_ = flock.Unlock()
-				if err = flock.Unlock(); (err != nil) != tt.wantErr {
-					t.Errorf("Unlock() error = %v, wantErr %v", err, tt.wantErr)
-				}
+			mockSys := mock_utils.NewMockSyscaller(ctrl)
+			mockSys.EXPECT().Close(gomock.Any()).Return(tt.wantErrorMessage)
+			if err := utils.Unlock(mockSys); (err != nil) != tt.wantErr {
+				t.Errorf("Unlock() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

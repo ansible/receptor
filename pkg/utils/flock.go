@@ -16,18 +16,38 @@ type FLock struct {
 	fd int
 }
 
+type Syscaller interface {
+	Close(fd int) (err error)
+	Flock(fd int, how int) (err error)
+	Open(path string, mode int, perm uint32) (fd int, err error)
+}
+
+type SyscallImpl struct{}
+
+func (si SyscallImpl) Close(fd int) (err error) {
+	return syscall.Close(fd)
+}
+
+func (si SyscallImpl) Flock(fd int, how int) (err error) {
+	return syscall.Flock(fd, how)
+}
+
+func (si SyscallImpl) Open(path string, mode int, perm uint32) (fd int, err error) {
+	return syscall.Open(path, mode, perm)
+}
+
 // TryFLock non-blockingly attempts to acquire a lock on the file.
-func TryFLock(filename string) (*FLock, error) {
-	fd, err := syscall.Open(filename, syscall.O_CREAT|syscall.O_RDONLY|syscall.O_CLOEXEC, 0o600)
+func TryFLock(s Syscaller, filename string) (*FLock, error) {
+	fd, err := s.Open(filename, syscall.O_CREAT|syscall.O_RDONLY|syscall.O_CLOEXEC, 0o600)
 	if err != nil {
 		return nil, err
 	}
-	err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
+	err = s.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
 	if err == syscall.EWOULDBLOCK {
 		err = ErrLocked
 	}
 	if err != nil {
-		_ = syscall.Close(fd)
+		_ = s.Close(fd)
 
 		return nil, err
 	}
@@ -36,6 +56,6 @@ func TryFLock(filename string) (*FLock, error) {
 }
 
 // Unlock unlocks the file lock.
-func (lock *FLock) Unlock() error {
-	return syscall.Close(lock.fd)
+func (lock *FLock) Unlock(s Syscaller) error {
+	return s.Close(lock.fd)
 }

@@ -35,12 +35,12 @@ type GorillaWebsocketDialerForDialer interface {
 	DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (Conner, *http.Response, error)
 }
 
-// gorillaWrapper represents the real library
-type GorillaWrapper struct {
+// GorillaDialWrapper represents the real library
+type GorillaDialWrapper struct {
 	dialer *websocket.Dialer
 }
 
-func (g GorillaWrapper) DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (Conner, *http.Response, error) {
+func (g GorillaDialWrapper) DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (Conner, *http.Response, error) {
 	return g.dialer.DialContext(ctx, urlStr, requestHeader)
 }
 
@@ -77,7 +77,7 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 			TLSClientConfig: tlscfg,
 			Proxy:           http.ProxyFromEnvironment,
 		}
-		wd.dialer = GorillaWrapper{dialer: d}
+		wd.dialer = GorillaDialWrapper{dialer: d}
 	}
 
 	return &wd, nil
@@ -119,14 +119,60 @@ type WebsocketListenerForWebsocket interface {
 	Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error)
 }
 
+type GorillaWebsocketUpgraderForListener interface {
+	Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (Conner, error)
+}
+
+// GorillaDialWrapper represents the real library
+type GorillaUpgradeWrapper struct {
+	upgrader *websocket.Upgrader
+}
+
+func (g GorillaUpgradeWrapper) Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (Conner, error) {
+	return g.upgrader.Upgrade(w, r, responseHeader)
+}
+
+type HttpServerForListener interface {
+	Serve(l net.Listener) error
+	ServeTLS(l net.Listener, certFile string, keyFile string) error
+	Close() error
+	SetTLSConfig(tlscfg *tls.Config)
+	SetHandeler(mux *http.ServeMux)
+}
+
+type HttpServerWrapper struct {
+	server *http.Server
+}
+
+func (s HttpServerWrapper) Serve(l net.Listener) error {
+	return s.server.Serve(l)
+}
+
+func (s HttpServerWrapper) ServeTLS(l net.Listener, certFile string, keyFile string) error {
+	return s.server.ServeTLS(l, certFile, keyFile)
+}
+
+func (s HttpServerWrapper) Close() error {
+	return s.server.Close()
+}
+
+func (s HttpServerWrapper) SetTLSConfig(tlscfg *tls.Config) {
+	s.server.TLSConfig = tlscfg
+}
+
+func (s HttpServerWrapper) SetHandeler(mux *http.ServeMux) {
+	s.server.Handler = mux
+}
+
 // WebsocketListener implements Backend for inbound Websocket.
 type WebsocketListener struct {
-	address string
-	path    string
-	tlscfg  *tls.Config
-	li      net.Listener
-	server  *http.Server
-	logger  *logger.ReceptorLogger
+	address  string
+	path     string
+	tlscfg   *tls.Config
+	li       net.Listener
+	server   HttpServerForListener
+	logger   *logger.ReceptorLogger
+	upgrader GorillaWebsocketUpgraderForListener
 }
 
 func (b *WebsocketListener) GetAddr() string {
@@ -138,13 +184,29 @@ func (b *WebsocketListener) GetTLS() *tls.Config {
 }
 
 // NewWebsocketListener instantiates a new WebsocketListener backend.
-func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.ReceptorLogger) (*WebsocketListener, error) {
+func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.ReceptorLogger, upgrader GorillaWebsocketUpgraderForListener, server HttpServerForListener) (*WebsocketListener, error) {
 	ul := WebsocketListener{
 		address: address,
 		path:    "/",
 		tlscfg:  tlscfg,
 		li:      nil,
 		logger:  logger,
+	}
+	if upgrader != nil {
+		ul.upgrader = upgrader
+	} else {
+		u := &websocket.Upgrader{}
+		ul.upgrader = GorillaUpgradeWrapper{upgrader: u}
+	}
+
+	if server != nil {
+		ul.server = server
+	} else {
+		ser := &http.Server{
+			Addr:              address,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		ul.server = HttpServerWrapper{server: ser}
 	}
 
 	return &ul, nil
@@ -176,8 +238,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 	sessChan := make(chan netceptor.BackendSession)
 	mux := http.NewServeMux()
 	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{}
-		conn, err := upgrader.Upgrade(w, r, nil)
+		conn, err := b.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			b.logger.Error("Error upgrading websocket connection: %s\n", err)
 
@@ -191,18 +252,15 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 		return nil, err
 	}
 	wg.Add(1)
-	b.server = &http.Server{
-		Addr:              b.address,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	b.server.SetHandeler(mux)
+
 	go func() {
 		defer wg.Done()
 		var err error
 		if b.tlscfg == nil {
 			err = b.server.Serve(b.li)
 		} else {
-			b.server.TLSConfig = b.tlscfg
+			b.server.SetTLSConfig(b.tlscfg)
 			err = b.server.ServeTLS(b.li, "", "")
 		}
 		if err != nil && err != http.ErrServerClosed {
@@ -358,7 +416,7 @@ func (cfg WebsocketListenerCfg) Run() error {
 	if tlscfg != nil && len(tlscfg.CipherSuites) > 0 {
 		tlscfg.CipherSuites = append([]uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}, tlscfg.CipherSuites...)
 	}
-	b, err := NewWebsocketListener(address, tlscfg, netceptor.MainInstance.Logger)
+	b, err := NewWebsocketListener(address, tlscfg, netceptor.MainInstance.Logger, nil, nil)
 	if err != nil {
 		b.logger.Error("Error creating listener %s: %s\n", address, err)
 

@@ -161,6 +161,133 @@ func (mr *MockWebsocketListenerForWebsocketMockRecorder) Start(ctx, wg interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockWebsocketListenerForWebsocket)(nil).Start), ctx, wg)
 }
 
+// MockGorillaWebsocketUpgraderForListener is a mock of GorillaWebsocketUpgraderForListener interface
+type MockGorillaWebsocketUpgraderForListener struct {
+	ctrl     *gomock.Controller
+	recorder *MockGorillaWebsocketUpgraderForListenerMockRecorder
+}
+
+// MockGorillaWebsocketUpgraderForListenerMockRecorder is the mock recorder for MockGorillaWebsocketUpgraderForListener
+type MockGorillaWebsocketUpgraderForListenerMockRecorder struct {
+	mock *MockGorillaWebsocketUpgraderForListener
+}
+
+// NewMockGorillaWebsocketUpgraderForListener creates a new mock instance
+func NewMockGorillaWebsocketUpgraderForListener(ctrl *gomock.Controller) *MockGorillaWebsocketUpgraderForListener {
+	mock := &MockGorillaWebsocketUpgraderForListener{ctrl: ctrl}
+	mock.recorder = &MockGorillaWebsocketUpgraderForListenerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockGorillaWebsocketUpgraderForListener) EXPECT() *MockGorillaWebsocketUpgraderForListenerMockRecorder {
+	return m.recorder
+}
+
+// Upgrade mocks base method
+func (m *MockGorillaWebsocketUpgraderForListener) Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (backends.Conner, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Upgrade", w, r, responseHeader)
+	ret0, _ := ret[0].(backends.Conner)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Upgrade indicates an expected call of Upgrade
+func (mr *MockGorillaWebsocketUpgraderForListenerMockRecorder) Upgrade(w, r, responseHeader interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upgrade", reflect.TypeOf((*MockGorillaWebsocketUpgraderForListener)(nil).Upgrade), w, r, responseHeader)
+}
+
+// MockHttpServerForListener is a mock of HttpServerForListener interface
+type MockHttpServerForListener struct {
+	ctrl     *gomock.Controller
+	recorder *MockHttpServerForListenerMockRecorder
+}
+
+// MockHttpServerForListenerMockRecorder is the mock recorder for MockHttpServerForListener
+type MockHttpServerForListenerMockRecorder struct {
+	mock *MockHttpServerForListener
+}
+
+// NewMockHttpServerForListener creates a new mock instance
+func NewMockHttpServerForListener(ctrl *gomock.Controller) *MockHttpServerForListener {
+	mock := &MockHttpServerForListener{ctrl: ctrl}
+	mock.recorder = &MockHttpServerForListenerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockHttpServerForListener) EXPECT() *MockHttpServerForListenerMockRecorder {
+	return m.recorder
+}
+
+// Serve mocks base method
+func (m *MockHttpServerForListener) Serve(l net.Listener) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Serve", l)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Serve indicates an expected call of Serve
+func (mr *MockHttpServerForListenerMockRecorder) Serve(l interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Serve", reflect.TypeOf((*MockHttpServerForListener)(nil).Serve), l)
+}
+
+// ServeTLS mocks base method
+func (m *MockHttpServerForListener) ServeTLS(l net.Listener, certFile, keyFile string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ServeTLS", l, certFile, keyFile)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ServeTLS indicates an expected call of ServeTLS
+func (mr *MockHttpServerForListenerMockRecorder) ServeTLS(l, certFile, keyFile interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ServeTLS", reflect.TypeOf((*MockHttpServerForListener)(nil).ServeTLS), l, certFile, keyFile)
+}
+
+// Close mocks base method
+func (m *MockHttpServerForListener) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close
+func (mr *MockHttpServerForListenerMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockHttpServerForListener)(nil).Close))
+}
+
+// SetTLSConfig mocks base method
+func (m *MockHttpServerForListener) SetTLSConfig(tlscfg *tls.Config) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTLSConfig", tlscfg)
+}
+
+// SetTLSConfig indicates an expected call of SetTLSConfig
+func (mr *MockHttpServerForListenerMockRecorder) SetTLSConfig(tlscfg interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTLSConfig", reflect.TypeOf((*MockHttpServerForListener)(nil).SetTLSConfig), tlscfg)
+}
+
+// SetHandeler mocks base method
+func (m *MockHttpServerForListener) SetHandeler(mux *http.ServeMux) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetHandeler", mux)
+}
+
+// SetHandeler indicates an expected call of SetHandeler
+func (mr *MockHttpServerForListenerMockRecorder) SetHandeler(mux interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetHandeler", reflect.TypeOf((*MockHttpServerForListener)(nil).SetHandeler), mux)
+}
+
 // MockConner is a mock of Conner interface
 type MockConner struct {
 	ctrl     *gomock.Controller

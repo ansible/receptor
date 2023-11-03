@@ -548,7 +548,7 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*BackendInfo, error)
 		return nil, err
 	}
 
-	backend, err := backends.NewWebsocketListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger)
+	backend, err := backends.NewWebsocketListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger, nil, nil)
 	if err != nil {
 		return nil, err
 	}

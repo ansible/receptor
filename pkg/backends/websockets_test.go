@@ -24,7 +24,7 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-func setupTlsCfg(t *testing.T) tls.Certificate {
+func setupTLSCfg(t *testing.T) tls.Certificate {
 	// Create a server TLS certificate for "localhost"
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -49,11 +49,11 @@ func setupTlsCfg(t *testing.T) tls.Certificate {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return tlsCert
 }
 
 func TestNewWebsocketDialer(t *testing.T) {
-
 	NewWebsocketDialerTestCases := []struct {
 		name             string
 		address          string
@@ -69,7 +69,7 @@ func TestNewWebsocketDialer(t *testing.T) {
 			address: "wss://test.testing",
 			redial:  false,
 			tlscfg: &tls.Config{
-				Certificates:             []tls.Certificate{setupTlsCfg(t)},
+				Certificates:             []tls.Certificate{setupTLSCfg(t)},
 				MinVersion:               tls.VersionTLS12,
 				PreferServerCipherSuites: true,
 			},
@@ -83,7 +83,7 @@ func TestNewWebsocketDialer(t *testing.T) {
 			address: "test.testing",
 			redial:  false,
 			tlscfg: &tls.Config{
-				Certificates:             []tls.Certificate{setupTlsCfg(t)},
+				Certificates:             []tls.Certificate{setupTLSCfg(t)},
 				MinVersion:               tls.VersionTLS12,
 				PreferServerCipherSuites: true,
 			},
@@ -110,11 +110,23 @@ func TestNewWebsocketDialer(t *testing.T) {
 	}
 }
 
-func TestWebsocketDialerStart(t *testing.T) {
+func setUpDialer(t *testing.T) (*gomock.Controller, *mock_backends.MockGorillaWebsocketDialerForDialer) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockWebsocketDialer := mock_backends.NewMockGorillaWebsocketDialerForDialer(ctrl)
+
+	return ctrl, mockWebsocketDialer
+}
+
+func setUpDialerWithConner(t *testing.T) (*gomock.Controller, *mock_backends.MockGorillaWebsocketDialerForDialer, *mock_backends.MockConner) {
+	ctrl, mockWebsocketDialer := setUpDialer(t)
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
+
+	return ctrl, mockWebsocketDialer, mockWebsocketConner
+}
+
+func TestWebsocketDialerStart(t *testing.T) {
+	_, mockWebsocketDialer, mockWebsocketConner := setUpDialerWithConner(t)
 	ctx := context.Background()
 	defer ctx.Done()
 
@@ -125,23 +137,43 @@ func TestWebsocketDialerStart(t *testing.T) {
 	resp := &http.Response{
 		Body: io.NopCloser(bytes.NewBufferString("Hello World")),
 	}
-	mockWebsocketDialer.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockWebsocketConner, resp, nil)
-	mockWebsocketConner.EXPECT().ReadMessage().Return(0, []byte{}, nil).AnyTimes()
-	sess, err := wd.Start(ctx, &sync.WaitGroup{})
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-	s := <-sess
 
-	if s == nil {
-		t.Errorf("session should not be nil")
+	websocketDialerTestCases := []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "Start ok",
+			err:  nil,
+		},
+		{
+			name: "Start Error",
+			err:  errors.New("Websocket Start error"),
+		},
+	}
+
+	for _, testCase := range websocketDialerTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			mockWebsocketDialer.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockWebsocketConner, resp, testCase.err)
+			mockWebsocketConner.EXPECT().ReadMessage().Return(0, []byte{}, nil).AnyTimes()
+			sess, err := wd.Start(ctx, &sync.WaitGroup{})
+			if err != nil {
+				t.Errorf(err.Error())
+			}
+			s := <-sess
+
+			if testCase.err == nil && s == nil {
+				t.Errorf("session should not be nil")
+			}
+			if testCase.err != nil && s != nil {
+				t.Errorf("session should be nil")
+			}
+		})
 	}
 }
 
 func TestWebsocketDialerGetAddr(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockWebsocketDialer := mock_backends.NewMockGorillaWebsocketDialerForDialer(ctrl)
+	_, mockWebsocketDialer := setUpDialer(t)
 
 	address := "wss://test.testing"
 	wd, wdErr := backends.NewWebsocketDialer(address, &tls.Config{}, "", false, logger.NewReceptorLogger("websockets_test.go>TestNewWebsocketDialer"), mockWebsocketDialer)
@@ -155,9 +187,7 @@ func TestWebsocketDialerGetAddr(t *testing.T) {
 }
 
 func TestWebsocketDialerGetTLS(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockWebsocketDialer := mock_backends.NewMockGorillaWebsocketDialerForDialer(ctrl)
+	_, mockWebsocketDialer := setUpDialer(t)
 
 	blankTLS := &tls.Config{}
 	wd, wdErr := backends.NewWebsocketDialer("wss://test.testing", blankTLS, "", false, logger.NewReceptorLogger("websockets_test.go>TestNewWebsocketDialer"), mockWebsocketDialer)
@@ -170,39 +200,16 @@ func TestWebsocketDialerGetTLS(t *testing.T) {
 	}
 }
 
-func TestWebsocketDialerStartError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockWebsocketDialer := mock_backends.NewMockGorillaWebsocketDialerForDialer(ctrl)
-	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
-	ctx := context.Background()
-	defer ctx.Done()
-
-	wd, wdErr := backends.NewWebsocketDialer("wss://test.testing", &tls.Config{}, "", false, logger.NewReceptorLogger("websockets_test.go>TestNewWebsocketDialer"), mockWebsocketDialer)
-	if wdErr != nil {
-		t.Errorf("NewWebsockerDialer return error: %v", wdErr)
-	}
-	resp := &http.Response{
-		Body: io.NopCloser(bytes.NewBufferString("Hello World")),
-	}
-	mockWebsocketDialer.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockWebsocketConner, resp, errors.New("Websocket Start error"))
-	mockWebsocketConner.EXPECT().ReadMessage().Return(0, []byte{}, nil).AnyTimes()
-	sess, err := wd.Start(ctx, &sync.WaitGroup{})
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-	s := <-sess
-
-	if s != nil {
-		t.Errorf("session should be nil")
-	}
-}
-
-func TestNewWebsocketListener(t *testing.T) {
+func setUpListener(t *testing.T) (*gomock.Controller, *mock_backends.MockGorillaWebsocketUpgraderForListener, *mock_backends.MockHttpServerForListener) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
 	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
+
+	return ctrl, mockWebsocketUpgrader, mockServer
+}
+func TestNewWebsocketListener(t *testing.T) {
+	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 
 	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
@@ -215,10 +222,7 @@ func TestNewWebsocketListener(t *testing.T) {
 }
 
 func TestWebsocketListenerSetandGetPath(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
+	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 
 	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
@@ -238,13 +242,10 @@ func TestWebsocketListenerSetandGetPath(t *testing.T) {
 }
 
 func TestWebsocketListenerStart(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	ctrl, mockWebsocketUpgrader, mockServer := setUpListener(t)
 	ctx := context.Background()
 	defer ctx.Done()
 
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 
 	wi, err := backends.NewWebsocketListener("localhost:21700", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
@@ -270,13 +271,9 @@ func TestWebsocketListenerStart(t *testing.T) {
 }
 
 func TestWebsocketListenerStartUpgradeError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 	ctx := context.Background()
 	defer ctx.Done()
-
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
 
 	wi, err := backends.NewWebsocketListener("localhost:21701", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
@@ -302,13 +299,10 @@ func TestWebsocketListenerStartUpgradeError(t *testing.T) {
 }
 
 func TestWebsocketListenerStartNetError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	ctrl, mockWebsocketUpgrader, mockServer := setUpListener(t)
 	ctx := context.Background()
 	defer ctx.Done()
 
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 
 	badAddress := "127.0.0.1:80"
@@ -332,13 +326,10 @@ func TestWebsocketListenerStartNetError(t *testing.T) {
 }
 
 func TestWebsocketListenerStartTLSNil(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	ctrl, mockWebsocketUpgrader, mockServer := setUpListener(t)
 	ctx := context.Background()
 	defer ctx.Done()
 
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 
 	wi, err := backends.NewWebsocketListener("localhost:21702", nil, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
@@ -363,13 +354,10 @@ func TestWebsocketListenerStartTLSNil(t *testing.T) {
 }
 
 func TestWebsocketListenerGetAddr(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	ctrl, mockWebsocketUpgrader, mockServer := setUpListener(t)
 	ctx := context.Background()
 	defer ctx.Done()
 
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 	address := "127.0.0.1:21703"
 
@@ -401,13 +389,7 @@ func TestWebsocketListenerGetAddr(t *testing.T) {
 }
 
 func TestWebsocketListenerGetTLS(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	ctx := context.Background()
-	defer ctx.Done()
-
-	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
+	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 
 	blankTLS := &tls.Config{}
 	wi, err := backends.NewWebsocketListener("127.0.0.1:21704", blankTLS, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)

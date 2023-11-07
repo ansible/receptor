@@ -35,7 +35,7 @@ type GorillaWebsocketDialerForDialer interface {
 	DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (Conner, *http.Response, error)
 }
 
-// GorillaDialWrapper represents the real library
+// GorillaDialWrapper represents the real library.
 type GorillaDialWrapper struct {
 	dialer *websocket.Dialer
 }
@@ -123,7 +123,7 @@ type GorillaWebsocketUpgraderForListener interface {
 	Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (Conner, error)
 }
 
-// GorillaDialWrapper represents the real library
+// GorillaDialWrapper represents the real library.
 type GorillaUpgradeWrapper struct {
 	upgrader *websocket.Upgrader
 }
@@ -132,7 +132,7 @@ func (g GorillaUpgradeWrapper) Upgrade(w http.ResponseWriter, r *http.Request, r
 	return g.upgrader.Upgrade(w, r, responseHeader)
 }
 
-type HttpServerForListener interface {
+type HTTPServerForListener interface {
 	Serve(l net.Listener) error
 	ServeTLS(l net.Listener, certFile string, keyFile string) error
 	Close() error
@@ -140,27 +140,27 @@ type HttpServerForListener interface {
 	SetHandeler(mux *http.ServeMux)
 }
 
-type HttpServerWrapper struct {
+type HTTPServerWrapper struct {
 	server *http.Server
 }
 
-func (s HttpServerWrapper) Serve(l net.Listener) error {
+func (s HTTPServerWrapper) Serve(l net.Listener) error {
 	return s.server.Serve(l)
 }
 
-func (s HttpServerWrapper) ServeTLS(l net.Listener, certFile string, keyFile string) error {
+func (s HTTPServerWrapper) ServeTLS(l net.Listener, certFile string, keyFile string) error {
 	return s.server.ServeTLS(l, certFile, keyFile)
 }
 
-func (s HttpServerWrapper) Close() error {
+func (s HTTPServerWrapper) Close() error {
 	return s.server.Close()
 }
 
-func (s HttpServerWrapper) SetTLSConfig(tlscfg *tls.Config) {
+func (s HTTPServerWrapper) SetTLSConfig(tlscfg *tls.Config) {
 	s.server.TLSConfig = tlscfg
 }
 
-func (s HttpServerWrapper) SetHandeler(mux *http.ServeMux) {
+func (s HTTPServerWrapper) SetHandeler(mux *http.ServeMux) {
 	s.server.Handler = mux
 }
 
@@ -170,7 +170,7 @@ type WebsocketListener struct {
 	path     string
 	tlscfg   *tls.Config
 	li       net.Listener
-	server   HttpServerForListener
+	server   HTTPServerForListener
 	logger   *logger.ReceptorLogger
 	upgrader GorillaWebsocketUpgraderForListener
 }
@@ -184,7 +184,7 @@ func (b *WebsocketListener) GetTLS() *tls.Config {
 }
 
 // NewWebsocketListener instantiates a new WebsocketListener backend.
-func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.ReceptorLogger, upgrader GorillaWebsocketUpgraderForListener, server HttpServerForListener) (*WebsocketListener, error) {
+func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.ReceptorLogger, upgrader GorillaWebsocketUpgraderForListener, server HTTPServerForListener) (*WebsocketListener, error) {
 	ul := WebsocketListener{
 		address: address,
 		path:    "/",
@@ -206,7 +206,7 @@ func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.Rec
 			Addr:              address,
 			ReadHeaderTimeout: 5 * time.Second,
 		}
-		ul.server = HttpServerWrapper{server: ser}
+		ul.server = HTTPServerWrapper{server: ser}
 	}
 
 	return &ul, nil

@@ -208,6 +208,7 @@ func setUpListener(t *testing.T) (*gomock.Controller, *mock_backends.MockGorilla
 
 	return ctrl, mockWebsocketUpgrader, mockServer
 }
+
 func TestNewWebsocketListener(t *testing.T) {
 	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 

@@ -548,7 +548,7 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*BackendInfo, error)
 		return nil, err
 	}
 
-	backend, err := backends.NewWebsocketListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger)
+	backend, err := backends.NewWebsocketListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -581,7 +581,7 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*BackendInfo, error)
 
 // WebSocketDial registers a new netceptor.Backend that will dial a remote node via a WebSocket.
 func (n *LibNode) WebSocketDial(address string, cost float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewWebsocketDialer(address, tlsCfg, "", true, n.netceptorInstance.Logger)
+	b1, err := backends.NewWebsocketDialer(address, tlsCfg, "", true, n.netceptorInstance.Logger, nil)
 	if err != nil {
 		return err
 	}

@@ -16,7 +16,7 @@ on:
         required: true
         default: 'no'
       name:
-        description: 'Name of the person who will create a tag / draft release.'
+        description: 'Name of the person who will create a tag / draft release in commas e.g. "John Doe".'
         required: true
         default: ''
       email:

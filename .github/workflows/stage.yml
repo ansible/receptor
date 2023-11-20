@@ -72,3 +72,4 @@ jobs:
             -e repo=${{ github.repository_owner }}/receptor \
             -e github_token=${{ secrets.GITHUB_TOKEN }} \
             -e target_commitish=${{ github.event.inputs.ref }}
+            -e tagger=${{ github.repository_owner }}

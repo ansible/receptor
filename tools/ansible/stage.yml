@@ -32,10 +32,6 @@
         return_content: yes
         body_format: json
       register: data
-    
-    - name: Print returned TAG data
-      debug:
-        var: data.json
 
     - name: Publish draft Release
       uri:

@@ -15,6 +15,14 @@ on:
         description: 'Are you sure? Set this to yes.'
         required: true
         default: 'no'
+      name:
+        description: 'Name of the person who will create a tag / draft release.'
+        required: true
+        default: ''
+      email:
+        description: 'Email of the person who will create a tag / draft release.'
+        required: true
+        default: ''
 jobs:
   stage:
     runs-on: ubuntu-latest
@@ -69,6 +77,10 @@ jobs:
         run: |
           make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ env.OWNER }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
 
+      - name: Get current time
+        uses: josStorer/get-current-time@v2
+        id: current-time
+
       - name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \
@@ -76,4 +88,7 @@ jobs:
             -e repo=${{ env.OWNER }}/receptor \
             -e github_token=${{ secrets.GITHUB_TOKEN }} \
             -e target_commitish=${{ github.event.inputs.ref }} \
-            -e tagger=${{ env.OWNER }}
+            -e tagger="${{ github.event.inputs.name }}" \
+            -e tagger_email="${{ github.event.inputs.email }}" \
+            -e time="${{ steps.current-time.outputs.time }}" \
+            -v

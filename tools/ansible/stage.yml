@@ -12,7 +12,10 @@
       message: "Release for v{{ version }}"
       object: "{{ target_commitish }}"
       type: "commit"
-      tagger: "{{ tagger }}"
+      tagger:
+        name: "{{ tagger }}"
+        email: "{{ tagger_email }}"
+        date: "{{ time }}"
 
   tasks:
     - name: Publish draft TAG
@@ -26,6 +29,14 @@
         status_code:
           - 200
           - 201
+        return_content: yes
+        body_format: json
+      register: data
+    
+    - name: Print returned TAG data
+      debug:
+        var: data.json
+
     - name: Publish draft Release
       uri:
         url: "https://api.github.com/repos/{{ repo }}/releases"

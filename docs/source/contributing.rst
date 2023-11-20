@@ -36,4 +36,4 @@ After the release is published, the `Promote Release <https://github.com/ansible
 - Build binaries for various OSes/platforms, and attach them to the `release <https://github.com/ansible/receptor/releases>`_.
 
 .. note::
-  To customize packaging and allow for tags that do not strictly satisfy the semantic versioning given to development releases, the current workflow uses simple ``make`` to build and archive binaries, instead of specific tools for build and release.
+  If you need to re-run `Stage Release <https://github.com/ansible/receptor/actions/workflows/stage.yml>`_ more than once you must delete the tag beforehand, otherwise the workflow will fail.

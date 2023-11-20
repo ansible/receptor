@@ -7,7 +7,25 @@
       tag_name: "v{{ version }}"
       target_commitish: "{{ target_commitish }}"
       draft: true
+    tagpayload:
+      tag: "v{{ version }}"
+      message: "Release for v{{ version }}"
+      object: "{{ target_commitish }}"
+      type: "commit"
+      tagger: "{{ tagger }}"
+
   tasks:
+    - name: Publish draft TAG
+      uri:
+        url: "https://api.github.com/repos/{{ repo }}/git/tags"
+        method: "POST"
+        headers:
+          Accept: "application/vnd.github.v3+json"
+          Authorization: "Bearer {{ github_token }}"
+        body: "{{ tagpayload | to_json }}"
+        status_code:
+          - 200
+          - 201
     - name: Publish draft Release
       uri:
         url: "https://api.github.com/repos/{{ repo }}/releases"

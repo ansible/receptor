@@ -61,15 +61,19 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Lowercase github owner
+        run: |
+          echo "OWNER=$(echo 'console.log("${{ github.repository_owner }}".toLowerCase())' | node -)" >> $GITHUB_ENV
+
       - name: Build container image
         run: |
-          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
+          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ env.OWNER }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
 
       - name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \
             -e version=${{ github.event.inputs.version }} \
-            -e repo=${{ github.repository_owner }}/receptor \
+            -e repo=${{ env.OWNER }}/receptor \
             -e github_token=${{ secrets.GITHUB_TOKEN }} \
-            -e target_commitish=${{ github.event.inputs.ref }}
-            -e tagger=${{ github.repository_owner }}
+            -e target_commitish=${{ github.event.inputs.ref }} \
+            -e tagger=${{ env.OWNER }}

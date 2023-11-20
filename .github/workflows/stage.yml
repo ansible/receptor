@@ -88,7 +88,7 @@ jobs:
             -e repo=${{ env.OWNER }}/receptor \
             -e github_token=${{ secrets.GITHUB_TOKEN }} \
             -e target_commitish=${{ github.event.inputs.ref }} \
-            -e tagger="${{ github.event.inputs.name }}" \
+            -e tagger_name="${{ github.event.inputs.name }}" \
             -e tagger_email="${{ github.event.inputs.email }}" \
             -e time="${{ steps.current-time.outputs.time }}" \
             -v

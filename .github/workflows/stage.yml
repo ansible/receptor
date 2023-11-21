@@ -16,9 +16,10 @@ on:
         required: true
         default: 'no'
       name:
-        description: 'Name of the person who will create a tag / draft release in commas e.g. "John Doe".'
+        description: 'Name of the person in single quotes who will create a tag / draft release.'
         required: true
         default: ''
+        type: string
       email:
         description: 'Email of the person who will create a tag / draft release.'
         required: true
@@ -84,10 +85,10 @@ jobs:
       - name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \
-            -e version=${{ github.event.inputs.version }} \
+            -e version="${{ github.event.inputs.version }}" \
             -e repo=${{ env.OWNER }}/receptor \
             -e github_token=${{ secrets.GITHUB_TOKEN }} \
-            -e target_commitish=${{ github.event.inputs.ref }} \
+            -e target_commitish="${{ github.event.inputs.ref }}" \
             -e tagger_name="${{ github.event.inputs.name }}" \
             -e tagger_email="${{ github.event.inputs.email }}" \
             -e time="${{ steps.current-time.outputs.time }}" \

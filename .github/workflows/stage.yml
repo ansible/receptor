@@ -8,7 +8,7 @@ on:
         required: true
         default: ''
       ref:
-        description: 'The ref to tag. Can be a branch name / SHA / etc.'
+        description: 'The ref to tag. Can only be the 40 character SHA.'
         required: true
         default: ''
       confirm:

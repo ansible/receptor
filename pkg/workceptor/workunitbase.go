@@ -485,6 +485,22 @@ func (bwu *BaseWorkUnit) CancelContext() {
 	bwu.cancel()
 }
 
+func (bwu *BaseWorkUnit) GetStatus() StatusFileData {
+	return bwu.status
+}
+
+func (bwu *BaseWorkUnit) GetStatusLock() *sync.RWMutex {
+	return bwu.statusLock
+}
+
+func (bwu *BaseWorkUnit) GetBaseStatus() *StatusFileData {
+	return bwu.getStatus()
+}
+
+func (bwu *BaseWorkUnit) GetWorkceptor() *Workceptor {
+	return bwu.w
+}
+
 // =============================================================================================== //
 
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {

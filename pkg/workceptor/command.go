@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,9 +19,48 @@ import (
 	"github.com/google/shlex"
 )
 
+type BaseWorkUnitForWorkUnit interface {
+	CancelContext()
+	Debug(format string, v ...interface{})
+	Error(format string, v ...interface{})
+	GetBaseStatus() *StatusFileData
+	GetStatus() StatusFileData
+	GetStatusLock() *sync.RWMutex
+	GetWorkceptor() *Workceptor
+	ID() string
+	Info(format string, v ...interface{})
+	Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper)
+	LastUpdateError() error
+	Load() error
+	MonitorLocalStatus()
+	Release(force bool) error
+	Save() error
+	SetFromParams(_ map[string]string) error
+	Status() *StatusFileData
+	StatusFileName() string
+	StdoutFileName() string
+	UnitDir() string
+	UnredactedStatus() *StatusFileData
+	UpdateBasicStatus(state int, detail string, stdoutSize int64)
+	UpdateFullStatus(statusFunc func(*StatusFileData))
+	Warning(format string, v ...interface{})
+	getStatus() *StatusFileData
+}
+
+// type BaseWorkUnitForCommand interface {
+// 	WorkUnit
+// 	GetStatus() StatusFileData
+// 	MonitorLocalStatus()
+// 	GetStatusLock() *sync.RWMutex
+// 	GetBaseStatus() *StatusFileData
+// 	GetWorkceptor() *Workceptor
+// 	CancelCancel()
+// 	Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper)
+// }
+
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.
 type commandUnit struct {
-	BaseWorkUnit
+	BaseWorkUnitForWorkUnit
 	command            string
 	baseParams         string
 	allowRuntimeParams bool
@@ -169,7 +209,7 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	if cmdParams != "" && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
-	cw.status.ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+	cw.GetStatus().ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
 
 	return nil
 }
@@ -181,10 +221,10 @@ func (cw *commandUnit) Status() *StatusFileData {
 
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (cw *commandUnit) UnredactedStatus() *StatusFileData {
-	cw.statusLock.RLock()
-	defer cw.statusLock.RUnlock()
+	cw.GetStatusLock().RLock()
+	defer cw.GetStatusLock().RUnlock()
 	status := cw.getStatus()
-	ed, ok := cw.status.ExtraData.(*commandExtraData)
+	ed, ok := cw.getStatus().ExtraData.(*commandExtraData)
 	if ok {
 		edCopy := *ed
 		status.ExtraData = &edCopy
@@ -226,8 +266,8 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
-	level := cw.w.nc.GetLogger().GetLogLevel()
-	levelName, _ := cw.w.nc.GetLogger().LogLevelToName(level)
+	level := cw.GetWorkceptor().nc.GetLogger().GetLogLevel()
+	levelName, _ := cw.GetWorkceptor().nc.GetLogger().LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
 
 	// TODO: This is another place where we rely on a pre-built binary for testing.
@@ -270,7 +310,7 @@ func (cw *commandUnit) Restart() error {
 
 // Cancel stops a running job.
 func (cw *commandUnit) Cancel() error {
-	cw.cancel()
+	cw.CancelContext()
 	status := cw.Status()
 	ced, ok := status.ExtraData.(*commandExtraData)
 	if !ok || ced.Pid <= 0 {
@@ -304,7 +344,7 @@ func (cw *commandUnit) Release(force bool) error {
 		return err
 	}
 
-	return cw.BaseWorkUnit.Release(force)
+	return cw.BaseWorkUnitForWorkUnit.Release(force)
 }
 
 // **************************************************************************
@@ -322,7 +362,7 @@ type CommandWorkerCfg struct {
 
 func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
-		BaseWorkUnit: BaseWorkUnit{
+		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 			status: StatusFileData{
 				ExtraData: &commandExtraData{},
 			},
@@ -331,7 +371,7 @@ func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType str
 		baseParams:         cfg.Params,
 		allowRuntimeParams: cfg.AllowRuntimeParams,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return cw
 }

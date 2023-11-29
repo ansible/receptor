@@ -13,7 +13,7 @@ import (
 
 func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
-		BaseWorkUnit: BaseWorkUnit{
+		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 			status: StatusFileData{
 				ExtraData: &commandExtraData{},
 			},
@@ -22,7 +22,7 @@ func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 		baseParams:         "foo",
 		allowRuntimeParams: true,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return cw
 }

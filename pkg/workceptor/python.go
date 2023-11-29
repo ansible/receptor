@@ -53,7 +53,7 @@ type workPythonCfg struct {
 func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
-			BaseWorkUnit: BaseWorkUnit{
+			BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 				status: StatusFileData{
 					ExtraData: &commandExtraData{},
 				},
@@ -63,7 +63,7 @@ func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return cw
 }

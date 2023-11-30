@@ -11,7 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func newCommandWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 			status: StatusFileData{
@@ -57,7 +57,7 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cw2 := newCommandWorker(w, cw.ID(), "command")
+	cw2 := newCommandWorker(nil, w, cw.ID(), "command")
 	err = cw2.Load()
 	if err != nil {
 		t.Fatal(err)

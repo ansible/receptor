@@ -489,6 +489,10 @@ func (bwu *BaseWorkUnit) GetStatus() StatusFileData {
 	return bwu.status
 }
 
+func (bwu *BaseWorkUnit) SetStatusExtraData(red *remoteExtraData) {
+	bwu.status.ExtraData = red
+}
+
 func (bwu *BaseWorkUnit) GetStatusLock() *sync.RWMutex {
 	return bwu.statusLock
 }

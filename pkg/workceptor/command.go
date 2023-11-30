@@ -25,6 +25,7 @@ type BaseWorkUnitForWorkUnit interface {
 	Error(format string, v ...interface{})
 	GetBaseStatus() *StatusFileData
 	GetStatus() StatusFileData
+	SetStatusExtraData(*remoteExtraData)
 	GetStatusLock() *sync.RWMutex
 	GetWorkceptor() *Workceptor
 	ID() string
@@ -46,17 +47,6 @@ type BaseWorkUnitForWorkUnit interface {
 	Warning(format string, v ...interface{})
 	getStatus() *StatusFileData
 }
-
-// type BaseWorkUnitForCommand interface {
-// 	WorkUnit
-// 	GetStatus() StatusFileData
-// 	MonitorLocalStatus()
-// 	GetStatusLock() *sync.RWMutex
-// 	GetBaseStatus() *StatusFileData
-// 	GetWorkceptor() *Workceptor
-// 	CancelCancel()
-// 	Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper)
-// }
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.
 type commandUnit struct {
@@ -224,7 +214,7 @@ func (cw *commandUnit) UnredactedStatus() *StatusFileData {
 	cw.GetStatusLock().RLock()
 	defer cw.GetStatusLock().RUnlock()
 	status := cw.getStatus()
-	ed, ok := cw.getStatus().ExtraData.(*commandExtraData)
+	ed, ok := cw.GetStatus().ExtraData.(*commandExtraData)
 	if ok {
 		edCopy := *ed
 		status.ExtraData = &edCopy
@@ -360,16 +350,20 @@ type CommandWorkerCfg struct {
 	VerifySignature    bool   `description:"Verify a signed work submission" default:"false"`
 }
 
-func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
-	cw := &commandUnit{
-		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
+func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+	if bwu == nil {
+		bwu = &BaseWorkUnit{
 			status: StatusFileData{
 				ExtraData: &commandExtraData{},
 			},
-		},
-		command:            cfg.Command,
-		baseParams:         cfg.Params,
-		allowRuntimeParams: cfg.AllowRuntimeParams,
+		}
+	}
+
+	cw := &commandUnit{
+		BaseWorkUnitForWorkUnit: bwu,
+		command:                 cfg.Command,
+		baseParams:              cfg.Params,
+		allowRuntimeParams:      cfg.AllowRuntimeParams,
 	}
 	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 

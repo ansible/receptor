@@ -27,7 +27,7 @@ type WorkerConfig interface {
 }
 
 // NewWorkerFunc represents a factory of WorkUnit instances.
-type NewWorkerFunc func(w *Workceptor, unitID string, workType string) WorkUnit
+type NewWorkerFunc func(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit
 
 // StatusFileData is the structure of the JSON data saved to a status file.
 // This struct should only contain value types, except for ExtraData.

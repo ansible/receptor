@@ -50,7 +50,7 @@ type workPythonCfg struct {
 }
 
 // NewWorker is a factory to produce worker instances.
-func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg workPythonCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
 			BaseWorkUnitForWorkUnit: &BaseWorkUnit{

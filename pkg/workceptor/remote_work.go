@@ -23,7 +23,8 @@ import (
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
-	BaseWorkUnit
+	// BaseWorkUnit
+	BaseWorkUnitForWorkUnit
 	topJC  *utils.JobContext
 	logger *logger.ReceptorLogger
 }
@@ -51,11 +52,11 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	if !ok {
 		return nil, nil, fmt.Errorf("remote ExtraData missing")
 	}
-	tlsConfig, err := rw.w.nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
+	tlsConfig, err := rw.GetWorkceptor().nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return nil, nil, err
 	}
-	conn, err := rw.w.nc.DialContext(ctx, red.RemoteNode, "control", tlsConfig)
+	conn, err := rw.GetWorkceptor().nc.DialContext(ctx, red.RemoteNode, "control", tlsConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,7 +86,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		if err == nil {
 			return conn, reader
 		}
-		rw.w.nc.GetLogger().Debug("Connection to %s failed with error: %s",
+		rw.GetWorkceptor().nc.GetLogger().Debug("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*remoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {
@@ -157,7 +158,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	workSubmitCmd["worktype"] = red.RemoteWorkType
 	workSubmitCmd["tlsclient"] = red.TLSClient
 	if red.SignWork {
-		signature, err := rw.w.createSignature(red.RemoteNode)
+		signature, err := rw.GetWorkceptor().createSignature(red.RemoteNode)
 		if err != nil {
 			return err
 		}
@@ -234,7 +235,7 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	workSubmitCmd["subcommand"] = workCmd
 	workSubmitCmd["unitid"] = red.RemoteUnitID
 	if red.SignWork {
-		signature, err := rw.w.createSignature(red.RemoteNode)
+		signature, err := rw.GetWorkceptor().createSignature(red.RemoteNode)
 		if err != nil {
 			return err
 		}
@@ -269,7 +270,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	status := rw.Status()
 	red, ok := status.ExtraData.(*remoteExtraData)
 	if !ok {
-		rw.w.nc.GetLogger().Error("remote ExtraData missing")
+		rw.GetWorkceptor().nc.GetLogger().Error("remote ExtraData missing")
 
 		return
 	}
@@ -294,7 +295,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
 		if err != nil {
-			rw.w.nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
+			rw.GetWorkceptor().nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
 			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
 			conn = nil
 
@@ -302,7 +303,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
-			rw.w.nc.GetLogger().Debug("Read error reading from %s: %s\n", remoteNode, err)
+			rw.GetWorkceptor().nc.GetLogger().Debug("Read error reading from %s: %s\n", remoteNode, err)
 			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
 			conn = nil
 
@@ -311,7 +312,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
 				if !forRelease {
-					rw.w.nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
+					rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
 					rw.UpdateFullStatus(func(status *StatusFileData) {
 						status.State = WorkStateFailed
 						status.Detail = "Remote work unit is gone"
@@ -320,14 +321,14 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 
 				return
 			}
-			rw.w.nc.GetLogger().Error("Remote error: %s\n", strings.TrimRight(status[6:], "\n"))
+			rw.GetWorkceptor().nc.GetLogger().Error("Remote error: %s\n", strings.TrimRight(status[6:], "\n"))
 
 			return
 		}
 		si := StatusFileData{}
 		err = json.Unmarshal([]byte(status), &si)
 		if err != nil {
-			rw.w.nc.GetLogger().Error("Error unmarshalling JSON: %s\n", status)
+			rw.GetWorkceptor().nc.GetLogger().Error("Error unmarshalling JSON: %s\n", status)
 
 			return
 		}
@@ -335,7 +336,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		if rw.LastUpdateError() != nil {
 			writeStatusFailures++
 			if writeStatusFailures > 3 {
-				rw.w.nc.GetLogger().Error("Exceeded retries for updating status file for work unit %s", rw.unitID)
+				rw.GetWorkceptor().nc.GetLogger().Error("Exceeded retries for updating status file for work unit %s", rw.ID())
 
 				return
 			}
@@ -343,7 +344,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			writeStatusFailures = 0
 		}
 		if err != nil {
-			rw.w.nc.GetLogger().Error("Error saving local status file: %s\n", err)
+			rw.GetWorkceptor().nc.GetLogger().Error("Error saving local status file: %s\n", err)
 
 			return
 		}
@@ -363,18 +364,18 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	status := rw.Status()
 	red, ok := status.ExtraData.(*remoteExtraData)
 	if !ok {
-		rw.w.nc.GetLogger().Error("remote ExtraData missing")
+		rw.GetWorkceptor().nc.GetLogger().Error("remote ExtraData missing")
 
 		return
 	}
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
-	stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
+	stdout, err := os.OpenFile(rw.StdoutFileName(), os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 	if err == nil {
 		err = stdout.Close()
 	}
 	if err != nil {
-		rw.w.nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.stdoutFileName, err)
+		rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 		return
 	}
@@ -389,7 +390,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		}
 		err := rw.Load()
 		if err != nil {
-			rw.w.nc.GetLogger().Error("Could not read status file %s: %s\n", rw.statusFileName, err)
+			rw.GetWorkceptor().nc.GetLogger().Error("Could not read status file %s: %s\n", rw.StatusFileName(), err)
 
 			return
 		}
@@ -414,9 +415,9 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			workSubmitCmd["unitid"] = remoteUnitID
 			workSubmitCmd["startpos"] = diskStdoutSize
 			if red.SignWork {
-				signature, err := rw.w.createSignature(red.RemoteNode)
+				signature, err := rw.GetWorkceptor().createSignature(red.RemoteNode)
 				if err != nil {
-					rw.w.nc.GetLogger().Error("could not create signature to get results")
+					rw.GetWorkceptor().nc.GetLogger().Error("could not create signature to get results")
 
 					return
 				}
@@ -424,31 +425,31 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			}
 			wscBytes, err := json.Marshal(workSubmitCmd)
 			if err != nil {
-				rw.w.nc.GetLogger().Error("error constructing work results command: %s", err)
+				rw.GetWorkceptor().nc.GetLogger().Error("error constructing work results command: %s", err)
 
 				return
 			}
 			wscBytes = append(wscBytes, '\n')
 			_, err = conn.Write(wscBytes)
 			if err != nil {
-				rw.w.nc.GetLogger().Warning("Write error sending to %s: %s\n", remoteNode, err)
+				rw.GetWorkceptor().nc.GetLogger().Warning("Write error sending to %s: %s\n", remoteNode, err)
 
 				continue
 			}
 			status, err := utils.ReadStringContext(mw, reader, '\n')
 			if err != nil {
-				rw.w.nc.GetLogger().Warning("Read error reading from %s: %s\n", remoteNode, err)
+				rw.GetWorkceptor().nc.GetLogger().Warning("Read error reading from %s: %s\n", remoteNode, err)
 
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
-				rw.w.nc.GetLogger().Warning("Remote node %s did not stream results\n", remoteNode)
+				rw.GetWorkceptor().nc.GetLogger().Warning("Remote node %s did not stream results\n", remoteNode)
 
 				continue
 			}
-			stdout, err := os.OpenFile(rw.stdoutFileName, os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
+			stdout, err := os.OpenFile(rw.StdoutFileName(), os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 			if err != nil {
-				rw.w.nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.stdoutFileName, err)
+				rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 				return
 			}
@@ -476,7 +477,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				} else {
 					errmsg = err.Error()
 				}
-				rw.w.nc.GetLogger().Warning("Could not copy to stdout file %s: %s\n", rw.stdoutFileName, errmsg)
+				rw.GetWorkceptor().nc.GetLogger().Warning("Could not copy to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
 
 				continue
 			}
@@ -501,7 +502,7 @@ func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
 // SetFromParams sets the in-memory state from parameters.
 func (rw *remoteUnit) SetFromParams(params map[string]string) error {
 	for k, v := range params {
-		rw.status.ExtraData.(*remoteExtraData).RemoteParams[k] = v
+		rw.GetStatus().ExtraData.(*remoteExtraData).RemoteParams[k] = v
 	}
 
 	return nil
@@ -528,10 +529,10 @@ func (rw *remoteUnit) Status() *StatusFileData {
 
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
-	rw.statusLock.RLock()
-	defer rw.statusLock.RUnlock()
+	rw.GetStatusLock().RLock()
+	defer rw.GetStatusLock().RUnlock()
 	status := rw.getStatus()
-	ed, ok := rw.status.ExtraData.(*remoteExtraData)
+	ed, ok := rw.GetStatus().ExtraData.(*remoteExtraData)
 	if ok {
 		edCopy := *ed
 		edCopy.RemoteParams = make(map[string]string)
@@ -556,9 +557,9 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		go func() {
 			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
-				err := rw.BaseWorkUnit.Release(false)
+				err := rw.BaseWorkUnitForWorkUnit.Release(false)
 				if err != nil {
-					rw.w.nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
+					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
 			}
 			mw.WorkerDone()
@@ -593,7 +594,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
-	newJobStarted := rw.topJC.NewJob(rw.w.ctx, 1, true)
+	newJobStarted := rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, true)
 	if !newJobStarted {
 		return fmt.Errorf("start or monitor process already running")
 	}
@@ -648,20 +649,20 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		rw.topJC.Cancel()
 		rw.topJC.Wait()
 		if release {
-			return rw.BaseWorkUnit.Release(true)
+			return rw.BaseWorkUnitForWorkUnit.Release(true)
 		}
 		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
 
 		return nil
 	}
 	if release && force {
-		_ = rw.connectAndRun(rw.w.ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+		_ = rw.connectAndRun(rw.GetWorkceptor().ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true)
 		})
 
-		return rw.BaseWorkUnit.Release(true)
+		return rw.BaseWorkUnitForWorkUnit.Release(true)
 	}
-	rw.topJC.NewJob(rw.w.ctx, 1, false)
+	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
 
 	return rw.runAndMonitor(rw.topJC, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release)
@@ -678,12 +679,18 @@ func (rw *remoteUnit) Release(force bool) error {
 	return rw.cancelOrRelease(true, force)
 }
 
-func newRemoteWorker(w *Workceptor, unitID, workType string) WorkUnit {
-	rw := &remoteUnit{logger: w.nc.GetLogger()}
-	rw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workType string) WorkUnit {
+	if bwu == nil {
+		bwu = &BaseWorkUnit{}
+	}
+	rw := &remoteUnit{
+		BaseWorkUnitForWorkUnit: bwu,
+		logger:                  w.nc.GetLogger(),
+	}
+	rw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 	red := &remoteExtraData{}
 	red.RemoteParams = make(map[string]string)
-	rw.status.ExtraData = red
+	rw.SetStatusExtraData(red)
 	rw.topJC = &utils.JobContext{}
 
 	return rw

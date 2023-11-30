@@ -485,20 +485,20 @@ func (bwu *BaseWorkUnit) CancelContext() {
 	bwu.cancel()
 }
 
-func (bwu *BaseWorkUnit) GetStatus() StatusFileData {
+func (bwu *BaseWorkUnit) GetStatusCopy() StatusFileData {
 	return bwu.status
 }
 
-func (bwu *BaseWorkUnit) SetStatusExtraData(red *remoteExtraData) {
+func (bwu *BaseWorkUnit) GetStatusWithoutExtraData() *StatusFileData {
+	return bwu.getStatus()
+}
+
+func (bwu *BaseWorkUnit) SetStatusExtraData(red *RemoteExtraData) {
 	bwu.status.ExtraData = red
 }
 
 func (bwu *BaseWorkUnit) GetStatusLock() *sync.RWMutex {
 	return bwu.statusLock
-}
-
-func (bwu *BaseWorkUnit) GetBaseStatus() *StatusFileData {
-	return bwu.getStatus()
 }
 
 func (bwu *BaseWorkUnit) GetWorkceptor() *Workceptor {

@@ -295,7 +295,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, t
 		expiration = time.Time{}
 	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
-		ed := status.ExtraData.(*remoteExtraData)
+		ed := status.ExtraData.(*RemoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
 		ed.TLSClient = tlsClient

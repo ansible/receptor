@@ -26,7 +26,7 @@ func (pw *pythonUnit) Start() error {
 	for k, v := range pw.config {
 		config[k] = v
 	}
-	config["params"] = pw.Status().ExtraData.(*commandExtraData).Params
+	config["params"] = pw.Status().ExtraData.(*CommandExtraData).Params
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func (cfg workPythonCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, u
 		commandUnit: commandUnit{
 			BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 				status: StatusFileData{
-					ExtraData: &commandExtraData{},
+					ExtraData: &CommandExtraData{},
 				},
 			},
 		},

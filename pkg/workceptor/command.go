@@ -25,7 +25,7 @@ type BaseWorkUnitForWorkUnit interface {
 	Error(format string, v ...interface{})
 	GetStatusCopy() StatusFileData
 	GetStatusWithoutExtraData() *StatusFileData
-	SetStatusExtraData(*RemoteExtraData)
+	SetStatusExtraData(interface{})
 	GetStatusLock() *sync.RWMutex
 	GetWorkceptor() *Workceptor
 	ID() string

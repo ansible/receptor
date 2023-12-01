@@ -15,7 +15,7 @@ func newCommandWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string,
 	cw := &commandUnit{
 		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 			status: StatusFileData{
-				ExtraData: &commandExtraData{},
+				ExtraData: &CommandExtraData{},
 			},
 		},
 		command:            "echo",
@@ -47,7 +47,7 @@ func TestWorkceptorJson(t *testing.T) {
 		t.Fatal(err)
 	}
 	cw.UpdateFullStatus(func(status *StatusFileData) {
-		ed, ok := status.ExtraData.(*commandExtraData)
+		ed, ok := status.ExtraData.(*CommandExtraData)
 		if !ok {
 			t.Fatal("ExtraData type assertion failed")
 		}
@@ -62,7 +62,7 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ed2, ok := cw2.Status().ExtraData.(*commandExtraData)
+	ed2, ok := cw2.Status().ExtraData.(*CommandExtraData)
 	if !ok {
 		t.Fatal("ExtraData type assertion failed")
 	}

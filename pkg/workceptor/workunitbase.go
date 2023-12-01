@@ -493,8 +493,8 @@ func (bwu *BaseWorkUnit) GetStatusWithoutExtraData() *StatusFileData {
 	return bwu.getStatus()
 }
 
-func (bwu *BaseWorkUnit) SetStatusExtraData(red *RemoteExtraData) {
-	bwu.status.ExtraData = red
+func (bwu *BaseWorkUnit) SetStatusExtraData(ed interface{}) {
+	bwu.status.ExtraData = ed
 }
 
 func (bwu *BaseWorkUnit) GetStatusLock() *sync.RWMutex {

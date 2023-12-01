@@ -263,7 +263,7 @@ func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) SetFromParams(arg0 interface{
 }
 
 // SetStatusExtraData mocks base method.
-func (m *MockBaseWorkUnitForWorkUnit) SetStatusExtraData(arg0 *workceptor.RemoteExtraData) {
+func (m *MockBaseWorkUnitForWorkUnit) SetStatusExtraData(arg0 interface{}) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetStatusExtraData", arg0)
 }

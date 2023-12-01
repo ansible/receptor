@@ -129,41 +129,42 @@ func TestCancel(t *testing.T) {
 						Pid: c.Process.Pid,
 					},
 				})
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			errorCatch: func(err error, t *testing.T) {
-				if err == nil {
+				if err != nil {
 					t.Error(err)
 				}
 			},
 		},
-		// {
-		// 	name: "happy day",
-		// 	expectedCalls: func() {
-		// 		mockBaseWorkUnit.EXPECT().CancelContext()
-		// 		mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
-		// 		mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
+		{
+			name: "happy day",
+			expectedCalls: func() {
+				mockBaseWorkUnit.EXPECT().CancelContext()
+				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
+				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 
-		// 		c := exec.Command("sleep", "30")
-		// 		go func() {
-		// 			c.Run()
-		// 		}()
-		// 		time.Sleep(200 * time.Millisecond)
+				c := exec.Command("sleep", "30")
+				go func() {
+					c.Run()
+				}()
+				time.Sleep(200 * time.Millisecond)
 
-		// 		mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-		// 			ExtraData: &workceptor.CommandExtraData{
-		// 				Pid: c.Process.Pid,
-		// 			},
-		// 		})
-		// 	},
-		// 	errorCatch: func(err error, t *testing.T) {
-		// 		if err == nil {
-		// 			t.Error(err)
-		// 		}
-		// 	},
-		// },
+				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+					ExtraData: &workceptor.CommandExtraData{
+						Pid: c.Process.Pid,
+					},
+				})
+			},
+			errorCatch: func(err error, t *testing.T) {
+				if err != nil {
+					t.Error(err)
+				}
+			},
+		},
 	}
 
-	for _, testCase := range paramsTestCases[len(paramsTestCases)-1:] {
+	for _, testCase := range paramsTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			testCase.expectedCalls()
 			err := wu.Cancel()
@@ -172,22 +173,3 @@ func TestCancel(t *testing.T) {
 	}
 
 }
-
-// func TestUnredactedStatus(t *testing.T) {
-// 	wu := createTestWorkUnit(t)
-// 	wu.UnredactedStatus()
-// }
-
-// func TestStart(t *testing.T) {
-// 	wu := createTestWorkUnit(t)
-// 	err := wu.Start()
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// }
-
-// mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
-// mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
-// mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-// 	ExtraData: &workceptor.CommandExtraData{},
-// })

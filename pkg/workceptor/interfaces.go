@@ -23,7 +23,7 @@ type WorkUnit interface {
 type WorkerConfig interface {
 	GetWorkType() string
 	GetVerifySignature() bool
-	NewWorker(w *Workceptor, unitID string, workType string) WorkUnit
+	NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit
 }
 
 // NewWorkerFunc represents a factory of WorkUnit instances.

@@ -102,7 +102,7 @@ build-all:
 	GOOS=windows go build -o receptor.exe ./cmd/receptor-cl && \
 	GOOS=darwin go build -o receptor.app ./cmd/receptor-cl && \
 	go build example/*.go && \
-	go build -o receptor --tags no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth ./cmd/receptor-cl && \
+	go build -o receptor --tags no_backends,no_services,no_tls_config ./cmd/receptor-cl && \
 	go build -o receptor ./cmd/receptor-cl
 
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)

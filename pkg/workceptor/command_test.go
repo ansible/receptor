@@ -2,6 +2,7 @@ package workceptor_test
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"sync"
 	"testing"
@@ -32,16 +33,22 @@ func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBa
 }
 
 func TestSetFromParams2(t *testing.T) {
-	wu, _, _, _ := createTestSetup(t)
+	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
 
 	paramsTestCases := []struct {
-		name       string
-		params     map[string]string
-		errorCatch func(error, *testing.T)
+		name          string
+		params        map[string]string
+		expectedCalls func()
+		errorCatch    func(error, *testing.T)
 	}{
 		{
 			name:   "one",
 			params: map[string]string{"": ""},
+			expectedCalls: func() {
+				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+					ExtraData: &workceptor.CommandExtraData{},
+				})
+			},
 			errorCatch: func(err error, t *testing.T) {
 				if err != nil {
 					t.Error(err)
@@ -51,6 +58,9 @@ func TestSetFromParams2(t *testing.T) {
 		{
 			name:   "two",
 			params: map[string]string{"params": "param"},
+			expectedCalls: func() {
+
+			},
 			errorCatch: func(err error, t *testing.T) {
 				if err == nil {
 					t.Error(err)
@@ -61,6 +71,7 @@ func TestSetFromParams2(t *testing.T) {
 
 	for _, testCase := range paramsTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			testCase.expectedCalls()
 			err := wu.SetFromParams(testCase.params)
 			testCase.errorCatch(err, t)
 		})
@@ -119,17 +130,20 @@ func TestCancel(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 
 				c := exec.Command("ls", "/tmp")
-				go func() {
+				processPid := make(chan int)
+
+				go func(c *exec.Cmd, processPid chan int) {
 					c.Run()
-				}()
+					processPid <- c.Process.Pid
+				}(c, processPid)
+
 				time.Sleep(200 * time.Millisecond)
 
 				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
 					ExtraData: &workceptor.CommandExtraData{
-						Pid: c.Process.Pid,
+						Pid: <-processPid,
 					},
 				})
-				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			errorCatch: func(err error, t *testing.T) {
 				if err != nil {
@@ -143,16 +157,23 @@ func TestCancel(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().CancelContext()
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
 				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
 
 				c := exec.Command("sleep", "30")
-				go func() {
-					c.Run()
-				}()
+				processPid := make(chan int)
+
+				go func(c *exec.Cmd, processPid chan int) {
+					err := c.Start()
+					if err != nil {
+						fmt.Println(err)
+					}
+					processPid <- c.Process.Pid
+				}(c, processPid)
 				time.Sleep(200 * time.Millisecond)
 
 				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
 					ExtraData: &workceptor.CommandExtraData{
-						Pid: c.Process.Pid,
+						Pid: <-processPid,
 					},
 				})
 			},

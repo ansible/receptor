@@ -57,10 +57,7 @@ type workType struct {
 
 // New constructs a new Workceptor instance.
 func New(ctx context.Context, nc NetceptorForWorkceptor, dataDir string) (*Workceptor, error) {
-	if dataDir == "" {
-		dataDir = path.Join(os.TempDir(), "receptor")
-	}
-	dataDir = path.Join(dataDir, nc.NodeID())
+	dataDir = setDataDir(dataDir, nc)
 	c, cancel := context.WithCancel(ctx)
 	w := &Workceptor{
 		ctx:               c,
@@ -85,6 +82,27 @@ func New(ctx context.Context, nc NetceptorForWorkceptor, dataDir string) (*Workc
 
 // MainInstance is the global instance of Workceptor instantiated by the command-line main() function.
 var MainInstance *Workceptor
+
+// setDataDir returns a valid data directory.
+func setDataDir(dataDir string, nc NetceptorForWorkceptor) string {
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		nc.GetLogger().Warning("Receptor data directory provided does not exist \"%s\". Trying the default '/var/run/receptor/", dataDir)
+	} else {
+		return path.Join(dataDir, nc.NodeID())
+	}
+
+	dataDir = "/var/run/receptor"
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		nc.GetLogger().Warning("Receptor data directory \"%s\" does not exist. Setting tmp '/tmp/receptor/", dataDir)
+	} else {
+		return path.Join(dataDir, nc.NodeID())
+	}
+
+	dataDir = path.Join(os.TempDir(), "receptor")
+	dataDir = path.Join(dataDir, nc.NodeID())
+
+	return dataDir
+}
 
 // stdoutSize returns size of stdout, if it exists, or 0 otherwise.
 func stdoutSize(unitdir string) int64 {

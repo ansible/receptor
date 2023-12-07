@@ -91,7 +91,7 @@ func setDataDir(dataDir string, nc NetceptorForWorkceptor) string {
 		return path.Join(dataDir, nc.NodeID())
 	}
 
-	dataDir = "/var/run/receptor"
+	dataDir = "/var/lib/receptor"
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		nc.GetLogger().Warning("Receptor data directory \"%s\" does not exist. Setting tmp '/tmp/receptor/", dataDir)
 	} else {

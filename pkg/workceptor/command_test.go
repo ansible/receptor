@@ -42,7 +42,7 @@ func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBa
 	return workUnit, mockBaseWorkUnit, mockNetceptor, ctrl, w
 }
 
-func TestSetFromParams2(t *testing.T) {
+func TestCommandSetFromParams(t *testing.T) {
 	wu, mockBaseWorkUnit, _, _, _ := createTestSetup(t)
 
 	paramsTestCases := []struct {
@@ -52,7 +52,7 @@ func TestSetFromParams2(t *testing.T) {
 		errorCatch    func(error, *testing.T)
 	}{
 		{
-			name:   "one",
+			name:   "no params with no error",
 			params: map[string]string{"": ""},
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
@@ -66,7 +66,7 @@ func TestSetFromParams2(t *testing.T) {
 			},
 		},
 		{
-			name:   "two",
+			name:   "params with error",
 			params: map[string]string{"params": "param"},
 			expectedCalls: func() {
 
@@ -125,7 +125,7 @@ func TestRestart(t *testing.T) {
 		errorCatch    func(error, *testing.T)
 	}{
 		{
-			name: "return error 1",
+			name: "load error",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().Load().Return(errors.New("terminated"))
 			},
@@ -136,7 +136,7 @@ func TestRestart(t *testing.T) {
 			},
 		},
 		{
-			name: "return nil 1",
+			name: "job complete with no error",
 			expectedCalls: func() {
 				statusFile := &workceptor.StatusFileData{State: 2}
 				mockBaseWorkUnit.EXPECT().Load().Return(nil)
@@ -154,7 +154,7 @@ func TestRestart(t *testing.T) {
 			},
 		},
 		{
-			name: "return nil 2",
+			name: "restart successful",
 			expectedCalls: func() {
 				statusFile := &workceptor.StatusFileData{State: 0}
 				mockBaseWorkUnit.EXPECT().Load().Return(nil)
@@ -194,7 +194,7 @@ func TestCancel(t *testing.T) {
 		errorCatch    func(error, *testing.T)
 	}{
 		{
-			name: "return no error 1",
+			name: "not a valid pid no error",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().CancelContext()
 				statusExpectCalls(mockBaseWorkUnit)
@@ -206,7 +206,7 @@ func TestCancel(t *testing.T) {
 			},
 		},
 		{
-			name: "return err 2",
+			name: "process interrupt error",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().CancelContext()
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
@@ -224,7 +224,7 @@ func TestCancel(t *testing.T) {
 			},
 		},
 		{
-			name: "return nil already finished",
+			name: "process already finished",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().CancelContext()
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
@@ -253,7 +253,7 @@ func TestCancel(t *testing.T) {
 			},
 		},
 		{
-			name: "happy day",
+			name: "cancelled process successfully",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().CancelContext()
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
@@ -306,7 +306,7 @@ func TestRelease(t *testing.T) {
 		force         bool
 	}{
 		{
-			name:          "error",
+			name:          "cancel error",
 			expectedCalls: func() {},
 			errorCatch: func(err error, t *testing.T) {
 				if err == nil {
@@ -316,7 +316,7 @@ func TestRelease(t *testing.T) {
 			force: false,
 		},
 		{
-			name: "happy day",
+			name: "released successfully",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().Release(gomock.Any())
 			},
@@ -345,23 +345,118 @@ func TestRelease(t *testing.T) {
 	}
 }
 
-// func TestCommandWorkerCfgRun(t *testing.T) {
-// 	cfgTestCases := []struct {
-// 		name            string
-// 		verifySignature bool
-// 	}{
-// 		{
-// 			name:            "error 1",
-// 			verifySignature: true,
-// 		},
-// 	}
-// 	for _, testCase := range cfgTestCases {
-// 		t.Run(testCase.name, func(t *testing.T) {
-// 			commandWorkerCfg := workceptor.CommandWorkerCfg{
-// 				VerifySignature: testCase.verifySignature,
-// 			}
-// 			commandWorkerCfg.Run()
-// 		})
-// 	}
+func TestSigningKeyPrepare(t *testing.T) {
+	privateKey := workceptor.SigningKeyPrivateCfg{}
+	err := privateKey.Prepare()
 
-// }
+	if err == nil {
+		t.Error(err)
+	}
+}
+
+func TestPrepareSigningKeyPrivateCfg(t *testing.T) {
+	signingKeyTestCases := []struct {
+		name            string
+		errorCatch      func(error, *testing.T)
+		privateKey      string
+		tokenExpiration string
+	}{
+		{
+			name:            "file does not exist error",
+			privateKey:      "does_not_exist.txt",
+			tokenExpiration: "",
+			errorCatch: func(err error, t *testing.T) {
+				if err == nil {
+					t.Error(err)
+				}
+			},
+		},
+		{
+			name:            "failed to parse token expiration",
+			privateKey:      "/etc/hosts",
+			tokenExpiration: "random_input",
+			errorCatch: func(err error, t *testing.T) {
+				if err == nil {
+					t.Error(err)
+				}
+			},
+		},
+		{
+			name:            "duration no error",
+			privateKey:      "/etc/hosts",
+			tokenExpiration: "3h",
+			errorCatch: func(err error, t *testing.T) {
+				if err != nil {
+					t.Error(err)
+				}
+			},
+		},
+		{
+			name:            "no duration no error",
+			privateKey:      "/etc/hosts",
+			tokenExpiration: "",
+			errorCatch: func(err error, t *testing.T) {
+				if err != nil {
+					t.Error(err)
+				}
+			},
+		},
+	}
+
+	for _, testCase := range signingKeyTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			privateKey := workceptor.SigningKeyPrivateCfg{
+				PrivateKey:      testCase.privateKey,
+				TokenExpiration: testCase.tokenExpiration,
+			}
+			_, err := privateKey.PrepareSigningKeyPrivateCfg()
+			testCase.errorCatch(err, t)
+		})
+	}
+}
+
+func TestVerifyingKeyPrepare(t *testing.T) {
+	publicKey := workceptor.VerifyingKeyPublicCfg{}
+	err := publicKey.Prepare()
+
+	if err == nil {
+		t.Error(err)
+	}
+}
+
+func TestPrepareVerifyingKeyPrivateCfg(t *testing.T) {
+	verifyingKeyTestCases := []struct {
+		name       string
+		errorCatch func(error, *testing.T)
+		publicKey  string
+	}{
+		{
+			name:      "file does not exist",
+			publicKey: "does_not_exist.txt",
+			errorCatch: func(err error, t *testing.T) {
+				if err == nil {
+					t.Error(err)
+				}
+			},
+		},
+		{
+			name:      "prepared successfully",
+			publicKey: "/etc/hosts",
+			errorCatch: func(err error, t *testing.T) {
+				if err != nil {
+					t.Error(err)
+				}
+			},
+		},
+	}
+
+	for _, testCase := range verifyingKeyTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			publicKey := workceptor.VerifyingKeyPublicCfg{
+				PublicKey: testCase.publicKey,
+			}
+			err := publicKey.PrepareVerifyingKeyPublicCfg()
+			testCase.errorCatch(err, t)
+		})
+	}
+}

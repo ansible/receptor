@@ -69,7 +69,6 @@ func TestCommandSetFromParams(t *testing.T) {
 			name:   "params with error",
 			params: map[string]string{"params": "param"},
 			expectedCalls: func() {
-
 			},
 			errorCatch: func(err error, t *testing.T) {
 				if err == nil {
@@ -86,7 +85,6 @@ func TestCommandSetFromParams(t *testing.T) {
 			testCase.errorCatch(err, t)
 		})
 	}
-
 }
 
 func TestUnredactedStatus(t *testing.T) {
@@ -293,7 +291,6 @@ func TestCancel(t *testing.T) {
 			testCase.errorCatch(err, t)
 		})
 	}
-
 }
 
 func TestRelease(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-func newCommandWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+func newCommandWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
 		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 			status: StatusFileData{

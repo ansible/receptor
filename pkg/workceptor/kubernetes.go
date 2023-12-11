@@ -1374,7 +1374,7 @@ type KubeWorkerCfg struct {
 }
 
 // NewWorker is a factory to produce worker instances.
-func (cfg KubeWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg KubeWorkerCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	ku := &kubeUnit{
 		BaseWorkUnit: BaseWorkUnit{
 			status: StatusFileData{

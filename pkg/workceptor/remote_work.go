@@ -23,7 +23,6 @@ import (
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
-	// BaseWorkUnit
 	BaseWorkUnitForWorkUnit
 	topJC  *utils.JobContext
 	logger *logger.ReceptorLogger

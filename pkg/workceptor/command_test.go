@@ -23,7 +23,7 @@ func statusExpectCalls(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWork
 	})
 }
 
-func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *gomock.Controller, *workceptor.Workceptor) {
+func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor) {
 	ctrl := gomock.NewController(t)
 	ctx := context.Background()
 
@@ -40,11 +40,11 @@ func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBa
 	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil)
 	workUnit := cwc.NewWorker(mockBaseWorkUnit, w, "", "")
 
-	return workUnit, mockBaseWorkUnit, mockNetceptor, ctrl, w
+	return workUnit, mockBaseWorkUnit, mockNetceptor, w
 }
 
 func TestCommandSetFromParams(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _, _ := createTestSetup(t) //nolint:dogsled
+	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
 
 	paramsTestCases := []struct {
 		name          string
@@ -89,7 +89,7 @@ func TestCommandSetFromParams(t *testing.T) {
 }
 
 func TestUnredactedStatus(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _, _ := createTestSetup(t) //nolint:dogsled
+	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
 	statusLock := &sync.RWMutex{}
 	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
@@ -101,7 +101,7 @@ func TestUnredactedStatus(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	wu, mockBaseWorkUnit, mockNetceptor, _, w := createTestSetup(t)
+	wu, mockBaseWorkUnit, mockNetceptor, w := createTestSetup(t)
 
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).Times(2)
 	mockNetceptor.EXPECT().GetLogger().Times(2)
@@ -116,7 +116,7 @@ func TestStart(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _, _ := createTestSetup(t) //nolint:dogsled
+	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
 
 	restartTestCases := []struct {
 		name          string
@@ -185,7 +185,7 @@ func TestRestart(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _, _ := createTestSetup(t) //nolint:dogsled
+	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
 
 	paramsTestCases := []struct {
 		name          string
@@ -295,7 +295,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestRelease(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _, _ := createTestSetup(t) //nolint:dogsled
+	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
 
 	releaseTestCases := []struct {
 		name          string

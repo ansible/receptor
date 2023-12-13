@@ -39,7 +39,6 @@ import (
 // kubeUnit implements the WorkUnit interface.
 type kubeUnit struct {
 	BaseWorkUnit
-	// BaseWorkUnitForWorkUnit
 	authMethod          string
 	streamMethod        string
 	baseParams          string

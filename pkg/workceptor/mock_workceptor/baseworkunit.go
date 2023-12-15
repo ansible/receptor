@@ -5,6 +5,7 @@
 package mock_workceptor
 
 import (
+	context "context"
 	reflect "reflect"
 	sync "sync"
 
@@ -79,6 +80,34 @@ func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) Error(arg0 interface{}, arg1 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0}, arg1...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Error", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).Error), varargs...)
+}
+
+// GetCancel mocks base method.
+func (m *MockBaseWorkUnitForWorkUnit) GetCancel() context.CancelFunc {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCancel")
+	ret0, _ := ret[0].(context.CancelFunc)
+	return ret0
+}
+
+// GetCancel indicates an expected call of GetCancel.
+func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) GetCancel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCancel", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).GetCancel))
+}
+
+// GetContext mocks base method.
+func (m *MockBaseWorkUnitForWorkUnit) GetContext() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetContext")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// GetContext indicates an expected call of GetContext.
+func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) GetContext() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContext", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).GetContext))
 }
 
 // GetStatusCopy mocks base method.
@@ -272,6 +301,18 @@ func (m *MockBaseWorkUnitForWorkUnit) SetStatusExtraData(arg0 interface{}) {
 func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) SetStatusExtraData(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStatusExtraData", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).SetStatusExtraData), arg0)
+}
+
+// SetWorkceptor mocks base method.
+func (m *MockBaseWorkUnitForWorkUnit) SetWorkceptor(arg0 *workceptor.Workceptor) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetWorkceptor", arg0)
+}
+
+// SetWorkceptor indicates an expected call of SetWorkceptor.
+func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) SetWorkceptor(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetWorkceptor", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).SetWorkceptor), arg0)
 }
 
 // Status mocks base method.

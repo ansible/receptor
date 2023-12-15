@@ -505,6 +505,10 @@ func (bwu *BaseWorkUnit) GetWorkceptor() *Workceptor {
 	return bwu.w
 }
 
+func (bwu *BaseWorkUnit) SetWorkceptor(w *Workceptor) {
+	bwu.w = w
+}
+
 func (bwu *BaseWorkUnit) GetContext() context.Context {
 	return bwu.ctx
 }

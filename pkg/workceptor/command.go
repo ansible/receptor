@@ -42,6 +42,7 @@ type BaseWorkUnitForWorkUnit interface {
 	SetStatusExtraData(interface{})
 	GetStatusLock() *sync.RWMutex
 	GetWorkceptor() *Workceptor
+	SetWorkceptor(*Workceptor)
 	GetContext() context.Context
 	GetCancel() context.CancelFunc
 	Debug(format string, v ...interface{})

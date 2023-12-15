@@ -4,6 +4,7 @@
 package workceptor
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -21,15 +22,7 @@ import (
 
 type BaseWorkUnitForWorkUnit interface {
 	CancelContext()
-	Debug(format string, v ...interface{})
-	Error(format string, v ...interface{})
-	GetStatusCopy() StatusFileData
-	GetStatusWithoutExtraData() *StatusFileData
-	SetStatusExtraData(interface{})
-	GetStatusLock() *sync.RWMutex
-	GetWorkceptor() *Workceptor
 	ID() string
-	Info(format string, v ...interface{})
 	Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper)
 	LastUpdateError() error
 	Load() error
@@ -44,6 +37,16 @@ type BaseWorkUnitForWorkUnit interface {
 	UnredactedStatus() *StatusFileData
 	UpdateBasicStatus(state int, detail string, stdoutSize int64)
 	UpdateFullStatus(statusFunc func(*StatusFileData))
+	GetStatusCopy() StatusFileData
+	GetStatusWithoutExtraData() *StatusFileData
+	SetStatusExtraData(interface{})
+	GetStatusLock() *sync.RWMutex
+	GetWorkceptor() *Workceptor
+	GetContext() context.Context
+	GetCancel() context.CancelFunc
+	Debug(format string, v ...interface{})
+	Error(format string, v ...interface{})
+	Info(format string, v ...interface{})
 	Warning(format string, v ...interface{})
 }
 

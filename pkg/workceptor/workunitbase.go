@@ -505,6 +505,14 @@ func (bwu *BaseWorkUnit) GetWorkceptor() *Workceptor {
 	return bwu.w
 }
 
+func (bwu *BaseWorkUnit) GetContext() context.Context {
+	return bwu.ctx
+}
+
+func (bwu *BaseWorkUnit) GetCancel() context.CancelFunc {
+	return bwu.cancel
+}
+
 // =============================================================================================== //
 
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {

@@ -10,7 +10,7 @@ add tests going forward.
 The following are needed to run the integration tests:
  * `receptor` must be in your path, I have symlinked `~/bin/receptor` to the
    `receptor` binary in my repo so my current dev build is always in my path.
- * `ss` is used to check if processes are bound to the right ports
+ * `lsof` is used to check if processes are bound to the right ports
  * In order to run the kubernetes integration tests you must have a running
    kubernetes and a `~/.kube/config` that has access to the default namespace
    as the kubernetes tests will expect they can run there. To skip kubernetes

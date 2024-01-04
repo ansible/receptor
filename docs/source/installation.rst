@@ -6,7 +6,7 @@ Installation guide
 
 Download and extract precompiled binary for your OS and platform from `the releases page on GitHub <https://github.com/ansible/receptor/releases>`_
 
-Alternatively, you can compile from source code (Golang 1.19+ required)
+Alternatively, you can compile from source code (Golang 1.20+ required)
 
 .. code::
 

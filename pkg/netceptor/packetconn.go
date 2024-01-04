@@ -22,6 +22,7 @@ type PacketConner interface {
 	Close() error
 	SetDeadline(t time.Time) error
 	SetReadDeadline(t time.Time) error
+	GetReadDeadline() time.Time
 	SetWriteDeadline(t time.Time) error
 	Cancel() *context.CancelFunc
 	LocalService() string
@@ -47,17 +48,18 @@ type NetcForPacketConn interface {
 
 // PacketConn implements the net.PacketConn interface via the Receptor network.
 type PacketConn struct {
-	s               NetcForPacketConn
-	localService    string
-	recvChan        chan *MessageData
-	readDeadline    time.Time
-	advertise       bool
-	adTags          map[string]string
-	connType        byte
-	hopsToLive      byte
-	unreachableSubs *utils.Broker
-	context         context.Context
-	cancel          context.CancelFunc
+	s                 NetcForPacketConn
+	localService      string
+	recvChan          chan *MessageData
+	readDeadlineMutex sync.Mutex
+	readDeadline      time.Time
+	advertise         bool
+	adTags            map[string]string
+	connType          byte
+	hopsToLive        byte
+	unreachableSubs   *utils.Broker
+	context           context.Context
+	cancel            context.CancelFunc
 }
 
 func NewPacketConnWithConst(s NetcForPacketConn, service string, advertise bool, adtags map[string]string, connTypeDatagram byte) *PacketConn {
@@ -200,7 +202,7 @@ func (pc *PacketConn) SubscribeUnreachable(doneChan chan struct{}) chan Unreacha
 // ReadFrom reads a packet from the network and returns its data and address.
 func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	var m *MessageData
-	if pc.readDeadline.IsZero() {
+	if pc.GetReadDeadline().IsZero() {
 		select {
 		case m = <-pc.recvChan:
 		case <-pc.context.Done():
@@ -209,7 +211,7 @@ func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	} else {
 		select {
 		case m = <-pc.recvChan:
-		case <-time.After(time.Until(pc.readDeadline)):
+		case <-time.After(time.Until(pc.GetReadDeadline())):
 			return 0, nil, ErrTimeout
 		}
 	}
@@ -283,16 +285,28 @@ func (pc *PacketConn) Close() error {
 
 // SetDeadline sets both the read and write deadlines.
 func (pc *PacketConn) SetDeadline(t time.Time) error {
+	pc.readDeadlineMutex.Lock()
 	pc.readDeadline = t
+	pc.readDeadlineMutex.Unlock()
 
 	return nil
 }
 
 // SetReadDeadline sets the read deadline.
 func (pc *PacketConn) SetReadDeadline(t time.Time) error {
+	pc.readDeadlineMutex.Lock()
 	pc.readDeadline = t
+	pc.readDeadlineMutex.Unlock()
 
 	return nil
+}
+
+func (pc *PacketConn) GetReadDeadline() time.Time {
+	pc.readDeadlineMutex.Lock()
+	readDeadline := pc.readDeadline
+	pc.readDeadlineMutex.Unlock()
+
+	return readDeadline
 }
 
 // SetWriteDeadline sets the write deadline.

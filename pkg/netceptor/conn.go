@@ -37,7 +37,7 @@ type acceptResult struct {
 type Listener struct {
 	s          *Netceptor
 	pc         PacketConner
-	ql         quic.Listener
+	ql         *quic.Listener
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
@@ -293,7 +293,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 
 	if tlscfg == nil {
-		tlscfg = generateClientTLSConfig()
+		tlscfg = generateClientTLSConfig(s.NodeID())
 	} else {
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
@@ -305,7 +305,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			_ = pc.Close()
 		})
 	}
-	cctx, ccancel := context.WithCancel(ctx)
+	cctx, ccancel := context.WithTimeout(ctx, 15*time.Second)
 	go func() {
 		select {
 		case <-okChan:
@@ -319,7 +319,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
+	qc, err := quic.Dial(cctx, pc, rAddr, tlscfg, cfg)
 	if err != nil {
 		close(okChan)
 		pcClose()
@@ -504,12 +504,12 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	return fmt.Errorf("insecure connection to secure service")
 }
 
-func generateClientTLSConfig() *tls.Config {
+func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
-		ServerName:            insecureCommonName,
+		ServerName:            host,
 		MinVersion:            tls.VersionTLS12,
 	}
 }

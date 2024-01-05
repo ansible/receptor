@@ -31,6 +31,7 @@ class TestMeshFirewall:
 
         # Release unsigned work
         result = invoke(commands.work, f"release {work_unit_id}".split())
+        time.sleep(5)
 
         assert result.exit_code == 0
 

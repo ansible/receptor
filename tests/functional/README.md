@@ -18,6 +18,7 @@ The following are needed to run the integration tests:
  * In order to run the receptorctl tests you must have python3, virtualenv, and
    pip installed. The `receptorctl-tests` make target will setup a virtualenv
    for the tests.
+ * `openssl` must be installed on the system in order for the cli tests to pass
 
 ## CLI Tests
 

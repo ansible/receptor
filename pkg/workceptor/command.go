@@ -45,10 +45,6 @@ type BaseWorkUnitForWorkUnit interface {
 	SetWorkceptor(*Workceptor)
 	GetContext() context.Context
 	GetCancel() context.CancelFunc
-	Debug(format string, v ...interface{})
-	Error(format string, v ...interface{})
-	Info(format string, v ...interface{})
-	Warning(format string, v ...interface{})
 }
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.

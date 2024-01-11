@@ -23,7 +23,7 @@ func statusExpectCalls(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWork
 	})
 }
 
-func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor) {
+func createCommandTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor) {
 	ctrl := gomock.NewController(t)
 	ctx := context.Background()
 
@@ -44,7 +44,7 @@ func createTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBa
 }
 
 func TestCommandSetFromParams(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
+	wu, mockBaseWorkUnit, _, _ := createCommandTestSetup(t)
 
 	paramsTestCases := []struct {
 		name          string
@@ -89,19 +89,31 @@ func TestCommandSetFromParams(t *testing.T) {
 }
 
 func TestUnredactedStatus(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
-	statusLock := &sync.RWMutex{}
-	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
-	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
-	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-		ExtraData: &workceptor.CommandExtraData{},
-	})
+	wu, mockBaseWorkUnit, _, _ := createCommandTestSetup(t)
+	restartTestCases := []struct {
+		name string
+	}{
+		{name: "test1"},
+		{name: "test2"},
+		{name: "test3"},
+	}
 
-	wu.UnredactedStatus()
+	for _, testCase := range restartTestCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			statusLock := &sync.RWMutex{}
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+				ExtraData: &workceptor.CommandExtraData{},
+			})
+			wu.UnredactedStatus()
+		})
+	}
 }
 
 func TestStart(t *testing.T) {
-	wu, mockBaseWorkUnit, mockNetceptor, w := createTestSetup(t)
+	wu, mockBaseWorkUnit, mockNetceptor, w := createCommandTestSetup(t)
 
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).Times(2)
 	mockNetceptor.EXPECT().GetLogger().Times(2)
@@ -116,7 +128,7 @@ func TestStart(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
+	wu, mockBaseWorkUnit, _, _ := createCommandTestSetup(t)
 
 	restartTestCases := []struct {
 		name          string
@@ -185,7 +197,7 @@ func TestRestart(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
+	wu, mockBaseWorkUnit, _, _ := createCommandTestSetup(t)
 
 	paramsTestCases := []struct {
 		name          string
@@ -295,7 +307,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestRelease(t *testing.T) {
-	wu, mockBaseWorkUnit, _, _ := createTestSetup(t)
+	wu, mockBaseWorkUnit, _, _ := createCommandTestSetup(t)
 
 	releaseTestCases := []struct {
 		name          string

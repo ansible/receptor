@@ -678,6 +678,10 @@ func (rw *remoteUnit) Release(force bool) error {
 	return rw.cancelOrRelease(true, force)
 }
 
+func NewRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workType string) WorkUnit {
+	return newRemoteWorker(bwu, w, unitID, workType)
+}
+
 func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workType string) WorkUnit {
 	if bwu == nil {
 		bwu = &BaseWorkUnit{}

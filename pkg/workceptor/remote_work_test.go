@@ -32,6 +32,7 @@ func createRemoteWorkTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 }
 
 func TestRemoteWorkUnredactedStatus(t *testing.T) {
+	t.Parallel()
 	wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
 	restartTestCases := []struct {
 		name string
@@ -45,7 +46,6 @@ func TestRemoteWorkUnredactedStatus(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().AnyTimes()
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{

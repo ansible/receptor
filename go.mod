@@ -2,8 +2,6 @@ module github.com/ansible/receptor
 
 go 1.21
 
-toolchain go1.21.5
-
 require (
 	github.com/creack/pty v1.1.21
 	github.com/fortytw2/leaktest v1.3.0

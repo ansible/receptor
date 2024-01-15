@@ -211,7 +211,7 @@ func (c *workceptorCommand) processSignature(workType, signature string, connIsU
 }
 
 func getSignWorkFromStatus(status *StatusFileData) bool {
-	red, ok := status.ExtraData.(*remoteExtraData)
+	red, ok := status.ExtraData.(*RemoteExtraData)
 	if ok {
 		return red.SignWork
 	}

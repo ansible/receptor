@@ -26,7 +26,7 @@ func (pw *pythonUnit) Start() error {
 	for k, v := range pw.config {
 		config[k] = v
 	}
-	config["params"] = pw.Status().ExtraData.(*commandExtraData).Params
+	config["params"] = pw.Status().ExtraData.(*CommandExtraData).Params
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -50,12 +50,12 @@ type workPythonCfg struct {
 }
 
 // NewWorker is a factory to produce worker instances.
-func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg workPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
-			BaseWorkUnit: BaseWorkUnit{
+			BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 				status: StatusFileData{
-					ExtraData: &commandExtraData{},
+					ExtraData: &CommandExtraData{},
 				},
 			},
 		},
@@ -63,7 +63,7 @@ func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
 
 	return cw
 }

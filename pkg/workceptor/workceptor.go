@@ -243,7 +243,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 	if err != nil {
 		return nil, err
 	}
-	worker := wt.newWorkerFunc(w, ident, workTypeName)
+	worker := wt.newWorkerFunc(nil, w, ident, workTypeName)
 	err = worker.SetFromParams(params)
 	if err == nil {
 		err = worker.Save()
@@ -295,7 +295,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, t
 		expiration = time.Time{}
 	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
-		ed := status.ExtraData.(*remoteExtraData)
+		ed := status.ExtraData.(*RemoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
 		ed.TLSClient = tlsClient
@@ -330,7 +330,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 		w.workTypesLock.RUnlock()
 		var worker WorkUnit
 		if ok {
-			worker = wt.newWorkerFunc(w, ident, sfd.WorkType)
+			worker = wt.newWorkerFunc(nil, w, ident, sfd.WorkType)
 		} else {
 			worker = newUnknownWorker(w, ident, sfd.WorkType)
 		}

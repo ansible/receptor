@@ -13,7 +13,9 @@ func Test_isCompatibleK8S(t *testing.T) {
 		isCompatible bool
 	}
 
-	kw := &kubeUnit{}
+	kw := &kubeUnit{
+		BaseWorkUnitForWorkUnit: &BaseWorkUnit{},
+	}
 
 	// Create Netceptor node using external backends
 	n1 := netceptor.New(context.Background(), "node1")
@@ -29,7 +31,7 @@ func Test_isCompatibleK8S(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kw.w = w
+	kw.SetWorkceptor(w)
 
 	tests := []args{
 		// K8S compatible versions

@@ -485,6 +485,38 @@ func (bwu *BaseWorkUnit) CancelContext() {
 	bwu.cancel()
 }
 
+func (bwu *BaseWorkUnit) GetStatusCopy() StatusFileData {
+	return bwu.status
+}
+
+func (bwu *BaseWorkUnit) GetStatusWithoutExtraData() *StatusFileData {
+	return bwu.getStatus()
+}
+
+func (bwu *BaseWorkUnit) SetStatusExtraData(ed interface{}) {
+	bwu.status.ExtraData = ed
+}
+
+func (bwu *BaseWorkUnit) GetStatusLock() *sync.RWMutex {
+	return bwu.statusLock
+}
+
+func (bwu *BaseWorkUnit) GetWorkceptor() *Workceptor {
+	return bwu.w
+}
+
+func (bwu *BaseWorkUnit) SetWorkceptor(w *Workceptor) {
+	bwu.w = w
+}
+
+func (bwu *BaseWorkUnit) GetContext() context.Context {
+	return bwu.ctx
+}
+
+func (bwu *BaseWorkUnit) GetCancel() context.CancelFunc {
+	return bwu.cancel
+}
+
 // =============================================================================================== //
 
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {

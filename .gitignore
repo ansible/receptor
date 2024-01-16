@@ -1,6 +1,7 @@
 .DS_Store
 .idea
 .vscode
+kind
 receptor
 receptor.exe
 receptor.app
@@ -20,3 +21,5 @@ kubectl
 .vagrant/
 /docs/build
 /dist
+/test-configs
+coverage.txt

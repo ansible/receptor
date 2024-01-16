@@ -182,8 +182,9 @@ func TestTraceroute(t *testing.T) {
 }
 
 // Test that a mesh starts and that connections are what we expect.
+//
+//nolint:tparallel
 func TestMeshShutdown(t *testing.T) {
-
 	// !!!!!!!!!!
 	// This test is intentionally set to not run in parallel with the other tests
 	// since it is checking to see that all ports are appropriately released.

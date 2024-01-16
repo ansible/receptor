@@ -1,6 +1,9 @@
 Kubernetes work
 ===============
 
+.. contents::
+   :local:
+
 Workceptor has the ability to launch Kubernetes pods to perform work.
 
 foo.yml
@@ -70,8 +73,8 @@ Now we can submit a kubernetes work unit.
 
 ``secret_kube_pod`` The contents of a pod definition. The "@" tells receptorctl to read in a file name and pass the contents on.
 
-Runtime Params
-^^^^^^^^^^^^^^
+Runtime params
+---------------
 
 Additional parameters can be passed in when issuing a "work submit" command, using "--param" in receptorctl. These params must have the correct ``allowruntime*`` fields specified in the ``work-kubernetes`` definition.
 

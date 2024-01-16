@@ -8,13 +8,22 @@ on:
         required: true
         default: ''
       ref:
-        description: 'The ref to tag. Can be a branch name / SHA / etc.'
+        description: 'The ref to tag. Can only be the 40 character SHA.'
         required: true
         default: ''
       confirm:
         description: 'Are you sure? Set this to yes.'
         required: true
         default: 'no'
+      name:
+        description: 'Name of the person in single quotes who will create a tag / draft release.'
+        required: true
+        default: ''
+        type: string
+      email:
+        description: 'Email of the person who will create a tag / draft release.'
+        required: true
+        default: ''
 jobs:
   stage:
     runs-on: ubuntu-latest
@@ -39,12 +48,12 @@ jobs:
           exit 0
 
       - name: Checkout receptor
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
 
       - name: Install python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
 
       - name: Install dependencies
         run: |
@@ -52,23 +61,35 @@ jobs:
       
       # setup qemu and buildx
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2  
+        uses: docker/setup-buildx-action@v3  
 
       - name: Log in to registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Lowercase github owner
+        run: |
+          echo "OWNER=$(echo 'console.log("${{ github.repository_owner }}".toLowerCase())' | node -)" >> $GITHUB_ENV
+
       - name: Build container image
         run: |
-          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ github.repository_owner }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
+          make container CONTAINERCMD="docker buildx" EXTRA_OPTS="--platform linux/amd64,linux/ppc64le,linux/arm64 --push" REPO=ghcr.io/${{ env.OWNER }}/receptor VERSION=v${{ github.event.inputs.version }} LATEST=yes
+
+      - name: Get current time
+        uses: josStorer/get-current-time@v2
+        id: current-time
 
       - name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \
-            -e version=${{ github.event.inputs.version }} \
-            -e repo=${{ github.repository_owner }}/receptor \
+            -e version="${{ github.event.inputs.version }}" \
+            -e repo=${{ env.OWNER }}/receptor \
             -e github_token=${{ secrets.GITHUB_TOKEN }} \
-            -e target_commitish=${{ github.event.inputs.ref }}
+            -e target_commitish="${{ github.event.inputs.ref }}" \
+            -e tagger_name="${{ github.event.inputs.name }}" \
+            -e tagger_email="${{ github.event.inputs.email }}" \
+            -e time="${{ steps.current-time.outputs.time }}" \
+            -v

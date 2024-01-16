@@ -2,20 +2,56 @@
 - hosts: localhost
   connection: local
   vars:
-    payload:
-      name: "v{{ version }}"
-      tag_name: "v{{ version }}"
-      target_commitish: "{{ target_commitish }}"
-      draft: true
+    headers:
+      Accept: "application/vnd.github+json"
+      Authorization: "Bearer {{ github_token }}"
+      X-GitHub-Api-Version: "2022-11-28"
   tasks:
+   # The next 2 tasks can maybe get deleted if GitHub ever fixes this:
+   # https://github.com/orgs/community/discussions/4924
+    - name: Create tag object
+      uri:
+        url: "https://api.github.com/repos/{{ repo }}/git/tags"
+        method: "POST"
+        headers: "{{ headers }}"
+        body:
+          tag: "v{{ version }}"
+          message: "Release for v{{ version }}"
+          object: "{{ target_commitish }}"
+          type: "commit"
+          tagger:
+            name: "{{ tagger_name }}"
+            email: "{{ tagger_email }}"
+        body_format: "json"
+        status_code:
+          - 200
+          - 201
+      register: tag
+
+    - name: Create tag reference
+      uri:
+        url: "https://api.github.com/repos/{{ repo }}/git/refs"
+        method: "POST"
+        headers: "{{ headers }}"
+        body:
+          ref: "refs/tags/{{ tag.json.tag }}"
+          sha: "{{ tag.json.sha }}"
+        body_format: "json"
+        status_code:
+          - 200
+          - 201
+
     - name: Publish draft Release
       uri:
         url: "https://api.github.com/repos/{{ repo }}/releases"
         method: "POST"
-        headers:
-          Accept: "application/vnd.github.v3+json"
-          Authorization: "Bearer {{ github_token }}"
-        body: "{{ payload | to_json }}"
+        headers: "{{ headers }}"
+        body:
+          name: "v{{ version }}"
+          tag_name: "v{{ version }}"
+          target_commitish: "{{ target_commitish }}"
+          draft: true
+        body_format: "json"
         status_code:
           - 200
           - 201

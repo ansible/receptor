@@ -3,29 +3,27 @@ package controlsvc
 import (
 	"context"
 	"fmt"
-
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type (
-	pingCommandType struct{}
-	pingCommand     struct {
+	PingCommandType struct{}
+	PingCommand     struct {
 		target string
 	}
 )
 
-func (t *pingCommandType) InitFromString(params string) (ControlCommand, error) {
+func (t *PingCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params == "" {
 		return nil, fmt.Errorf("no ping target")
 	}
-	c := &pingCommand{
+	c := &PingCommand{
 		target: params,
 	}
 
 	return c, nil
 }
 
-func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
+func (t *PingCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
 	target, ok := config["target"]
 	if !ok {
 		return nil, fmt.Errorf("no ping target")
@@ -34,14 +32,14 @@ func (t *pingCommandType) InitFromJSON(config map[string]interface{}) (ControlCo
 	if !ok {
 		return nil, fmt.Errorf("ping target must be string")
 	}
-	c := &pingCommand{
+	c := &PingCommand{
 		target: targetStr,
 	}
 
 	return c, nil
 }
 
-func (c *pingCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *PingCommand) ControlFunc(ctx context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	pingTime, pingRemote, err := nc.Ping(ctx, c.target, nc.MaxForwardingHops())
 	cfr := make(map[string]interface{})
 	if err == nil {

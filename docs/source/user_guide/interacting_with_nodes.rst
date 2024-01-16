@@ -1,5 +1,11 @@
+
+
 Interacting with nodes
 ======================
+
+.. contents::
+   :local:
+
 
 The ``control-service`` allows the user to issue commands like "status" or "work submit" to a receptor node.
 
@@ -65,7 +71,7 @@ The "status" command will display helpful information about mesh, including know
     bar          control   Stream     2021-07-22 23:32:35 -               -
 
 ReceptorControl
-^^^^^^^^^^^^^^^
+----------------
 
 For a more programmatic way to interact with receptor nodes, use the ReceptorControl python class.
 
@@ -79,7 +85,7 @@ For a more programmatic way to interact with receptor nodes, use the ReceptorCon
 .. _connect_to_csv:
 
 Connect to control service
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------
 
 Use the "connect" command to connect to any receptor control service running on the mesh. From here, issue a series of commands and examine the output, without disconnecting.
 
@@ -104,7 +110,7 @@ Once connected to a control service, one can issue commands like "status" or "wo
 Keep in mind that a "work submit" command will require a payload. Type out the payload contents and press ctrl-D to send the EOF signal. The socket will then close and work will begin. See :ref:`workceptor` for more on submitting work via receptor.
 
 Control service commands
-^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
 A ``control-service`` can accept commands in two formats; a space-delimited string or JSON. In some cases, JSON accepts arguments that are not supported in the string format and are marked with `json-only` in the table below.
 
@@ -170,7 +176,7 @@ The order of the parameters (from left to right) in the following table matter, 
 The above table does not apply the receptorctl command-line tool. For the exact usage of the various receptorctl commands, type ``receptorctl --help``, or to see the help for a specific command, ``receptorctl work submit --help``.
 
 Reload
-^^^^^^
+-------
 
 In general, changes to a receptor configuration file do not take effect until the receptor process is restarted.
 

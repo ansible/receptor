@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go" //nolint:typecheck
+	"github.com/quic-go/quic-go"
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
@@ -36,8 +36,8 @@ type acceptResult struct {
 // Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
 	s          *Netceptor
-	pc         *PacketConn
-	ql         quic.Listener //nolint:typecheck
+	pc         PacketConner
+	ql         *quic.Listener
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
@@ -49,7 +49,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
 	if service == "" {
-		service = s.getEphemeralService()
+		service = s.GetEphemeralService()
 	}
 	s.listenerLock.Lock()
 	defer s.listenerLock.Unlock()
@@ -58,7 +58,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	if isReserved || isListening {
 		return nil, fmt.Errorf("service %s is already listening", service)
 	}
-	_ = s.addNameHash(service)
+	_ = s.AddNameHash(service)
 	var connType byte
 	if tlscfg == nil {
 		connType = ConnTypeStream
@@ -86,19 +86,19 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		connType:     connType,
 		hopsToLive:   s.maxForwardingHops,
 	}
-	pc.startUnreachable()
+	pc.StartUnreachable()
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
-	cfg := &quic.Config{ //nolint:typecheck
+	cfg := &quic.Config{
 		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := quic.Listen(pc, tlscfg, cfg) //nolint:typecheck
+	ql, err := quic.Listen(pc, tlscfg, cfg)
 	if err != nil {
 		return nil, err
 	}
 	if advertise {
-		s.addLocalServiceAdvertisement(service, connType, adTags)
+		s.AddLocalServiceAdvertisement(service, connType, adTags)
 	}
 	doneChan := make(chan struct{})
 	go func() {
@@ -261,9 +261,9 @@ func (li *Listener) Addr() net.Addr {
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
-	pc       *PacketConn
-	qc       quic.Connection //nolint:typecheck
-	qs       quic.Stream     //nolint:typecheck
+	pc       PacketConner
+	qc       quic.Connection
+	qs       quic.Stream
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
@@ -276,14 +276,14 @@ func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn
 
 // DialContext is like Dial but uses a context to allow timeout or cancellation.
 func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*Conn, error) {
-	_ = s.addNameHash(node)
-	_ = s.addNameHash(service)
+	_ = s.AddNameHash(node)
+	_ = s.AddNameHash(service)
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return nil, err
 	}
 	rAddr := s.NewAddr(node, service)
-	cfg := &quic.Config{ //nolint:typecheck
+	cfg := &quic.Config{
 		HandshakeIdleTimeout: 15 * time.Second,
 		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
 	}
@@ -293,7 +293,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 
 	if tlscfg == nil {
-		tlscfg = generateClientTLSConfig()
+		tlscfg = generateClientTLSConfig(s.NodeID())
 	} else {
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
@@ -305,7 +305,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			_ = pc.Close()
 		})
 	}
-	cctx, ccancel := context.WithCancel(ctx)
+	cctx, ccancel := context.WithTimeout(ctx, 15*time.Second)
 	go func() {
 		select {
 		case <-okChan:
@@ -319,7 +319,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg) //nolint:typecheck
+	qc, err := quic.Dial(cctx, pc, rAddr, tlscfg, cfg)
 	if err != nil {
 		close(okChan)
 		pcClose()
@@ -380,7 +380,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 
 // monitorUnreachable receives unreachable messages from the underlying PacketConn, and ends the connection
 // if the remote service has gone away.
-func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
+func monitorUnreachable(pc PacketConner, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
 	msgCh := pc.SubscribeUnreachable(doneChan)
 	if msgCh == nil {
 		cancel()
@@ -390,7 +390,7 @@ func monitorUnreachable(pc *PacketConn, doneChan chan struct{}, remoteAddr Addr,
 	// read from channel until closed
 	for msg := range msgCh {
 		if msg.Problem == ProblemServiceUnknown && msg.ToNode == remoteAddr.node && msg.ToService == remoteAddr.service {
-			pc.s.Logger.Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
+			pc.GetLogger().Warning("remote service %s to node %s is unreachable", msg.ToService, msg.ToNode)
 			cancel()
 		}
 	}
@@ -421,11 +421,11 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) CloseConnection() error {
-	c.pc.cancel()
+	c.pc.Cancel()
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.localService, c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }
@@ -490,7 +490,7 @@ func generateServerTLSConfig() *tls.Config {
 	}
 }
 
-func verifyServerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	for i := 0; i < len(rawCerts); i++ {
 		cert, err := x509.ParseCertificate(rawCerts[i])
 		if err != nil {
@@ -504,12 +504,12 @@ func verifyServerCertificate(rawCerts [][]byte, verifiedChains [][]*x509.Certifi
 	return fmt.Errorf("insecure connection to secure service")
 }
 
-func generateClientTLSConfig() *tls.Config {
+func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
-		ServerName:            insecureCommonName,
+		ServerName:            host,
 		MinVersion:            tls.VersionTLS12,
 	}
 }

@@ -1,3 +1,4 @@
+---
 run:
   timeout: 10m
 
@@ -6,24 +7,24 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    #- cyclop # TODO: Reduce code complexity.
+    # - cyclop # TODO: Reduce code complexity.
     - depguard
     - dogsled
-    #- dupl # TODO: Remove duplicates.
+    # - dupl # TODO: Remove duplicates.
     - durationcheck
-    #- errcheck # TODO: Not all received errors are checked.
-    #- errorlint # TODO: Use errors package.
+    # - errcheck # TODO: Not all received errors are checked.
+    # - errorlint # TODO: Use errors package.
     - exportloopref
-    #- forcetypeassert # TODO: always assert types when when casting.
-    #- funlen # TODO: Reduce code complexity.
+    # - forcetypeassert # TODO: always assert types when when casting.
+    # - funlen # TODO: Reduce code complexity.
     - gci
-    #- gochecknoglobals # TODO: Reduce number of globals.
-    #- gochecknoinits # TODO: Maybe not use init().
-    #- gocognit # TODO: Reduce code complexity.
+    # - gochecknoglobals # TODO: Reduce number of globals.
+    # - gochecknoinits # TODO: Maybe not use init().
+    # - gocognit # TODO: Reduce code complexity.
     - gocritic
-    #- gocyclo # TODO: Reduce code complexity.
+    # - gocyclo # TODO: Reduce code complexity.
     - godot
-    #- goerr113 # TODO: Please do not use dynamic errors.
+    # - goerr113 # TODO: Please do not use dynamic errors.
     - gofmt
     - gofumpt
     - goheader
@@ -40,12 +41,12 @@ linters:
     - makezero
     - misspell
     - nakedret
-    #- nestif # TODO: Reduce code complexity.
+    # - nestif # TODO: Reduce code complexity.
     - nilerr
     - nlreturn
     - noctx
     - nolintlint
-    #- paralleltest # TODO: missing at some locations
+    # - paralleltest # TODO: missing at some locations
     - prealloc
     - predeclared
     - revive
@@ -53,24 +54,66 @@ linters:
     - sqlclosecheck
     - staticcheck
     - stylecheck
-    #- testpackage # TODO: Put tests in their dedicated test packages.
-    #- thelper # TODO: Requires test refactoring.
+    # - testpackage # TODO: Put tests in their dedicated test packages.
+    # - thelper # TODO: Requires test refactoring.
     - tparallel
     - typecheck
     - unconvert
-    #- unparam # TODO: This breaks something, look at it!
+    # - unparam # TODO: This breaks something, look at it!
     - unused
     - wastedassign
     - whitespace
     # - wrapcheck # TODO: Errors passed upwards should be wrapped.
 
+linters-settings:
+  depguard:
+    rules:
+      main:
+        files:
+          - "$all"
+          - "!$test"
+          - "!**/functional/**/*.go"
+        allow:
+          - "$gostd"
+          - "github.com/ansible/receptor/internal/version"
+          - "github.com/ansible/receptor/pkg"
+          - "github.com/creack/pty"
+          - "github.com/fsnotify/fsnotify"
+          - "github.com/ghjm/cmdline"
+          - "github.com/golang-jwt/jwt/v4"
+          - "github.com/google/shlex"
+          - "github.com/gorilla/websocket"
+          - "github.com/jupp0r/go-priority-queue"
+          - "github.com/minio/highwayhash"
+          - "github.com/pbnjay/memory"
+          - "github.com/quic-go/quic-go"
+          - "github.com/rogpeppe/go-internal/lockedfile"
+          - "github.com/songgao/water"
+          - "github.com/vishvananda/netlink"
+          - "k8s.io/api/core"
+          - "k8s.io/apimachinery/pkg"
+          - "k8s.io/client-go"
+      tests:
+        files:
+          - "$test"
+          - "**/functional/**/*.go"
+        allow:
+          - "$gostd"
+          - "github.com/ansible/receptor/pkg"
+          - "github.com/ansible/receptor/tests/utils"
+          - "github.com/fortytw2/leaktest"
+          - "github.com/gorilla/websocket"
+          - "github.com/golang/mock/gomock"
+          - "github.com/prep/socketpair"
+
 issues:
-  # Dont commit the following line. 
+  # Dont commit the following line.
   # It will make CI pass without telling you about errors.
   # fix: true
   exclude:
-    - "lostcancel" # TODO: Context is not canceled on multiple occasions. Needs more detailed work to be fixed.
-    - "SA2002|thelper|testinggoroutine" # TODO: Test interface used outside of its routine, tests need to be rewritten.
-    - "G306" # TODO: Restrict perms of touched files.
-    - "G402|G404" # TODO: Make TLS more secure.
-    - "G204" # gosec is throwing a fit, ignore.
+    - "lostcancel"  # TODO: Context is not canceled on multiple occasions. Needs more detailed work to be fixed.
+    - "SA2002|thelper|testinggoroutine"  # TODO: Test interface used outside of its routine, tests need to be rewritten.
+    - "G306"  # TODO: Restrict perms of touched files.
+    - "G402|G404"  # TODO: Make TLS more secure.
+    - "G204"  # gosec is throwing a fit, ignore.
+...

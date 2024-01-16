@@ -2,8 +2,6 @@ package controlsvc
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestReload(t *testing.T) {
@@ -22,22 +20,35 @@ func TestReload(t *testing.T) {
 		{filename: "reload_test_yml/successful_reload.yml", modifyError: false, absentError: false},
 	}
 	err := parseConfigForReload("reload_test_yml/init.yml", false)
-	assert.NoError(t, err)
-	assert.Len(t, cfgNotReloadable, 5)
+	if err != nil {
+		t.Errorf("parseConfigForReload %s: Unexpected err: %v", "init.yml", err)
+	}
+
+	if len(cfgNotReloadable) != 5 {
+		t.Errorf("cfNotReloadable length expected %d, got %d", 5, len(cfgNotReloadable))
+	}
 
 	for _, s := range scenarios {
 		t.Logf("%s", s.filename)
 		err = parseConfigForReload(s.filename, true)
 		if s.modifyError {
-			assert.Error(t, err)
+			if err == nil {
+				t.Errorf("parseConfigForReload %s %s: Expected err, got %v", s.filename, "modifyError", err)
+			}
 		} else {
-			assert.NoError(t, err)
+			if err != nil {
+				t.Errorf("parseConfigForReload %s %s: Unexpected err: %v", s.filename, "modifyError", err)
+			}
 		}
 		err = cfgAbsent()
 		if s.absentError {
-			assert.Error(t, err)
+			if err == nil {
+				t.Errorf("parseConfigForReload %s %s: Expected err, got %v", s.filename, "absentError", err)
+			}
 		} else {
-			assert.NoError(t, err)
+			if err != nil {
+				t.Errorf("parseConfigForReload %s %s: Unexpected err: %v", s.filename, "absentError", err)
+			}
 		}
 	}
 }

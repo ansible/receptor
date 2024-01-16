@@ -287,13 +287,11 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 			t.Parallel()
 
 			_, caCrt, err := utils.GenerateCA("ca", "localhost")
-
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			key1, crt1, err := utils.GenerateCert("node2", "localhost", []string{"localhost"}, []string{"node2"})
-
 			if err != nil {
 				t.Fatal(err)
 			}

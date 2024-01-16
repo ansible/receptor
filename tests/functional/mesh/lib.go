@@ -30,18 +30,15 @@ type LibMesh struct {
 
 // NewLibMesh constructs a new LibMesh.
 func NewLibMesh() LibMesh {
-
 	baseDir := filepath.Join(os.TempDir(), "receptor-testing")
 	os.Mkdir(baseDir, 0o700)
 
 	err := os.MkdirAll(baseDir, 0o755)
-
 	if err != nil {
 		panic(err)
 	}
 
 	tempdir, err := os.MkdirTemp(baseDir, "mesh-")
-
 	if err != nil {
 		panic(err)
 	}
@@ -56,14 +53,13 @@ func NewLibMesh() LibMesh {
 
 // m.NewLibNode constructs a node with the name passed as the argument.
 func (m *LibMesh) NewLibNode(nodeID string) *LibNode {
-
 	node := LibNode{
 		Config: types.NodeCfg{
 			ID:      nodeID,
 			DataDir: m.DataDir,
 		},
 		ControlSocket: filepath.Join(m.DataDir, nodeID+".sock"),
-		backends:      make(map[string]backendInfo),
+		backends:      make(map[string]BackendInfo),
 	}
 
 	m.nodes[nodeID] = &node
@@ -71,7 +67,7 @@ func (m *LibMesh) NewLibNode(nodeID string) *LibNode {
 	return &node
 }
 
-func (m *LibMesh) Start(dirSuffix string) error {
+func (m *LibMesh) Start(_ string) error {
 	var err error
 
 	// Bootstrap nodes
@@ -136,7 +132,6 @@ func (m LibMesh) WaitForShutdown() {
 // consistent with the connections made by the nodes.
 func (m LibMesh) CheckConnections() bool {
 	statusList, err := m.Status()
-
 	if err != nil {
 		return false
 	}
@@ -222,6 +217,7 @@ func (m *LibMesh) CheckControlSockets() bool {
 		controller := NewReceptorControl()
 		if controller.Connect(node.GetControlSocket()) != nil {
 			node.netceptorInstance.Logger.Warning("%s: failed to connect to control socket", node.GetID())
+
 			return false
 		}
 		controller.Close()
@@ -270,7 +266,7 @@ type LibNode struct {
 	ListenerCfgs           map[listenerName]ListenerCfg
 	netceptorInstance      *netceptor.Netceptor
 	workceptorInstance     *workceptor.Workceptor
-	backends               map[string]backendInfo
+	backends               map[string]BackendInfo
 	controlServer          *controlsvc.Server
 	ControlSocket          string
 	controlServerCanceller context.CancelFunc
@@ -285,8 +281,10 @@ type LibNode struct {
 
 type listenerName string
 
-type workPlugin string // "kube" or "command"
-type workType string   // identifier for an instance of work-kubernetes or work-command
+type (
+	workPlugin string // "kube" or "command"
+	workType   string // identifier for an instance of work-kubernetes or work-command
+)
 
 // Status returns the status of the node.
 func (n *LibNode) Status() (*netceptor.Status, error) {
@@ -305,7 +303,7 @@ func (n *LibNode) GetDataDir() string {
 	return n.Config.DataDir
 }
 
-// GetID returns the ID (name) of this node
+// GetID returns the ID (name) of this node.
 func (n *LibNode) GetID() string {
 	return n.Config.ID
 }
@@ -344,12 +342,12 @@ func (n *LibNode) Start() error {
 // TCPListenerCfg, UDPListenerCfg, and WebsocketListenerCfg and starts listening
 // on the appropriate protocol.
 func (n *LibNode) StartListeners() error {
-	var bi *backendInfo
+	var bi *BackendInfo
 	var err error
 
 	for _, listenerCfg := range n.ListenerCfgs {
 		switch lcfg := listenerCfg.(type) {
-		case *backends.TCPListenerCfg: //nolint:typecheck
+		case *backends.TCPListenerCfg:
 			bi, err = n.TCPListen(listenerCfg)
 
 			// Record what address we are listening on so we can reuse it if we restart this node
@@ -389,7 +387,6 @@ func (n *LibNode) EstablishRemoteConnections() error {
 		}
 
 		tlscfg, err := n.netceptorInstance.GetClientTLSConfig(connection.TLS, host, netceptor.ExpectedHostnameTypeDNS)
-
 		if err != nil {
 			return err
 		}
@@ -452,15 +449,13 @@ func (n *LibNode) WaitForShutdown() {
 }
 
 // TCPListen takes a ListenerCfg (backends.TCPListenerCfg) and listens for TCP traffic.
-func (n *LibNode) TCPListen(listenerCfg ListenerCfg) (*backendInfo, error) {
+func (n *LibNode) TCPListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 	tlsCfg, err := n.netceptorInstance.GetServerTLSConfig(listenerCfg.GetTLS())
-
 	if err != nil {
 		return nil, err
 	}
 
 	backend, err := backends.NewTCPListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger)
-
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +473,7 @@ func (n *LibNode) TCPListen(listenerCfg ListenerCfg) (*backendInfo, error) {
 		return nil, err
 	}
 
-	bi := backendInfo{
+	bi := BackendInfo{
 		protocol:       "tcp",
 		bindAddr:       listenerCfg.GetAddr(),
 		connectionCost: cost,
@@ -503,9 +498,8 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 }
 
 // UDPListen takes a ListenerCfg (backends.UDPListenerCfg) and listens for UDP traffic.
-func (n *LibNode) UDPListen(listenerCfg ListenerCfg) (*backendInfo, error) {
+func (n *LibNode) UDPListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 	backend, err := backends.NewUDPListener(listenerCfg.GetAddr(), n.netceptorInstance.Logger)
-
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +517,7 @@ func (n *LibNode) UDPListen(listenerCfg ListenerCfg) (*backendInfo, error) {
 		return nil, err
 	}
 
-	bi := backendInfo{
+	bi := BackendInfo{
 		protocol:       "udp",
 		bindAddr:       listenerCfg.GetAddr(),
 		connectionCost: cost,
@@ -548,15 +542,13 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 }
 
 // WebsocketListen takes a ListenerCfg (backends.WebsocketListenerCfg) and listens for Websocket traffic.
-func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*backendInfo, error) {
+func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 	tlsCfg, err := n.netceptorInstance.GetServerTLSConfig(listenerCfg.GetTLS())
-
 	if err != nil {
 		return nil, err
 	}
 
-	backend, err := backends.NewWebsocketListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger)
-
+	backend, err := backends.NewWebsocketListener(listenerCfg.GetAddr(), tlsCfg, n.netceptorInstance.Logger, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -574,7 +566,7 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*backendInfo, error)
 		return nil, err
 	}
 
-	bi := backendInfo{
+	bi := BackendInfo{
 		protocol:       "ws",
 		bindAddr:       listenerCfg.GetAddr(),
 		connectionCost: cost,
@@ -589,7 +581,7 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*backendInfo, error)
 
 // WebSocketDial registers a new netceptor.Backend that will dial a remote node via a WebSocket.
 func (n *LibNode) WebSocketDial(address string, cost float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewWebsocketDialer(address, tlsCfg, "", true, n.netceptorInstance.Logger)
+	b1, err := backends.NewWebsocketDialer(address, tlsCfg, "", true, n.netceptorInstance.Logger, nil)
 	if err != nil {
 		return err
 	}
@@ -611,7 +603,6 @@ func (n *LibNode) StartLocalServices() error {
 	n.controlServer = controlsvc.New(true, n.netceptorInstance)
 
 	err := n.configureFirewallRules()
-
 	if err != nil {
 		return err
 	}
@@ -623,7 +614,6 @@ func (n *LibNode) StartLocalServices() error {
 	}
 
 	tlsCfg, err := n.netceptorInstance.GetServerTLSConfig(n.controlServerTLS)
-
 	if err != nil {
 		return err
 	}
@@ -663,7 +653,6 @@ func (n *LibNode) StartLocalServices() error {
 
 func (n *LibNode) configureFirewallRules() error {
 	rules, err := netceptor.ParseFirewallRules(n.Config.FirewallRules)
-
 	if err != nil {
 		return err
 	}
@@ -680,7 +669,6 @@ func (n *LibNode) configureFirewallRules() error {
 func (n *LibNode) configureTLS() error {
 	for _, c := range n.TLSServerConfigs {
 		tlscfg, err := c.PrepareTLSServerConfig(n.netceptorInstance)
-
 		if err != nil {
 			return err
 		}
@@ -694,7 +682,6 @@ func (n *LibNode) configureTLS() error {
 
 	for _, c := range n.TLSClientConfigs {
 		tlscfg, pinnedFingerprints, err := c.PrepareTLSClientConfig(n.netceptorInstance)
-
 		if err != nil {
 			return err
 		}
@@ -711,9 +698,7 @@ func (n *LibNode) configureTLS() error {
 
 func (n *LibNode) configureWorkers() error {
 	for _, cfg := range n.workerConfigs {
-
 		err := n.workceptorInstance.RegisterWorker(cfg.GetWorkType(), cfg.NewWorker, cfg.GetVerifySignature())
-
 		if err != nil {
 			return err
 		}
@@ -725,7 +710,6 @@ func (n *LibNode) configureWorkers() error {
 func (n *LibNode) configureWorkSigning() error {
 	if n.WorkSigningKey != nil {
 		duration, err := n.WorkSigningKey.PrepareSigningKeyPrivateCfg()
-
 		if err != nil {
 			return err
 		}
@@ -739,7 +723,6 @@ func (n *LibNode) configureWorkSigning() error {
 
 	if n.WorkVerificationKey != nil {
 		err := n.WorkVerificationKey.PrepareVerifyingKeyPublicCfg()
-
 		if err != nil {
 			return err
 		}
@@ -750,7 +733,7 @@ func (n *LibNode) configureWorkSigning() error {
 	return nil
 }
 
-// Connection is an abstraction that ultimately results in a new running netceptor.Backend
+// Connection is an abstraction that ultimately results in a new running netceptor.Backend.
 type Connection struct {
 	RemoteNode *LibNode
 	Protocol   string
@@ -770,12 +753,11 @@ type NativeBackend interface {
 	GetTLS() *tls.Config
 }
 
-type backendInfo struct {
+type BackendInfo struct {
 	protocol       string
 	bindAddr       string
 	connectionCost float64
 	nodeCost       map[string]float64
-	allowedPeers   []string
 	listener       NativeBackend
 }
 

@@ -9,15 +9,15 @@ import (
 )
 
 type (
-	connectCommandType struct{}
-	connectCommand     struct {
+	ConnectCommandType struct{}
+	ConnectCommand     struct {
 		targetNode    string
 		targetService string
 		tlsConfigName string
 	}
 )
 
-func (t *connectCommandType) InitFromString(params string) (ControlCommand, error) {
+func (t *ConnectCommandType) InitFromString(params string) (ControlCommand, error) {
 	tokens := strings.Split(params, " ")
 	if len(tokens) < 2 {
 		return nil, fmt.Errorf("no connect target")
@@ -29,7 +29,7 @@ func (t *connectCommandType) InitFromString(params string) (ControlCommand, erro
 	if len(tokens) == 3 {
 		tlsConfigName = tokens[2]
 	}
-	c := &connectCommand{
+	c := &ConnectCommand{
 		targetNode:    tokens[0],
 		targetService: tokens[1],
 		tlsConfigName: tlsConfigName,
@@ -38,7 +38,7 @@ func (t *connectCommandType) InitFromString(params string) (ControlCommand, erro
 	return c, nil
 }
 
-func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
+func (t *ConnectCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
 	targetNode, ok := config["node"]
 	if !ok {
 		return nil, fmt.Errorf("no connect target node")
@@ -65,7 +65,7 @@ func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (Contro
 	} else {
 		tlsConfigStr = ""
 	}
-	c := &connectCommand{
+	c := &ConnectCommand{
 		targetNode:    targetNodeStr,
 		targetService: targetServiceStr,
 		tlsConfigName: tlsConfigStr,
@@ -74,7 +74,7 @@ func (t *connectCommandType) InitFromJSON(config map[string]interface{}) (Contro
 	return c, nil
 }
 
-func (c *connectCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *ConnectCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, cfo ControlFuncOperations) (map[string]interface{}, error) {
 	tlscfg, err := nc.GetClientTLSConfig(c.tlsConfigName, c.targetNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (c *connectCommand) ControlFunc(ctx context.Context, nc *netceptor.Netcepto
 	if err != nil {
 		return nil, err
 	}
-	err = cfo.BridgeConn("Connecting\n", rc, "connected service", nc.Logger)
+	err = cfo.BridgeConn("Connecting\n", rc, "connected service", nc.GetLogger(), &Util{})
 	if err != nil {
 		return nil, err
 	}

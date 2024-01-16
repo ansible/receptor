@@ -14,10 +14,10 @@ jobs:
       TAG: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
 
       - name: Install dependencies
         run: |
@@ -49,7 +49,7 @@ jobs:
           echo ${{ secrets.QUAY_TOKEN }} | docker login quay.io -u ${{ secrets.QUAY_USER }} --password-stdin
 
       - name: Copy Image to Quay
-        uses: akhilerm/tag-push-action@v2.0.0
+        uses: akhilerm/tag-push-action@v2.1.0
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: |
@@ -66,7 +66,7 @@ jobs:
           fi
 
       - name: Push floating tag to Quay
-        uses: akhilerm/tag-push-action@v2.0.0
+        uses: akhilerm/tag-push-action@v2.1.0
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
@@ -77,12 +77,12 @@ jobs:
       VERSION: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.19
+          go-version: "1.20"
 
       - name: Build packages
         run: |

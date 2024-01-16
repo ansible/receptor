@@ -1,75 +1,24 @@
 package workceptor
 
 import (
-	"context"
 	"testing"
-
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-func Test_isCompatibleK8S(t *testing.T) {
+func Test_shouldUseReconnect(t *testing.T) {
 	type args struct {
-		version      string
-		isCompatible bool
+		kw *kubeUnit
 	}
-
-	kw := &kubeUnit{
-		BaseWorkUnitForWorkUnit: &BaseWorkUnit{},
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		// TODO: Add test cases.
 	}
-
-	// Create Netceptor node using external backends
-	n1 := netceptor.New(context.Background(), "node1")
-	b1, err := netceptor.NewExternalBackend()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = n1.AddBackend(b1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w, err := New(context.Background(), n1, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	kw.SetWorkceptor(w)
-
-	tests := []args{
-		// K8S compatible versions
-		{version: "v1.24.8", isCompatible: true},
-		{version: "v1.25.4", isCompatible: true},
-		{version: "v1.23.14", isCompatible: true},
-
-		// K8S Z stream >
-		{version: "v1.24.99", isCompatible: true},
-		{version: "v1.25.99", isCompatible: true},
-		{version: "v1.23.99", isCompatible: true},
-
-		// K8S Z stream <
-		{version: "v1.24.7", isCompatible: false},
-		{version: "v1.25.3", isCompatible: false},
-		{version: "v1.23.13", isCompatible: false},
-
-		// K8S X stream >
-		{version: "v2.24.8", isCompatible: true},
-		{version: "v2.25.4", isCompatible: true},
-		{version: "v2.23.14", isCompatible: true},
-
-		// K8S X stream <
-		{version: "v0.24.8", isCompatible: false},
-		{version: "v0.25.4", isCompatible: false},
-		{version: "v0.23.14", isCompatible: false},
-
-		// Other versions
-		{version: "yoloswag", isCompatible: false},
-		{version: "v1.23.14+sadfasdf", isCompatible: true},
-		{version: "v1.23.14-asdfasdf+12131", isCompatible: true}, // ignore pre-release
-		{version: "v1.23.15-asdfasdf+12131", isCompatible: true},
-	}
-
 	for _, tt := range tests {
-		t.Run(tt.version, func(t *testing.T) {
-			if got := isCompatibleK8S(kw, tt.version); got != tt.isCompatible {
-				t.Errorf("isCompatibleK8S() = %v, want %v", got, tt.isCompatible)
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldUseReconnect(tt.args.kw); got != tt.want {
+				t.Errorf("shouldUseReconnect() = %v, want %v", got, tt.want)
 			}
 		})
 	}

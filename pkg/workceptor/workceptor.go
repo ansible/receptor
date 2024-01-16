@@ -8,6 +8,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"io/fs"
+	"net"
 	"os"
 	"path"
 	"reflect"
@@ -32,6 +34,17 @@ type NetceptorForWorkceptor interface {
 	GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType netceptor.ExpectedHostnameType) (*tls.Config, error) // have a common pkg for types
 	GetLogger() *logger.ReceptorLogger
 	DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error) // create an interface for Conn
+}
+
+type ServerForWorkceptor interface {
+	AddControlFunc(name string, cType controlsvc.ControlCommandType) error
+	ConnectionListener(ctx context.Context, listener net.Listener)
+	RunControlSession(conn net.Conn)
+	RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config, unixSocket string, unixSocketPermissions fs.FileMode, tcpListen string, tcptls *tls.Config) error
+	SetServerNet(n controlsvc.Neter)
+	SetServerTLS(t controlsvc.Tlser)
+	SetServerUtils(u controlsvc.Utiler)
+	SetupConnection(conn net.Conn)
 }
 
 // Workceptor is the main object that handles unit-of-work management.
@@ -115,7 +128,7 @@ func stdoutSize(unitdir string) int64 {
 }
 
 // RegisterWithControlService registers this workceptor instance with a control service instance.
-func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
+func (w *Workceptor) RegisterWithControlService(cs ServerForWorkceptor) error {
 	err := cs.AddControlFunc("work", &workceptorCommandType{
 		w: w,
 	})

@@ -748,7 +748,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 func shouldUseReconnect() bool {
 	// Support for streaming from pod with timestamps using reconnect method is in all current versions
 	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
-	// accepted values: "enabled", "disabled", "auto" with "enabled" being the default
+	// accepted values: "enabled", "disabled", "auto" with "disabled" being the default
 	// all invalid value will assume to be "disabled"
 
 	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
@@ -765,7 +765,7 @@ func shouldUseReconnect() bool {
 		}
 	}
 
-	return true
+	return false
 }
 
 func parseTime(s string) *time.Time {

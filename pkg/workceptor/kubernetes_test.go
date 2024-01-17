@@ -33,7 +33,7 @@ func TestShouldUseReconnect(t *testing.T) {
 		{
 			name:     "Auto test",
 			envValue: "auto",
-			want:	false,
+			want:     false,
 		},
 		{
 			name:     "Default test",

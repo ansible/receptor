@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func Test_shouldUseReconnect(t *testing.T) {
+func TestShouldUseReconnect(t *testing.T) {
 	const envVariable string = "RECEPTOR_KUBE_SUPPORT_RECONNECT"
 
 	tests := []struct {
@@ -57,7 +57,7 @@ func Test_shouldUseReconnect(t *testing.T) {
 	}
 }
 
-func Test_parseTime(t *testing.T) {
+func TestParseTime(t *testing.T) {
 	type args struct {
 		s string
 	}

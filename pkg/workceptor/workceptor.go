@@ -98,18 +98,18 @@ var MainInstance *Workceptor
 
 // setDataDir returns a valid data directory.
 func setDataDir(dataDir string, nc NetceptorForWorkceptor) string {
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		nc.GetLogger().Warning("Receptor data directory provided does not exist \"%s\". Trying the default '/var/run/receptor/", dataDir)
-	} else {
+	_, err := os.Stat(dataDir)
+	if err == nil {
 		return path.Join(dataDir, nc.NodeID())
 	}
+	nc.GetLogger().Warning("Receptor data directory provided does not exist \"%s\". Trying the default '/var/lib/receptor/", dataDir)
 
 	dataDir = "/var/lib/receptor"
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		nc.GetLogger().Warning("Receptor data directory \"%s\" does not exist. Setting tmp '/tmp/receptor/", dataDir)
-	} else {
+	_, err = os.Stat(dataDir)
+	if err == nil {
 		return path.Join(dataDir, nc.NodeID())
 	}
+	nc.GetLogger().Warning("Receptor data directory \"%s\" does not exist. Setting tmp '/tmp/receptor/", dataDir)
 
 	dataDir = path.Join(os.TempDir(), "receptor")
 	dataDir = path.Join(dataDir, nc.NodeID())

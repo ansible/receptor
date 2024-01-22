@@ -15,7 +15,7 @@ import (
 )
 
 func InitCA(opts *CertOptions, certOut, keyOut string) error {
-	ca, err := CreateCA(opts)
+	ca, err := CreateCA(opts, &RsaWrapper{})
 	if err == nil {
 		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate})
 	}

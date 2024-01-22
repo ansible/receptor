@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -19,6 +20,16 @@ import (
 
 	"github.com/ansible/receptor/pkg/utils"
 )
+
+type Rsaer interface {
+	GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error)
+}
+
+type RsaWrapper struct{}
+
+func (rw *RsaWrapper) GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error) {
+	return rsa.GenerateKey(random, bits)
+}
 
 // CertNames lists the subjectAltNames that can be assigned to a certificate or request.
 type CertNames struct {
@@ -241,7 +252,7 @@ type CA struct {
 }
 
 // CreateCA initializes a new CertKeyPair from given parameters.
-func CreateCA(opts *CertOptions) (*CA, error) {
+func CreateCA(opts *CertOptions, rsaWrapper Rsaer) (*CA, error) {
 	if opts.CommonName == "" {
 		return nil, fmt.Errorf("must provide CommonName")
 	}
@@ -260,7 +271,7 @@ func CreateCA(opts *CertOptions) (*CA, error) {
 
 	var err error
 	ca := &CA{}
-	ca.PrivateKey, err = rsa.GenerateKey(rand.Reader, opts.Bits)
+	ca.PrivateKey, err = rsaWrapper.GenerateKey(rand.Reader, opts.Bits)
 	if err != nil {
 		return nil, err
 	}

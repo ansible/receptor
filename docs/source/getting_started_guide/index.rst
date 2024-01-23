@@ -1,6 +1,6 @@
-+++++++++++++++++++++++++++++
+#############################
 Getting started with Receptor
-+++++++++++++++++++++++++++++
+#############################
 
 Receptor is an overlay network intended to ease the distribution of work across
 a large and dispersed collection of workers. Receptor nodes establish peer-to-

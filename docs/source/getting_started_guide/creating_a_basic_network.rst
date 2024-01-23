@@ -1,9 +1,9 @@
-+++++++++++++++++++++++++++++++
+###############################
 Creating a basic 3-node network
-+++++++++++++++++++++++++++++++
+###############################
 
 In this section, we will create a three-node network.
-The three nodes are: foo, bar, and mal
+The three nodes are: foo, bar, and mal.
 
 `foo -> bar <- mal`
 
@@ -11,12 +11,12 @@ foo and mal are directly connected to bar with TCP connections.
 
 foo can reach mal by sending network packets through bar.
 
-#######################
+***********************
 Receptor configurations
-#######################
+***********************
 
-To create this, we will create three configuration files, one for each node.
-1. foo.yml
+1. Create three configuration files, one for each node.
+ **foo.yml**
 
 .. code-block:: yaml
 
@@ -35,7 +35,7 @@ To create this, we will create three configuration files, one for each node.
     - log-level: debug
     ...
 
-1. bar.yml
+**bar.yml**
 
 .. code-block:: yaml
 
@@ -53,7 +53,7 @@ To create this, we will create three configuration files, one for each node.
     - log-level: debug
     ...
 
-1. mal.yml
+ **mal.yml**
 
 .. code-block:: yaml
 
@@ -78,7 +78,7 @@ To create this, we will create three configuration files, one for each node.
       allowruntimeparams: true
     ...
 
-1. Run the services in separate terminals
+2. Run the services in separate terminals.
 
 .. code-block: bash
 

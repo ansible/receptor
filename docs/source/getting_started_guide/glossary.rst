@@ -1,6 +1,6 @@
-========
+########
 Glossary
-========
+########
 
 The following is a list of the definitions elsewhere for receptor.
 

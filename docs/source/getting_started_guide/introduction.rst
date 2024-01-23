@@ -1,6 +1,6 @@
-++++++++++++++++++++++++
+########################
 Introduction to receptor
-++++++++++++++++++++++++
+########################
 
 Receptor is an overlay network.
 It eases the work distribution across a large and dispersed collection

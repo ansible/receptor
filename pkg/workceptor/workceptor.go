@@ -493,8 +493,81 @@ func sleepOrDone(doneChan <-chan struct{}, interval time.Duration) bool {
 	}
 }
 
+func (w *Workceptor) CleanupGetResults(stdout Filer, resultClose func(), cancel context.CancelFunc) {
+	err := stdout.Close()
+	if err != nil {
+		w.nc.GetLogger().Error("Error closing stdout %s", stdout.Name())
+	}
+	resultClose()
+	cancel()
+}
+
+func (w *Workceptor) AttemptToStatFile(ctxChild context.Context, stdoutFilename string, statChan chan struct{}, fs FileSystemer) {
+	failures := 0
+	for {
+		select {
+		case <-ctxChild.Done():
+			return
+		case <-time.After(1 * time.Second):
+			_, err := fs.Stat(stdoutFilename)
+			if fs.IsNotExist(err) {
+				failures++
+				if failures > 3 {
+					w.nc.GetLogger().Error("Exceeded retries for reading stdout %s", stdoutFilename)
+					statChan <- struct{}{}
+
+					return
+				}
+			} else {
+				failures = 0
+			}
+		}
+	}
+}
+
+func (w *Workceptor) ReadFile(ctx context.Context, statChan chan struct{}, stdout Filer, filePos *int64, resultChan chan []byte) error {
+	var err error
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-statChan:
+			return nil
+		default:
+			var newPos int64
+			newPos, err = stdout.Seek(*filePos, 0)
+			if err != nil {
+				w.nc.GetLogger().Warning("Seek error processing stdout: %s\n", err)
+
+				return nil
+			}
+			if newPos != *filePos {
+				w.nc.GetLogger().Warning("Seek error processing stdout\n")
+
+				return nil
+			}
+			var n int
+			buf := make([]byte, utils.NormalBufferSize)
+			n, err = stdout.Read(buf)
+			if n > 0 {
+				*filePos += int64(n)
+				select {
+				case <-ctx.Done():
+					return nil
+				case resultChan <- buf[:n]:
+				}
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	return err
+}
+
 // GetResults returns a live stream of the results of a unit.
-func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int64) (chan []byte, error) {
+func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int64, fs FileSystemer) (chan []byte, error) {
 	unit, err := w.findUnit(unitID)
 	if err != nil {
 		return nil, err
@@ -511,21 +584,12 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 	var stdout *os.File
 	ctxChild, cancel := context.WithCancel(ctx)
 	go func() {
-		defer func() {
-			err = stdout.Close()
-			if err != nil {
-				w.nc.GetLogger().Error("Error closing stdout %s", stdoutFilename)
-			}
-			resultClose()
-			cancel()
-		}()
-
 		// Wait for stdout file to exist
 		for {
-			stdout, err = os.Open(stdoutFilename)
+			stdout, err = fs.Open(stdoutFilename)
 			switch {
 			case err == nil:
-			case os.IsNotExist(err):
+			case fs.IsNotExist(err):
 				if IsComplete(unit.Status().State) {
 					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
@@ -544,72 +608,22 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 
 			break
 		}
-		filePos := startPos
+		defer w.CleanupGetResults(stdout, resultClose, cancel)
+		filePos := &startPos
 		statChan := make(chan struct{}, 1)
-		go func() {
-			failures := 0
-			for {
-				select {
-				case <-ctxChild.Done():
-					return
-				case <-time.After(1 * time.Second):
-					_, err := os.Stat(stdoutFilename)
-					if os.IsNotExist(err) {
-						failures++
-						if failures > 3 {
-							w.nc.GetLogger().Error("Exceeded retries for reading stdout %s", stdoutFilename)
-							statChan <- struct{}{}
 
-							return
-						}
-					} else {
-						failures = 0
-					}
-				}
-			}
-		}()
+		go w.AttemptToStatFile(ctxChild, stdoutFilename, statChan, fs)
+
 		for {
 			if sleepOrDone(ctx.Done(), 250*time.Millisecond) {
 				return
 			}
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-statChan:
-					return
-				default:
-					var newPos int64
-					newPos, err = stdout.Seek(filePos, 0)
-					if err != nil {
-						w.nc.GetLogger().Warning("Seek error processing stdout: %s\n", err)
 
-						return
-					}
-					if newPos != filePos {
-						w.nc.GetLogger().Warning("Seek error processing stdout\n")
+			w.ReadFile(ctx, statChan, stdout, filePos, resultChan)
 
-						return
-					}
-					var n int
-					buf := make([]byte, utils.NormalBufferSize)
-					n, err = stdout.Read(buf)
-					if n > 0 {
-						filePos += int64(n)
-						select {
-						case <-ctx.Done():
-							return
-						case resultChan <- buf[:n]:
-						}
-					}
-				}
-				if err != nil {
-					break
-				}
-			}
 			if err == io.EOF {
 				unitStatus := unit.Status()
-				if IsComplete(unitStatus.State) && filePos >= unitStatus.StdoutSize {
+				if IsComplete(unitStatus.State) && *filePos >= unitStatus.StdoutSize {
 					w.nc.GetLogger().Debug("Stdout complete - closing channel for: %s \n", unitID)
 
 					return

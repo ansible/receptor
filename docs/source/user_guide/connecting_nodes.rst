@@ -1,3 +1,4 @@
+.. _connecting_nodes::
 Connecting nodes
 ================
 

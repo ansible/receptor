@@ -10,5 +10,5 @@ Installing Receptor
 
 .. seealso::
 
-    :ref: `Receptor Installation <https://ansible.readthedocs.io/projects/receptor/en/latest/installation.html>`_
-    :ref: `Using Receptor Containers <https://ansible.readthedocs.io/projects/receptor/en/latest/user_guide/basic_usage.html#use-receptor-through-a-container-image>`_
+    :ref: `installing`
+    :ref: `using_receptor_containers`

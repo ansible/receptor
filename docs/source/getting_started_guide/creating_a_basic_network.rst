@@ -16,6 +16,7 @@ Receptor configurations
 ***********************
 
 1. Create three configuration files, one for each node.
+
  **foo.yml**
 
 .. code-block:: yaml
@@ -78,21 +79,21 @@ Receptor configurations
       allowruntimeparams: true
     ...
 
-2. Run the services in separate terminals.
+1. Run the services in separate terminals.
 
-.. code-block: bash
+.. code-block:: bash
 
     ./receptor --config foo.yml
 
-.. code-block: bash
+.. code-block:: bash
 
     ./receptor --config bar.yml
 
-.. code-block: bash
+.. code-block:: bash
 
     ./receptor --config mal.yml
 
 .. seealso::
 
-    :ref: `Configuring Receptor with a config file <https://ansible.readthedocs.io/projects/receptor/en/latest/user_guide/basic_usage.html#configuring-receptor-with-a-config-file>`_
-    :ref: `Connecting Nodes <https://ansible.readthedocs.io/projects/receptor/en/latest/user_guide/connecting_nodes.html>`_
+    :ref: `configuring_receptor_with_a_config_file`
+    :ref: `connecting_nodes`

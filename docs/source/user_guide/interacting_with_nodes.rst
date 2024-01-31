@@ -1,5 +1,6 @@
 
 
+.. _interacting_with_nodes::
 Interacting with nodes
 ======================
 
@@ -109,6 +110,7 @@ Once connected to a control service, one can issue commands like "status" or "wo
 
 Keep in mind that a "work submit" command will require a payload. Type out the payload contents and press ctrl-D to send the EOF signal. The socket will then close and work will begin. See :ref:`workceptor` for more on submitting work via receptor.
 
+:: _control_service_commands::
 Control service commands
 --------------------------
 

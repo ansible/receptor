@@ -24,7 +24,7 @@ transient network failures.
 
     :ref:`glossary`
         Receptor glossary
-    :ref: `Interacting with nodes <https://ansible.readthedocs.io/projects/receptor/en/latest/user_guide/interacting_with_nodes.html>`
+    :ref: `interacting_with_nodes`
         Further examples of working with nodes
-    :ref: `Connecting nodes<https://ansible.readthedocs.io/projects/receptor/en/latest/user_guide/connecting_nodes.html>`_
+    :ref: `connecting_nodes`
         Detail on connecting receptor nodes

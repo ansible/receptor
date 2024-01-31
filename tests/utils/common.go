@@ -23,7 +23,7 @@ func GenerateCA(name, commonName string) (string, string, error) {
 	crtPath := filepath.Join(dir, name+".crt")
 
 	// Create our certificate and private key
-	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: commonName, Bits: 2048})
+	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: commonName, Bits: 2048}, &certificates.RsaWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -49,7 +49,7 @@ func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, 
 	crtPath := filepath.Join(dir, name+".crt")
 
 	// Create a temporary CA to sign this certificate
-	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: "temp ca", Bits: 2048})
+	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: "temp ca", Bits: 2048}, &certificates.RsaWrapper{})
 	if err != nil {
 		return "", "", err
 	}

@@ -77,7 +77,6 @@ FdaOLykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m
 		CommonName: "Ansible Automation Controller Nodes Mesh ROOT CA",
 		NotAfter:   goodCaTimeAfter,
 		NotBefore:  goodCaTimeBefore,
-		// SerialNumber:	"1641513833",
 	}
 
 	goodCaPrivateKeyBlock, _ := pem.Decode([]byte(`-----BEGIN RSA PRIVATE KEY-----
@@ -182,12 +181,6 @@ rydzkVNNVeMVX2TER9yc8AdFqkRlaBWHmO61rYmV+N1quLM0uMVsu55ZNCY=
 				return
 			}
 
-			// if !reflect.DeepEqual(certGot.Extensions, certWant.Extensions) {
-			// 	t.Errorf("CreateCA() Certificate Extensions got = %v, want = %v", certGot.Extensions, certWant.Extensions)
-
-			// 	return
-			// }
-
 			if !reflect.DeepEqual(certGot.ExtraExtensions, certWant.ExtraExtensions) {
 				t.Errorf("CreateCA() Certificate ExtraExtensions got = %v, want = %v", certGot.ExtraExtensions, certWant.ExtraExtensions)
 
@@ -229,12 +222,6 @@ rydzkVNNVeMVX2TER9yc8AdFqkRlaBWHmO61rYmV+N1quLM0uMVsu55ZNCY=
 
 				return
 			}
-
-			// if !reflect.DeepEqual(certGot.PublicKey, certWant.PublicKey) {
-			// 	t.Errorf("CreateCA() Certificate PublicKey got = %v, want = %v", certGot.PublicKey, certWant.PublicKey)
-
-			// 	return
-			// }
 
 			if !reflect.DeepEqual(certGot.PublicKeyAlgorithm, certWant.PublicKeyAlgorithm) {
 				t.Errorf("CreateCA() Certificate PublicKeyAlgorithm got = %v, want = %v", certGot.PublicKeyAlgorithm, certWant.PublicKeyAlgorithm)

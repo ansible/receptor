@@ -120,11 +120,11 @@ else
 TESTCMD = -run $(RUNTEST)
 endif
 
-BLOCKLIST='/tests/'
+BLOCKLIST='/tests/|mock_|example'
 COVERAGE_FILE='coverage.txt'
 
 coverage: build-all
-	PATH="${PWD}:${PATH}" go test $$(go list ./... | grep -v $(BLOCKLIST)) \
+	PATH="${PWD}:${PATH}" go test $$(go list ./... | grep -vE $(BLOCKLIST)) \
 	  $(TESTCMD) \
 	  -count=1 \
 	  -cover \

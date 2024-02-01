@@ -19,12 +19,13 @@ transient network failures.
     installing_receptor
     creating_a_basic_network
     trying_sample_commands
+    glossary
 
 .. seealso::
 
     :ref:`glossary`
         Receptor glossary
-    :ref: `interacting_with_nodes`
+    :ref:`interacting_with_nodes`
         Further examples of working with nodes
-    :ref: `connecting_nodes`
+    :ref:`connecting_nodes`
         Detail on connecting receptor nodes

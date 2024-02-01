@@ -42,4 +42,4 @@ Congratulations, you are now using Receptor!
 
 .. seealso::
 
-    :ref: `control_service_commands`
+    :ref:`control_service_commands`

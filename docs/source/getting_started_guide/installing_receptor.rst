@@ -3,7 +3,7 @@ Installing Receptor
 ###################
 
 1. `Download receptor <https://github.com/ansible/receptor/releases>`
-1. Install receptor
+2. Install receptor
 .. code-block:: bash
 
     pip install receptorctl`

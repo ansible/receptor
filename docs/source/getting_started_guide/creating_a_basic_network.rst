@@ -79,7 +79,7 @@ Receptor configurations
       allowruntimeparams: true
     ...
 
-1. Run the services in separate terminals.
+2. Run the services in separate terminals.
 
 .. code-block:: bash
 

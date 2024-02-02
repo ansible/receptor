@@ -22,8 +22,6 @@ transient network failures.
 
 .. seealso::
 
-    :ref:`glossary`
-        Receptor glossary
     :ref:`interacting_with_nodes`
         Further examples of working with nodes
     :ref:`connecting_nodes`

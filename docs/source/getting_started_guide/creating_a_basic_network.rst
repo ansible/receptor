@@ -21,9 +21,9 @@ Receptor configurations
 
 .. code-block:: yaml
 
-    ---
-    - node:
-      id: foo
+  ---
+  - node:
+    id: foo
 
     - control-service:
       service: control

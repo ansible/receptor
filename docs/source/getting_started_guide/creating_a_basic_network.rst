@@ -96,4 +96,6 @@ Receptor configurations
 .. seealso::
 
     :ref:`configuring_receptor_with_a_config_file`
+        Configuring Receptor with a configuration file
     :ref:`connecting_nodes`
+        Detail on connecting receptor nodes

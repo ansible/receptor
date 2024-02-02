@@ -6,6 +6,8 @@ User guide
 
 This guide describes how to use receptor in multiple environments and uses the following terms:
 
+.. _glossary:
+
 .. glossary::
 
    Backend

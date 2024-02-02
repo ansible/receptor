@@ -19,7 +19,6 @@ transient network failures.
     installing_receptor
     creating_a_basic_network
     trying_sample_commands
-    glossary
 
 .. seealso::
 

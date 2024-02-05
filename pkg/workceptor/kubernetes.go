@@ -120,10 +120,9 @@ func podRunningAndReady() func(event watch.Event) (bool, error) {
 	return inner
 }
 
-func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool) (io.ReadCloser, error) {
+func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
 	var logStream io.ReadCloser
 	var err error
-	var sinceTime time.Time
 	podNamespace := kw.pod.Namespace
 	podName := kw.pod.Name
 	podOptions := &corev1.PodLogOptions{
@@ -172,7 +171,7 @@ func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *S
 	defer streamWait.Done()
 	podNamespace := kw.pod.Namespace
 	podName := kw.pod.Name
-	logStream, err := kw.kubeLoggingConnectionHandler(false)
+	logStream, err := kw.kubeLoggingConnectionHandler(false, time.Time{})
 	if err != nil {
 		return
 	}
@@ -228,7 +227,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			break
 		}
 
-		logStream, err := kw.kubeLoggingConnectionHandler(true)
+		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			break
 		}

@@ -771,13 +771,13 @@ func shouldUseReconnect() bool {
 		case "disabled":
 			return false
 		case "auto":
-			// continue
+			return true
 		default:
 			return false
 		}
 	}
 
-	return false
+	return true
 }
 
 func parseTime(s string) *time.Time {

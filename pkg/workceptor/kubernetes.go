@@ -241,7 +241,8 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					kw.GetWorkceptor().nc.GetLogger().Info(
 						"Context was canceled while reading logs for pod %s/%s. Assuming pod has finished",
 						podNamespace,
-						podName)
+						podName,
+					)
 
 					return
 				}
@@ -260,8 +261,15 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 					break
 				}
-				*stdoutErr = err
+
 				kw.GetWorkceptor().nc.GetLogger().Error("Error reading from pod %s/%s: %s", podNamespace, podName, err)
+
+				// At this point we exausted all retries, every retry we either failed to read OR we read but did not get newer msg
+				// If we got a EOF on the last retry we assume that we read everything and we can stop the loop
+				// we ASSUME this is the happy path.
+				if err != io.EOF {
+					*stdoutErr = err
+				}
 
 				return
 			}
@@ -487,6 +495,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 	if podName == "" {
 		// create new pod if ked.PodName is empty
+		// TODO: add retry logic to make this more resilient to transient errors
 		if err := kw.createPod(nil); err != nil {
 			if err != ErrPodCompleted {
 				errMsg := fmt.Sprintf("Error creating pod: %s", err)

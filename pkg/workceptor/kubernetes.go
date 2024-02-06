@@ -201,7 +201,8 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 	for {
 		if *stdinErr != nil {
-			break
+			// fail to send stdin to pod, no need to continue
+			return
 		}
 
 		// get pod, with retry
@@ -224,12 +225,14 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
-			break
+			// fail to get pod, no need to continue
+			return
 		}
 
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
-			break
+			// fail to get log stream, no need to continue
+			return
 		}
 
 		// read from logstream
@@ -739,7 +742,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		return
 	}
 
-	if kw.GetContext().Err() != context.Canceled {
+	// only transition from WorkStateRunning to WorkStateSucceeded if WorkStateFailed is set we do not override
+	if kw.GetContext().Err() != context.Canceled && kw.Status().State == WorkStateRunning {
 		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 	}
 }

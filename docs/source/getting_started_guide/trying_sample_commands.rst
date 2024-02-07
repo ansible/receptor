@@ -2,6 +2,9 @@
 Try Sample Commands
 ###################
 
+N.B. The prior steps of network setup and receptor installation
+need to be completed in order for these command to work
+
 1. Show network status
 
 .. code-block:: bash
@@ -43,3 +46,6 @@ Congratulations, you are now using Receptor!
 .. seealso::
 
     :ref:`control_service_commands`
+    :ref:`installation`
+    :ref:`creating_a_basic_network`
+    :ref:`installing_receptor`

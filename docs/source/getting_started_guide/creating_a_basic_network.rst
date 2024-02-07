@@ -1,4 +1,5 @@
-:: _creating_a_basic_network:
+
+.. _creating_a_basic_network:
 
 ###############################
 Creating a basic 3-node network

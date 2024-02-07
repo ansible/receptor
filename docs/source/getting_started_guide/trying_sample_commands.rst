@@ -46,6 +46,6 @@ Congratulations, you are now using Receptor!
 .. seealso::
 
     :ref:`control_service_commands`
-    :ref:`installation`
+    :ref:`installating`
     :ref:`creating_a_basic_network`
     :ref:`installing_receptor`

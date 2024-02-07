@@ -16,4 +16,6 @@ Installing Receptor
 .. seealso::
 
     :ref:`installing`
+        Detailed installation instructions
     :ref:`using_receptor_containers`
+        Using receptor in containers

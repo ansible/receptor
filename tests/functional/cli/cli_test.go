@@ -59,8 +59,10 @@ func TestListeners(t *testing.T) {
 			defer cmd.Process.Wait()
 			defer cmd.Process.Kill()
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-			success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel1()
+
+			success, err := utils.CheckUntilTimeoutWithErr(ctx1, 10*time.Millisecond, func() (bool, error) {
 				return ConfirmListening(cmd.Process.Pid, listenProto)
 			})
 			if err != nil {
@@ -116,8 +118,10 @@ func TestSSLListeners(t *testing.T) {
 				return err == nil
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-			success := utils.CheckUntilTimeout(ctx, 10*time.Millisecond, checkFunc)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel1()
+
+			success := utils.CheckUntilTimeout(ctx1, 10*time.Millisecond, checkFunc)
 			if !success {
 				t.Fatalf("Timed out while waiting for tls backend to start:\n%s", receptorStdOut.String())
 			}
@@ -190,8 +194,10 @@ func TestCostMap(t *testing.T) {
 					defer cmd.Process.Wait()
 					defer cmd.Process.Kill()
 
-					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+					ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel1()
+
+					success, err := utils.CheckUntilTimeoutWithErr(ctx1, 10*time.Millisecond, func() (bool, error) {
 						return ConfirmListening(cmd.Process.Pid, listenProto)
 					})
 					if err != nil {
@@ -238,8 +244,10 @@ func TestCosts(t *testing.T) {
 					defer cmd.Process.Wait()
 					defer cmd.Process.Kill()
 
-					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+					ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel1()
+
+					success, err := utils.CheckUntilTimeoutWithErr(ctx1, 10*time.Millisecond, func() (bool, error) {
 						return ConfirmListening(cmd.Process.Pid, listenProto)
 					})
 					if err != nil {

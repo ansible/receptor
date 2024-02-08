@@ -498,6 +498,126 @@ func TestCreateCertReqNegative(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, gotErr := certificates.CreateCertReq(tt.args.opts, tt.args.privateKey)
 			if gotErr == nil || gotErr.Error() != tt.wantErr.Error() {
+				t.Errorf("CreateCertReq() error = %v, wantErr = %v", gotErr, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCreateCertReqWithKey(t *testing.T) {
+	type args struct {
+		opts *certificates.CertOptions
+	}
+
+	goodCaTimeAfterString := "2032-01-07T00:03:51Z"
+	goodCaTimeAfter, err := time.Parse(time.RFC3339, goodCaTimeAfterString)
+	if err != nil {
+		t.Errorf("Error parsing time %s: %v", goodCaTimeAfterString, err)
+	}
+	goodCaTimeBeforeString := "2022-01-07T00:03:51Z"
+	goodCaTimeBefore, err := time.Parse(time.RFC3339, goodCaTimeBeforeString)
+	if err != nil {
+		t.Errorf("Error parsing time %s: %v", goodCaTimeBeforeString, err)
+	}
+
+	goodCertOptions := certificates.CertOptions{
+		Bits:       4096,
+		CommonName: "Ansible Automation Controller Receptor",
+		NotAfter:   goodCaTimeAfter,
+		NotBefore:  goodCaTimeBefore,
+	}
+
+	goodCertificateRequest := &x509.CertificateRequest{
+		Attributes:         nil,
+		DNSNames:           nil,
+		EmailAddresses:     nil,
+		Extensions:         nil,
+		ExtraExtensions:    nil,
+		IPAddresses:        nil,
+		PublicKeyAlgorithm: x509.RSA,
+		SignatureAlgorithm: x509.SHA256WithRSA,
+		Subject: pkix.Name{
+			CommonName:         goodCertOptions.CommonName,
+			Country:            nil,
+			ExtraNames:         []pkix.AttributeTypeAndValue{},
+			Locality:           nil,
+			Names:              []pkix.AttributeTypeAndValue{},
+			Organization:       nil,
+			OrganizationalUnit: nil,
+			PostalCode:         nil,
+			Province:           nil,
+			SerialNumber:       "",
+			StreetAddress:      nil,
+		},
+		URIs:    nil,
+		Version: 0,
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.CertificateRequest
+		want1   *rsa.PrivateKey
+		wantErr bool
+	}{
+		{
+			name: "Positive test",
+			args: args{
+				opts: &goodCertOptions,
+			},
+			want:    goodCertificateRequest,
+			want1:   nil,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := certificates.CreateCertReqWithKey(tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateCertReqWithKey() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CreateCertReqWithKey() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("CreateCertReqWithKey() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestCreateCertReqWithKeyNegative(t *testing.T) {
+	type args struct {
+		opts *certificates.CertOptions
+	}
+
+	badCertOptions := certificates.CertOptions{
+		Bits: -1,
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.CertificateRequest
+		want1   *rsa.PrivateKey
+		wantErr error
+	}{
+		{
+			name: "Negative test for Bits",
+			args: args{
+				opts: &badCertOptions,
+			},
+			want:    nil,
+			want1:   nil,
+			wantErr: fmt.Errorf("crypto/rsa: too few primes of given length to generate an RSA key"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, gotErr := certificates.CreateCertReqWithKey(tt.args.opts)
+			if gotErr == nil || gotErr.Error() != tt.wantErr.Error() {
 				t.Errorf("CreateCA() error = %v, wantErr = %v", gotErr, tt.wantErr)
 			}
 		})

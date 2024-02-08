@@ -13,6 +13,7 @@ Receptor is an overlay network intended to ease the distribution of work across 
    :maxdepth: 2
 
    installation
+   getting_started_guide/index
    user_guide/index
    developer_guide
    contributing

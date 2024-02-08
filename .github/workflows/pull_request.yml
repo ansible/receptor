@@ -70,7 +70,7 @@ jobs:
           sudo cp ./receptor /usr/local/bin/receptor
 
       - name: Download kind binary
-        run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.21.0/kind-linux-amd64 && chmod +x ./kind
+        run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind
 
       - name: Create k8s cluster
         run: ./kind create cluster

@@ -18,7 +18,7 @@ func TestShouldUseReconnect(t *testing.T) {
 		{
 			name:     "Positive (undefined) test",
 			envValue: "",
-			want:     false,
+			want:     true,
 		},
 		{
 			name:     "Enabled test",
@@ -33,7 +33,7 @@ func TestShouldUseReconnect(t *testing.T) {
 		{
 			name:     "Auto test",
 			envValue: "auto",
-			want:     false,
+			want:     true,
 		},
 		{
 			name:     "Default test",

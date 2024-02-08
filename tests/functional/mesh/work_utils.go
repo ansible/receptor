@@ -21,8 +21,10 @@ func workSetup(workPluginName workPlugin, t *testing.T) (map[string]*ReceptorCon
 		t.Fatal(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err = m.WaitForReady(ctx)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel1()
+
+	err = m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err, m.DataDir)
 	}

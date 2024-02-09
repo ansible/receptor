@@ -138,7 +138,7 @@ type hasTerm struct {
 
 func (h *hasTerm) DeepCopySelector() fields.Selector { return h }
 func (h *hasTerm) Empty() bool                       { return true }
-func (h *hasTerm) Matches(ls fields.Fields) bool     { return true }
+func (h *hasTerm) Matches(_ fields.Fields) bool      { return true }
 func (h *hasTerm) Requirements() fields.Requirements {
 	return []fields.Requirement{{
 		Field:    h.field,
@@ -146,18 +146,17 @@ func (h *hasTerm) Requirements() fields.Requirements {
 		Value:    h.value,
 	}}
 }
-func (h *hasTerm) RequiresExactMatch(field string) (value string, found bool) { return "", true }
-func (h *hasTerm) String() string                                             { return "Test" }
-func (h *hasTerm) Transform(fn fields.TransformFunc) (fields.Selector, error) { return h, nil }
+func (h *hasTerm) RequiresExactMatch(_ string) (value string, found bool)    { return "", true }
+func (h *hasTerm) String() string                                            { return "Test" }
+func (h *hasTerm) Transform(_ fields.TransformFunc) (fields.Selector, error) { return h, nil }
 
-type ex struct {
-}
+type ex struct{}
 
-func (e *ex) Stream(options remotecommand.StreamOptions) error {
+func (e *ex) Stream(_ remotecommand.StreamOptions) error {
 	return nil
 }
 
-func (e *ex) StreamWithContext(ctx context.Context, options remotecommand.StreamOptions) error {
+func (e *ex) StreamWithContext(_ context.Context, _ remotecommand.StreamOptions) error {
 	return nil
 }
 
@@ -165,48 +164,54 @@ func TestKubeStart(t *testing.T) {
 	ku, mockbwu, mockNet, w, mockKubeAPI, ctx := createKubernetesTestSetup(t)
 
 	startTestCases := []struct {
-		name string
+		name          string
+		expectedCalls func()
 	}{
-		{name: "test1"},
+		{
+			name: "test1",
+			expectedCalls: func() {
+				mockbwu.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				config := rest.Config{}
+				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				mockbwu.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNet.EXPECT().GetLogger().Return(logger).AnyTimes()
+				clientset := kubernetes.Clientset{}
+				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+				mockbwu.EXPECT().MonitorLocalStatus().AnyTimes()
+				lock := &sync.RWMutex{}
+				mockbwu.EXPECT().GetStatusLock().Return(lock).AnyTimes()
+				kubeExtraData := workceptor.KubeExtraData{}
+				status := workceptor.StatusFileData{ExtraData: &kubeExtraData}
+				mockbwu.EXPECT().GetStatusWithoutExtraData().Return(&status).AnyTimes()
+				mockbwu.EXPECT().GetStatusCopy().Return(status).AnyTimes()
+				mockbwu.EXPECT().GetContext().Return(ctx).AnyTimes()
+				pod := corev1.Pod{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{Name: "Test Name"}, Spec: corev1.PodSpec{}, Status: corev1.PodStatus{}}
+
+				mockKubeAPI.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&pod, nil).AnyTimes()
+				mockbwu.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+
+				field := hasTerm{}
+				mockKubeAPI.EXPECT().OneTermEqualSelector(gomock.Any(), gomock.Any()).Return(&field).AnyTimes()
+				ev := watch.Event{Object: &pod}
+				mockKubeAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&ev, nil).AnyTimes()
+				apierr := apierrors.StatusError{}
+				mockKubeAPI.EXPECT().NewNotFound(gomock.Any(), gomock.Any()).Return(&apierr).AnyTimes()
+				mockbwu.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				c := rest.RESTClient{}
+				req := rest.NewRequest(&c)
+				mockKubeAPI.EXPECT().SubResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(req).AnyTimes()
+				exec := ex{}
+				mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), gomock.Any(), gomock.Any()).Return(&exec, nil).AnyTimes()
+				mockbwu.EXPECT().UnitDir().Return("TestDir").AnyTimes()
+			},
+		},
 	}
 
 	for _, testCase := range startTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			mockbwu.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			config := rest.Config{}
-			mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
-			mockbwu.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-			logger := logger.NewReceptorLogger("")
-			mockNet.EXPECT().GetLogger().Return(logger).AnyTimes()
-			clientset := kubernetes.Clientset{}
-			mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
-			mockbwu.EXPECT().MonitorLocalStatus().AnyTimes()
-			lock := &sync.RWMutex{}
-			mockbwu.EXPECT().GetStatusLock().Return(lock).AnyTimes()
-			kubeExtraData := workceptor.KubeExtraData{}
-			status := workceptor.StatusFileData{ExtraData: &kubeExtraData}
-			mockbwu.EXPECT().GetStatusWithoutExtraData().Return(&status).AnyTimes()
-			mockbwu.EXPECT().GetStatusCopy().Return(status).AnyTimes()
-			mockbwu.EXPECT().GetContext().Return(ctx).AnyTimes()
-			pod := corev1.Pod{metav1.TypeMeta{}, metav1.ObjectMeta{Name: "Test Name"}, corev1.PodSpec{}, corev1.PodStatus{}}
-
-			mockKubeAPI.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&pod, nil).AnyTimes()
-			mockbwu.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
-
-			field := hasTerm{}
-			mockKubeAPI.EXPECT().OneTermEqualSelector(gomock.Any(), gomock.Any()).Return(&field).AnyTimes()
-			ev := watch.Event{Object: &pod}
-			mockKubeAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&ev, nil).AnyTimes()
-			apierr := apierrors.StatusError{}
-			mockKubeAPI.EXPECT().NewNotFound(gomock.Any(), gomock.Any()).Return(&apierr).AnyTimes()
-			mockbwu.EXPECT().MonitorLocalStatus().AnyTimes()
-
-			c := rest.RESTClient{}
-			req := rest.NewRequest(&c)
-			mockKubeAPI.EXPECT().SubResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(req).AnyTimes()
-			exec := ex{}
-			mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), gomock.Any(), gomock.Any()).Return(&exec, nil).AnyTimes()
-			mockbwu.EXPECT().UnitDir().Return("TestDir").AnyTimes()
+			testCase.expectedCalls()
 
 			err := ku.Start()
 			if err != nil {

@@ -49,148 +49,148 @@ func (m *MockKubeAPIer) EXPECT() *MockKubeAPIerMockRecorder {
 }
 
 // NewNotFound mocks base method
-func (m *MockKubeAPIer) NewNotFound(qualifiedResource schema.GroupResource, name string) *errors.StatusError {
+func (m *MockKubeAPIer) NewNotFound(arg0 schema.GroupResource, arg1 string) *errors.StatusError {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewNotFound", qualifiedResource, name)
+	ret := m.ctrl.Call(m, "NewNotFound", arg0, arg1)
 	ret0, _ := ret[0].(*errors.StatusError)
 	return ret0
 }
 
 // NewNotFound indicates an expected call of NewNotFound
-func (mr *MockKubeAPIerMockRecorder) NewNotFound(qualifiedResource, name interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) NewNotFound(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewNotFound", reflect.TypeOf((*MockKubeAPIer)(nil).NewNotFound), qualifiedResource, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewNotFound", reflect.TypeOf((*MockKubeAPIer)(nil).NewNotFound), arg0, arg1)
 }
 
 // OneTermEqualSelector mocks base method
-func (m *MockKubeAPIer) OneTermEqualSelector(k, v string) fields.Selector {
+func (m *MockKubeAPIer) OneTermEqualSelector(arg0, arg1 string) fields.Selector {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "OneTermEqualSelector", k, v)
+	ret := m.ctrl.Call(m, "OneTermEqualSelector", arg0, arg1)
 	ret0, _ := ret[0].(fields.Selector)
 	return ret0
 }
 
 // OneTermEqualSelector indicates an expected call of OneTermEqualSelector
-func (mr *MockKubeAPIerMockRecorder) OneTermEqualSelector(k, v interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) OneTermEqualSelector(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OneTermEqualSelector", reflect.TypeOf((*MockKubeAPIer)(nil).OneTermEqualSelector), k, v)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OneTermEqualSelector", reflect.TypeOf((*MockKubeAPIer)(nil).OneTermEqualSelector), arg0, arg1)
 }
 
 // NewForConfig mocks base method
-func (m *MockKubeAPIer) NewForConfig(c *rest.Config) (*kubernetes.Clientset, error) {
+func (m *MockKubeAPIer) NewForConfig(arg0 *rest.Config) (*kubernetes.Clientset, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewForConfig", c)
+	ret := m.ctrl.Call(m, "NewForConfig", arg0)
 	ret0, _ := ret[0].(*kubernetes.Clientset)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewForConfig indicates an expected call of NewForConfig
-func (mr *MockKubeAPIerMockRecorder) NewForConfig(c interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) NewForConfig(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewForConfig", reflect.TypeOf((*MockKubeAPIer)(nil).NewForConfig), c)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewForConfig", reflect.TypeOf((*MockKubeAPIer)(nil).NewForConfig), arg0)
 }
 
 // GetLogs mocks base method
-func (m *MockKubeAPIer) GetLogs(clientset *kubernetes.Clientset, namespace, name string, opts *v1.PodLogOptions) *rest.Request {
+func (m *MockKubeAPIer) GetLogs(arg0 *kubernetes.Clientset, arg1, arg2 string, arg3 *v1.PodLogOptions) *rest.Request {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogs", clientset, namespace, name, opts)
+	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*rest.Request)
 	return ret0
 }
 
 // GetLogs indicates an expected call of GetLogs
-func (mr *MockKubeAPIerMockRecorder) GetLogs(clientset, namespace, name, opts interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) GetLogs(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockKubeAPIer)(nil).GetLogs), clientset, namespace, name, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockKubeAPIer)(nil).GetLogs), arg0, arg1, arg2, arg3)
 }
 
 // Get mocks base method
-func (m *MockKubeAPIer) Get(clientset *kubernetes.Clientset, namespace string, ctx context.Context, name string, opts v10.GetOptions) (*v1.Pod, error) {
+func (m *MockKubeAPIer) Get(arg0 context.Context, arg1 *kubernetes.Clientset, arg2, arg3 string, arg4 v10.GetOptions) (*v1.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", clientset, namespace, ctx, name, opts)
+	ret := m.ctrl.Call(m, "Get", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*v1.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get
-func (mr *MockKubeAPIerMockRecorder) Get(clientset, namespace, ctx, name, opts interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) Get(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockKubeAPIer)(nil).Get), clientset, namespace, ctx, name, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockKubeAPIer)(nil).Get), arg0, arg1, arg2, arg3, arg4)
 }
 
 // Create mocks base method
-func (m *MockKubeAPIer) Create(clientset *kubernetes.Clientset, namespace string, ctx context.Context, pod *v1.Pod, opts v10.CreateOptions) (*v1.Pod, error) {
+func (m *MockKubeAPIer) Create(arg0 context.Context, arg1 *kubernetes.Clientset, arg2 string, arg3 *v1.Pod, arg4 v10.CreateOptions) (*v1.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", clientset, namespace, ctx, pod, opts)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*v1.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create
-func (mr *MockKubeAPIerMockRecorder) Create(clientset, namespace, ctx, pod, opts interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) Create(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockKubeAPIer)(nil).Create), clientset, namespace, ctx, pod, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockKubeAPIer)(nil).Create), arg0, arg1, arg2, arg3, arg4)
 }
 
 // List mocks base method
-func (m *MockKubeAPIer) List(clientset *kubernetes.Clientset, namespace string, ctx context.Context, opts v10.ListOptions) (*v1.PodList, error) {
+func (m *MockKubeAPIer) List(arg0 context.Context, arg1 *kubernetes.Clientset, arg2 string, arg3 v10.ListOptions) (*v1.PodList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", clientset, namespace, ctx, opts)
+	ret := m.ctrl.Call(m, "List", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*v1.PodList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // List indicates an expected call of List
-func (mr *MockKubeAPIerMockRecorder) List(clientset, namespace, ctx, opts interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) List(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockKubeAPIer)(nil).List), clientset, namespace, ctx, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockKubeAPIer)(nil).List), arg0, arg1, arg2, arg3)
 }
 
 // Watch mocks base method
-func (m *MockKubeAPIer) Watch(clientset *kubernetes.Clientset, namespace string, ctx context.Context, opts v10.ListOptions) (watch.Interface, error) {
+func (m *MockKubeAPIer) Watch(arg0 context.Context, arg1 *kubernetes.Clientset, arg2 string, arg3 v10.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Watch", clientset, namespace, ctx, opts)
+	ret := m.ctrl.Call(m, "Watch", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(watch.Interface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Watch indicates an expected call of Watch
-func (mr *MockKubeAPIerMockRecorder) Watch(clientset, namespace, ctx, opts interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) Watch(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockKubeAPIer)(nil).Watch), clientset, namespace, ctx, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockKubeAPIer)(nil).Watch), arg0, arg1, arg2, arg3)
 }
 
 // Delete mocks base method
-func (m *MockKubeAPIer) Delete(clientset *kubernetes.Clientset, namespace string, ctx context.Context, name string, opts v10.DeleteOptions) error {
+func (m *MockKubeAPIer) Delete(arg0 context.Context, arg1 *kubernetes.Clientset, arg2, arg3 string, arg4 v10.DeleteOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", clientset, namespace, ctx, name, opts)
+	ret := m.ctrl.Call(m, "Delete", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Delete indicates an expected call of Delete
-func (mr *MockKubeAPIerMockRecorder) Delete(clientset, namespace, ctx, name, opts interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) Delete(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockKubeAPIer)(nil).Delete), clientset, namespace, ctx, name, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockKubeAPIer)(nil).Delete), arg0, arg1, arg2, arg3, arg4)
 }
 
 // SubResource mocks base method
-func (m *MockKubeAPIer) SubResource(clientset *kubernetes.Clientset, podName, podNamespace string) *rest.Request {
+func (m *MockKubeAPIer) SubResource(arg0 *kubernetes.Clientset, arg1, arg2 string) *rest.Request {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubResource", clientset, podName, podNamespace)
+	ret := m.ctrl.Call(m, "SubResource", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*rest.Request)
 	return ret0
 }
 
 // SubResource indicates an expected call of SubResource
-func (mr *MockKubeAPIerMockRecorder) SubResource(clientset, podName, podNamespace interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) SubResource(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubResource", reflect.TypeOf((*MockKubeAPIer)(nil).SubResource), clientset, podName, podNamespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubResource", reflect.TypeOf((*MockKubeAPIer)(nil).SubResource), arg0, arg1, arg2)
 }
 
 // InClusterConfig mocks base method
@@ -223,69 +223,69 @@ func (mr *MockKubeAPIerMockRecorder) NewDefaultClientConfigLoadingRules() *gomoc
 }
 
 // BuildConfigFromFlags mocks base method
-func (m *MockKubeAPIer) BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+func (m *MockKubeAPIer) BuildConfigFromFlags(arg0, arg1 string) (*rest.Config, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildConfigFromFlags", masterUrl, kubeconfigPath)
+	ret := m.ctrl.Call(m, "BuildConfigFromFlags", arg0, arg1)
 	ret0, _ := ret[0].(*rest.Config)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BuildConfigFromFlags indicates an expected call of BuildConfigFromFlags
-func (mr *MockKubeAPIerMockRecorder) BuildConfigFromFlags(masterUrl, kubeconfigPath interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) BuildConfigFromFlags(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildConfigFromFlags", reflect.TypeOf((*MockKubeAPIer)(nil).BuildConfigFromFlags), masterUrl, kubeconfigPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildConfigFromFlags", reflect.TypeOf((*MockKubeAPIer)(nil).BuildConfigFromFlags), arg0, arg1)
 }
 
 // NewClientConfigFromBytes mocks base method
-func (m *MockKubeAPIer) NewClientConfigFromBytes(configBytes []byte) (clientcmd.ClientConfig, error) {
+func (m *MockKubeAPIer) NewClientConfigFromBytes(arg0 []byte) (clientcmd.ClientConfig, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewClientConfigFromBytes", configBytes)
+	ret := m.ctrl.Call(m, "NewClientConfigFromBytes", arg0)
 	ret0, _ := ret[0].(clientcmd.ClientConfig)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewClientConfigFromBytes indicates an expected call of NewClientConfigFromBytes
-func (mr *MockKubeAPIerMockRecorder) NewClientConfigFromBytes(configBytes interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) NewClientConfigFromBytes(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewClientConfigFromBytes", reflect.TypeOf((*MockKubeAPIer)(nil).NewClientConfigFromBytes), configBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewClientConfigFromBytes", reflect.TypeOf((*MockKubeAPIer)(nil).NewClientConfigFromBytes), arg0)
 }
 
 // NewSPDYExecutor mocks base method
-func (m *MockKubeAPIer) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
+func (m *MockKubeAPIer) NewSPDYExecutor(arg0 *rest.Config, arg1 string, arg2 *url.URL) (remotecommand.Executor, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewSPDYExecutor", config, method, url)
+	ret := m.ctrl.Call(m, "NewSPDYExecutor", arg0, arg1, arg2)
 	ret0, _ := ret[0].(remotecommand.Executor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewSPDYExecutor indicates an expected call of NewSPDYExecutor
-func (mr *MockKubeAPIerMockRecorder) NewSPDYExecutor(config, method, url interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) NewSPDYExecutor(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewSPDYExecutor", reflect.TypeOf((*MockKubeAPIer)(nil).NewSPDYExecutor), config, method, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewSPDYExecutor", reflect.TypeOf((*MockKubeAPIer)(nil).NewSPDYExecutor), arg0, arg1, arg2)
 }
 
 // StreamWithContext mocks base method
-func (m *MockKubeAPIer) StreamWithContext(exec remotecommand.Executor, ctx context.Context, options remotecommand.StreamOptions) error {
+func (m *MockKubeAPIer) StreamWithContext(arg0 context.Context, arg1 remotecommand.Executor, arg2 remotecommand.StreamOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StreamWithContext", exec, ctx, options)
+	ret := m.ctrl.Call(m, "StreamWithContext", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StreamWithContext indicates an expected call of StreamWithContext
-func (mr *MockKubeAPIerMockRecorder) StreamWithContext(exec, ctx, options interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) StreamWithContext(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamWithContext", reflect.TypeOf((*MockKubeAPIer)(nil).StreamWithContext), exec, ctx, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamWithContext", reflect.TypeOf((*MockKubeAPIer)(nil).StreamWithContext), arg0, arg1, arg2)
 }
 
 // UntilWithSync mocks base method
-func (m *MockKubeAPIer) UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition watch0.PreconditionFunc, conditions ...watch0.ConditionFunc) (*watch.Event, error) {
+func (m *MockKubeAPIer) UntilWithSync(arg0 context.Context, arg1 cache.ListerWatcher, arg2 runtime.Object, arg3 watch0.PreconditionFunc, arg4 ...watch0.ConditionFunc) (*watch.Event, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{ctx, lw, objType, precondition}
-	for _, a := range conditions {
+	varargs := []interface{}{arg0, arg1, arg2, arg3}
+	for _, a := range arg4 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "UntilWithSync", varargs...)
@@ -295,9 +295,9 @@ func (m *MockKubeAPIer) UntilWithSync(ctx context.Context, lw cache.ListerWatche
 }
 
 // UntilWithSync indicates an expected call of UntilWithSync
-func (mr *MockKubeAPIerMockRecorder) UntilWithSync(ctx, lw, objType, precondition interface{}, conditions ...interface{}) *gomock.Call {
+func (mr *MockKubeAPIerMockRecorder) UntilWithSync(arg0, arg1, arg2, arg3 interface{}, arg4 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{ctx, lw, objType, precondition}, conditions...)
+	varargs := append([]interface{}{arg0, arg1, arg2, arg3}, arg4...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UntilWithSync", reflect.TypeOf((*MockKubeAPIer)(nil).UntilWithSync), varargs...)
 }
 

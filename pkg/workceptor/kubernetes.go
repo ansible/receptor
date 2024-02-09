@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -54,7 +55,7 @@ type kubeUnit struct {
 }
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker.
-type kubeExtraData struct {
+type KubeExtraData struct {
 	Image         string
 	Command       string
 	Params        string
@@ -63,6 +64,109 @@ type kubeExtraData struct {
 	KubePod       string
 	PodName       string
 }
+
+type KubeAPIer interface {
+	NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError
+	OneTermEqualSelector(k string, v string) fields.Selector
+	NewForConfig(c *rest.Config) (*kubernetes.Clientset, error)
+	GetLogs(clientset *kubernetes.Clientset, namespace string, name string, opts *corev1.PodLogOptions) *rest.Request
+	Get(clientset *kubernetes.Clientset, namespace string, ctx context.Context, name string, opts metav1.GetOptions) (*corev1.Pod, error)
+	Create(clientset *kubernetes.Clientset, namespace string, ctx context.Context, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error)
+	List(clientset *kubernetes.Clientset, namespace string, ctx context.Context, opts metav1.ListOptions) (*corev1.PodList, error)
+	Watch(clientset *kubernetes.Clientset, namespace string, ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Delete(clientset *kubernetes.Clientset, namespace string, ctx context.Context, name string, opts metav1.DeleteOptions) error
+	SubResource(clientset *kubernetes.Clientset, podName string, podNamespace string) *rest.Request
+	InClusterConfig() (*rest.Config, error)
+	NewDefaultClientConfigLoadingRules() *clientcmd.ClientConfigLoadingRules
+	BuildConfigFromFlags(masterUrl string, kubeconfigPath string) (*rest.Config, error)
+	NewClientConfigFromBytes(configBytes []byte) (clientcmd.ClientConfig, error)
+	NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error)
+	StreamWithContext(exec remotecommand.Executor, ctx context.Context, options remotecommand.StreamOptions) error
+	UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition watch2.PreconditionFunc, conditions ...watch2.ConditionFunc) (*watch.Event, error)
+	NewFakeNeverRateLimiter() flowcontrol.RateLimiter
+	NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter
+}
+
+type KubeAPIWrapper struct {
+}
+
+func (ku KubeAPIWrapper) NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError {
+	return apierrors.NewNotFound(qualifiedResource, name)
+}
+
+func (ku KubeAPIWrapper) OneTermEqualSelector(k string, v string) fields.Selector {
+	return fields.OneTermEqualSelector(k, v)
+}
+
+func (ku KubeAPIWrapper) NewForConfig(c *rest.Config) (*kubernetes.Clientset, error) {
+	return kubernetes.NewForConfig(c)
+}
+
+func (ku KubeAPIWrapper) GetLogs(clientset *kubernetes.Clientset, namespace string, name string, opts *corev1.PodLogOptions) *rest.Request {
+	return clientset.CoreV1().Pods(namespace).GetLogs(name, opts)
+}
+
+func (ku KubeAPIWrapper) Get(clientset *kubernetes.Clientset, namespace string, ctx context.Context, name string, opts metav1.GetOptions) (*corev1.Pod, error) {
+	return clientset.CoreV1().Pods(namespace).Get(ctx, name, opts)
+}
+
+func (ku KubeAPIWrapper) Create(clientset *kubernetes.Clientset, namespace string, ctx context.Context, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
+	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
+}
+
+func (ku KubeAPIWrapper) List(clientset *kubernetes.Clientset, namespace string, ctx context.Context, opts metav1.ListOptions) (*corev1.PodList, error) {
+	return clientset.CoreV1().Pods(namespace).List(ctx, opts)
+}
+
+func (ku KubeAPIWrapper) Watch(clientset *kubernetes.Clientset, namespace string, ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	return clientset.CoreV1().Pods(namespace).Watch(ctx, opts)
+}
+
+func (ku KubeAPIWrapper) Delete(clientset *kubernetes.Clientset, namespace string, ctx context.Context, name string, opts metav1.DeleteOptions) error {
+	return clientset.CoreV1().Pods(namespace).Delete(ctx, name, opts)
+}
+
+func (ku KubeAPIWrapper) SubResource(clientset *kubernetes.Clientset, podName string, podNamespace string) *rest.Request {
+	return clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(podNamespace).SubResource("attach")
+}
+
+func (ku KubeAPIWrapper) InClusterConfig() (*rest.Config, error) {
+	return rest.InClusterConfig()
+}
+
+func (ku KubeAPIWrapper) NewDefaultClientConfigLoadingRules() *clientcmd.ClientConfigLoadingRules {
+	return clientcmd.NewDefaultClientConfigLoadingRules()
+}
+
+func (ku KubeAPIWrapper) BuildConfigFromFlags(masterUrl string, kubeconfigPath string) (*rest.Config, error) {
+	return clientcmd.BuildConfigFromFlags(masterUrl, kubeconfigPath)
+}
+
+func (ku KubeAPIWrapper) NewClientConfigFromBytes(configBytes []byte) (clientcmd.ClientConfig, error) {
+	return clientcmd.NewClientConfigFromBytes(configBytes)
+}
+
+func (ku KubeAPIWrapper) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
+	return remotecommand.NewSPDYExecutor(config, method, url)
+}
+
+func (ku KubeAPIWrapper) StreamWithContext(exec remotecommand.Executor, ctx context.Context, options remotecommand.StreamOptions) error {
+	return exec.StreamWithContext(ctx, options)
+}
+
+func (ku KubeAPIWrapper) UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition watch2.PreconditionFunc, conditions ...watch2.ConditionFunc) (*watch.Event, error) {
+	return watch2.UntilWithSync(ctx, lw, objType, precondition, conditions...)
+}
+
+func (ku KubeAPIWrapper) NewFakeNeverRateLimiter() flowcontrol.RateLimiter {
+	return flowcontrol.NewFakeNeverRateLimiter()
+}
+
+func (ku KubeAPIWrapper) NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter {
+	return flowcontrol.NewFakeAlwaysRateLimiter()
+}
+
+var KubeAPIWrapperInstance KubeAPIer
 
 // ErrPodCompleted is returned when pod has already completed before we could attach.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
@@ -78,7 +182,7 @@ func podRunningAndReady() func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
-			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+			return false, KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		if t, ok := event.Object.(*corev1.Pod); ok {
 			switch t.Status.Phase {
@@ -134,9 +238,7 @@ func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 		podOptions.SinceTime = &metav1.Time{Time: sinceTime}
 	}
 
-	logReq := kw.clientset.CoreV1().Pods(podNamespace).GetLogs(
-		podName, podOptions,
-	)
+	logReq := KubeAPIWrapperInstance.GetLogs(kw.clientset, podNamespace, podName, podOptions)
 	// get logstream, with retry
 	for retries := 5; retries > 0; retries-- {
 		logStream, err = logReq.Stream(kw.GetContext())
@@ -207,7 +309,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 		// get pod, with retry
 		for retries := 5; retries > 0; retries-- {
-			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.GetContext(), podName, metav1.GetOptions{})
+			kw.pod, err = KubeAPIWrapperInstance.Get(kw.clientset, podNamespace, kw.GetContext(), podName, metav1.GetOptions{})
 			if err == nil {
 				break
 			}
@@ -278,7 +380,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			}
 
 			split := strings.SplitN(line, " ", 2)
-			timeStamp := parseTime(split[0])
+			timeStamp := ParseTime(split[0])
 			if !timeStamp.After(sinceTime) && !successfulWrite {
 				continue
 			}
@@ -301,7 +403,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 }
 
 func (kw *kubeUnit) createPod(env map[string]string) error {
-	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
+	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	command, err := shlex.Split(ked.Command)
 	if err != nil {
 		return err
@@ -383,7 +485,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 
 	// get pod and store to kw.pod
-	kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Create(kw.GetContext(), pod, metav1.CreateOptions{})
+	kw.pod, err = KubeAPIWrapperInstance.Create(kw.clientset, ked.KubeNamespace, kw.GetContext(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -398,21 +500,21 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		status.State = WorkStatePending
 		status.Detail = "Pod created"
 		status.StdoutSize = 0
-		status.ExtraData.(*kubeExtraData).PodName = kw.pod.Name
+		status.ExtraData.(*KubeExtraData).PodName = kw.pod.Name
 	})
 
 	// Wait for the pod to be running
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", kw.pod.Name).String()
+	fieldSelector := KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.pod.Name).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
 
-			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).List(kw.GetContext(), options)
+			return KubeAPIWrapperInstance.List(kw.clientset, ked.KubeNamespace, kw.GetContext(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
 
-			return kw.clientset.CoreV1().Pods(ked.KubeNamespace).Watch(kw.GetContext(), options)
+			return KubeAPIWrapperInstance.Watch(kw.clientset, ked.KubeNamespace, kw.GetContext(), options)
 		},
 	}
 
@@ -422,7 +524,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	}
 
 	time.Sleep(2 * time.Second)
-	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
+	ev, err := KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}
@@ -491,7 +593,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	skipStdin := true
 
 	status := kw.Status()
-	ked := status.ExtraData.(*kubeExtraData)
+	ked := status.ExtraData.(*KubeExtraData)
 
 	podName := ked.PodName
 	podNamespace := ked.KubeNamespace
@@ -538,7 +640,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			default:
 			}
 
-			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.GetContext(), podName, metav1.GetOptions{})
+			kw.pod, err = KubeAPIWrapperInstance.Get(kw.clientset, podNamespace, kw.GetContext(), podName, metav1.GetOptions{})
 			if err == nil {
 				break
 			}
@@ -563,11 +665,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	// Attach stdin stream to the pod
 	var exec remotecommand.Executor
 	if !skipStdin {
-		req := kw.clientset.CoreV1().RESTClient().Post().
-			Resource("pods").
-			Name(podName).
-			Namespace(podNamespace).
-			SubResource("attach")
+		req := KubeAPIWrapperInstance.SubResource(kw.clientset, podName, podNamespace)
 
 		req.VersionedParams(
 			&corev1.PodExecOptions{
@@ -579,9 +677,8 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 			},
 			scheme.ParameterCodec,
 		)
-
 		var err error
-		exec, err = remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
+		exec, err = KubeAPIWrapperInstance.NewSPDYExecutor(kw.config, "POST", req.URL())
 		if err != nil {
 			errMsg := fmt.Sprintf("Error creating SPDY executor: %s", err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -675,7 +772,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 
 			var err error
 			for retries := 5; retries > 0; retries-- {
-				err = exec.StreamWithContext(kw.GetContext(), remotecommand.StreamOptions{
+				err = KubeAPIWrapperInstance.StreamWithContext(exec, kw.GetContext(), remotecommand.StreamOptions{
 					Stdin: stdin,
 					Tty:   false,
 				})
@@ -721,7 +818,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		}()
 	}
 
-	stdoutWithReconnect := shouldUseReconnect()
+	stdoutWithReconnect := ShouldUseReconnect()
 	if stdoutWithReconnect && stdoutErr == nil {
 		kw.GetWorkceptor().nc.GetLogger().Debug("streaming stdout with reconnect support")
 		go kw.kubeLoggingWithReconnect(&streamWait, stdout, &stdinErr, &stdoutErr)
@@ -757,7 +854,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	}
 }
 
-func shouldUseReconnect() bool {
+func ShouldUseReconnect() bool {
 	// Support for streaming from pod with timestamps using reconnect method is in all current versions
 	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
 	// accepted values: "enabled", "disabled", "auto".  The default is "enabled"
@@ -780,7 +877,7 @@ func shouldUseReconnect() bool {
 	return true
 }
 
-func parseTime(s string) *time.Time {
+func ParseTime(s string) *time.Time {
 	t, err := time.Parse(time.RFC3339, s)
 	if err == nil {
 		return &t
@@ -973,10 +1070,10 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 
 func (kw *kubeUnit) connectUsingKubeconfig() error {
 	var err error
-	ked := kw.UnredactedStatus().ExtraData.(*kubeExtraData)
+	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	if ked.KubeConfig == "" {
-		clr := clientcmd.NewDefaultClientConfigLoadingRules()
-		kw.config, err = clientcmd.BuildConfigFromFlags("", clr.GetDefaultFilename())
+		clr := KubeAPIWrapperInstance.NewDefaultClientConfigLoadingRules()
+		kw.config, err = KubeAPIWrapperInstance.BuildConfigFromFlags("", clr.GetDefaultFilename())
 		if ked.KubeNamespace == "" {
 			c, err := clr.Load()
 			if err != nil {
@@ -985,14 +1082,14 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 			curContext, ok := c.Contexts[c.CurrentContext]
 			if ok && curContext != nil {
 				kw.UpdateFullStatus(func(sfd *StatusFileData) {
-					sfd.ExtraData.(*kubeExtraData).KubeNamespace = curContext.Namespace
+					sfd.ExtraData.(*KubeExtraData).KubeNamespace = curContext.Namespace
 				})
 			} else {
 				return fmt.Errorf("could not determine namespace")
 			}
 		}
 	} else {
-		cfg, err := clientcmd.NewClientConfigFromBytes([]byte(ked.KubeConfig))
+		cfg, err := KubeAPIWrapperInstance.NewClientConfigFromBytes([]byte(ked.KubeConfig))
 		if err != nil {
 			return err
 		}
@@ -1002,7 +1099,7 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 				return err
 			}
 			kw.UpdateFullStatus(func(sfd *StatusFileData) {
-				sfd.ExtraData.(*kubeExtraData).KubeNamespace = namespace
+				sfd.ExtraData.(*KubeExtraData).KubeNamespace = namespace
 			})
 		}
 		kw.config, err = cfg.ClientConfig()
@@ -1019,7 +1116,7 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 
 func (kw *kubeUnit) connectUsingIncluster() error {
 	var err error
-	kw.config, err = rest.InClusterConfig()
+	kw.config, err = KubeAPIWrapperInstance.InClusterConfig()
 	if err != nil {
 		return err
 	}
@@ -1082,16 +1179,16 @@ func (kw *kubeUnit) connectToKube() error {
 	if ok {
 		switch envRateLimiter {
 		case "never":
-			kw.config.RateLimiter = flowcontrol.NewFakeNeverRateLimiter()
+			kw.config.RateLimiter = KubeAPIWrapperInstance.NewFakeNeverRateLimiter()
 		case "always":
-			kw.config.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+			kw.config.RateLimiter = KubeAPIWrapperInstance.NewFakeAlwaysRateLimiter()
 		default:
 		}
 		kw.GetWorkceptor().nc.GetLogger().Debug("RateLimiter: %s", envRateLimiter)
 	}
 
 	kw.GetWorkceptor().nc.GetLogger().Debug("QPS: %f, Burst: %d", kw.config.QPS, kw.config.Burst)
-	kw.clientset, err = kubernetes.NewForConfig(kw.config)
+	kw.clientset, err = KubeAPIWrapperInstance.NewForConfig(kw.config)
 	if err != nil {
 		return err
 	}
@@ -1114,7 +1211,7 @@ func readFileToString(filename string) (string, error) {
 
 // SetFromParams sets the in-memory state from parameters.
 func (kw *kubeUnit) SetFromParams(params map[string]string) error {
-	ked := kw.GetStatusCopy().ExtraData.(*kubeExtraData)
+	ked := kw.GetStatusCopy().ExtraData.(*KubeExtraData)
 	type value struct {
 		name       string
 		permission bool
@@ -1203,7 +1300,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 // Status returns a copy of the status currently loaded in memory.
 func (kw *kubeUnit) Status() *StatusFileData {
 	status := kw.UnredactedStatus()
-	ed, ok := status.ExtraData.(*kubeExtraData)
+	ed, ok := status.ExtraData.(*KubeExtraData)
 	if ok {
 		ed.KubeConfig = ""
 		ed.KubePod = ""
@@ -1217,7 +1314,7 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 	kw.GetStatusLock().RLock()
 	defer kw.GetStatusLock().RUnlock()
 	status := kw.GetStatusWithoutExtraData()
-	ked, ok := kw.GetStatusCopy().ExtraData.(*kubeExtraData)
+	ked, ok := kw.GetStatusCopy().ExtraData.(*KubeExtraData)
 	if ok {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
@@ -1246,7 +1343,7 @@ func (kw *kubeUnit) startOrRestart() error {
 // Restart resumes monitoring a job after a Receptor restart.
 func (kw *kubeUnit) Restart() error {
 	status := kw.Status()
-	ked := status.ExtraData.(*kubeExtraData)
+	ked := status.ExtraData.(*KubeExtraData)
 	if IsComplete(status.State) {
 		return nil
 	}
@@ -1260,7 +1357,7 @@ func (kw *kubeUnit) Restart() error {
 		if err != nil {
 			kw.GetWorkceptor().nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
-			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
+			err := KubeAPIWrapperInstance.Delete(kw.clientset, ked.KubeNamespace, context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
 				kw.GetWorkceptor().nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
@@ -1285,7 +1382,7 @@ func (kw *kubeUnit) Cancel() error {
 	kw.CancelContext()
 	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 	if kw.pod != nil {
-		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
+		err := KubeAPIWrapperInstance.Delete(kw.clientset, kw.pod.Namespace, context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			kw.GetWorkceptor().nc.GetLogger().Error("Error deleting pod %s: %s", kw.pod.Name, err)
 		}
@@ -1332,10 +1429,14 @@ type KubeWorkerCfg struct {
 
 // NewWorker is a factory to produce worker instances.
 func (cfg KubeWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+	return cfg.NewkubeWorker(bwu, w, unitID, workType, nil)
+}
+
+func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string, kawi KubeAPIer) WorkUnit {
 	if bwu == nil {
 		bwu = &BaseWorkUnit{
 			status: StatusFileData{
-				ExtraData: &kubeExtraData{
+				ExtraData: &KubeExtraData{
 					Image:         cfg.Image,
 					Command:       cfg.Command,
 					KubeNamespace: cfg.Namespace,
@@ -1344,6 +1445,11 @@ func (cfg KubeWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, u
 				},
 			},
 		}
+	}
+
+	KubeAPIWrapperInstance = KubeAPIWrapper{}
+	if kawi != nil {
+		KubeAPIWrapperInstance = kawi
 	}
 
 	ku := &kubeUnit{

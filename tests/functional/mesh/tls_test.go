@@ -103,8 +103,10 @@ func TestTCPSSLConnections(t *testing.T) {
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 20*time.Second)
-			err = m.WaitForReady(ctx)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel1()
+
+			err = m.WaitForReady(ctx1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -187,9 +189,11 @@ func TestTCPSSLClientAuthFailNoKey(t *testing.T) {
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel1()
+
 			sleepInterval := 100 * time.Millisecond
-			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+			if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
 				linuxTLSError := strings.Contains(m.LogWriter.String(), "certificate signed by unknown authority")
 				macTLSError := strings.Contains(m.LogWriter.String(), "certificate is not trusted")
 
@@ -265,9 +269,11 @@ func TestTCPSSLClientAuthFailBadKey(t *testing.T) {
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel1()
+
 			sleepInterval := 100 * time.Millisecond
-			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+			if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
 				linuxTLSError := strings.Contains(m.LogWriter.String(), "certificate signed by unknown authority")
 				macTLSError := strings.Contains(m.LogWriter.String(), "certificate is not trusted")
 
@@ -330,9 +336,11 @@ func TestTCPSSLServerAuthFailNoKey(t *testing.T) {
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel1()
+
 			sleepInterval := 100 * time.Millisecond
-			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+			if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
 				return strings.Contains(m.LogWriter.String(), "first record does not look like a TLS handshake")
 			}) {
 				t.Fatal("Expected connection to fail but it succeeded")
@@ -402,9 +410,11 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 			defer m.WaitForShutdown()
 			defer m.Destroy()
 
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel1()
+
 			sleepInterval := 100 * time.Millisecond
-			if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+			if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
 				linuxTLSError := strings.Contains(m.LogWriter.String(), "certificate signed by unknown authority")
 				macTLSError := strings.Contains(m.LogWriter.String(), "certificate is not trusted")
 

@@ -46,8 +46,10 @@ func TestMeshStartup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
-			err = m.WaitForReady(ctx)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel1()
+
+			err = m.WaitForReady(ctx1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -109,8 +111,10 @@ func TestTraceroute(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-			err = m.WaitForReady(ctx)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel1()
+
+			err = m.WaitForReady(ctx1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -212,8 +216,9 @@ func TestMeshShutdown(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-			err = m.WaitForReady(ctx)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel1()
+			err = m.WaitForReady(ctx1)
 
 			if err != nil {
 				t.Fatal(err)
@@ -288,8 +293,10 @@ func TestCosts(t *testing.T) {
 	defer m.WaitForShutdown()
 	defer m.Destroy()
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-	err = m.WaitForReady(ctx)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel1()
+
+	err = m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,9 +358,11 @@ func TestDuplicateNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel1()
+
 	sleepInterval := 100 * time.Millisecond
-	if !utils.CheckUntilTimeout(ctx, sleepInterval, func() bool {
+	if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
 		return strings.Contains(m.LogWriter.String(), "connected using a node ID we are already connected to")
 	}) {
 		t.Fatal("duplicate nodes were not expected to exist together")

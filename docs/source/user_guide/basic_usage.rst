@@ -22,6 +22,7 @@ Supported log levels, in increasing verbosity, are Error, Warning, Info and Debu
 Note: stop the receptor process with ``ctrl-c``
 
 .. _configuring_receptor_with_a_config_file:
+
 Configuring Receptor with a config file
 ----------------------------------------
 
@@ -46,7 +47,8 @@ Start receptor using the config file
 
 Changing the configuration file does take effect until the receptor process is restarted.
 
-:: _using_receptor_containers:
+.. _using_receptor_containers:
+
 Use Receptor through a container image
 ---------------------------------------
 

@@ -50,7 +50,7 @@ jobs:
         run: make coverage
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -65,14 +65,14 @@ jobs:
         run: find /tmp/receptor-testing -name controlsock -delete
 
       - name: Artifact receptor data
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
           name: test-logs
           path: /tmp/receptor-testing
 
       - name: Archive receptor binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: receptor
           path: /usr/local/bin/receptor

@@ -1,5 +1,3 @@
-.. _contributing:
-
 ******************
 Contributor guide
 ******************
@@ -22,7 +20,7 @@ Receptor welcomes community contributions!  See the :ref:`dev_guide` for details
 Release process
 ===============
 
-Maintainers have the ability to run the `Stage Release <https://github.com/ansible/receptor/actions/workflows/stage.yml>`_ workflow. Running this workflow will:
+Maintainers have the ability to run the `Stage Release`_ workflow. Running this workflow will:
 
 - Build and push the container image to ghcr.io. This serves as a staging environment where the image can be tested.
 - Create a draft release at `<https://github.com/ansible/receptor/releases>`_
@@ -36,4 +34,7 @@ After the release is published, the `Promote Release <https://github.com/ansible
 - Build binaries for various OSes/platforms, and attach them to the `release <https://github.com/ansible/receptor/releases>`_.
 
 .. note::
-  If you need to re-run `Stage Release <https://github.com/ansible/receptor/actions/workflows/stage.yml>`_ more than once you must delete the tag beforehand, otherwise the workflow will fail.
+  If you need to re-run `Stage Release`_ more than once you must delete the tag beforehand, otherwise the workflow will fail.
+
+.. _Stage Release: https://github.com/ansible/receptor/actions/workflows/stage.yml
+

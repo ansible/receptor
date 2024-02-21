@@ -52,15 +52,15 @@ Note at this time it is necessary to have either a tcp-listener or a tcp-peer to
 
 Note: at least one of the containers in the pod spec must be named "worker". This is the container that stdin is passed into, and that stdout is retrieved from.
 
-First, we need the receptor control service running in order to be able to start a kubernetes work unit. 
+First, we need the receptor control service running in order to be able to start a kubernetes work unit.
 
 .. code-block:: sh
 
     $ receptor -c foo.yml
-    DEBUG 2022/01/17 10:05:56 Listening on TCP [::]:2222                                          
-    INFO 2022/01/17 10:05:56 Running control service control                                      
-    INFO 2022/01/17 10:05:56 Initialization complete 
-   
+    DEBUG 2022/01/17 10:05:56 Listening on TCP [::]:2222
+    INFO 2022/01/17 10:05:56 Running control service control
+    INFO 2022/01/17 10:05:56 Initialization complete
+
 Now we can submit a kubernetes work unit.
 
 .. code-block:: yaml

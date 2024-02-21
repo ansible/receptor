@@ -34,7 +34,7 @@ This guide describes how to use receptor in multiple environments and uses the f
 
    receptor
       The receptor application taken as a whole, which typically runs as a daemon.
-      
+
    receptorctl
       A user-facing command line used to interact with receptor, typically over a Unix domain socket.
 

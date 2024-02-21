@@ -8,7 +8,7 @@ Receptor is an open source project that lives at https://github.com/ansible/rece
 .. contents::
    :local:
 
-See the :ref:`contributing` for more general details.
+See the :ref:`contributing:contributing` for more general details.
 
 
 Testing
@@ -91,11 +91,11 @@ Here is the Prepare method for ``TCPDialerCfg``. By the time this code executes,
 
     // Prepare verifies the parameters are correct.
     func (cfg TCPDialerCfg) Prepare() error {
-    	if cfg.Cost <= 0.0 {
-    		return fmt.Errorf("connection cost must be positive")
-    	}
+        if cfg.Cost <= 0.0 {
+            return fmt.Errorf("connection cost must be positive")
+        }
 
-    	return nil
+        return nil
     }
 
 This simply does a check to make sure the provided Cost is valid.
@@ -106,27 +106,27 @@ The Run method for the ``TCPDialerCfg`` object:
 
     // Run runs the action.
     func (cfg TCPDialerCfg) Run() error {
-    	logger.Debug("Running TCP peer connection %s\n", cfg.Address)
-    	host, _, err := net.SplitHostPort(cfg.Address)
-    	if err != nil {
-    		return err
-    	}
-    	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host, "dns")
-    	if err != nil {
-    		return err
-    	}
-    	b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
-    	if err != nil {
-    		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+        logger.Debug("Running TCP peer connection %s\n", cfg.Address)
+        host, _, err := net.SplitHostPort(cfg.Address)
+        if err != nil {
+            return err
+        }
+        tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host, "dns")
+        if err != nil {
+            return err
+        }
+        b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
+        if err != nil {
+            logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 
-    		return err
-    	}
-    	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
-    	if err != nil {
-    		return err
-    	}
+            return err
+        }
+        err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+        if err != nil {
+            return err
+        }
 
-    	return nil
+        return nil
     }
 
 This gets a new TCP dialer object and passes it to the netceptor AddBackend method, so that it can be processed further. AddBackend will start proper Go routines that periodically dial the address defined in the TCP dialer structure, which will lead to a proper TCP connection to another receptor node.
@@ -147,7 +147,7 @@ The control-service on `foo` will receive this command and subsequently call the
 .. code-block:: go
 
     func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duration, string, error) {
-    	pc, err := nc.ListenPacket("")
+        pc, err := nc.ListenPacket("")
 
 ``target`` is the target node, "bar" in this case.
 
@@ -158,13 +158,13 @@ The control-service on `foo` will receive this command and subsequently call the
 .. code-block:: go
 
     pc := &PacketConn{
-    	s:            s,
-    	localService: service,
-    	recvChan:     make(chan *messageData),
-    	advertise:    false,
-    	adTags:       nil,
-    	connType:     ConnTypeDatagram,
-    	hopsToLive:   s.maxForwardingHops,
+        s:            s,
+        localService: service,
+        recvChan:     make(chan *messageData),
+        advertise:    false,
+        adTags:       nil,
+        connType:     ConnTypeDatagram,
+        hopsToLive:   s.maxForwardingHops,
     }
 
     s.listenerRegistry[service] = pc
@@ -189,12 +189,12 @@ Sends an empty message to the address "bar:ping" on the mesh. Recall that nodes 
 .. code-block:: go
 
     md := &messageData{
-    	FromNode:    s.nodeID,
-    	FromService: fromService,
-    	ToNode:      toNode,
-    	ToService:   toService,
-    	HopsToLive:  hopsToLive,
-    	Data:        data,
+        FromNode:    s.nodeID,
+        FromService: fromService,
+        ToNode:      toNode,
+        ToService:   toService,
+        HopsToLive:  hopsToLive,
+        Data:        data,
     }
 
     return s.handleMessageData(md)
@@ -239,8 +239,8 @@ So before the "ping" command was issued, this protoWriter Go routine was already
 .. code-block:: go
 
     func (ns *TCPSession) Send(data []byte) error {
-    	buf := ns.framer.SendData(data)
-    	n, err := ns.conn.Write(buf)
+        buf := ns.framer.SendData(data)
+        n, err := ns.conn.Write(buf)
 
 ``ns.conn`` is net.Conn object, which is part of the Golang standard library.
 
@@ -306,7 +306,7 @@ This checks whether the destination node indicated in the message is the current
 .. code-block:: go
 
     func (s *Netceptor) handlePing(md *messageData) error {
-    	return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
+        return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
     }
 
 This is the ping reply handler. It sends an empty message to the FromNode (`foo`).

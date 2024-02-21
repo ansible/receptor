@@ -109,7 +109,7 @@ One can also connect to the locally running control service in a similar manner
 
 Once connected to a control service, one can issue commands like "status" or "work list" and get JSON-formatted responses back.
 
-Keep in mind that a "work submit" command will require a payload. Type out the payload contents and press ctrl-D to send the EOF signal. The socket will then close and work will begin. See :ref:`workceptor` for more on submitting work via receptor.
+Keep in mind that a "work submit" command will require a payload. Type out the payload contents and press ctrl-D to send the EOF signal. The socket will then close and work will begin. See :ref:`user_guide/workceptor:workceptor` for more on submitting work via receptor.
 
 .. _control_service_commands:
 
@@ -127,7 +127,7 @@ String example:
 JSON example:
 
 .. code-block:: json
-  
+
     {
       "command":"work",
       "subcommand":"submit",

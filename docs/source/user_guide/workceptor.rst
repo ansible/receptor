@@ -1,5 +1,3 @@
-.. _workceptor:
-
 Workceptor
 ==========
 

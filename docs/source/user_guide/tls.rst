@@ -6,7 +6,7 @@ mesh connections.
 
 .. contents::
    :local:
-   
+
 Configuring TLS
 ---------------
 

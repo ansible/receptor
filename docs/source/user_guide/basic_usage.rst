@@ -2,6 +2,7 @@ Using Receptor
 ===============
 
 . contents::
+
    :local:
 
 Configuring Receptor with the CLI

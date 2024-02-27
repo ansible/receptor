@@ -277,7 +277,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes X stream negative test",
 			args: args{
 				versionStr: "v0.0.0",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -285,7 +284,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes Y stream negative test",
 			args: args{
 				versionStr: "v1.22.9998",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -293,7 +291,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.23 Z stream negative test",
 			args: args{
 				versionStr: "v1.23.13",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -301,7 +298,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.23 exact positive test",
 			args: args{
 				versionStr: "v1.23.14",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -309,7 +305,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.23 Z stream positive test",
 			args: args{
 				versionStr: "v1.23.15",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -317,7 +312,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.24 Z stream negative test",
 			args: args{
 				versionStr: "v1.24.7",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -325,7 +319,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.24 exact positive test",
 			args: args{
 				versionStr: "v1.24.8",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -333,7 +326,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.24 Z stream positive test",
 			args: args{
 				versionStr: "v1.24.9",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -341,7 +333,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.25 Z stream negative test",
 			args: args{
 				versionStr: "v1.25.3",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -349,7 +340,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kuberentes 1.25 exact positive test",
 			args: args{
 				versionStr: "v1.25.4",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -357,7 +347,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes 1.25 Z stream positive test",
 			args: args{
 				versionStr: "v1.25.99",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -365,7 +354,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes Y stream positive test",
 			args: args{
 				versionStr: "v1.26.0",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -373,7 +361,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes X stream positive test 1",
 			args: args{
 				versionStr: "v2.0.0",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -381,7 +368,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes X stream positive test 2",
 			args: args{
 				versionStr: "v2.23.14",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -389,7 +375,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes X stream positive test 3",
 			args: args{
 				versionStr: "v2.24.8",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -397,7 +382,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes X stream positive test 4",
 			args: args{
 				versionStr: "v2.25.4",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -405,7 +389,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Kubernetes X stream positive test 5",
 			args: args{
 				versionStr: "v2.26.0",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -413,7 +396,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Missing Kubernetes version negative test",
 			args: args{
 				versionStr: "yoloswag",
-				kw:         kw,
 			},
 			want: false,
 		},
@@ -421,7 +403,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Prerelease Kubernetes version positive test 1",
 			args: args{
 				versionStr: "v1.23.14+sadfasdf",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -429,7 +410,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Prerelease Kubernetes version positive test 2",
 			args: args{
 				versionStr: "v1.23.14-asdfasdf+12131",
-				kw:         kw,
 			},
 			want: true,
 		},
@@ -437,13 +417,13 @@ func Test_IsCompatibleK8S(t *testing.T) {
 			name: "Prerelease Kubernetes version positive test 3",
 			args: args{
 				versionStr: "v1.23.15-asdfasdf+12131",
-				kw:         kw,
 			},
 			want: true,
 		},
 	}
 
 	for _, tt := range tests {
+		tt.args.kw = kw
 		t.Run(tt.name, func(t *testing.T) {
 			if got := workceptor.IsCompatibleK8S(tt.args.kw, tt.args.versionStr); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("IsCompatibleK8S() = %v, want %v", got, tt.want)

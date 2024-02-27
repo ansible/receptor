@@ -24,9 +24,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-func TestShouldUseReconnect(t *testing.T) {
-	const envVariable string = "RECEPTOR_KUBE_SUPPORT_RECONNECT"
-
+func startNetceptorNodeWithWorkceptor() (*workceptor.KubeUnit, error) {
 	kw := &workceptor.KubeUnit{
 		BaseWorkUnitForWorkUnit: &workceptor.BaseWorkUnit{},
 	}
@@ -35,20 +33,31 @@ func TestShouldUseReconnect(t *testing.T) {
 	n1 := netceptor.New(context.Background(), "node1")
 	b1, err := netceptor.NewExternalBackend()
 	if err != nil {
-		t.Fatal(err)
+		return kw, err
 	}
 
 	err = n1.AddBackend(b1)
 	if err != nil {
-		t.Fatal(err)
+		return kw, err
 	}
 
 	w, err := workceptor.New(context.Background(), n1, "")
 	if err != nil {
-		t.Fatal(err)
+		return kw, err
 	}
 
 	kw.SetWorkceptor(w)
+
+	return kw, nil
+}
+
+func TestShouldUseReconnect(t *testing.T) {
+	const envVariable string = "RECEPTOR_KUBE_SUPPORT_RECONNECT"
+
+	kw, err := startNetceptorNodeWithWorkceptor()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name     string
@@ -246,27 +255,10 @@ func Test_IsCompatibleK8S(t *testing.T) {
 		versionStr string
 	}
 
-	kw := &workceptor.KubeUnit{
-		BaseWorkUnitForWorkUnit: &workceptor.BaseWorkUnit{},
-	}
-
-	// Create Netceptor node using external backends
-	n1 := netceptor.New(context.Background(), "node1")
-	b1, err := netceptor.NewExternalBackend()
+	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = n1.AddBackend(b1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w, err := workceptor.New(context.Background(), n1, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	kw.SetWorkceptor(w)
 
 	tests := []struct {
 		name string

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
 	"github.com/golang/mock/gomock"
@@ -26,16 +27,34 @@ import (
 func TestShouldUseReconnect(t *testing.T) {
 	const envVariable string = "RECEPTOR_KUBE_SUPPORT_RECONNECT"
 
+	kw := &workceptor.KubeUnit{
+		BaseWorkUnitForWorkUnit: &workceptor.BaseWorkUnit{},
+	}
+
+	// Create Netceptor node using external backends
+	n1 := netceptor.New(context.Background(), "node1")
+	b1, err := netceptor.NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = n1.AddBackend(b1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := workceptor.New(context.Background(), n1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kw.SetWorkceptor(w)
+
 	tests := []struct {
 		name     string
 		envValue string
 		want     bool
 	}{
-		{
-			name:     "Positive (undefined) test",
-			envValue: "",
-			want:     true,
-		},
 		{
 			name:     "Enabled test",
 			envValue: "enabled",
@@ -66,7 +85,7 @@ func TestShouldUseReconnect(t *testing.T) {
 				os.Unsetenv(envVariable)
 			}
 
-			if got := workceptor.ShouldUseReconnect(); got != tt.want {
+			if got := workceptor.ShouldUseReconnect(kw); got != tt.want {
 				t.Errorf("shouldUseReconnect() = %v, want %v", got, tt.want)
 			}
 		})
@@ -216,6 +235,218 @@ func TestKubeStart(t *testing.T) {
 			err := ku.Start()
 			if err != nil {
 				t.Error(err)
+			}
+		})
+	}
+}
+
+func Test_IsCompatibleK8S(t *testing.T) {
+	type args struct {
+		kw         *workceptor.KubeUnit
+		versionStr string
+	}
+
+	kw := &workceptor.KubeUnit{
+		BaseWorkUnitForWorkUnit: &workceptor.BaseWorkUnit{},
+	}
+
+	// Create Netceptor node using external backends
+	n1 := netceptor.New(context.Background(), "node1")
+	b1, err := netceptor.NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = n1.AddBackend(b1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := workceptor.New(context.Background(), n1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kw.SetWorkceptor(w)
+
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "Kubernetes X stream negative test",
+			args: args{
+				versionStr: "v0.0.0",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Kubernetes Y stream negative test",
+			args: args{
+				versionStr: "v1.22.9998",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Kubernetes 1.23 Z stream negative test",
+			args: args{
+				versionStr: "v1.23.13",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Kubernetes 1.23 exact positive test",
+			args: args{
+				versionStr: "v1.23.14",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes 1.23 Z stream positive test",
+			args: args{
+				versionStr: "v1.23.15",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes 1.24 Z stream negative test",
+			args: args{
+				versionStr: "v1.24.7",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Kubernetes 1.24 exact positive test",
+			args: args{
+				versionStr: "v1.24.8",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes 1.24 Z stream positive test",
+			args: args{
+				versionStr: "v1.24.9",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes 1.25 Z stream negative test",
+			args: args{
+				versionStr: "v1.25.3",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Kuberentes 1.25 exact positive test",
+			args: args{
+				versionStr: "v1.25.4",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes 1.25 Z stream positive test",
+			args: args{
+				versionStr: "v1.25.99",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes Y stream positive test",
+			args: args{
+				versionStr: "v1.26.0",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes X stream positive test 1",
+			args: args{
+				versionStr: "v2.0.0",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Kubernetes X stream positive test 2",
+			args: args{
+				versionStr: "v2.23.14",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes X stream positive test 3",
+			args: args{
+				versionStr: "v2.24.8",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes X stream positive test 4",
+			args: args{
+				versionStr: "v2.25.4",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Kubernetes X stream positive test 5",
+			args: args{
+				versionStr: "v2.26.0",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Missing Kubernetes version negative test",
+			args: args{
+				versionStr: "yoloswag",
+				kw:         kw,
+			},
+			want: false,
+		},
+		{
+			name: "Prerelease Kubernetes version positive test 1",
+			args: args{
+				versionStr: "v1.23.14+sadfasdf",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Prerelease Kubernetes version positive test 2",
+			args: args{
+				versionStr: "v1.23.14-asdfasdf+12131",
+				kw:         kw,
+			},
+			want: true,
+		},
+		{
+			name: "Prerelease Kubernetes version positive test 3",
+			args: args{
+				versionStr: "v1.23.15-asdfasdf+12131",
+				kw:         kw,
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := workceptor.IsCompatibleK8S(tt.args.kw, tt.args.versionStr); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("IsCompatibleK8S() = %v, want %v", got, tt.want)
 			}
 		})
 	}

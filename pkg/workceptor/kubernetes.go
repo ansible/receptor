@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -36,8 +37,8 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
-// kubeUnit implements the WorkUnit interface.
-type kubeUnit struct {
+// KubeUnit implements the WorkUnit interface.
+type KubeUnit struct {
 	BaseWorkUnitForWorkUnit
 	authMethod          string
 	streamMethod        string
@@ -225,7 +226,7 @@ func podRunningAndReady() func(event watch.Event) (bool, error) {
 	return inner
 }
 
-func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
+func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
 	var logStream io.ReadCloser
 	var err error
 	podNamespace := kw.pod.Namespace
@@ -266,7 +267,7 @@ func (kw *kubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 	return logStream, nil
 }
 
-func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdoutErr *error) {
+func (kw *KubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdoutErr *error) {
 	// Legacy method, for use on k8s < v1.23.14
 	// uses io.Copy to stream data from pod to stdout file
 	// known issues around this, as logstream can terminate due to log rotation
@@ -290,7 +291,7 @@ func (kw *kubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *S
 	}
 }
 
-func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdinErr *error, stdoutErr *error) {
+func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdinErr *error, stdoutErr *error) {
 	// preferred method for k8s >= 1.23.14
 	defer streamWait.Done()
 	var sinceTime time.Time
@@ -403,7 +404,7 @@ func (kw *kubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	}
 }
 
-func (kw *kubeUnit) createPod(env map[string]string) error {
+func (kw *KubeUnit) createPod(env map[string]string) error {
 	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	command, err := shlex.Split(ked.Command)
 	if err != nil {
@@ -521,7 +522,9 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 
 	ctxPodReady := kw.GetContext()
 	if kw.podPendingTimeout != time.Duration(0) {
-		ctxPodReady, _ = context.WithTimeout(kw.GetContext(), kw.podPendingTimeout)
+		var ctxPodCancel context.CancelFunc
+		ctxPodReady, ctxPodCancel = context.WithTimeout(kw.GetContext(), kw.podPendingTimeout)
+		defer ctxPodCancel()
 	}
 
 	time.Sleep(2 * time.Second)
@@ -590,7 +593,7 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	return nil
 }
 
-func (kw *kubeUnit) runWorkUsingLogger() {
+func (kw *KubeUnit) runWorkUsingLogger() {
 	skipStdin := true
 
 	status := kw.Status()
@@ -819,7 +822,7 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 		}()
 	}
 
-	stdoutWithReconnect := ShouldUseReconnect()
+	stdoutWithReconnect := ShouldUseReconnect(kw)
 	if stdoutWithReconnect && stdoutErr == nil {
 		kw.GetWorkceptor().nc.GetLogger().Debug("streaming stdout with reconnect support")
 		go kw.kubeLoggingWithReconnect(&streamWait, stdout, &stdinErr, &stdoutErr)
@@ -855,7 +858,50 @@ func (kw *kubeUnit) runWorkUsingLogger() {
 	}
 }
 
-func ShouldUseReconnect() bool {
+func IsCompatibleK8S(kw *KubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
+	if err != nil {
+		kw.GetWorkceptor().nc.GetLogger().Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
+
+		return false
+	}
+
+	// ignore pre-release in version comparison
+	semver = semver.WithPreRelease("")
+
+	// The patch was backported to minor version 23, 24 and 25
+	// We check z stream based on the minor version
+	// if minor versions < 23, set to high value (e.g. v1.22.9999)
+	// if minor versions == 23, compare with v1.23.14
+	// if minor version == 24, compare with v1.24.8
+	// if minor version == 25, compare with v1.25.4
+	// if minor versions > 23, compare with low value (e.g. v1.26.0)
+	var compatibleVer string
+	switch {
+	case semver.Minor() == 23:
+		compatibleVer = "v1.23.14"
+	case semver.Minor() == 24:
+		compatibleVer = "v1.24.8"
+	case semver.Minor() == 25:
+		compatibleVer = "v1.25.4"
+	case semver.Minor() > 25:
+		compatibleVer = fmt.Sprintf("%d.%d.0", semver.Major(), semver.Minor())
+	default:
+		compatibleVer = fmt.Sprintf("%d.%d.9999", semver.Major(), semver.Minor())
+	}
+
+	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
+		kw.GetWorkceptor().nc.GetLogger().Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
+
+		return true
+	}
+
+	kw.GetWorkceptor().nc.GetLogger().Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
+
+	return false
+}
+
+func ShouldUseReconnect(kw *KubeUnit) bool {
 	// Support for streaming from pod with timestamps using reconnect method is in all current versions
 	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
 	// accepted values: "enabled", "disabled", "auto".  The default is "enabled"
@@ -875,7 +921,14 @@ func ShouldUseReconnect() bool {
 		}
 	}
 
-	return true
+	serverVerInfo, err := kw.clientset.ServerVersion()
+	if err != nil {
+		kw.GetWorkceptor().nc.GetLogger().Warning("could not detect Kubernetes server version, will not use reconnect support")
+
+		return false
+	}
+
+	return IsCompatibleK8S(kw, serverVerInfo.String())
 }
 
 func ParseTime(s string) *time.Time {
@@ -918,7 +971,7 @@ func getDefaultInterface() (string, error) {
 	return "", fmt.Errorf("could not determine local address")
 }
 
-func (kw *kubeUnit) runWorkUsingTCP() {
+func (kw *KubeUnit) runWorkUsingTCP() {
 	// Create local cancellable context
 	ctx, cancel := kw.GetContext(), kw.GetCancel()
 	defer cancel()
@@ -1069,7 +1122,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 }
 
-func (kw *kubeUnit) connectUsingKubeconfig() error {
+func (kw *KubeUnit) connectUsingKubeconfig() error {
 	var err error
 	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	if ked.KubeConfig == "" {
@@ -1115,7 +1168,7 @@ func (kw *kubeUnit) connectUsingKubeconfig() error {
 	return nil
 }
 
-func (kw *kubeUnit) connectUsingIncluster() error {
+func (kw *KubeUnit) connectUsingIncluster() error {
 	var err error
 	kw.config, err = KubeAPIWrapperInstance.InClusterConfig()
 	if err != nil {
@@ -1125,7 +1178,7 @@ func (kw *kubeUnit) connectUsingIncluster() error {
 	return nil
 }
 
-func (kw *kubeUnit) connectToKube() error {
+func (kw *KubeUnit) connectToKube() error {
 	var err error
 	switch {
 	case kw.authMethod == "kubeconfig" || kw.authMethod == "runtime":
@@ -1211,7 +1264,7 @@ func readFileToString(filename string) (string, error) {
 }
 
 // SetFromParams sets the in-memory state from parameters.
-func (kw *kubeUnit) SetFromParams(params map[string]string) error {
+func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	ked := kw.GetStatusCopy().ExtraData.(*KubeExtraData)
 	type value struct {
 		name       string
@@ -1299,7 +1352,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 }
 
 // Status returns a copy of the status currently loaded in memory.
-func (kw *kubeUnit) Status() *StatusFileData {
+func (kw *KubeUnit) Status() *StatusFileData {
 	status := kw.UnredactedStatus()
 	ed, ok := status.ExtraData.(*KubeExtraData)
 	if ok {
@@ -1311,7 +1364,7 @@ func (kw *kubeUnit) Status() *StatusFileData {
 }
 
 // Status returns a copy of the status currently loaded in memory.
-func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
+func (kw *KubeUnit) UnredactedStatus() *StatusFileData {
 	kw.GetStatusLock().RLock()
 	defer kw.GetStatusLock().RUnlock()
 	status := kw.GetStatusWithoutExtraData()
@@ -1325,7 +1378,7 @@ func (kw *kubeUnit) UnredactedStatus() *StatusFileData {
 }
 
 // startOrRestart is a shared implementation of Start() and Restart().
-func (kw *kubeUnit) startOrRestart() error {
+func (kw *KubeUnit) startOrRestart() error {
 	// Connect to the Kubernetes API
 	if err := kw.connectToKube(); err != nil {
 		return err
@@ -1342,7 +1395,7 @@ func (kw *kubeUnit) startOrRestart() error {
 }
 
 // Restart resumes monitoring a job after a Receptor restart.
-func (kw *kubeUnit) Restart() error {
+func (kw *KubeUnit) Restart() error {
 	status := kw.Status()
 	ked := status.ExtraData.(*KubeExtraData)
 	if IsComplete(status.State) {
@@ -1372,14 +1425,14 @@ func (kw *kubeUnit) Restart() error {
 }
 
 // Start launches a job with given parameters.
-func (kw *kubeUnit) Start() error {
+func (kw *KubeUnit) Start() error {
 	kw.UpdateBasicStatus(WorkStatePending, "Connecting to Kubernetes", 0)
 
 	return kw.startOrRestart()
 }
 
 // Cancel releases resources associated with a job, including cancelling it if running.
-func (kw *kubeUnit) Cancel() error {
+func (kw *KubeUnit) Cancel() error {
 	kw.CancelContext()
 	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 	if kw.pod != nil {
@@ -1396,7 +1449,7 @@ func (kw *kubeUnit) Cancel() error {
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (kw *kubeUnit) Release(force bool) error {
+func (kw *KubeUnit) Release(force bool) error {
 	err := kw.Cancel()
 	if err != nil && !force {
 		return err
@@ -1453,7 +1506,7 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		KubeAPIWrapperInstance = kawi
 	}
 
-	ku := &kubeUnit{
+	ku := &KubeUnit{
 		BaseWorkUnitForWorkUnit: bwu,
 		authMethod:              strings.ToLower(cfg.AuthMethod),
 		streamMethod:            strings.ToLower(cfg.StreamMethod),

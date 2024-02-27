@@ -60,7 +60,9 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 		return nil, nil, err
 	}
 	reader := bufio.NewReader(conn)
-	ctxChild, _ := context.WithTimeout(ctx, 5*time.Second)
+	ctxChild, ctxCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer ctxCancel()
+
 	hello, err := utils.ReadStringContext(ctxChild, reader, '\n')
 	if err != nil {
 		conn.CloseConnection()

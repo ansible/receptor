@@ -219,7 +219,6 @@ func TestMeshShutdown(t *testing.T) {
 			ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel1()
 			err = m.WaitForReady(ctx1)
-
 			if err != nil {
 				t.Fatal(err)
 			}

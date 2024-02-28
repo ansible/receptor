@@ -73,7 +73,6 @@ func (m *LibMesh) Start(_ string) error {
 	// Bootstrap nodes
 	for _, node := range m.GetNodes() {
 		err = node.StartLocalServices()
-
 		if err != nil {
 			return err
 		}
@@ -86,7 +85,6 @@ func (m *LibMesh) Start(_ string) error {
 	// Start listeners first, we connect below
 	for _, node := range m.GetNodes() {
 		err = node.StartListeners()
-
 		if err != nil {
 			return err
 		}
@@ -95,7 +93,6 @@ func (m *LibMesh) Start(_ string) error {
 	// Establish outbound connections
 	for _, node := range m.GetNodes() {
 		err = node.EstablishRemoteConnections()
-
 		if err != nil {
 			return err
 		}
@@ -318,19 +315,16 @@ func (n *LibNode) Start() error {
 	var err error
 
 	err = n.StartLocalServices()
-
 	if err != nil {
 		return err
 	}
 
 	err = n.StartListeners()
-
 	if err != nil {
 		return err
 	}
 
 	err = n.EstablishRemoteConnections()
-
 	if err != nil {
 		return err
 	}
@@ -399,13 +393,11 @@ func (n *LibNode) EstablishRemoteConnections() error {
 		switch connection.Protocol {
 		case "tcp":
 			err = n.TCPDial(dialAddr, connectionCost, tlscfg)
-
 			if err != nil {
 				return err
 			}
 		case "udp":
 			err = n.UDPDial(dialAddr, connectionCost)
-
 			if err != nil {
 				return err
 			}
@@ -416,7 +408,6 @@ func (n *LibNode) EstablishRemoteConnections() error {
 			}
 
 			err = n.WebSocketDial(proto+dialAddr, connectionCost, tlscfg)
-
 			if err != nil {
 				return err
 			}
@@ -468,7 +459,6 @@ func (n *LibNode) TCPListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 		netceptor.BackendConnectionCost(cost),
 		netceptor.BackendNodeCost(nodeCost),
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +502,6 @@ func (n *LibNode) UDPListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 		netceptor.BackendConnectionCost(cost),
 		netceptor.BackendNodeCost(nodeCost),
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -561,7 +550,6 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*BackendInfo, error)
 		netceptor.BackendConnectionCost(cost),
 		netceptor.BackendNodeCost(nodeCost),
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +596,6 @@ func (n *LibNode) StartLocalServices() error {
 	}
 
 	err = n.configureTLS()
-
 	if err != nil {
 		return err
 	}
@@ -619,31 +606,26 @@ func (n *LibNode) StartLocalServices() error {
 	}
 
 	n.workceptorInstance, err = workceptor.New(n.netceptorInstance.Context(), n.netceptorInstance, n.GetDataDir())
-
 	if err != nil {
 		return err
 	}
 
 	err = n.configureWorkSigning()
-
 	if err != nil {
 		return err
 	}
 
 	err = n.workceptorInstance.RegisterWithControlService(n.controlServer)
-
 	if err != nil {
 		return err
 	}
 
 	err = n.configureWorkers()
-
 	if err != nil {
 		return err
 	}
 
 	err = n.controlServer.RunControlSvc(n.controlerServerContext, "control", tlsCfg, n.ControlSocket, os.FileMode(0o600), "", nil)
-
 	if err != nil {
 		return err
 	}
@@ -658,7 +640,6 @@ func (n *LibNode) configureFirewallRules() error {
 	}
 
 	err = n.netceptorInstance.AddFirewallRules(rules, true)
-
 	if err != nil {
 		return err
 	}
@@ -674,7 +655,6 @@ func (n *LibNode) configureTLS() error {
 		}
 
 		err = n.netceptorInstance.SetServerTLSConfig(c.Name, tlscfg)
-
 		if err != nil {
 			return err
 		}
@@ -687,7 +667,6 @@ func (n *LibNode) configureTLS() error {
 		}
 
 		err = n.netceptorInstance.SetClientTLSConfig(c.Name, tlscfg, pinnedFingerprints)
-
 		if err != nil {
 			return err
 		}

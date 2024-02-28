@@ -202,7 +202,6 @@ func (r *ReceptorControl) Status() (*netceptor.Status, error) {
 	}
 	status := netceptor.Status{}
 	err = json.Unmarshal(data, &status)
-
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,6 @@ func (lw *TestLogWriter) Write(p []byte) (n int, err error) {
 	defer lw.Lock.Unlock()
 
 	n, err = lw.Buffer.Write(p)
-
 	if err != nil {
 		return 0, err
 	}

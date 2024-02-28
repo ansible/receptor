@@ -72,13 +72,11 @@ func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 			defer cancel1()
 
 			err = controllers["node1"].AssertWorkFailed(ctx1, unitID)
-
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			_, err = controllers["node1"].WorkRelease(unitID)
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -87,7 +85,6 @@ func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 			defer cancel2()
 
 			err = controllers["node1"].AssertWorkReleased(ctx2, unitID)
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -96,7 +93,6 @@ func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 			defer cancel3()
 
 			err = assertFilesReleased(ctx3, nodes["node1"].GetDataDir(), "node1", unitID)
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -275,13 +271,11 @@ func TestWorkSubmitWhileRemoteNodeIsDown(t *testing.T) {
 			defer cancel1()
 
 			err = controllers["node1"].AssertWorkPending(ctx1, unitID)
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
 			err = nodes["node3"].Start()
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -291,7 +285,6 @@ func TestWorkSubmitWhileRemoteNodeIsDown(t *testing.T) {
 			defer cancel2()
 
 			err = m.WaitForReady(ctx2)
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -300,7 +293,6 @@ func TestWorkSubmitWhileRemoteNodeIsDown(t *testing.T) {
 			defer cancel3()
 
 			err = controllers["node1"].AssertWorkSucceeded(ctx3, unitID)
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -515,7 +507,6 @@ func TestRuntimeParams(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel1()
 	err = m.WaitForReady(ctx1)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -524,7 +515,6 @@ func TestRuntimeParams(t *testing.T) {
 	controllers := make(map[string]*ReceptorControl)
 	controllers["node1"] = NewReceptorControl()
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -536,13 +526,11 @@ func TestRuntimeParams(t *testing.T) {
 	}
 
 	err = controllers["node1"].AssertWorkSucceeded(ctx1, unitID)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
 	err = controllers["node1"].AssertWorkResults(unitID, []byte("it worked!"))
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -589,7 +577,6 @@ func TestKubeRuntimeParams(t *testing.T) {
 		"secret_kube_pod": "%s",
 		"secret_kube_config": "%s"
     }`))
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -618,13 +605,11 @@ func TestKubeRuntimeParams(t *testing.T) {
 	}
 
 	err = controllers["node1"].AssertWorkSucceeded(ctx1, unitID)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
 	err = controllers["node1"].AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -782,7 +767,6 @@ func TestSignedWorkVerification(t *testing.T) {
 	}
 
 	err = m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err)
 	}

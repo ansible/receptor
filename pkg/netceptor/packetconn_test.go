@@ -155,7 +155,7 @@ func TestPacketConn(t *testing.T) {
 		{
 			"ReadFrom Error",
 			"",
-			func(ctx context.Context) {
+			func(ctx context.Context) { //nolint:revive
 				newCtx, ctxCancel := context.WithCancel(context.Background())
 				time.AfterFunc(time.Microsecond*200, ctxCancel)
 				mockNetceptorForPacketConn.EXPECT().Context().Return(newCtx)

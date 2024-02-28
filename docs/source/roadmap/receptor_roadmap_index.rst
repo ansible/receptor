@@ -1,5 +1,5 @@
 =================
-receptor Roadmaps
+Receptor Roadmaps
 =================
 
 The ``receptor`` team develops a roadmap for each major  ``receptor`` release.

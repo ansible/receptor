@@ -144,7 +144,7 @@ FdaOLykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m
 -----END CERTIFICATE-----
 `))
 
-	return tempCertFile, tempCertKey, tempCA, func(t *testing.T) {
+	return tempCertFile, tempCertKey, tempCA, func(t *testing.T) { //nolint:revive
 		defer os.Remove(tempCertFile.Name())
 		defer os.Remove(tempCertKey.Name())
 		defer os.Remove(tempCA.Name())
@@ -162,7 +162,7 @@ func useUtilsSetupSuite(t *testing.T, name string) (string, string, string, func
 		t.Error(err.Error())
 	}
 
-	return ca, certKey, cert, func(t *testing.T) {
+	return ca, certKey, cert, func(t *testing.T) { //nolint:revive
 		defer os.Remove(ca)
 		defer os.Remove(certKey)
 		defer os.Remove(cert)
@@ -179,7 +179,7 @@ func useUtilsSetupSuiteWithGenerateWithCA(t *testing.T, name string) (string, st
 		t.Error(err.Error())
 	}
 
-	return caCert, cert, certKey, func(t *testing.T) {
+	return caCert, cert, certKey, func(t *testing.T) { //nolint:revive
 		defer os.Remove(caCert)
 		defer os.Remove(caKey)
 		defer os.Remove(certKey)

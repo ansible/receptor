@@ -224,7 +224,7 @@ func (w *Workceptor) VerifySignature(signature string) error {
 	if err != nil {
 		return fmt.Errorf("could not load verifying key file: %s", err.Error())
 	}
-	token, err := jwt.ParseWithClaims(signature, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(signature, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) { //nolint:revive
 		return rsaPublicKey, nil
 	})
 	if err != nil {

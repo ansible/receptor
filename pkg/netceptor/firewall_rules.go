@@ -131,7 +131,7 @@ func firewallRule(comparers []CompareFunc, action string) (FirewallRuleFunc, err
 		return nil, fmt.Errorf("unknown action: %s", action)
 	}
 	if len(comparers) == 0 {
-		return func(md *MessageData) FirewallResult {
+		return func(md *MessageData) FirewallResult { //nolint:revive
 			return result
 		}, nil
 	}

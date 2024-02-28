@@ -49,7 +49,7 @@ func TestConnectionListener(t *testing.T) {
 	}
 
 	for _, testCase := range connectionListenerTestCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) { //nolint:revive
 			ctx, ctxCancel := context.WithCancel(context.Background())
 			defer ctxCancel()
 
@@ -89,7 +89,7 @@ func TestSetupConnection(t *testing.T) {
 	}
 
 	for _, testCase := range setupConnectionTestCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) { //nolint:revive
 			testCase.expectedCalls()
 			s := controlsvc.New(false, mockNetceptor)
 			tlsConn := tls.Client(mockConn, &tls.Config{})
@@ -452,7 +452,7 @@ func TestAddControlFunc(t *testing.T) {
 		{
 			name:  "obliterate command",
 			input: "obliterate",
-			testCase: func(msg string, err error) {
+			testCase: func(msg string, err error) { //nolint:revive
 				if err != nil {
 					t.Errorf("error should be nil. received %s", err)
 				}
@@ -461,7 +461,7 @@ func TestAddControlFunc(t *testing.T) {
 	}
 
 	for _, testCase := range controlFuncTestsCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) { //nolint:revive
 			s := controlsvc.New(true, mockNetceptor)
 			err := s.AddControlFunc(testCase.input, mockCtrlCmd)
 			testCase.testCase(testCase.errorMessage, err)
@@ -522,7 +522,7 @@ func TestRunControlSession(t *testing.T) {
 	}
 
 	for _, testCase := range runControlSessionTestCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) { //nolint:revive
 			mandatoryExpects()
 			testCase.expectedCalls()
 			s := controlsvc.New(false, mockNetceptor)
@@ -592,7 +592,7 @@ func TestRunControlSessionTwo(t *testing.T) {
 	}
 
 	for _, testCase := range runControlSessionTestCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) { //nolint:revive
 			testCase.expectedCalls()
 			s := controlsvc.New(true, mockNetceptor)
 			pipeA, pipeB := net.Pipe()

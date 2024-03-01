@@ -5,7 +5,8 @@ Receptor 2
 
 **Target: TBD**
 
-.. contents:: Topics
+.. contents::
+   :local:
 
 ---------------
 Release Manager

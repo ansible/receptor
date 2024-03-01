@@ -21,8 +21,7 @@ and as a medium for seeking further feedback from the community.
 You can submit feedback on the current roadmap in multiple ways:
 - Create issue on github in ansible/receptor
 
-See `Ansible communication channels <https://github.com/ansible/ansible-documentation/blob/devel/docs/docsite/rst/community/communication.rst>`_ for details on how to
-join and use the email lists and chat channels.
+Go to `Ansible forum <https://forum.ansible.com/>`_ to join the community discussions.
 
 .. toctree::
    :maxdepth: 1

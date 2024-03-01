@@ -286,22 +286,17 @@ func TestCreateCANegative(t *testing.T) {
 	}
 }
 
-func TestCreateCertReqValid(t *testing.T) {
-	type args struct {
-		opts       *certificates.CertOptions
-		privateKey *rsa.PrivateKey
-	}
-
+func setupGoodCertRequest() (certificates.CertOptions, *x509.CertificateRequest, error) {
 	goodCaTimeAfterString := "2032-01-07T00:03:51Z"
 	goodCaTimeAfter, err := time.Parse(time.RFC3339, goodCaTimeAfterString)
 	if err != nil {
-		t.Errorf("Error parsing time %s: %v", goodCaTimeAfterString, err)
+		return certificates.CertOptions{}, &x509.CertificateRequest{}, err
 	}
 
 	goodCaTimeBeforeString := "2022-01-07T00:03:51Z"
 	goodCaTimeBefore, err := time.Parse(time.RFC3339, goodCaTimeBeforeString)
 	if err != nil {
-		t.Errorf("Error parsing time %s: %v", goodCaTimeBeforeString, err)
+		return certificates.CertOptions{}, &x509.CertificateRequest{}, err
 	}
 
 	goodCertOptions := certificates.CertOptions{
@@ -335,6 +330,20 @@ func TestCreateCertReqValid(t *testing.T) {
 		},
 		URIs:    nil,
 		Version: 0,
+	}
+
+	return goodCertOptions, goodCertificateRequest, nil
+}
+
+func TestCreateCertReqValid(t *testing.T) {
+	type args struct {
+		opts       *certificates.CertOptions
+		privateKey *rsa.PrivateKey
+	}
+
+	goodCertOptions, goodCertificateRequest, err := setupGoodCertRequest()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	goodPrivateKeyBlock, _ := pem.Decode([]byte(`-----BEGIN RSA PRIVATE KEY-----
@@ -509,48 +518,9 @@ func TestCreateCertReqWithKey(t *testing.T) {
 		opts *certificates.CertOptions
 	}
 
-	goodCaTimeAfterString := "2032-01-07T00:03:51Z"
-	goodCaTimeAfter, err := time.Parse(time.RFC3339, goodCaTimeAfterString)
+	goodCertOptions, goodCertificateRequest, err := setupGoodCertRequest()
 	if err != nil {
-		t.Errorf("Error parsing time %s: %v", goodCaTimeAfterString, err)
-	}
-	goodCaTimeBeforeString := "2022-01-07T00:03:51Z"
-	goodCaTimeBefore, err := time.Parse(time.RFC3339, goodCaTimeBeforeString)
-	if err != nil {
-		t.Errorf("Error parsing time %s: %v", goodCaTimeBeforeString, err)
-	}
-
-	goodCertOptions := certificates.CertOptions{
-		Bits:       4096,
-		CommonName: "Ansible Automation Controller Receptor",
-		NotAfter:   goodCaTimeAfter,
-		NotBefore:  goodCaTimeBefore,
-	}
-
-	goodCertificateRequest := &x509.CertificateRequest{
-		Attributes:         nil,
-		DNSNames:           nil,
-		EmailAddresses:     nil,
-		Extensions:         nil,
-		ExtraExtensions:    nil,
-		IPAddresses:        nil,
-		PublicKeyAlgorithm: x509.RSA,
-		SignatureAlgorithm: x509.SHA256WithRSA,
-		Subject: pkix.Name{
-			CommonName:         goodCertOptions.CommonName,
-			Country:            nil,
-			ExtraNames:         []pkix.AttributeTypeAndValue{},
-			Locality:           nil,
-			Names:              []pkix.AttributeTypeAndValue{},
-			Organization:       nil,
-			OrganizationalUnit: nil,
-			PostalCode:         nil,
-			Province:           nil,
-			SerialNumber:       "",
-			StreetAddress:      nil,
-		},
-		URIs:    nil,
-		Version: 0,
+		t.Fatal(err)
 	}
 
 	tests := []struct {

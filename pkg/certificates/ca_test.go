@@ -162,7 +162,7 @@ rydzkVNNVeMVX2TER9yc8AdFqkRlaBWHmO61rYmV+N1quLM0uMVsu55ZNCY=
 			mockRsa := mock_certificates.NewMockRsaer(ctrl)
 
 			mockRsa.EXPECT().GenerateKey(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(random io.Reader, bits int) (*rsa.PrivateKey, error) { //nolint:revive
+				func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
 					return goodCaPrivateKey, nil
 				},
 			)

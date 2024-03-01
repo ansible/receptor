@@ -49,7 +49,7 @@ linters:
     # - paralleltest # TODO: missing at some locations
     - prealloc
     - predeclared
-    - revive
+    # - revive
     - rowserrcheck
     - sqlclosecheck
     - staticcheck

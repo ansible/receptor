@@ -44,7 +44,7 @@ func TestAllocateUnit(t *testing.T) {
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
-	workFunc := func(bwu workceptor.BaseWorkUnitForWorkUnit, w *workceptor.Workceptor, unitID string, workType string) workceptor.WorkUnit { //nolint:revive
+	workFunc := func(bwu workceptor.BaseWorkUnitForWorkUnit, w *workceptor.Workceptor, unitID string, workType string) workceptor.WorkUnit {
 		return mockWorkUnit
 	}
 

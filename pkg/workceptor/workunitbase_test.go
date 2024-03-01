@@ -214,7 +214,7 @@ func TestBaseLoad(t *testing.T) {
 func TestBaseUpdateFullStatus(t *testing.T) {
 	ctrl, bwu, w, _ := setUp(t)
 	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
-	sf := func(sfd *workceptor.StatusFileData) { //nolint:revive
+	sf := func(sfd *workceptor.StatusFileData) {
 		// Do nothing
 	}
 	bwu.UpdateFullStatus(sf)

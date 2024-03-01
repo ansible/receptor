@@ -17,7 +17,7 @@ type (
 
 var configPath = ""
 
-var reloadParseAndRun = func(toRun []string) error { //nolint:revive
+var reloadParseAndRun = func(toRun []string) error {
 	return fmt.Errorf("no configuration file was provided, reload function not set")
 }
 

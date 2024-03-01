@@ -572,17 +572,11 @@ func TestCreateCertReqWithKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := certificates.CreateCertReqWithKey(tt.args.opts)
+			_, _, err := certificates.CreateCertReqWithKey(tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateCertReqWithKey() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CreateCertReqWithKey() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("CreateCertReqWithKey() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

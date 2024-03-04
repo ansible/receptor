@@ -47,6 +47,8 @@ func (cfg nullBackendCfg) Reload() error {
 }
 
 func main() {
+	//cmd.Execute() //cobra commands
+
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Specifies the node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Runs a self-contained node with no backend", nullBackendCfg{}, cmdline.Singleton)

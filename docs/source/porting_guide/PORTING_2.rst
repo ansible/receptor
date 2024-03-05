@@ -1,12 +1,11 @@
-------------------------
-Receptor 2 Porting Guide
-------------------------
+--------------------------
+Receptor 2.x Porting Guide
+--------------------------
 
 .. contents::
    :local:
 
-We suggest you read this page along withthe Receptor 2 Changelog to
-understand what updates you may need to make
+We suggest you read this page along with the Receptor 2 Changelog to understand what updates you may need to make
 
 ^^^^^^^^^^^^^^^^^
 Software Versions

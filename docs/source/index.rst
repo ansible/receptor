@@ -18,4 +18,5 @@ Receptor is an overlay network intended to ease the distribution of work across 
    developer_guide
    porting_guide/index
    roadmap/index
+   upgrade/index
    contributing

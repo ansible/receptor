@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/ansible/receptor/cmd/cmd"
 	_ "github.com/ansible/receptor/internal/version"
 	_ "github.com/ansible/receptor/pkg/backends"
 	_ "github.com/ansible/receptor/pkg/certificates"
@@ -47,6 +48,8 @@ func (cfg nullBackendCfg) Reload() error {
 }
 
 func main() {
+	cmd.Execute() //cobra commands
+
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Run a self-contained node with no backends", nullBackendCfg{}, cmdline.Singleton)

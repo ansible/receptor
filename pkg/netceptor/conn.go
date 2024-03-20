@@ -227,8 +227,6 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 				}
 			}()
 			li.sendResult(conn, err)
-
-			ccancel()
 		}()
 	}
 }

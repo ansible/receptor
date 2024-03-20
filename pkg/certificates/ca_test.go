@@ -21,11 +21,13 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestCreateCAValid(t *testing.T) {
-	type args struct {
-		opts *certificates.CertOptions
-	}
-	goodCaBlock, _ := pem.Decode([]byte(`
+func setupGoodCertificate() (x509.Certificate) {
+	setupGoodCertificateBlock()
+
+	return cert
+}
+func setupGoodCertificateBlock() []byte {
+	return []byte(`
 -----BEGIN CERTIFICATE-----
 MIIFVTCCAz2gAwIBAgIEYdeDaTANBgkqhkiG9w0BAQsFADA7MTkwNwYDVQQDEzBB
 bnNpYmxlIEF1dG9tYXRpb24gQ29udHJvbGxlciBOb2RlcyBNZXNoIFJPT1QgQ0Ew
@@ -57,7 +59,14 @@ xffYhMv6yXvVxVnJHEsG3kM/CsvsU364BBd9kDcZbHpjNcDHMu+XxECJjD2atVtu
 FdaOLykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m
 69EpJXbL15ZQLCPsaIcqJqpK23VyJKc8fA==
 -----END CERTIFICATE-----
-`))
+`)
+}
+
+func TestCreateCAValid(t *testing.T) {
+	type args struct {
+		opts *certificates.CertOptions
+	}
+	goodCaBlock, _ := pem.Decode(setupGoodCertificate())
 
 	goodCaCertificate, err := x509.ParseCertificate(goodCaBlock.Bytes)
 	if err != nil {
@@ -660,6 +669,102 @@ func TestGetReqNamesNegative(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := certificates.GetReqNames(tt.args.request)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetReqNames() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetReqNames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadCertificate(t *testing.T) {
+	type args struct {
+		filename string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.Certificate
+		wantErr bool
+	}{
+		{
+			name: "Positive test",
+			args: args{
+				filename: "tbd1",
+			},
+			want:    setupGoodCertificate(),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockOser(ctrl)
+
+			o.EXPECT().ReadFile(gomock.Eq("tbd1")).Return(setupGoodCertificate(), nil)
+			got, err := certificates.LoadCertificate(tt.args.filename, o)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadCertificate() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadCertificatesNegative(t *testing.T) {
+	type args struct {
+		filename string
+	}
+
+	_, goodCertificateRequest, err := setupGoodCertRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	goodCertificateRequest.Extensions = []pkix.Extension{
+		{
+			Id:       utils.OIDSubjectAltName,
+			Critical: true,
+			Value:    nil,
+		},
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.Certificate
+		wantErr bool
+	}{
+		{
+			name: "Negative multiple-item test",
+			args: args{
+				filename: "TBD2",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Negative no certificate test",
+			args: args{
+				filename: "TBD3",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := certificates.LoadCertificate(tt.args.filename, &certificates.OsWrapper{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetReqNames() error = %v, wantErr %v", err, tt.wantErr)
 

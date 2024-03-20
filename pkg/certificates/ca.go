@@ -21,6 +21,16 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 )
 
+type Oser interface {
+	ReadFile(name string) ([]byte, error)
+}
+
+type OsWrapper struct{}
+
+func (ow *OsWrapper) ReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
 type Rsaer interface {
 	GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error)
 }
@@ -48,8 +58,8 @@ type CertOptions struct {
 }
 
 // LoadFromPEMFile loads certificate data from a PEM file.
-func LoadFromPEMFile(filename string) ([]interface{}, error) {
-	content, err := os.ReadFile(filename)
+func LoadFromPEMFile(filename string, osWrapper Oser) ([]interface{}, error) {
+	content, err := Oser.ReadFile(osWrapper, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +188,8 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 }
 
 // LoadCertificate loads a single certificate from a file.
-func LoadCertificate(filename string) (*x509.Certificate, error) {
-	data, err := LoadFromPEMFile(filename)
+func LoadCertificate(filename string, osWrapper Oser) (*x509.Certificate, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +206,7 @@ func LoadCertificate(filename string) (*x509.Certificate, error) {
 
 // LoadRequest loads a single certificate request from a file.
 func LoadRequest(filename string) (*x509.CertificateRequest, error) {
-	data, err := LoadFromPEMFile(filename)
+	data, err := LoadFromPEMFile(filename, &OsWrapper{})
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +223,7 @@ func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 
 // LoadPrivateKey loads a single RSA private key from a file.
 func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
-	data, err := LoadFromPEMFile(filename)
+	data, err := LoadFromPEMFile(filename, &OsWrapper{})
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +240,7 @@ func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 
 // LoadPublicKey loads a single RSA public key from a file.
 func LoadPublicKey(filename string) (*rsa.PublicKey, error) {
-	data, err := LoadFromPEMFile(filename)
+	data, err := LoadFromPEMFile(filename, &OsWrapper{})
 	if err != nil {
 		return nil, err
 	}

@@ -8,7 +8,7 @@ This guide describes how to use receptor in multiple environments and uses the f
 
 .. glossary::
 
-   Backend
+   backend
       A type of connection that receptor nodes can pass traffic over. Current backends include TCP, UDP and websockets.
 
    backend peers
@@ -46,11 +46,11 @@ This guide describes how to use receptor in multiple environments and uses the f
 
    basic_usage
    connecting_nodes
+   edge_networks
+   firewall
    interacting_with_nodes
-   workceptor
    k8s
    tls
-   firewall
-   edge_networks
+   workceptor
 
 

@@ -2022,8 +2022,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					select {
 					case initDoneChan <- true:
 					case <-ctx.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					case <-ci.Context.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					}
 					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
@@ -2043,8 +2047,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					select {
 					case s.sendRouteFloodChan <- 0:
 					case <-ctx.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					case <-ci.Context.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					}
 					select {

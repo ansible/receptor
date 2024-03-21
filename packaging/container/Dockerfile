@@ -1,7 +1,7 @@
 FROM quay.io/centos/centos:stream9 as builder
 ARG VERSION
 
-RUN dnf -y update && dnf install -y golang make python3 python3-pip git
+RUN dnf -y update && dnf install -y 'golang < 1.21' make python3 python3-pip git
 RUN pip install wheel
 
 ADD source.tar.gz /source

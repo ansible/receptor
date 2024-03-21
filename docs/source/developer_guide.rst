@@ -1,7 +1,8 @@
 .. _dev_guide:
 
+===============
 Developer guide
-================
+===============
 
 Receptor is an open source project that lives at https://github.com/ansible/receptor
 
@@ -10,17 +11,11 @@ Receptor is an open source project that lives at https://github.com/ansible/rece
 
 See the :ref:`contributing:contributing` for more general details.
 
+-------
+Linters
+-------
 
-Testing
---------
-
-Pull requests must pass a suite of integration tests before being merged into ``devel``.
-
-``make test`` will run the full test suite locally. Some of the tests require access to a Kubernetes cluster; these tests will load in the kubeconfig file located at ``$HOME/.kube/config``. One simple way to make these tests work is to start minikube locally before running ``make test``. See https://minikube.sigs.k8s.io/docs/start/ for more information about minikube.
-
-To skip tests that depend on Kubernetes, set environment variable ``export SKIP_KUBE=1``.
-
-Additionally, all code must pass a suite of Go linters. There is a pre-commit yaml file in the receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
+All code must pass a suite of Go linters. There is a pre-commit yaml file in the receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
 
 .. code::
 
@@ -31,6 +26,21 @@ Additionally, all code must pass a suite of Go linters. There is a pre-commit ya
     pre-commit install
 
 See https://pre-commit.com/ and https://golangci-lint.run/ for more details on installing and using these tools.
+
+-------
+Testing
+-------
+
+^^^^^^^^^^^
+Development
+^^^^^^^^^^^
+
+Write unit tests for new features or functionality.
+Add/Update tests for bug fixes.
+
+^^^^^^^
+Mocking
+^^^^^^^
 
 We are using gomock to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by ``mock_``. An example is the package mock_workceptor under pkg/workceptor.
 
@@ -46,13 +56,31 @@ For example, to create/update mocks for Workceptor, we can run:
 
     mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
 
+^^^^^^^^^^
+Kubernetes
+^^^^^^^^^^
+
+Some of the tests require access to a Kubernetes cluster; these tests will load in the kubeconfig file located at ``$HOME/.kube/config``. One simple way to make these tests work is to start minikube locally before running ``make test``. See https://minikube.sigs.k8s.io/docs/start/ for more information about minikube.
+
+To skip tests that depend on Kubernetes, set environment variable ``export SKIP_KUBE=1``.
+
+^^^^^^^^^
+Execution
+^^^^^^^^^
+
+Pull requests must pass a suite of unit and integration tests before being merged into ``devel``.
+
+``make test`` will run the full test suite locally.
+
+-----------
 Source code
 -----------
 
 The next couple of sections are aimed to orient developers to the receptor codebase and provide a starting point for understanding how receptor works.
 
+^^^^^^^^^^^^^^^^^^^^^
 Parsing receptor.conf
-^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 Let's see how items in the config file are mapped to Golang internals.
 
@@ -133,6 +161,7 @@ This gets a new TCP dialer object and passes it to the netceptor AddBackend meth
 
 In general, when studying how the start up process works in receptor, take a look at the Init, Prepare, and Run methods throughout the code, as these are the entry points to running those specific components of receptor.
 
+^^^^
 Ping
 ^^^^
 

@@ -1,0 +1,53 @@
+name: "Build container from arbitrary repo / ref"
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'The receptor repository to build from.'
+        required: true
+        default: 'ansible/receptor'
+      ref:
+        description: 'The ref to build. Can be a branch or any other valid ref.'
+        required: true
+        default: 'devel'
+      tag:
+        description: 'The tag for the container.'
+        required: true
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Install build dependencies
+        run: |
+          pip install build
+
+      - name: Login To ghcr.io
+        uses: docker/login-action@v2
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+
+      - name: Build Multiarch Image & Push To ghcr.io
+        run: |
+          REPO=$(echo $REPO | tr '[A-Z]' '[a-z]')
+          make container REPO=$REPO TAG=$TAG
+        env:
+          CONTAINERCMD: docker buildx
+          EXTRA_OPTS: --platform linux/amd64,linux/ppc64le,linux/arm64 --push
+          TAG: ${{ github.event.inputs.tag }}
+          REPO: ghcr.io/${{ github.repository }}

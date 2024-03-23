@@ -5,6 +5,9 @@
 - tcp-listener:
     port: 2223
 
+- control-service:
+    service: control
+
 - work-command:
     worktype: echo
     command: echo

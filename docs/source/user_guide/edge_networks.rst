@@ -20,7 +20,7 @@ If a particular node in a network has higher than normal latency, we allow the u
 
 If a connection timeout occurs, the users can expect to see a message like this in their receptor logs.
 
-.. code::
+.. code-block:: text
 
     DEBUG 2022/04/07 12:48:56 Sending initial connection message
     ERROR 2022/04/07 12:48:56 Backend sending error read tcp 10.26.5    0.239:27199->10.102.21.131:35024: i/o **timeout**

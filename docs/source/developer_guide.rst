@@ -17,7 +17,7 @@ Linters
 
 All code must pass a suite of Go linters. There is a pre-commit yaml file in the receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
 
-.. code::
+.. code-block:: bash
 
     cd $HOME
     go get github.com/golangci/golangci-lint/cmd/golangci-lint
@@ -46,13 +46,13 @@ We are using gomock to generate mocks for our unit tests. The mocks are living i
 
 In order to genenerate a mock for a particular file, you can run:
 
-.. code::
+.. code-block:: bash
 
     mockgen -source=pkg/filename.go -destination=pkg/mock_pkg/mock_filename.go
 
 For example, to create/update mocks for Workceptor, we can run:
 
-.. code::
+.. code-block:: bash
 
     mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
 
@@ -344,7 +344,7 @@ The FromService here is not "ping", but rather the ephemeral service that was cr
 
 With ``trace`` enabled in the receptor configuration, the following log statements show the reply from `bar`,
 
-.. code::
+.. code-block:: bash
 
     TRACE --- Received data length 0 from foo:h73opPEh to bar:ping via foo
     TRACE --- Sending data length 0 from bar:ping to foo:h73opPEh

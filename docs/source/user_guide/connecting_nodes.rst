@@ -58,24 +58,24 @@ If we start the backends for each of these configurations, this will form a thre
 
 From three terminals we can start this example by using the container we provide on quay.io
 
-.. code::
+.. code-block:: bash
 
     podman run -it --rm --network host --name foo -v${PWD}/foo.yml:/etc/receptor/receptor.conf quay.io/ansible/receptor
 
 
-.. code::
+.. code-block:: bash
 
     podman run -it --rm --network host --name bar -v${PWD}/bar.yml:/etc/receptor/receptor.conf quay.io/ansible/receptor
 
 
-.. code::
+.. code-block:: bash
 
     podman run -it --rm --network host --name fish -v${PWD}/fish.yml:/etc/receptor/receptor.conf quay.io/ansible/receptor
 
 
 Logs from `fish` shows a successful connection to `bar` via `foo`.
 
-.. code::
+.. code-block:: text
 
     INFO 2021/07/22 23:04:31 Known Connections:
     INFO 2021/07/22 23:04:31    fish: foo(1.00)
@@ -97,7 +97,7 @@ Configuring backends
 
 in foo.yml
 
-.. code::
+.. code-block:: yaml
 
     - tcp-listener:
         port: 2222
@@ -112,7 +112,7 @@ The costs on the two ends of the connection must match. For example, the ``tcp-p
 
 in fish.yml
 
-.. code::
+.. code-block:: yaml
 
     - tcp-peer:
         address: localhost:2222

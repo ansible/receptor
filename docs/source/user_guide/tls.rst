@@ -68,7 +68,7 @@ Receptor supports X.509 compliant certificates. Although numerous tools can be u
 
 makecerts.sh
 
-.. code::
+.. code-block:: bash
 
     #!/bin/bash
     mkdir -p certs
@@ -110,7 +110,7 @@ Certificate pinning is an added requirement, and does not eliminate the need to 
 
 To find the fingerprint of a given certificate, use the following OpenSSL command:
 
-.. code::
+.. code-block:: bash
 
    openssl x509 -in my-cert.pem -noout -fingerprint -sha256
 

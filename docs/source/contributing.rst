@@ -27,7 +27,7 @@ Contributions to Receptor go through the Github pull request process.
 An initial checklist for your change to increase the likelihood of acceptance:
 - No issues when running linters/code checkers
 - No issues from unit/functional tests
-- Write good commit messages. See [How to write a Git commit message](https://cbea.ms/git-commit/).
+- Write good commit messages. See How to write a Git commit message<https://cbea.ms/git-commit/>.
 
 ===============
 Release process

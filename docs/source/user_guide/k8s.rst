@@ -33,7 +33,7 @@ foo.yml
 
 kubeitpod.yml
 
-Note at this time it is necessary to have either a tcp-listener or a tcp-peer to be able to start the control service. See https://github.com/ansible/receptor/issues/518
+N.B. it may necessary to have one of tcp-listener, tcp-peer, or local-only to be able to start the control service. See https://github.com/ansible/receptor/issues/518
 
 .. code-block:: yaml
 
@@ -63,7 +63,7 @@ First, we need the receptor control service running in order to be able to start
 
 Now we can submit a kubernetes work unit.
 
-.. code-block:: yaml
+.. code-block:: bash
 
     $ receptorctl --socket /tmp/foo.sock work submit kubeit --param secret_kube_config=@$HOME/.kube/config --param secret_kube_pod=@kubeitpod.yml --no-payload
     Result:  Job Started

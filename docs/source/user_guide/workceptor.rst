@@ -74,7 +74,7 @@ Local work
 
 Start the work by connecting to the ``control-service`` and issuing a "work submit" command
 
-.. code::
+.. code-block:: bash
 
     $ receptorctl --socket /tmp/foo.sock work submit echoint --no-payload
     Result:  Job Started
@@ -87,7 +87,7 @@ Work results
 
 Use the "Unit ID" to get work results
 
-.. code::
+.. code-block:: bash
 
     receptorctl --socket /tmp/foo.sock work results t1BlAB18
     1
@@ -109,7 +109,7 @@ Although connected to `foo`, by providing the "--node" option the work can be st
 
 The work type must be defined on the node it is intended to run on, e.g. `bar` must have a ``work-command`` called "echoint", in this case.
 
-.. code::
+.. code-block:: bash
 
     $ receptorctl --socket /tmp/foo.sock work submit echoint --node bar --no-payload
     Result:  Job Started
@@ -123,7 +123,6 @@ Sequence of events for remote work submission
 - This work unit attempts to connect to `bar`'s control service and issue a "work submit echoint" command. From `bar`'s perspective, this is the exact same operation as if a user connected to `bar` directly and issued a work submit command. `bar` is not aware that `foo` is the one that issued the command.
 - Once submitted, `foo` will stream work results back to itself and store it on disk. It also periodically gets the ``work status`` of the work running on `bar`. Status includes information about the work state and the stdout size.
 - `foo` continues streaming stdout results until the size stored on disk matches the StdoutSize reported in `bar`'s status.
-
 
 .. _work_payload:
 
@@ -143,7 +142,7 @@ Here the bash command expects to read a line from stdin, echo the line in all up
 
 Payloads can be passed into receptor using the "--payload" option.
 
-.. code::
+.. code-block:: bash
 
     $ echo -e "hi\ni am foo\nwhat is your name" | receptorctl --socket /tmp/foo.sock work submit echopayload --node bar --payload - -f
     HI
@@ -171,7 +170,7 @@ The ``allowruntimeparams`` option will allow parameters to be passed to the work
 client submitting the work. The contents of a specific directory can be listed by passing the paths
 to the receptor command as positional arguments immediately after the ``workType``:
 
-.. code::
+.. code-block:: bash
 
     receptorctl --socket /tmp/foo.sock work submit --node bar --no-payload -f listcontents /root/ /bin/
     /bin/:
@@ -184,7 +183,7 @@ to the receptor command as positional arguments immediately after the ``workType
 Passing options or flags to the work command needs to be done using the ``--param`` parameter to
 extend the ``params`` work command setting. The ``--all`` flag can be passed to the work command this way:
 
-.. code::
+.. code-block:: bash
 
     receptorctl --socket /tmp/foo.sock work submit --node bar --no-payload -f --param params='--all' listcontents /root/
     .
@@ -201,7 +200,7 @@ Work list
 
 "work list" returns information about all work units that have ran on this receptor node. The following shows two work units, ``12L8s8h2`` and ``T0oN0CAp``
 
-.. code::
+.. code-block:: bash
 
     $ receptorctl --socket /tmp/foo.sock work list
     {'12L8s8h2': {'Detail': 'exit status 0',
@@ -262,7 +261,7 @@ A *single* pair of RSA public and private keys is created offline and distribute
 
 The following commands can be used to create keys for signing work:
 
-.. code::
+.. code-block:: bash
 
     openssl genrsa -out signworkprivate.pem 2048
     openssl rsa -in signworkprivate.pem -pubout -out signworkpublic.pem
@@ -294,7 +293,7 @@ Tokenexpiration determines how long a the signature is valid for. This expiratio
 
 Use the "--signwork" parameter to sign the work.
 
-.. code::
+.. code-block:: bash
 
     $ receptorctl --socket /tmp/foo.sock work submit echoint --node bar --no-payload --signwork
 
@@ -309,7 +308,7 @@ For a given work unit, receptor will store files in ``{datadir}/{nodeID}/{unitID
 
 Here is the receptor directory tree after running ``work submit echopayload`` described in :ref:`work_payload`.
 
-.. code::
+.. code-block:: bash
 
     $ tree /tmp/receptor
     /tmp/receptor
@@ -330,7 +329,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 ``stdin`` is a copy of the submitted payload. The contents of this file is the same on both the local (`foo`) and remote (`bar`) machines.
 
-.. code::
+.. code-block:: bash
 
     $ cat /tmp/receptor/bar/NImim5WA/stdin
     hi
@@ -339,7 +338,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 ``stdout`` contains the work unit results; the stdout of the command execution. It will also be the same on both the local node and remote node.
 
-.. code::
+.. code-block:: bash
 
     $ cat /tmp/receptor/bar/NImim5WA/stdout
     HI
@@ -348,7 +347,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
 
 ``status`` contains additional information related to the work unit. The contents of status are different on `foo` and `bar`.
 
-.. code::
+.. code-block:: bash
 
     $ cat /tmp/receptor/bar/NImim5WA/stdout
     {
@@ -359,7 +358,7 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
        "ExtraData":null
     }
 
-.. code::
+.. code-block:: text
 
     $ cat /tmp/receptor/foo/BsAjS4wi/stdout
     {
@@ -379,7 +378,6 @@ The main purpose of work unit ``BsAjS4wi`` on `foo` is to copy stdin, stdout, an
           "Expiration":"0001-01-01T00:00:00Z"
        }
     }
-
 
 .. image:: remote.png
    :alt: sequence of events during work remote submission

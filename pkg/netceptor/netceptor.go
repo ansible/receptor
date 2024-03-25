@@ -798,7 +798,6 @@ func (s *Netceptor) monitorConnectionAging() {
 			for conn := range timedOut {
 				s.Logger.Warning("Timing out connection %s, idle for the past %s\n", conn, s.maxConnectionIdleTime)
 				timedOut[conn]()
-				s.removeConnection(conn)
 			}
 		case <-s.context.Done():
 			return
@@ -1875,7 +1874,6 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 	defer func() {
 		_ = sess.Close()
 		if established {
-			s.removeConnection(remoteNodeID)
 			select {
 			case s.sendRouteFloodChan <- 0:
 			case <-ctx.Done(): // ctx is a child of s.context
@@ -1928,6 +1926,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						continue
 					}
 					if ri.ForwardingNode != remoteNodeID {
+						s.removeConnection(remoteNodeID)
+
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci,
 							fmt.Sprintf("remote node ID changed unexpectedly from %s to %s",
 								remoteNodeID, ri.NodeID))
@@ -1937,6 +1937,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						remoteCost, ok := ri.Connections[s.nodeID]
 						if !ok {
 							if remoteEstablished {
+								s.removeConnection(remoteNodeID)
+
 								return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
 							}
 							// This is a late initialization request from the remote node, so don't process it as a routing update.
@@ -1944,6 +1946,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						}
 						remoteEstablished = true
 						if ok && remoteCost != connectionCost {
+							s.removeConnection(remoteNodeID)
+
 							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
 						}
 					}
@@ -1957,6 +1961,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					}
 				case MsgTypeReject:
 					s.Logger.Warning("Received a rejection message from peer.")
+					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
 				default:
@@ -2017,8 +2022,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					select {
 					case initDoneChan <- true:
 					case <-ctx.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					case <-ci.Context.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					}
 					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
@@ -2038,8 +2047,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					select {
 					case s.sendRouteFloodChan <- 0:
 					case <-ctx.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					case <-ci.Context.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					}
 					select {
@@ -2052,11 +2065,14 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					established = true
 				} else if msgType == MsgTypeReject {
 					s.Logger.Warning("Received a rejection message from peer.")
+					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
 				}
 			}
 		case <-ci.Context.Done():
+			s.removeConnection(remoteNodeID)
+
 			return nil
 		}
 	}

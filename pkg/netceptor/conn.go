@@ -167,7 +167,8 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			continue
 		}
 		go func() {
-			ctx, _ := context.WithTimeout(ctx, 60*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+			defer cancel()
 			qs, err := qc.AcceptStream(ctx)
 			select {
 			case <-li.doneChan:

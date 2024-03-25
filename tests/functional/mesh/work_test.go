@@ -799,7 +799,7 @@ func TestSignedWorkVerification(t *testing.T) {
 		t.Fatal(err, m.GetDataDir())
 	}
 
-	// node2 has the wrong public key to verify work signatures, so the work submission should fail
+	// node3 has the wrong public key to verify work signatures, so the work submission should fail
 	job = `{"command":"work","subcommand":"submit","worktype":"echo","node":"node3", "signwork":"true"}`
 	_, err = controllers["node1"].WorkSubmitJSON(job)
 	if err == nil {

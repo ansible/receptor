@@ -12,14 +12,14 @@ Alternatively, you can compile from source code (Golang 1.20+ required)
 
     make receptor
 
-Test the installation with
+Test the installation with the following commands:
 
 .. code-block:: bash
 
     receptor --help
     receptor --version
 
-The preferred way to interact with receptor nodes is to use the receptorctl command line tool
+The preferred way to interact with Receptor nodes is to use the ``receptorctl`` command line tool
 
 .. code-block:: bash
 

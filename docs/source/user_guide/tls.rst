@@ -10,9 +10,9 @@ mesh connections.
 Configuring TLS
 ---------------
 
-Add ``tls-server`` and ``tls-client`` definitions to receptor config files.
+Add ``tls-server`` and ``tls-client`` definitions to Receptor config files.
 
-foo.yml
+``foo.yml``
 
 .. code-block:: yaml
 
@@ -34,9 +34,9 @@ foo.yml
         port: 2222
         tls: myserver
 
-Having ``tls-server`` defined does nothing on its own, but it can be referenced elsewhere in the receptor config file. Above, ``tls`` in the ``tcp-listener`` is set to use ``myserver``. In general, ``tls-server`` should be referenced anywhere receptor is expecting an incoming connection, i.e. ``*-listener`` backends or on the ``control-service``. Similarly, ``tls-client`` should be referenced anywhere receptor is expecting to make an outgoing connection, i.e. ``*-peer`` backends or in receptorctl (the command-line client for receptor).
+Having ``tls-server`` defined does nothing on its own, but it can be referenced elsewhere in the Receptor config file. Above, ``tls`` in the ``tcp-listener`` is set to use ``myserver``. In general, ``tls-server`` should be referenced anywhere Receptor is expecting an incoming connection, i.e. ``*-listener`` backends or on the ``control-service``. Similarly, ``tls-client`` should be referenced anywhere Receptor is expecting to make an outgoing connection, i.e. ``*-peer`` backends or in ``receptorctl`` (the command-line client for Receptor).
 
-bar.yml
+``bar.yml``
 
 .. code-block:: yaml
 
@@ -64,9 +64,9 @@ bar.yml
 Generating certs
 -----------------
 
-Receptor supports X.509 compliant certificates. Although numerous tools can be used to generate valid certificates, receptor has a built-in tool to help with this process. Running receptor with the ``cert-init``, ``cert-makereq``, and ``cert-signreq`` actions will create certificate authorities, make requests, and sign requests, respectively.
+Receptor supports X.509 compliant certificates. Although numerous tools can be used to generate valid certificates, Receptor has a built-in tool to help with this process. Running Receptor with the ``cert-init``, ``cert-makereq``, and ``cert-signreq`` actions will create certificate authorities, make requests, and sign requests, respectively.
 
-makecerts.sh
+``makecerts.sh``
 
 .. code-block:: bash
 
@@ -78,7 +78,7 @@ makecerts.sh
       receptor --cert-signreq req=certs/$node.csr cacert=certs/ca.crt cakey=certs/ca.key outcert=certs/$node.crt
     done
 
-The above script will create a CA, and for each node `foo` and `bar`, create a certificate request and sign it with the CA. These certs and keys can then be used to create ``tls-server`` and ``tls-client`` definitions in the receptor config files.
+The above script will create a CA, and for each node `foo` and `bar`, create a certificate request and sign it with the CA. These certs and keys can then be used to create ``tls-server`` and ``tls-client`` definitions in the Receptor config files.
 
 Pinned certificates
 --------------------
@@ -120,15 +120,15 @@ SHA256 and SHA512 fingerprints are supported.  SHA1 fingerprints are not support
 Above the mesh TLS
 -------------------
 
-Below-the-mesh TLS deals with connections that are being made to an IP address or DNS name, and so it can use normal X.509 certificates which include DNS names or IP addresses in their subjectAltName field.  However, above-the-mesh TLS deals with connections whose endpoint addresses are receptor node IDs.  This requires generating certificates that include receptor node IDs as names in the subjectAltName extension.  To do this, the otherName field of subjectAltName can be utilized.  This field is designed to accept arbitrary names of any type, and includes an ISO Object Identifier (OID) that defines what type of name this is, followed by arbitrary data that is meaningful for that type.  Red Hat has its own OID namespace, which is controlled by RHANANA, the Red Hat Assigned Names And Number Authority.  Receptor has an assignment within the overall Red Hat namespace.
+Below-the-mesh TLS deals with connections that are being made to an IP address or DNS name, and so it can use normal X.509 certificates which include DNS names or IP addresses in their subjectAltName field.  However, above-the-mesh TLS deals with connections whose endpoint addresses are Receptor node IDs.  This requires generating certificates that include Receptor node IDs as names in the subjectAltName extension.  To do this, the otherName field of subjectAltName can be utilized.  This field is designed to accept arbitrary names of any type, and includes an ISO Object Identifier (OID) that defines what type of name this is, followed by arbitrary data that is meaningful for that type.  Red Hat has its own OID namespace, which is controlled by RHANANA, the Red Hat Assigned Names And Number Authority.  Receptor has an assignment within the overall Red Hat namespace.
 
-If you decide to consume TLS authentication in your mesh, the certificates OIDs (1.3.6.1.4.1.2312.19.1) will be verified against the `node.id` specified in the configuration file. If there is no match, the receptor binary will hard exit. If you need to get around this check, visit the `Skip Certificate Validation`_ section for more details.
+If TLS authentication is used in your mesh, the certificates OIDs (1.3.6.1.4.1.2312.19.1) will be verified against the `node.id` specified in the configuration file. If there is no match, the Receptor binary will hard exit. To avoid this check, visit the `Skip Certificate Validation`_ section for more details.
 
 
 Skip certificate validation
 ----------------------------
 
-Depending on the specifics of your environment(s), if you need to turn off certificate validation, you can add a `skipreceptornamescheck` key-value pair in your configuration file for `tls-server`, `tls-config`, or both.
+Depending on the specifics of your environment(s), if certificate validation needs to be turned off, add a `skipreceptornamescheck` key-value pair in the configuration file for `tls-server`, `tls-config`, or both.
 The default behaviour for this option is `false` which means that the certificate's OIDs will be verified against the node ID.
 
 .. code-block:: yaml

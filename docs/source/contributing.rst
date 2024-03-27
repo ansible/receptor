@@ -42,12 +42,12 @@ After the draft release has been created, edit it and populate the description. 
 
 After the release is published, the `Promote Release <https://github.com/ansible/receptor/actions/workflows/promote.yml>`_ workflow will run automatically. This workflow will:
 
-- Publish receptorctl to `PyPI <https://pypi.org/project/receptorctl/>`_.
+- Publish ``receptorctl`` to `PyPI <https://pypi.org/project/receptorctl/>`_.
 - Pull the container image from ghcr.io, re-tag, and push to `Quay.io <https://quay.io/repository/ansible/receptor>`_.
 - Build binaries for various OSes/platforms, and attach them to the `release <https://github.com/ansible/receptor/releases>`_.
 
 .. note::
-  If you need to re-run `Stage Release`_ more than once you must delete the tag beforehand, otherwise the workflow will fail.
+  If `Stage Release`_ needs to be re-run more than once, delete the tag beforehand to prevent the workflow from failing.
 
 .. _Stage Release: https://github.com/ansible/receptor/actions/workflows/stage.yml
 

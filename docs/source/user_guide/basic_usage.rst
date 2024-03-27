@@ -18,7 +18,7 @@ The log shows the receptor node started successfully
 
 ``INFO 2021/07/22 22:40:36 Initialization complete``
 
-Supported log levels, in increasing verbosity, are Error, Warning, Info (default) and Debug.
+Supported log levels, in increasing verbosity, are ``Error``, ``Warning``, ``Info`` and ``Debug``.  The default level is ``Info``.
 
 Note: stop the receptor process with ``ctrl-c``
 

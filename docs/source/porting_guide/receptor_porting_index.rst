@@ -2,7 +2,7 @@
 Receptor Porting Guides
 =======================
 
-This section lists porting guides that can help you in updating your environment from one version of receptor to the next.
+This section lists porting guides that can help in updating your environment from one version of Receptor to the next.
 
 .. toctree::
    :maxdepth: 1

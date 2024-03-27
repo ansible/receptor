@@ -20,7 +20,7 @@ Receptor configurations
 
 1. Create three configuration files, one for each node.
 
- **foo.yml**
+ ``foo.yml``
 
 .. code-block:: yaml
 
@@ -40,7 +40,7 @@ Receptor configurations
 
   ...
 
-**bar.yml**
+``bar.yml``
 
 .. code-block:: yaml
 
@@ -59,7 +59,7 @@ Receptor configurations
 
   ...
 
-**mal.yml**
+``mal.yml``
 
 .. code-block:: yaml
 

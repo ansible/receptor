@@ -20,7 +20,7 @@ Receptor configurations
 
 1. Create three configuration files, one for each node.
 
- **foo.yml**
+ ``foo.yml``
 
 .. code-block:: yaml
 
@@ -28,61 +28,64 @@ Receptor configurations
   - node:
     id: foo
 
-    - control-service:
-      service: control
-      filename: /tmp/foo.sock
+  - control-service:
+    service: control
+    filename: /tmp/foo.sock
 
-    - tcp-peer:
-      address: localhost:2222
-      redial: true
+  - tcp-peer:
+    address: localhost:2222
+    redial: true
 
-    - log-level: debug
-    ...
+  - log-level: debug
 
-**bar.yml**
+  ...
 
-.. code-block:: yaml
-
-    ---
-    - node:
-      id: bar
-
-    - control-service:
-      service: control
-      filename: /tmp/bar.sock
-
-    - tcp-listener:
-      port: 2222
-
-    - log-level: debug
-    ...
-
- **mal.yml**
+``bar.yml``
 
 .. code-block:: yaml
 
-    ---
-    - node:
-      id: mal
+  ---
+  - node:
+    id: bar
 
-    - control-service:
-      service: control
-      filename: /tmp/mal.sock
+  - control-service:
+    service: control
+    filename: /tmp/bar.sock
 
-    - tcp-peer:
-      address: localhost:2222
-      redial: true
+  - tcp-listener:
+    port: 2222
 
-    - log-level: debug
+  - log-level: debug
 
-    - work-command:
-      workType: echo
-      command: bash
-      params: "-c \"while read -r line; do echo $line; sleep 1; done\""
-      allowruntimeparams: true
-    ...
+  ...
 
-2. Run the services in separate terminals.
+``mal.yml``
+
+.. code-block:: yaml
+
+  ---
+  - node:
+    id: mal
+
+  - control-service:
+    service: control
+    filename: /tmp/mal.sock
+
+  - tcp-peer:
+    address: localhost:2222
+    redial: true
+
+  - log-level: debug
+
+  - work-command:
+    workType: echo
+    command: bash
+    params: "-c \"while read -r line; do echo $line; sleep 1; done\""
+    allowruntimeparams: true
+
+  ...
+
+1. Run the services in separate terminals.
 
 .. code-block:: bash
 

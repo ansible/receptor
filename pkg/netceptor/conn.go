@@ -306,14 +306,20 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			_ = pc.Close()
 		})
 	}
-	cctx, ccancel := context.WithCancel(ctx)
+	//cctx, ccancel := context.WithCancel(ctx)
+	cctx, ccancel := context.WithTimeout(ctx, 90*time.Second)
+	defer ccancel()
 	go func() {
 		select {
 		case <-okChan:
+			ccancel()
+
 			return
 		case <-cctx.Done():
+			ccancel()
 			pcClose()
 		case <-s.context.Done():
+			ccancel()
 			pcClose()
 		}
 	}()
@@ -324,6 +330,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	if err != nil {
 		close(okChan)
 		pcClose()
+		ccancel()
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
 		}
@@ -335,6 +342,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		close(okChan)
 		_ = qc.CloseWithError(500, err.Error())
 		_ = pc.Close()
+		ccancel()
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
 		}
@@ -347,6 +355,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		close(okChan)
 		_ = qs.Close()
 		_ = pc.Close()
+		ccancel()
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
 		}
@@ -359,10 +368,14 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		case <-qc.Context().Done():
 			_ = qs.Close()
 			_ = pc.Close()
+			ccancel()
 		case <-s.context.Done():
 			_ = qs.Close()
 			_ = pc.Close()
+			ccancel()
 		case <-doneChan:
+			ccancel()
+
 			return
 		}
 	}()

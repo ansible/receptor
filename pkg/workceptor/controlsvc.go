@@ -423,7 +423,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			return nil, err
 		}
 
-		resultChan, err := c.w.GetResults(ctx, unitid, startPos)
+		resultChan, err := c.w.GetResults(ctx, unitid, startPos, FileSystem{})
 		if err != nil {
 			return nil, err
 		}

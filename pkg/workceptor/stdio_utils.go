@@ -17,6 +17,7 @@ type FileSystemer interface {
 	Stat(name string) (os.FileInfo, error)
 	Open(name string) (*os.File, error)
 	RemoveAll(path string) error
+	IsNotExist(err error) bool
 }
 
 // FileSystem represents the real filesystem.
@@ -40,6 +41,10 @@ func (FileSystem) Open(name string) (*os.File, error) {
 // RemoveAll removes path and any children it contains.
 func (FileSystem) RemoveAll(path string) error {
 	return os.RemoveAll(path)
+}
+
+func (FileSystem) IsNotExist(err error) bool {
+	return os.IsNotExist(err)
 }
 
 // FileWriteCloser wraps io.WriteCloser.
@@ -167,4 +172,11 @@ func (sr *STDinReader) Error() error {
 // SetReader sets the reader var.
 func (sr *STDinReader) SetReader(reader FileReadCloser) {
 	sr.reader = reader
+}
+
+type Filer interface {
+	Name() string
+	Close() error
+	Read(b []byte) (n int, err error)
+	Seek(offset int64, whence int) (ret int64, err error)
 }

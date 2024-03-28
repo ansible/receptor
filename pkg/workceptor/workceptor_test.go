@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -412,6 +413,107 @@ func TestListKnownUnitIDs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w.ListKnownUnitIDs()
+		})
+	}
+}
+
+func TestCleanupGetResults(t *testing.T) {
+	ctrl, _, w := testSetup(t)
+	mockFiler := mock_workceptor.NewMockFiler(ctrl)
+
+	testCases := []struct {
+		name     string
+		workType string
+	}{
+		{
+			name: "parallel test 1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockFiler.EXPECT().Close()
+			mockFiler.EXPECT().Name().Return("filename.txt")
+			_, cancel := context.WithCancel(context.Background())
+			w.CleanupGetResults(mockFiler, func() {}, cancel)
+		})
+	}
+}
+
+func TestAttemptToStatFile(t *testing.T) {
+	ctrl, _, w := testSetup(t)
+	mockFileSystemer := mock_workceptor.NewMockFileSystemer(ctrl)
+
+	testCases := []struct {
+		name     string
+		workType string
+	}{
+		{
+			name: "parallel test 1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			statChan := make(chan struct{})
+			mockFileSystemer.EXPECT().IsNotExist(gomock.Any()).Return(true).Times(4)
+			mockFileSystemer.EXPECT().Stat(gomock.Any()).Return(nil, errors.New("terminated")).Times(4)
+			go func() {
+				<-statChan
+			}()
+			w.AttemptToStatFile(ctx, "", statChan, mockFileSystemer)
+		})
+	}
+}
+
+func TestReadFile(t *testing.T) {
+	ctrl, _, w := testSetup(t)
+	mockFiler := mock_workceptor.NewMockFiler(ctrl)
+
+	testCases := []struct {
+		name          string
+		expectedCalls func(context.CancelFunc)
+		newPos        int64
+	}{
+		{
+			name: "error 1",
+			expectedCalls: func(cancel context.CancelFunc) {
+				mockFiler.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(0), errors.New("terminated"))
+			},
+		},
+		{
+			name: "error 2",
+			expectedCalls: func(cancel context.CancelFunc) {
+				mockFiler.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(1), nil)
+			},
+		},
+		{
+			name: "error 3",
+			expectedCalls: func(cancel context.CancelFunc) {
+				mockFiler.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(0), nil)
+				mockFiler.EXPECT().Read(gomock.Any()).Return(0, errors.New("terminated"))
+			},
+		},
+		{
+			name: "normal case",
+			expectedCalls: func(cancel context.CancelFunc) {
+				time.AfterFunc(time.Microsecond*100, cancel)
+				mockFiler.EXPECT().Seek(gomock.Any(), gomock.Any()).Return(int64(0), nil).AnyTimes()
+				mockFiler.EXPECT().Read(gomock.Any()).Return(0, nil).AnyTimes()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			statChan := make(chan struct{})
+			resultChan := make(chan []byte)
+
+			tc.expectedCalls(cancel)
+			tmp := int64(0)
+			w.ReadFile(ctx, statChan, mockFiler, &tmp, resultChan)
 		})
 	}
 }

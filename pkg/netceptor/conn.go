@@ -306,7 +306,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			_ = pc.Close()
 		})
 	}
-	cctx, ccancel := context.WithCancel(ctx)
+	cctx, ccancel := context.WithTimeout(ctx, 90*time.Second)
 	go func() {
 		select {
 		case <-okChan:

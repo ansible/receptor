@@ -46,8 +46,10 @@ else
 	DEBUGFLAGS=
 endif
 
+GO ?= go
+
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" $(GO) build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
 
 clean:
 	@rm -fv .container-flag*
@@ -90,7 +92,7 @@ receptorctl-lint: receptorctl/.VERSION
 	@cd receptorctl && tox -e lint
 
 format:
-	@find cmd/ pkg/ -type f -name '*.go' -exec go fmt {} \;
+	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
 
 fmt: format
 
@@ -99,17 +101,17 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows go build -o receptor.exe ./cmd/receptor-cl && \
-	GOOS=darwin go build -o receptor.app ./cmd/receptor-cl && \
-	go build example/*.go && \
-	go build -o receptor --tags no_backends,no_services,no_tls_config ./cmd/receptor-cl && \
-	go build -o receptor ./cmd/receptor-cl
+	GOOS=windows $(GO) build -o receptor.exe ./cmd/receptor-cl && \
+	GOOS=darwin $(GO) build -o receptor.app ./cmd/receptor-cl && \
+	$(GO) build example/*.go && \
+	$(GO) build -o receptor --tags no_backends,no_services,no_tls_config ./cmd/receptor-cl && \
+	$(GO) build -o receptor ./cmd/receptor-cl
 
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
 build-package:
 	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
 	mkdir -p dist/$(DIST) && \
-	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 go build -o dist/$(DIST)/$(BINNAME) $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl && \
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build -o dist/$(DIST)/$(BINNAME) $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl && \
 	tar -C dist/$(DIST) -zcf dist/$(DIST).tar.gz $(BINNAME) && \
 	cd dist/ && sha256sum $(DIST).tar.gz >> checksums.txt
 
@@ -124,7 +126,7 @@ BLOCKLIST='/tests/|mock_|example'
 COVERAGE_FILE='coverage.txt'
 
 coverage: build-all
-	PATH="${PWD}:${PATH}" go test $$(go list ./... | grep -vE $(BLOCKLIST)) \
+	PATH="${PWD}:${PATH}" $(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
 	  $(TESTCMD) \
 	  -count=1 \
 	  -cover \
@@ -135,7 +137,7 @@ coverage: build-all
 
 test: receptor
 	PATH="${PWD}:${PATH}" \
-	go test ./... $(TESTCMD) -count=1 -race -timeout 5m
+	$(GO) test ./... $(TESTCMD) -count=1 -race -timeout 5m
 
 receptorctl-test: receptorctl/.VERSION
 	@cd receptorctl && tox -e py3

@@ -15,7 +15,9 @@ See the :ref:`contributing:contributing` for more general details.
 Linters
 -------
 
-All code must pass a suite of Go linters. There is a pre-commit yaml file in the Receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
+All code must pass a suite of Go linters.
+There is a pre-commit yaml file in the Receptor repository that points to the linter suite.
+It is strongly recommmended to install the pre-commit yaml so that the linters run locally on each commit.
 
 .. code-block:: bash
 
@@ -76,7 +78,7 @@ Pull requests must pass a suite of unit and integration tests before being merge
 Source code
 -----------
 
-The next couple of sections are aimed to orient developers to the Receptor codebase and provide a starting point for understanding how Receptor works.
+The following sections help orient developers to the Receptor code base and provide a starting point for understanding how Receptor works.
 
 ^^^^^^^^^^^^^^^^^^^^^
 Parsing receptor.conf
@@ -109,7 +111,7 @@ In ``receptor.go`` (modified for clarity):
 
     cl.ParseAndRun("receptor.conf", []string{"Init", "Prepare", "Run"})
 
-A Receptor config file has many action items, such as "node", "work-command", and "tcp-peer". ParseAndRun is how each of these items are instantiated when Receptor starts.
+A Receptor config file has many action items, such as ```node``, ``work-command``, and ``tcp-peer``. ``ParseAndRun`` is how each of these items are instantiated when Receptor starts.
 
 Specifically, ParseAndRun will run the Init, Prepare, and Run methods associated with each action item.
 

@@ -91,7 +91,7 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 		return "", "", err
 	}
 	CA := &certificates.CA{}
-	CA.Certificate, err = certificates.LoadCertificate(caCrtPath)
+	CA.Certificate, err = certificates.LoadCertificate(caCrtPath, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}

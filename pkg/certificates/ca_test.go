@@ -21,12 +21,27 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestCreateCAValid(t *testing.T) {
-	type args struct {
-		opts *certificates.CertOptions
+func setupGoodCertificate() (*x509.Certificate, error) {
+	goodPEMData := setupGoodCertificatePEMData()
+	goodCertificateBlock, rest := pem.Decode(goodPEMData)
+	if len(rest) != 0 {
+		return &x509.Certificate{}, fmt.Errorf("Excess PEM Data: %v", rest)
 	}
-	goodCaBlock, _ := pem.Decode([]byte(`
------BEGIN CERTIFICATE-----
+
+	if goodCertificateBlock.Type != "CERTIFICATE" {
+		return &x509.Certificate{}, fmt.Errorf("PEM Block is not a certificate: %v", goodCertificateBlock.Type)
+	}
+
+	goodCertificate, err := x509.ParseCertificate(goodCertificateBlock.Bytes)
+	if err != nil {
+		return &x509.Certificate{}, err
+	}
+
+	return goodCertificate, nil
+}
+
+func setupGoodCertificatePEMData() []byte {
+	return []byte(`-----BEGIN CERTIFICATE-----
 MIIFVTCCAz2gAwIBAgIEYdeDaTANBgkqhkiG9w0BAQsFADA7MTkwNwYDVQQDEzBB
 bnNpYmxlIEF1dG9tYXRpb24gQ29udHJvbGxlciBOb2RlcyBNZXNoIFJPT1QgQ0Ew
 HhcNMjIwMTA3MDAwMzUxWhcNMzIwMTA3MDAwMzUxWjA7MTkwNwYDVQQDEzBBbnNp
@@ -56,12 +71,21 @@ rKshMt4IOKQf1ScE+EJe1njpREHV+fa+kYvQB6cRuxW9a8sOSeQNaSL73Zv54elZ
 xffYhMv6yXvVxVnJHEsG3kM/CsvsU364BBd9kDcZbHpjNcDHMu+XxECJjD2atVtu
 FdaOLykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m
 69EpJXbL15ZQLCPsaIcqJqpK23VyJKc8fA==
------END CERTIFICATE-----
-`))
+-----END CERTIFICATE-----`)
+}
 
-	goodCaCertificate, err := x509.ParseCertificate(goodCaBlock.Bytes)
+func TestCreateCAValid(t *testing.T) {
+	type args struct {
+		opts *certificates.CertOptions
+	}
+	goodCaCertificate, err := setupGoodCertificate()
 	if err != nil {
-		t.Errorf("Error parsing certificate: %v", err)
+		t.Errorf("Error setting up certificate: %v", err)
+	}
+
+	goodCaCertificate.ExtKeyUsage = []x509.ExtKeyUsage{
+		x509.ExtKeyUsageClientAuth,
+		x509.ExtKeyUsageServerAuth,
 	}
 
 	goodCaTimeAfterString := "2032-01-07T00:03:51Z"
@@ -662,6 +686,146 @@ func TestGetReqNamesNegative(t *testing.T) {
 			got, err := certificates.GetReqNames(tt.args.request)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetReqNames() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetReqNames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadCertificate(t *testing.T) {
+	type args struct {
+		filename string
+	}
+
+	goodCertificate, err := setupGoodCertificate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	positiveTestFilename := "positive_test_filename"
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.Certificate
+		wantErr bool
+	}{
+		{
+			name: "Positive test",
+			args: args{
+				filename: positiveTestFilename,
+			},
+			want:    goodCertificate,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockOser(ctrl)
+
+			o.
+				EXPECT().
+				ReadFile(gomock.Eq(positiveTestFilename)).
+				Return(setupGoodCertificatePEMData(), nil).
+				Times(1)
+			got, err := certificates.LoadCertificate(tt.args.filename, o)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadCertificate() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadCertificatesNegative(t *testing.T) {
+	type args struct {
+		filename string
+	}
+
+	_, goodCertificateRequest, err := setupGoodCertRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	goodCertificateRequest.Extensions = []pkix.Extension{
+		{
+			Id:       utils.OIDSubjectAltName,
+			Critical: true,
+			Value:    nil,
+		},
+	}
+
+	negativeMultipleItemTest := "negative_multiple_item_test"
+
+	multipleCertificates := setupGoodCertificatePEMData()
+	multipleCertificates = append(multipleCertificates, multipleCertificates[0])
+
+	negativeNoCertificateTest := "negative_no_certificate_test"
+	noCertificates := []byte{
+		0, 0, 0, 0,
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.Certificate
+		wantErr bool
+	}{
+		{
+			name: "Negative multiple item test",
+			args: args{
+				filename: negativeMultipleItemTest,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Negative no certificate test",
+			args: args{
+				filename: negativeNoCertificateTest,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockOser(ctrl)
+
+			switch tt.args.filename {
+			case negativeMultipleItemTest:
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(negativeMultipleItemTest)).
+					Return(multipleCertificates, nil).
+					Times(1)
+
+			case negativeNoCertificateTest:
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(negativeNoCertificateTest)).
+					Return(noCertificates, nil).
+					Times(1)
+
+			default:
+				t.Errorf("Unexpected filename: %s", tt.args.filename)
+			}
+			got, err := certificates.LoadCertificate(tt.args.filename, o)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadCertificate() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
 			}

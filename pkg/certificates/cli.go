@@ -60,7 +60,7 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 	var req *x509.CertificateRequest
 	var key *rsa.PrivateKey
 	if keyIn != "" {
-		data, err := LoadFromPEMFile(keyIn)
+		data, err := LoadFromPEMFile(keyIn, &OsWrapper{})
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func (mr makeReq) Run() error {
 func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool) error {
 	ca := &CA{}
 	var err error
-	ca.Certificate, err = LoadCertificate(caCrtPath)
+	ca.Certificate, err = LoadCertificate(caCrtPath, &OsWrapper{})
 	if err != nil {
 		return err
 	}

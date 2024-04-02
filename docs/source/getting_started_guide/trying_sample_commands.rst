@@ -3,7 +3,7 @@ Try Sample Commands
 ###################
 
 .. note::
-    The prior steps of network setup and receptor installation need to be completed in order for these command to work.
+    You must complete the prior steps of network setup and Receptor installation for these commands to work.
 
 1. Show network status
 

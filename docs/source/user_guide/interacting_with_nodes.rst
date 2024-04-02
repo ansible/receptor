@@ -186,7 +186,7 @@ In general, changes to a receptor configuration file do not take effect until th
 
 However, the action items pertaining to receptor backend connections can be reloaded, without a receptor restart. These include the following,
 
-.. code-block:: yaml
+.. code-block:: text
 
     tcp-peer
     tcp-listener

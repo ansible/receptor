@@ -18,7 +18,7 @@ constraints, lack of community maintainers, and so on.
 Each roadmap is published both as an idea of what is upcoming in ``Receptor``,
 and as a medium for seeking further feedback from the community.
 
-Feedback can be submitted on the current roadmap by:
+You can submit feedback on the current roadmap by:
 - Creating issue on github in ansible/receptor
 
 Go to `Ansible forum <https://forum.ansible.com/>`_ to join the community discussions.

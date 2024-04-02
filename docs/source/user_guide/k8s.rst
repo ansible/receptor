@@ -34,7 +34,7 @@ foo.yml
 kubeitpod.yml
 
 .. note::
-   It may be necessary to have one of tcp-listener, tcp-peer, or local-only to be able to start the control service. See https://github.com/ansible/receptor/issues/518
+   You may need to set one of tcp-listener, tcp-peer, or local-only before you can start the control service. See https://github.com/ansible/receptor/issues/518
 
 .. code-block:: yaml
 

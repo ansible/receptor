@@ -289,7 +289,7 @@ func init() {
 	log.SetFlags(log.Ldate | log.Ltime)
 
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+		"log-level", "Specifies the verbosity level for command output", loglevelCfg{}, cmdline.Singleton)
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
 		"trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
 }

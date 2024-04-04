@@ -170,8 +170,8 @@ func (cfg TLSServerConfig) Prepare() error {
 // TLSClientConfig stores the configuration options for a TLS client.
 type TLSClientConfig struct {
 	Name                   string   `required:"true" description:"Name of this TLS client configuration"`
-	Cert                   string   `required:"false" description:"Client certificate filename"`
-	Key                    string   `required:"false" description:"Client private key filename"`
+	Cert                   string   `required:"true" description:"Client certificate filename"`
+	Key                    string   `required:"true" description:"Client private key filename"`
 	RootCAs                string   `required:"false" description:"Root CA bundle to use instead of system trust"`
 	InsecureSkipVerify     bool     `required:"false" description:"Accept any server cert" default:"false"`
 	PinnedServerCert       []string `required:"false" description:"Pinned fingerprint of required server certificate"`

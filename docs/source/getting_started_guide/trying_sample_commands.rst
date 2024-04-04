@@ -2,8 +2,8 @@
 Try Sample Commands
 ###################
 
-N.B. The prior steps of network setup and receptor installation
-need to be completed in order for these command to work
+.. note::
+    You must complete the prior steps of network setup and Receptor installation for these commands to work.
 
 1. Show network status
 
@@ -41,7 +41,7 @@ need to be completed in order for these command to work
 
     receptorctl --socket /tmp/foo.sock work results work_unit_id
 
-Congratulations, you are now using Receptor!
+Congratulations, Receptor is now ready to use!
 
 .. seealso::
 

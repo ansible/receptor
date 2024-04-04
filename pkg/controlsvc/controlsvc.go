@@ -491,7 +491,7 @@ type cmdlineConfigWindows struct {
 // cmdlineConfigUnix is the cmdline configuration object for a control service on Unix.
 type cmdlineConfigUnix struct {
 	Service     string `description:"Receptor service name to listen on" default:"control"`
-	Filename    string `description:"Filename of local Unix socket to bind to the service"`
+	Filename    string `description:"Specifies the filename of a local Unix socket to bind to the service."`
 	Permissions int    `description:"Socket file permissions" default:"0600"`
 	TLS         string `description:"Name of TLS server config for the Receptor listener"`
 	TCPListen   string `description:"Local TCP port or host:port to bind to the control service"`
@@ -536,9 +536,9 @@ func (cfg cmdlineConfigWindows) Run() error {
 func init() {
 	if runtime.GOOS == "windows" {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Run a control service", cmdlineConfigWindows{})
+			"control-service", "Runs a control service", cmdlineConfigWindows{})
 	} else {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Run a control service", cmdlineConfigUnix{})
+			"control-service", "Runs a control service", cmdlineConfigUnix{})
 	}
 }

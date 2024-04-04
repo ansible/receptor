@@ -25,5 +25,5 @@ func (cfg cmdlineCfg) Run() error {
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-version",
-		"version", "Show the Receptor version", cmdlineCfg{}, cmdline.Exclusive)
+		"version", "Displays the Receptor version.", cmdlineCfg{}, cmdline.Exclusive)
 }

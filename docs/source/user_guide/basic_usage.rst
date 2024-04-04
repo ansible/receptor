@@ -10,7 +10,7 @@ Configuring Receptor with the CLI
 
 Run the following command in a terminal to start a node called `foo`,
 
-.. code::
+.. code-block:: bash
 
     receptor --node id=foo --local-only --log-level Debug
 
@@ -18,7 +18,7 @@ The log shows the receptor node started successfully
 
 ``INFO 2021/07/22 22:40:36 Initialization complete``
 
-Supported log levels, in increasing verbosity, are Error, Warning, Info and Debug.
+Supported log levels, in increasing verbosity, are ``Error``, ``Warning``, ``Info`` and ``Debug``.  The default level is ``Info``.
 
 Note: stop the receptor process with ``ctrl-c``
 
@@ -42,7 +42,7 @@ Receptor can be configured on the command-line, exemplified above, or via a yaml
 
 Start receptor using the config file
 
-.. code::
+.. code-block:: bash
 
     receptor --config foo.yml
 
@@ -53,19 +53,19 @@ Changing the configuration file does take effect until the receptor process is r
 Use Receptor through a container image
 ---------------------------------------
 
-.. code::
+.. code-block:: bash
 
     podman pull quay.io/ansible/receptor
 
 Start a container, which automatically runs receptor with the default config located at ``/etc/receptor/receptor.conf``
 
-.. code::
+.. code-block:: bash
 
     podman run -it --rm --name receptor quay.io/ansible/receptor
 
 In another terminal, issue a basic "status" command to the running receptor process
 
-.. code::
+.. code-block:: bash
 
     $ podman exec receptor receptorctl status
     Node ID: d9b5a8e3c156

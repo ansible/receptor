@@ -1,3 +1,5 @@
+.. _firewall_rules:
+
 Firewall Rules
 ==============
 

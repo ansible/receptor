@@ -4,7 +4,7 @@
 Developer guide
 ===============
 
-Receptor is an open source project that lives at https://github.com/ansible/receptor
+Receptor is an open source project that lives at `ansible/receptor repository <https://github.com/ansible/receptor/>`
 
 .. contents::
    :local:
@@ -15,9 +15,11 @@ See the :ref:`contributing:contributing` for more general details.
 Linters
 -------
 
-All code must pass a suite of Go linters. There is a pre-commit yaml file in the receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
+All code must pass a suite of Go linters.
+There is a pre-commit yaml file in the Receptor repository that points to the linter suite.
+It is strongly recommmended to install the pre-commit yaml so that the linters run locally on each commit.
 
-.. code::
+.. code-block:: bash
 
     cd $HOME
     go get github.com/golangci/golangci-lint/cmd/golangci-lint
@@ -25,7 +27,7 @@ All code must pass a suite of Go linters. There is a pre-commit yaml file in the
     cd receptor
     pre-commit install
 
-See https://pre-commit.com/ and https://golangci-lint.run/ for more details on installing and using these tools.
+See `Pre commit <https://pre-commit.com/>`_ and `Golangci-lint <https://golangci-lint.run/>`_ for more details on installing and using these tools.
 
 -------
 Testing
@@ -44,15 +46,15 @@ Mocking
 
 We are using gomock to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by ``mock_``. An example is the package mock_workceptor under pkg/workceptor.
 
-In order to genenerate a mock for a particular file, you can run:
+In order to genenerate a mock for a particular file, run:
 
-.. code::
+.. code-block:: bash
 
     mockgen -source=pkg/filename.go -destination=pkg/mock_pkg/mock_filename.go
 
 For example, to create/update mocks for Workceptor, we can run:
 
-.. code::
+.. code-block:: bash
 
     mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
 
@@ -76,7 +78,7 @@ Pull requests must pass a suite of unit and integration tests before being merge
 Source code
 -----------
 
-The next couple of sections are aimed to orient developers to the receptor codebase and provide a starting point for understanding how receptor works.
+The following sections help orient developers to the Receptor code base and provide a starting point for understanding how Receptor works.
 
 ^^^^^^^^^^^^^^^^^^^^^
 Parsing receptor.conf
@@ -101,15 +103,15 @@ As an example, in tcp.go
 
 ``RegisterConfigTypeForApp`` tells the cmdline parser that "tcp-peer" is mapped to the ``TCPDialerCfg{}`` structure.
 
-``main()`` in receptor.go is the entry point for a running receptor process.
+``main()`` in ``receptor.go`` is the entry point for a running Receptor process.
 
-In receptor.go (modified for clarity):
+In ``receptor.go`` (modified for clarity):
 
 .. code-block:: go
 
     cl.ParseAndRun("receptor.conf", []string{"Init", "Prepare", "Run"})
 
-A receptor config file has many action items, such as "node", "work-command", and "tcp-peer". ParseAndRun is how each of these items are instantiated when receptor starts.
+A Receptor config file has many action items, such as ```node``, ``work-command``, and ``tcp-peer``. ``ParseAndRun`` is how each of these items are instantiated when Receptor starts.
 
 Specifically, ParseAndRun will run the Init, Prepare, and Run methods associated with each action item.
 
@@ -157,15 +159,16 @@ The Run method for the ``TCPDialerCfg`` object:
         return nil
     }
 
-This gets a new TCP dialer object and passes it to the netceptor AddBackend method, so that it can be processed further. AddBackend will start proper Go routines that periodically dial the address defined in the TCP dialer structure, which will lead to a proper TCP connection to another receptor node.
+This gets a new TCP dialer object and passes it to the netceptor ``AddBackend`` method, so that it can be processed further.
+``AddBackend`` will start proper Go routines that periodically dial the address defined in the TCP dialer structure, which will lead to a proper TCP connection to another Receptor node.
 
-In general, when studying how the start up process works in receptor, take a look at the Init, Prepare, and Run methods throughout the code, as these are the entry points to running those specific components of receptor.
+In general, when studying how the start up process works in Receptor, take a look at the ``Init``, ``Prepare``, and ``Run`` methods throughout the code, as these are the entry points to running those specific components of Receptor.
 
 ^^^^
 Ping
 ^^^^
 
-Studying how pings work in receptor will provide a useful glimpse into the internal workings of netceptor -- the main component of receptor that handles connections and data traffic over the mesh.
+Studying how pings work in Receptor will provide a useful glimpse into the internal workings of netceptor -- the main component of Receptor that handles connections and data traffic over the mesh.
 
 ``receptorctl --socket /tmp/foo.sock ping bar``
 
@@ -342,9 +345,9 @@ This is the ping reply handler. It sends an empty message to the FromNode (`foo`
 
 The FromService here is not "ping", but rather the ephemeral service that was created from ``ListenPacket("")`` in ping.go on `foo`.
 
-With ``trace`` enabled in the receptor configuration, the following log statements show the reply from `bar`,
+With ``trace`` enabled in the Receptor configuration, the following log statements show the reply from ``bar``,
 
-.. code::
+.. code-block:: bash
 
     TRACE --- Received data length 0 from foo:h73opPEh to bar:ping via foo
     TRACE --- Sending data length 0 from bar:ping to foo:h73opPEh

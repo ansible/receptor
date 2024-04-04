@@ -10,11 +10,11 @@ Command line arguments use the following syntax: ``receptor [--<action> [<param>
 
 The possible options for ``<action>`` are listed below.  Parameters for actions are listed in their own section.
 
--------------
-Miscellaneous
--------------
+----------------
+Persistent Flags
+----------------
 
-.. list-table:: Miscellaneous
+.. list-table:: Persistent Flags
     :header-rows: 1
     :widths: auto
 
@@ -33,7 +33,7 @@ Miscellaneous
     * - ``--log-level``
       - Specifies the verbosity level for command output.
     * - ``--node``
-      - Specifies the node configuration of this instance.  THis parameter is required.
+      - Specifies the node configuration of this instance.  This parameter is required.
     * - ``--trace``
       - Enables packet tracing output.
     * - ``--version``
@@ -106,9 +106,9 @@ Node
       - local hostname
     * - ``datadir=<string>``
       - Directory in which to store node data
-      - No default value.
+      - /tmp/receptor
     * - ``firewallrules=<JSON list of JSON dict of JSON data to JSON data>``
-      -  Firewall Rules (see documentation for syntax)
+      -  Firewall Rules. See :ref:`firewall_rules` for syntax
       - No default value.
     * - ``maxidleconnectiontimeout=<string>``
       - Max duration with no traffic before a backend connection is timed out and refreshed
@@ -141,13 +141,13 @@ TLS Client
       - Description
       - Default value
     * - ``cert=<string>``
-      - Client certificate filename
+      - Client certificate filename (required)
       - No default value.
     * - ``insecureskipverify=<bool>``
       - Accept any server cert
       - false
     * - ``key=<string>``
-      - Client private key filename
+      - Client private key filename (required)
       - No default value.
     * - ``mintls13=<bool>``
       - Set minimum TLS version to 1.3. Otherwise the minimum is 1.2
@@ -794,7 +794,7 @@ Generate certificates and run a certificate authority
 Certificate Authority Initialization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Certificate Authoirity Initialization
+.. list-table:: Certificate Authority Initialization
     :header-rows: 1
     :widths: auto
 

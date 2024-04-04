@@ -184,7 +184,7 @@ Reload
 
 In general, changes to a receptor configuration file do not take effect until the receptor process is restarted.
 
-However, the action items pertaining to receptor backend connections can be reloaded, without a receptor restart. These include the following,
+Any action items related to receptor backend connections can be reloaded, without a receptor restart. These include:
 
 .. code-block:: text
 

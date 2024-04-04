@@ -38,7 +38,7 @@ All features will be showed on `help` argument:
 #   list-files   - list all available tests files
 #   run          - run a specific test
 #   run-all      - run all tests. Returns 0 if pass
-#   help         - show this help section
+#   help         - Displays this help text
 ```
 
 List all available tests:

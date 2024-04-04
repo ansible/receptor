@@ -8,7 +8,7 @@ Receptor command line
 
 Command line arguments use the following syntax: ``receptor [--<action> [<param>=<value> ...] ...]``
 
-<action> are listed below.  When an action has parameters, they are listed in their own section.
+The possible options for ``<action>`` are listed below.  Parameters for actions are listed in their own section.
 
 -------------
 Miscellaneous
@@ -20,23 +20,23 @@ Miscellaneous
 
     * - Action
       - Description
-    * - --bash-completion
-      - Generate a completion script for the bash shell
-    * - --config <filename>
-      - Load additional config options from a YAML file
-    * - --control-service
-      - Run a control service
-    * - --help
+    * - ``--bash-completion``
+      - Generates a completion script for the Bash shell.
+    * - ``--config <filename>``
+      - Loads additional configuration options from a YAML file.
+    * - ``--control-service``
+      - Runs a control service.
+    * - ``--help``
       - Show this help
-    * - --local-only
-      - Run a self-contained node with no backends
-    * - --log-level
-      - Set specific log level output
-    * - --node
-      - Node configuration of this instance (required)
-    * - --trace
-      - Enables packet tracing output
-    * - --version
+    * - ``--local-only``
+      - Runs a self-contained node with no backend.
+    * - ``--log-level``
+      - Specifies the verbosity level for command output.
+    * - ``--node``
+      - Specifies the node configuration of this instance.  THis parameter is required.
+    * - ``--trace``
+      - Enables packet tracing output.
+    * - ``--version``
       - Display the Receptor version.
 
 ^^^^^^^^^^^^^^^
@@ -56,22 +56,22 @@ Control Service
     * - Parameter
       -  Description
       -  Default value
-    * - filename=<string>
+    * - ``filename=<string>``
       - Specifies the filename of a local Unix socket to bind to the service.
       - No default value.
-    * - permissions=<int>
+    * - ``permissions=<int>``
       - Socket file permissions
       - 0600
-    * - service=<string>
+    * - ``service=<string>``
       - Receptor service name to listen on
       - control
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS server config for the Receptor listener
       - No default value.
-    * - tcplisten=<string>
+    * - ``tcplisten=<string>``
       - Local TCP port or host:port to bind to the control service
       - No default value.
-    * - tcptls=<string>
+    * - ``tcptls=<string>``
       - Name of TLS server config for the TCP listener
       - No default value.
 
@@ -86,7 +86,7 @@ Log level
     * - Parameter
       - Description
       - Default value
-    * - level=<string>
+    * - ``level=<string>``
       - Log level: Error, Warning, Info or Debug
       - Error
 
@@ -101,16 +101,16 @@ Node
     * - Parameter
       - Description
       - Default value
-    * - id=<string>
+    * - ``id=<string>``
       - Node ID
       - local hostname
-    * - datadir=<string>
+    * - ``datadir=<string>``
       - Directory in which to store node data
       - No default value.
-    * - firewallrules=<JSON list of JSON dict of JSON data to JSON data>
+    * - ``firewallrules=<JSON list of JSON dict of JSON data to JSON data>``
       -  Firewall Rules (see documentation for syntax)
       - No default value.
-    * - maxidleconnectiontimeout=<string>
+    * - ``maxidleconnectiontimeout=<string>``
       - Max duration with no traffic before a backend connection is timed out and refreshed
       - No default value.
 
@@ -124,9 +124,9 @@ Configure resources used by other commands
 
     * - Action
       - Description
-    * - --tls-client
+    * - ``--tls-client``
       - Define a TLS client configuration
-    * - --tls-server
+    * - ``--tls-server``
       - Define a TLS server configuration
 
 ^^^^^^^^^^
@@ -140,28 +140,28 @@ TLS Client
     * - Parameter
       - Description
       - Default value
-    * - cert=<string>
+    * - ``cert=<string>``
       - Client certificate filename
       - No default value.
-    * - insecureskipverify=<bool>
+    * - ``insecureskipverify=<bool>``
       - Accept any server cert
       - false
-    * - key=<string>
+    * - ``key=<string>``
       - Client private key filename
       - No default value.
-    * - mintls13=<bool>
+    * - ``mintls13=<bool>``
       - Set minimum TLS version to 1.3. Otherwise the minimum is 1.2
       - false
-    * - name=<string>
+    * - ``name=<string>``
       - Name of this TLS client configuration (required)
       - No default value.
-    * - pinnedservercert=<[]string (may be repeated)>
+    * - ``pinnedservercert=<[]string (may be repeated)>``
       - Pinned fingerprint of required server certificate
       - No default value.
-    * - rootcas=<string>
+    * - ``rootcas=<string>``
       - Root CA bundle to use instead of system trust
       - No default value.
-    * - skipreceptornamescheck=<bool>
+    * - ``skipreceptornamescheck=<bool>``
       - if true, skip verifying ReceptorNames OIDs in certificate at startup
       - No default value.
 
@@ -176,28 +176,28 @@ TLS Server
     * - Parameter
       - Description
       - Default value
-    * - cert=<string>
+    * - ``cert=<string>``
       - Server certificate filename (required)
       - No default value.
-    * - clientcas=<string>
+    * - ``clientcas=<string>``
       - Filename of CA bundle to verify client certs with
       - No default value.
-    * - key=<string>
+    * - ``key=<string>``
       - Server private key filename (required)
       - No default value.
-    * - mintls13=<bool>
+    * - ``mintls13=<bool>``
       - Set minimum TLS version to 1.3. Otherwise the minimum is 1.2
       - false
-    * - name=<string>
+    * - ``name=<string>``
       - Name of this TLS server configuration (required)
       - No default value.
-    * - pinnedclientcert=<[]string (may be repeated)>
+    * - ``pinnedclientcert=<[]string (may be repeated)>``
       - Pinned fingerprint of required client certificate
       - No default value.
-    * - requireclientcert=<bool>
+    * - ``requireclientcert=<bool>``
       - Require client certificates
       - false
-    * - skipreceptornamescheck=<bool>
+    * - ``skipreceptornamescheck=<bool>``
       - Skip verifying ReceptorNames OIDs in certificate at startup
       - false
 
@@ -211,17 +211,17 @@ Commands to configure back-ends, which connect Receptor nodes together
 
     * - Action
       - Description
-    * - --tcp-listener
+    * - ``--tcp-listener``
       - Run a backend listener on a TCP port
-    * - --tcp-peer
+    * - ``--tcp-peer``
       - Make an outbound backend connection to a TCP peer
-    * - --udp-listener
+    * - ``--udp-listener``
       - Run a backend listener on a UDP port
-    * - --udp-peer
+    * - ``--udp-peer``
       - Make an outbound backend connection to a UDP peer
-    * - --ws-listener
+    * - ``--ws-listener``
       - Run an http server that accepts websocket connections
-    * - --ws-peer
+    * - ``--ws-peer``
       - Connect outbound to a websocket peer
 
 ^^^^^^^^^^^^
@@ -235,22 +235,22 @@ TCP listener
     * - Parameter
       - Description
       - Default value
-    * - allowedpeers=<[]string (may be repeated)>
+    * - ``allowedpeers=<[]string (may be repeated)>``
       - Peer node IDs to allow via this connection
       - No default value.
-    * - bindaddr=<string>
+    * - ``bindaddr=<string>``
       - Local address to bind to
       - 0.0.0.0
-    * - cost=<float64>
+    * - ``cost=<float64>``
       - Connection cost (weight)
       - 1.0
-    * - nodecost=<JSON dict of string to float64>
+    * - ``nodecost=<JSON dict of string to float64>``
       - Per-node costs
       - No default value.
-    * - port=<int>
+    * - ``port=<int>``
       - Local TCP port to listen on (required)
       - No default value.
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS server config
       - No default value.
 
@@ -265,19 +265,19 @@ TCP Peer
     * - Parameter
       - Description
       - Default value
-    * - address=<string>
+    * - ``address=<string>``
       - Remote address (Host:Port) to connect to (required)
       - No default value.
-    * - allowedpeers=<[]string (may be repeated)>
+    * - ``allowedpeers=<[]string (may be repeated)>``
       - Peer node IDs to allow via this connection
       - No default value.
-    * - cost=<float64>
+    * - ``cost=<float64>``
       - Connection cost (weight)
       - 1.0
-    * - redial=<bool>
+    * - ``redial=<bool>``
       - Keep redialing on lost connection
       - true
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS client configuration
       - No default value.
 
@@ -292,19 +292,19 @@ UDP Listener
     * - Parameter
       - Description
       - Default value
-    * - allowedpeers=<[]string (may be repeated)>
+    * - ``allowedpeers=<[]string (may be repeated)>``
       - Peer node IDs to allow via this connection
       - No default value.
-    * - bindaddr=<string>
+    * - ``bindaddr=<string>``
       - Local address to bind to
       - 0.0.0.0
-    * - cost=<float64>
+    * - ``cost=<float64>``
       - Connection cost (weight)
       - 1.0
-    * - nodecost=<JSON dict of string to float64>
+    * - ``nodecost=<JSON dict of string to float64>``
       - Per-node costs
       - No default value.
-    * - port=<int>
+    * - ``port=<int>``
       - Local UDP port to listen on (required)
       - No default value.
 
@@ -319,16 +319,16 @@ UDP Peer
     * - Parameter
       - Description
       - Default value
-    * - address=<string>
+    * - ``address=<string>``
       - Host:Port to connect to (required)
       - No default value.
-    * - allowedpeers=<[]string (may be repeated)>
+    * - ``allowedpeers=<[]string (may be repeated)>``
       - Peer node IDs to allow via this connection
       - No default value.
-    * - cost=<float64>
+    * - ``cost=<float64>``
       - Connection cost (weight)
       - 1.0
-    * - redial=<bool>
+    * - ``redial=<bool>``
       - Keep redialing on lost connection
       - true
 
@@ -343,25 +343,25 @@ Websocket Listener
     * - Parameter
       - Description
       - Default value
-    * - allowedpeers=<[]string (may be repeated)>
+    * - ``allowedpeers=<[]string (may be repeated)>``
       - Peer node IDs to allow via this connection
       - No default value.
-    * - bindaddr=<string>
+    * - ``bindaddr=<string>``
       - Local address to bind to
       - 0.0.0.0
-    * - cost=<float64>
+    * - ``cost=<float64>``
       - Connection cost (weight)
       - 1.0
-    * - nodecost=<JSON dict of string to float64>
+    * - ``nodecost=<JSON dict of string to float64>``
       - Per-node costs
       - No default value.
-    * - path=<string>
+    * - ``path=<string>``
       - URI path to the websocket server
       - \/
-    * - port=<int>
+    * - ``port=<int>``
       - Local TCP port to run http server on (required)
       - No default value.
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS server configuration
       - No default value.
 
@@ -376,22 +376,22 @@ Websocket Peer
     * - Parameter
       - Description
       - Default value
-    * - address=<string>
+    * - ``address=<string>``
       - URL to connect to (required)
       - No default value.
-    * - allowedpeers=<[]string (may be repeated)>
+    * - ``allowedpeers=<[]string (may be repeated)>``
       - Peer node IDs to allow via this connection
       - No default value.
-    * - cost=<float64>
+    * - ``cost=<float64>``
       - Connection cost (weight)
       - 1.0
-    * - extraheader=<string>
+    * - ``extraheader=<string>``
       - Sends extra HTTP header on initial connection
       - No default value.
-    * - redial=<bool>
+    * - ``redial=<bool>``
       - Keep redialing on lost connection
       - true
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS client config
       - No default value.
 
@@ -405,21 +405,21 @@ Configure services that run on top of the Receptor mesh
 
     * - Action
       - Description
-    * - --command-service
+    * - ``--command-service``
       - Run an interactive command via a Receptor service
-    * - --ip-router
+    * - ``--ip-router``
       - Run an IP router using a tun interface
-    * - --tcp-client
+    * - ``--tcp-client``
       - Listen on a Receptor service and forward via TCP
-    * - --tcp-server
+    * - ``--tcp-server``
       - Listen for TCP and forward via Receptor
-    * - --udp-client
+    * - ``--udp-client``
       - Listen on a Receptor service and forward via UDP
-    * - --udp-server
+    * - ``--udp-server``
       - Listen for UDP and forward via Receptor
-    * - --unix-socket-client
+    * - ``--unix-socket-client``
       - Listen via Receptor and forward to a Unix socket
-    * - --unix-socket-server
+    * - ``--unix-socket-server``
       - Listen on a Unix socket and forward via Receptor
 
 ^^^^^^^^^^^^^^^
@@ -433,13 +433,13 @@ Command Service
     * - Parameter
       - Description
       - Default value
-    * - command=<string>
+    * - ``command=<string>``
       - Command to execute on a connection (required)
       - No default value.
-    * - service=<string>
+    * - ``service=<string>``
       - Receptor service name to bind to (required)
       - No default value.
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS server config
       - No default value.
 
@@ -454,16 +454,16 @@ IP Router
     * - Parameter
       - Description
       - Default value
-    * - interface=<string>
+    * - ``interface=<string>``
       - Name of the local tun interface
       - No default value.
-    * - localnet=<string>
+    * - ``localnet=<string>``
       - Local /30 CIDR address (required)
       - No default value.
-    * - networkname=<string>
+    * - ``networkname=<string>``
       - Name of this network and service. (required)
       - No default value.
-    * - routes=<string>
+    * - ``routes=<string>``
       - Comma separated list of CIDR subnets to advertise
       - No default value.
 
@@ -478,16 +478,16 @@ TCP Client
     * - Parameter
       - Description
       - Default value
-    * - address=<string>
+    * - ``address=<string>``
       - Address for outbound TCP connection (required)
       - No default value.
-    * - service=<string>
+    * - ``service=<string>``
       - Receptor service name to bind to (required)
       - No default value.
-    * - tlsserver=<string>
+    * - ``tlsserver=<string>``
       - Name of TLS server config for the Receptor service
       - No default value.
-    * - tlsclient=<string>
+    * - ``tlsclient=<string>``
       - Name of TLS client config for the TCP connection
       - No default value.
 
@@ -502,22 +502,22 @@ TCP Server
     * - Parameter
       - Description
       - Default value
-    * - bindaddr=<string>
+    * - ``bindaddr=<string>``
       - Address to bind TCP listener to
       - 0.0.0.0
-    * - port=<int>
+    * - ``port=<int>``
       - Local TCP port to bind to (required)
       - No default value.
-    * - remotenode=<string>
+    * - ``remotenode=<string>``
       - Receptor node to connect to (required)
       - No default value.
-    * - remoteservice=<string>
+    * - ``remoteservice=<string>``
       - Receptor service name to connect to (required)
       - No default value.
-    * - tlsserver=<string>
+    * - ``tlsserver=<string>``
       - Name of TLS server config for the TCP listener
       - No default value.
-    * - tlsclient=<string>
+    * - ``tlsclient=<string>``
       - Name of TLS client config for the Receptor connection
       - No default value.
 
@@ -532,10 +532,10 @@ UDP Client
     * - Parameter
       - Description
       - Default value
-    * - address=<string>
+    * - ``address=<string>``
       - Address for outbound UDP connection (required)
       - No default value.
-    * - service=<string>
+    * - ``service=<string>``
       - Receptor service name to bind to (required)
       - No default value.
 
@@ -550,16 +550,16 @@ UDP Server
     * - Parameter
       - Description
       - Default value
-    * - bindaddr=<string>
+    * - ``bindaddr=<string>``
       - Address to bind UDP listener to
       - 0.0.0.0
-    * - port=<int>
+    * - ``port=<int>``
       - Local UDP port to bind to (required)
       - No default value.
-    * - remotenode=<string>
+    * - ``remotenode=<string>``
       - Receptor node to connect to (required)
       - No default value.
-    * - remoteservice=<string>
+    * - ``remoteservice=<string>``
       - Receptor service name to connect to (required)
       - No default value.
 
@@ -574,13 +574,13 @@ Unix Socket Client
     * - Parameter
       - Description
       - Default value
-    * - filename=<string>
+    * - ``filename=<string>``
       - Socket filename, which must already exist (required)
       - No default value.
-    * - service=<string>
+    * - ``service=<string>``
       - Receptor service name to bind to (required)
       - No default value.
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS server config for the Receptor connection
       - No default value.
 
@@ -595,19 +595,19 @@ Unix Socket Server
     * - Parameter
       - Description
       - Default value
-    * - filename=<string>
+    * - ``filename=<string>``
       - Socket filename, which will be overwritten (required)
       - No default value.
-    * - permissions=<int>
+    * - ``permissions=<int>``
       - Socket file permissions
       - 0600
-    * - remotenode=<string>
+    * - ``remotenode=<string>``
       - Receptor node to connect to (required)
       - No default value.
-    * - remoteservice=<string>
+    * - ``remoteservice=<string>``
       - Receptor service name to connect to (required)
       - No default value.
-    * - tls=<string>
+    * - ``tls=<string>``
       - Name of TLS client config for the Receptor connection
       - No default value.
 
@@ -621,15 +621,15 @@ Configure workers that process units of work
 
     * - Action
       - Description
-    * - --work-command
+    * - ``--work-command``
       - Run a worker using an external command
-    * - --work-kubernetes
+    * - ``--work-kubernetes``
       - Run a worker using Kubernetes
-    * - --work-python
+    * - ``--work-python``
       - Run a worker using a Python plugin
-    * - --work-signing
+    * - ``--work-signing``
       - Private key to sign work submissions
-    * - --work-verification
+    * - ``--work-verification``
       - Public key to verify work submissions
 
 ^^^^^^^^^^^^
@@ -643,19 +643,19 @@ Work Command
     * - Parameter
       - Description
       - Default value
-    * - allowruntimeparams=<bool>
+    * - ``allowruntimeparams=<bool>``
       - Allow users to add more parameters
       - false
-    * - command=<string>
+    * - ``command=<string>``
       - Command to run to process units of work (required)
       - No default value.
-    * - params=<string>
+    * - ``params=<string>``
       - Command-line parameters
       - No default value.
-    * - verifysignature=<bool>
+    * - ``verifysignature=<bool>``
       - Verify a signed work submission
       - false
-    * - worktype=<string>
+    * - ``worktype=<string>``
       - Name for this worker type (required)
       - No default value.
 
@@ -670,49 +670,49 @@ Work Kubernetes
     * - Parameter
       - Description
       - Default value
-    * - allowruntimeauth=<bool>
+    * - ``allowruntimeauth=<bool>``
       - Allow passing API parameters at runtime
       - false
-    * - allowruntimecommand=<bool>
+    * - ``allowruntimecommand=<bool>``
       - Allow specifying image & command at runtime
       - false
-    * - allowruntimeparams=<bool>
+    * - ``allowruntimeparams=<bool>``
       - Allow adding command parameters at runtime
       - false
-    * - allowruntimepod=<bool>
+    * - ``allowruntimepod=<bool>``
       - Allow passing Pod at runtime
       - false
-    * - authmethod=<string>
+    * - ``authmethod=<string>``
       - One of: kubeconfig, incluster
       - incluster
-    * - command=<string>
+    * - ``command=<string>``
       - Command to run in the container (overrides entrypoint)
       - No default value.
-    * - deletepodonrestart=<bool>
+    * - ``deletepodonrestart=<bool>``
       - On restart, delete the pod if in pending state
       - true
-    * - image=<string>
+    * - ``image=<string>``
       - Container image to use for the worker pod
       - No default value.
-    * - kubeconfig=<string>
+    * - ``kubeconfig=<string>``
       - Kubeconfig filename (for authmethod=kubeconfig)
       - No default value.
-    * - namespace=<string>
+    * - ``namespace=<string>``
       - Kubernetes namespace to create pods in
       - No default value.
-    * - params=<string>
+    * - ``params=<string>``
       - Command-line parameters to pass to the entrypoint
       - No default value.
-    * - pod=<string>
+    * - ``pod=<string>``
       - Pod definition filename, in json or yaml format
       - No default value.
-    * - streammethod=<string>
+    * - ``streammethod=<string>``
       - Method for connecting to worker pods: logger or tcp
       - logger
-    * - verifysignature=<bool>
+    * - ``verifysignature=<bool>``
       - Verify a signed work submission
       - false
-    * - worktype=<string>
+    * - ``worktype=<string>``
       - Name for this worker type (required)
       - No default value.
 
@@ -727,16 +727,16 @@ Work Python
     * - Parameter
       - Description
       - Default value
-    * - config=<JSON dict with string keys>
+    * - ``config=<JSON dict with string keys>``
       - Plugin-specific configuration
       - No default value.
-    * - function=<string>
+    * - ``function=<string>``
       - Receptor-exported function to call (required)
       - No default value.
-    * - plugin=<string>
+    * - ``plugin=<string>``
       - Python module name of the worker plugin (required)
       - No default value.
-    * - worktype=<string>
+    * - ``worktype=<string>``
       - Name for this worker type (required)
       - No default value.
 
@@ -751,10 +751,10 @@ Work Signing
     * - Parameter
       - Description
       - Default value
-    * - privatekey=<string>
+    * - ``privatekey=<string>``
       - Private key to sign work submissions
       - No default value.
-    * - tokenexpiration=<string>
+    * - ``tokenexpiration=<string>``
       - Expiration of the signed json web token, e.g. 3h or 3h30m
       - No default value.
 
@@ -769,7 +769,7 @@ Work Verification
     * - Parameter
       - Description
       - Default value
-    * - publickey=<string>
+    * - ``publickey=<string>``
       - Public key to verify signed work submissions
       - No default value.
 
@@ -783,11 +783,11 @@ Generate certificates and run a certificate authority
 
     * - Action
       - Description
-    * - --cert-init
+    * - ``--cert-init``
       - Initialize PKI CA
-    * - --cert-makereq
+    * - ``--cert-makereq``
       - Create certificate request
-    * - --cert-signreq
+    * - ``--cert-signreq``
       - Sign request and produce certificate
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -801,22 +801,22 @@ Certificate Authority Initialization
     * - Parameter
       - Description
       - Default value
-    * - bits=<int>
+    * - ``bits=<int>``
       - Bit length of the encryption keys of the certificate (required)
       - No default value.
-    * - commonname=<string>
+    * - ``commonname=<string>``
       - Common name to assign to the certificate (required)
       - No default value.
-    * - notafter=<string>
+    * - ``notafter=<string>``
       - Expiration (NotAfter) date/time, in RFC3339 format
       - No default value.
-    * - notbefore=<string>
+    * - ``notbefore=<string>``
       - Effective (NotBefore) date/time, in RFC3339 format
       - No default value.
-    * - outcert=<string>
+    * - ``outcert=<string>``
       - File to save the CA certificate to (required)
       - No default value.
-    * - outkey=<string>
+    * - ``outkey=<string>``
       - File to save the CA private key to (required)
       - No default value.
 
@@ -831,28 +831,28 @@ Create Certificate Request
     * - Parameter
       - Description
       - Default value
-    * - bits=<int>
+    * - ``bits=<int>``
       - Bit length of the encryption keys of the certificate
       - No default value.
-    * - commonname=<string>
+    * - ``commonname=<string>``
       - Common name to assign to the certificate (required)
       - No default value.
-    * - dnsname=<[]string (may be repeated)>
+    * - ``dnsname=<[]string (may be repeated)>``
       - DNS names to add to the certificate
       - No default value.
-    * - inkey=<string>
+    * - ``inkey=<string>``
       - Private key to use for the request
       - No default value.
-    * - ipaddress=<[]string (may be repeated)>
+    * - ``ipaddress=<[]string (may be repeated)>``
       - IP addresses to add to the certificate
       - No default value.
-    * - nodeid=<[]string (may be repeated)>
+    * - ``nodeid=<[]string (may be repeated)>``
       - Receptor node IDs to add to the certificate
       - No default value.
-    * - outreq=<string>
+    * - ``outreq=<string>``
       - File to save the certificate request to (required)
       - No default value.
-    * - outkey=<string>
+    * - ``outkey=<string>``
       - File to save the private key to (new key will be generated)
       - No default value.
 
@@ -867,24 +867,24 @@ Sign Request and Produce Certificate
     * - Parameter
       - Description
       - Default value
-    * - cacert=<string>
+    * - ``cacert=<string>``
       - CA certificate PEM filename (required)
       - No default value.
-    * - cakey=<string>
+    * - ``cakey=<string>``
       - CA private key PEM filename (required)
       - No default value.
-    * - notafter=<string>
+    * - ``notafter=<string>``
       - Expiration (NotAfter) date/time, in RFC3339 format
       - No default value.
-    * - notbefore=<string>
+    * - ``notbefore=<string>``
       - Effective (NotBefore) date/time, in RFC3339 format
       - No default value.
-    * - outcert=<string>
+    * - ``outcert=<string>``
       - File to save the signed certificate to (required)
       - No default value.
-    * - req=<string>
+    * - ``req=<string>``
       - Certificate Request PEM filename (required)
       - No default value.
-    * - verify=<bool>
+    * - ``verify=<bool>``
       - If true, do not prompt the user for verification
       - False

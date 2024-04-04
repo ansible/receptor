@@ -536,9 +536,9 @@ func (cfg cmdlineConfigWindows) Run() error {
 func init() {
 	if runtime.GOOS == "windows" {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Run a control service", cmdlineConfigWindows{})
+			"control-service", "Runs a control service", cmdlineConfigWindows{})
 	} else {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Run a control service", cmdlineConfigUnix{})
+			"control-service", "Runs a control service", cmdlineConfigUnix{})
 	}
 }

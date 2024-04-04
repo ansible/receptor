@@ -42,7 +42,7 @@ Receptor can be configured on the command-line, exemplified above, or via a yaml
 
 Start receptor using the config file
 
-.. code-block:: yaml
+.. code-block:: bash
 
     receptor --config foo.yml
 
@@ -53,13 +53,13 @@ Changing the configuration file does take effect until the receptor process is r
 Use Receptor through a container image
 ---------------------------------------
 
-.. code-block:: yaml
+.. code-block:: bash
 
     podman pull quay.io/ansible/receptor
 
 Start a container, which automatically runs receptor with the default config located at ``/etc/receptor/receptor.conf``
 
-.. code-block:: yaml
+.. code-block:: bash
 
     podman run -it --rm --name receptor quay.io/ansible/receptor
 

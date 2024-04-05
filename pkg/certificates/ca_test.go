@@ -21,15 +21,19 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+var excessPEMDataFormatString string = "Excess PEM Data: %v"
+
+var wrongPEMBlockTypeFormatString string = "PEM Block is not a %s: %v"
+
 func setupGoodCertificate() (*x509.Certificate, error) {
 	goodCertificatePEMData := setupGoodCertificatePEMData()
 	goodCertificateBlock, rest := pem.Decode(goodCertificatePEMData)
 	if len(rest) != 0 {
-		return &x509.Certificate{}, fmt.Errorf("Excess PEM Data: %v", rest)
+		return &x509.Certificate{}, fmt.Errorf(excessPEMDataFormatString, rest)
 	}
 
 	if goodCertificateBlock.Type != "CERTIFICATE" {
-		return &x509.Certificate{}, fmt.Errorf("PEM Block is not a certificate: %v", goodCertificateBlock.Type)
+		return &x509.Certificate{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "certificate", goodCertificateBlock.Type)
 	}
 
 	goodCertificate, err := x509.ParseCertificate(goodCertificateBlock.Bytes)
@@ -79,11 +83,11 @@ func setupGoodCertificateRequest() (*x509.CertificateRequest, error) {
 
 	goodCertificateRequestBlock, rest := pem.Decode(goodCertificateRequestPEMData)
 	if len(rest) != 0 {
-		return &x509.CertificateRequest{}, fmt.Errorf("Excess PEM Data: %v", rest)
+		return &x509.CertificateRequest{}, fmt.Errorf(excessPEMDataFormatString, rest)
 	}
 
 	if goodCertificateRequestBlock.Type != "CERTIFICATE REQUEST" {
-		return &x509.CertificateRequest{}, fmt.Errorf("PEM Block is not a certificate request: %v", goodCertificateRequestBlock.Type)
+		return &x509.CertificateRequest{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "certificate request", goodCertificateRequestBlock.Type)
 	}
 
 	goodCertificateRequest, err := x509.ParseCertificateRequest(goodCertificateRequestBlock.Bytes)
@@ -116,11 +120,11 @@ func setupGoodRSAPrivateKey() (*rsa.PrivateKey, error) {
 	goodRSAPrivateKeyPEMData := setupGoodRSAPrivateKeyPEMData()
 	goodRSAPrivateKeyBlock, rest := pem.Decode(goodRSAPrivateKeyPEMData)
 	if len(rest) != 0 {
-		return &rsa.PrivateKey{}, fmt.Errorf("Excess PEM Data: %v", rest)
+		return &rsa.PrivateKey{}, fmt.Errorf(excessPEMDataFormatString, rest)
 	}
 
 	if goodRSAPrivateKeyBlock.Type != "RSA PRIVATE KEY" {
-		return &rsa.PrivateKey{}, fmt.Errorf("PEM Block is not a RSA Private Key: %v", goodRSAPrivateKeyBlock.Type)
+		return &rsa.PrivateKey{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "RSA Private Key", goodRSAPrivateKeyBlock.Type)
 	}
 
 	goodRSAPrivateKey, err := x509.ParsePKCS1PrivateKey(goodRSAPrivateKeyBlock.Bytes)
@@ -190,11 +194,11 @@ func setupGoodPrivateKey() (*rsa.PrivateKey, error) {
 
 	goodPrivateKeyBlock, rest := pem.Decode(goodPrivateKeyPEMData)
 	if len(rest) != 0 {
-		return &rsa.PrivateKey{}, fmt.Errorf("Excess PEM Data: %v", rest)
+		return &rsa.PrivateKey{}, fmt.Errorf(excessPEMDataFormatString, rest)
 	}
 
 	if goodPrivateKeyBlock.Type != "PRIVATE KEY" {
-		return &rsa.PrivateKey{}, fmt.Errorf("PEM Block is not a private key: %v", goodPrivateKeyBlock.Type)
+		return &rsa.PrivateKey{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "private key", goodPrivateKeyBlock.Type)
 	}
 
 	goodResult, err := x509.ParsePKCS8PrivateKey(goodPrivateKeyBlock.Bytes)
@@ -267,11 +271,11 @@ func setupGoodPublicKey() (*rsa.PublicKey, error) {
 
 	goodPublicKeyBlock, rest := pem.Decode(goodPublicKeyPEMData)
 	if len(rest) != 0 {
-		return &rsa.PublicKey{}, fmt.Errorf("Excess PEM Data: %v", rest)
+		return &rsa.PublicKey{}, fmt.Errorf(excessPEMDataFormatString, rest)
 	}
 
 	if goodPublicKeyBlock.Type != "PUBLIC KEY" {
-		return &rsa.PublicKey{}, fmt.Errorf("PEM Block is not a public key: %v", goodPublicKeyBlock.Type)
+		return &rsa.PublicKey{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "public key", goodPublicKeyBlock.Type)
 	}
 
 	goodResult, err := x509.ParsePKIXPublicKey(goodPublicKeyBlock.Bytes)
@@ -1000,34 +1004,36 @@ func TestLoadFromPEMFile(t *testing.T) {
 		filename string
 	}
 
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
 	certificateTestFilename := "certificate_test_filename"
 	goodCertificate, err := setupGoodCertificate()
 	if err != nil {
-		t.Errorf("Error setting up certificate: %v", err)
+		t.Errorf(errorSettingUpTypeFormatString, "certificate", err)
 	}
 
 	certificateRequestTestFilename := "certificate_request_test_filename"
 	goodCertificateRequest, err := setupGoodCertificateRequest()
 	if err != nil {
-		t.Errorf("Error setting up certificate request: %v", err)
+		t.Errorf(errorSettingUpTypeFormatString, "certificate request", err)
 	}
 
 	rsaPrivateKeyTestFilename := "rsa_private_key_test_filename"
 	goodRSAPrivateKey, err := setupGoodRSAPrivateKey()
 	if err != nil {
-		t.Errorf("Error setting up rsa private key: %v", err)
+		t.Errorf(errorSettingUpTypeFormatString, "rsa private key", err)
 	}
 
 	privateKeyTestFilename := "private_key_test_filename"
 	goodPrivateKey, err := setupGoodPrivateKey()
 	if err != nil {
-		t.Errorf("Error setting up private key: %v", err)
+		t.Errorf(errorSettingUpTypeFormatString, "private key", err)
 	}
 
 	publicKeyTestFilename := "public_key_test_filename"
 	goodPublicKey, err := setupGoodPublicKey()
 	if err != nil {
-		t.Errorf("Error setting up public key: %v", err)
+		t.Errorf(errorSettingUpTypeFormatString, "public key", err)
 	}
 
 	tests := []struct {

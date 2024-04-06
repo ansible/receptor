@@ -23,3 +23,5 @@ kubectl
 /dist
 /test-configs
 coverage.txt
+*status
+*status.lock

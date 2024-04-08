@@ -1041,6 +1041,13 @@ func TestLoadFromPEMFile(t *testing.T) {
 		t.Errorf(errorSettingUpTypeFormatString, "public key", err)
 	}
 
+	failedToDecodeTestFilename := "failed_to_decode_test_filename"
+	failedToDecodeFileContents := []byte{
+		0, 0, 0, 0,
+	}
+
+	unknownBlockTypeTestFilename := "unknown_block_type_test_filename"
+
 	tests := []struct {
 		name                  string
 		args                  args
@@ -1133,6 +1140,36 @@ func TestLoadFromPEMFile(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Failed to decode",
+			args: args{
+				filename: failedToDecodeTestFilename,
+			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(failedToDecodeFileContents), nil).
+					Times(1)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Unknown block type",
+			args: args{
+				filename: unknownBlockTypeTestFilename,
+			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupUnknownBlockTypeFileContents()), nil).
+					Times(1)
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1184,76 +1221,4 @@ hMv6yXvVxVnJHEsG3kM/CsvsU364BBd9kDcZbHpjNcDHMu+XxECJjD2atVtuFdaO
 LykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m69Ep
 JXbL15ZQLCPsaIcqJqpK23VyJKc8fDEA
 -----END PKCS7-----`)
-}
-
-func TestLoadFromPEMFileNegative(t *testing.T) {
-	type args struct {
-		filename string
-	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	o := mock_certificates.NewMockOser(ctrl)
-
-	failedToDecodeTestFilename := "failed_to_decode_test_filename"
-	failedToDecodeFileContents := []byte{
-		0, 0, 0, 0,
-	}
-
-	unknownBlockTypeTestFilename := "unknown_block_type_test_filename"
-
-	tests := []struct {
-		name                  string
-		args                  args
-		wantOserReadfileCalls func()
-		want                  []interface{}
-		wantErr               bool
-	}{
-		{
-			name: "Failed to decode",
-			args: args{
-				filename: failedToDecodeTestFilename,
-			},
-			wantOserReadfileCalls: func() {
-				o.
-					EXPECT().
-					ReadFile(gomock.Any()).
-					Return(interface{}(failedToDecodeFileContents), nil).
-					Times(1)
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "Unknown block type",
-			args: args{
-				filename: unknownBlockTypeTestFilename,
-			},
-			wantOserReadfileCalls: func() {
-				o.
-					EXPECT().
-					ReadFile(gomock.Any()).
-					Return(interface{}(setupUnknownBlockTypeFileContents()), nil).
-					Times(1)
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.wantOserReadfileCalls()
-
-			got, err := certificates.LoadFromPEMFile(tt.args.filename, o)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("LoadFromPEMFile() error = %v, wantErr %v", err, tt.wantErr)
-
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("LoadFromPEMFile() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }

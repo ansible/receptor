@@ -184,7 +184,7 @@ func (w *Workceptor) createSignature(nodeID string) (string, error) {
 		ExpiresAt: jwt.NewNumericDate(exp),
 		Audience:  []string{nodeID},
 	}
-	rsaPrivateKey, err := certificates.LoadPrivateKey(w.SigningKey)
+	rsaPrivateKey, err := certificates.LoadPrivateKey(w.SigningKey, &certificates.OsWrapper{})
 	if err != nil {
 		return "", fmt.Errorf("could not load signing key file: %s", err.Error())
 	}

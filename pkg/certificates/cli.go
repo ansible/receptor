@@ -158,7 +158,7 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 	if err != nil {
 		return err
 	}
-	ca.PrivateKey, err = LoadPrivateKey(caKeyPath)
+	ca.PrivateKey, err = LoadPrivateKey(caKeyPath, &OsWrapper{})
 	if err != nil {
 		return err
 	}

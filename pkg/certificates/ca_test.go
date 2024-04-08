@@ -1004,6 +1004,11 @@ func TestLoadFromPEMFile(t *testing.T) {
 		filename string
 	}
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	o := mock_certificates.NewMockOser(ctrl)
+
 	errorSettingUpTypeFormatString := "Error setting up %s: %v"
 
 	certificateTestFilename := "certificate_test_filename"
@@ -1037,15 +1042,23 @@ func TestLoadFromPEMFile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		args    args
-		want    []interface{}
-		wantErr bool
+		name                  string
+		args                  args
+		wantOserReadfileCalls func()
+		want                  []interface{}
+		wantErr               bool
 	}{
 		{
 			name: "Certificate",
 			args: args{
 				filename: certificateTestFilename,
+			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupGoodCertificatePEMData()), nil).
+					Times(1)
 			},
 			want: []interface{}{
 				goodCertificate,
@@ -1057,6 +1070,13 @@ func TestLoadFromPEMFile(t *testing.T) {
 			args: args{
 				filename: certificateRequestTestFilename,
 			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupGoodCertificateRequestPEMData()), nil).
+					Times(1)
+			},
 			want: []interface{}{
 				goodCertificateRequest,
 			},
@@ -1066,6 +1086,13 @@ func TestLoadFromPEMFile(t *testing.T) {
 			name: "RSA Private Key",
 			args: args{
 				filename: rsaPrivateKeyTestFilename,
+			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupGoodRSAPrivateKeyPEMData()), nil).
+					Times(1)
 			},
 			want: []interface{}{
 				goodRSAPrivateKey,
@@ -1077,6 +1104,13 @@ func TestLoadFromPEMFile(t *testing.T) {
 			args: args{
 				filename: privateKeyTestFilename,
 			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupGoodPrivateKeyPEMData()), nil).
+					Times(1)
+			},
 			want: []interface{}{
 				goodPrivateKey,
 			},
@@ -1087,6 +1121,13 @@ func TestLoadFromPEMFile(t *testing.T) {
 			args: args{
 				filename: publicKeyTestFilename,
 			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupGoodPublicKeyPEMData()), nil).
+					Times(1)
+			},
 			want: []interface{}{
 				goodPublicKey,
 			},
@@ -1095,49 +1136,7 @@ func TestLoadFromPEMFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			o := mock_certificates.NewMockOser(ctrl)
-			switch tt.args.filename {
-			case certificateTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(setupGoodCertificatePEMData()), nil).
-					Times(1)
-
-			case certificateRequestTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(setupGoodCertificateRequestPEMData()), nil).
-					Times(1)
-
-			case rsaPrivateKeyTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(setupGoodRSAPrivateKeyPEMData()), nil).
-					Times(1)
-
-			case privateKeyTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(setupGoodPrivateKeyPEMData()), nil).
-					Times(1)
-
-			case publicKeyTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(setupGoodPublicKeyPEMData()), nil).
-					Times(1)
-
-			default:
-				t.Errorf("Unexpected filename: %s", tt.args.filename)
-			}
+			tt.wantOserReadfileCalls()
 
 			got, err := certificates.LoadFromPEMFile(tt.args.filename, o)
 			if (err != nil) != tt.wantErr {
@@ -1191,6 +1190,12 @@ func TestLoadFromPEMFileNegative(t *testing.T) {
 	type args struct {
 		filename string
 	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	o := mock_certificates.NewMockOser(ctrl)
+
 	failedToDecodeTestFilename := "failed_to_decode_test_filename"
 	failedToDecodeFileContents := []byte{
 		0, 0, 0, 0,
@@ -1199,15 +1204,23 @@ func TestLoadFromPEMFileNegative(t *testing.T) {
 	unknownBlockTypeTestFilename := "unknown_block_type_test_filename"
 
 	tests := []struct {
-		name    string
-		args    args
-		want    []interface{}
-		wantErr bool
+		name                  string
+		args                  args
+		wantOserReadfileCalls func()
+		want                  []interface{}
+		wantErr               bool
 	}{
 		{
 			name: "Failed to decode",
 			args: args{
 				filename: failedToDecodeTestFilename,
+			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(failedToDecodeFileContents), nil).
+					Times(1)
 			},
 			want:    nil,
 			wantErr: true,
@@ -1217,34 +1230,20 @@ func TestLoadFromPEMFileNegative(t *testing.T) {
 			args: args{
 				filename: unknownBlockTypeTestFilename,
 			},
+			wantOserReadfileCalls: func() {
+				o.
+					EXPECT().
+					ReadFile(gomock.Any()).
+					Return(interface{}(setupUnknownBlockTypeFileContents()), nil).
+					Times(1)
+			},
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			o := mock_certificates.NewMockOser(ctrl)
-			switch tt.args.filename {
-			case failedToDecodeTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(failedToDecodeFileContents), nil).
-					Times(1)
-
-			case unknownBlockTypeTestFilename:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(tt.args.filename)).
-					Return(interface{}(setupUnknownBlockTypeFileContents()), nil).
-					Times(1)
-
-			default:
-				t.Errorf("Unexpected filename: %s", tt.args.filename)
-			}
+			tt.wantOserReadfileCalls()
 
 			got, err := certificates.LoadFromPEMFile(tt.args.filename, o)
 			if (err != nil) != tt.wantErr {

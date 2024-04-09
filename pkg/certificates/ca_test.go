@@ -1222,3 +1222,90 @@ LykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m69Ep
 JXbL15ZQLCPsaIcqJqpK23VyJKc8fDEA
 -----END PKCS7-----`)
 }
+
+func TestLoadPrivateKey(t *testing.T) {
+	type args struct {
+		filename string
+	}
+
+	positivePrivateKeyFilename := "private_key_test_filename"
+
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
+	goodPrivateKey, err := setupGoodPrivateKey()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "private key", err)
+	}
+
+	negativeMultipleItemFilename := "negative_multiple_item_test"
+	multiplePrivateKeys := setupGoodPrivateKeyPEMData()
+	multiplePrivateKeys = append(multiplePrivateKeys, multiplePrivateKeys[0])
+
+	negativeNoPrivateKeyFilename := "negative_no_private_key_test"
+	noPrivateKey := []byte{
+		0, 0, 0, 0, 0,
+	}
+
+	tests := []struct {
+		name                   string
+		args                   args
+		wantOserReadfileArg    string
+		wantOserReadfileResult []byte
+		want                   *rsa.PrivateKey
+		wantErr                bool
+	}{
+		{
+			name: "Positive Private Key",
+			args: args{
+				filename: positivePrivateKeyFilename,
+			},
+			wantOserReadfileArg:    positivePrivateKeyFilename,
+			wantOserReadfileResult: setupGoodPrivateKeyPEMData(),
+			want:                   goodPrivateKey,
+			wantErr:                false,
+		},
+		{
+			name: "Negative multi item test",
+			args: args{
+				filename: negativeMultipleItemFilename,
+			},
+			wantOserReadfileArg:    negativeMultipleItemFilename,
+			wantOserReadfileResult: multiplePrivateKeys,
+			want:                   nil,
+			wantErr:                true,
+		},
+		{
+			name: "Negative no private key test",
+			args: args{
+				filename: negativeNoPrivateKeyFilename,
+			},
+			wantOserReadfileArg:    negativeNoPrivateKeyFilename,
+			wantOserReadfileResult: noPrivateKey,
+			want:                   nil,
+			wantErr:                true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockOser(ctrl)
+			o.
+				EXPECT().
+				ReadFile(gomock.Eq(tt.wantOserReadfileArg)).
+				Return(tt.wantOserReadfileResult, nil).
+				Times(1)
+
+			got, err := certificates.LoadPrivateKey(tt.args.filename, o)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadPrivateKey() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadPrivateKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

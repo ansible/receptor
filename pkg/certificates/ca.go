@@ -222,8 +222,8 @@ func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 }
 
 // LoadPrivateKey loads a single RSA private key from a file.
-func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
-	data, err := LoadFromPEMFile(filename, &OsWrapper{})
+func LoadPrivateKey(filename string, osWrapper Oser) (*rsa.PrivateKey, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}

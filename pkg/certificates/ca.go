@@ -239,8 +239,8 @@ func LoadPrivateKey(filename string, osWrapper Oser) (*rsa.PrivateKey, error) {
 }
 
 // LoadPublicKey loads a single RSA public key from a file.
-func LoadPublicKey(filename string) (*rsa.PublicKey, error) {
-	data, err := LoadFromPEMFile(filename, &OsWrapper{})
+func LoadPublicKey(filename string, osWrapper Oser) (*rsa.PublicKey, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}

@@ -220,7 +220,7 @@ func (w *Workceptor) VerifySignature(signature string) error {
 	if w.VerifyingKey == "" {
 		return fmt.Errorf("could not verify signature: verifying key not specified")
 	}
-	rsaPublicKey, err := certificates.LoadPublicKey(w.VerifyingKey)
+	rsaPublicKey, err := certificates.LoadPublicKey(w.VerifyingKey, &certificates.OsWrapper{})
 	if err != nil {
 		return fmt.Errorf("could not load verifying key file: %s", err.Error())
 	}

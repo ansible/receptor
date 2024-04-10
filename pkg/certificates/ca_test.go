@@ -1309,3 +1309,90 @@ func TestLoadPrivateKey(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadPublicKey(t *testing.T) {
+	type args struct {
+		filename string
+	}
+
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
+	positivePublicKeyFilename := "public_key_test_filename"
+	goodPublicKey, err := setupGoodPublicKey()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "public key", err)
+	}
+
+	negativeMultipleItemFilename := "negative_multiple_item_test"
+	multiplePublicKeys := setupGoodPublicKeyPEMData()
+	multiplePublicKeys = append(multiplePublicKeys, multiplePublicKeys[0])
+
+	negativeNoPublicKeyFilename := "negative_no_public_key_test"
+	noPublicKey := []byte{
+		0, 0, 0, 0,
+	}
+
+	tests := []struct {
+		name                   string
+		args                   args
+		wantOserReadfileArg    string
+		wantOserReadfileResult []byte
+		want                   *rsa.PublicKey
+		wantErr                bool
+	}{
+		{
+			name: "Positive Private Key",
+			args: args{
+				filename: positivePublicKeyFilename,
+			},
+			wantOserReadfileArg:    positivePublicKeyFilename,
+			wantOserReadfileResult: setupGoodPublicKeyPEMData(),
+			want:                   goodPublicKey,
+			wantErr:                false,
+		},
+		{
+			name: "Negative multi item test",
+			args: args{
+				filename: negativeMultipleItemFilename,
+			},
+			wantOserReadfileArg:    negativeMultipleItemFilename,
+			wantOserReadfileResult: multiplePublicKeys,
+			want:                   nil,
+			wantErr:                true,
+		},
+		{
+			name: "Negative no private key test",
+			args: args{
+				filename: negativeNoPublicKeyFilename,
+			},
+			wantOserReadfileArg:    negativeNoPublicKeyFilename,
+			wantOserReadfileResult: noPublicKey,
+			want:                   nil,
+			wantErr:                true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockOser(ctrl)
+			o.
+				EXPECT().
+				ReadFile(gomock.Eq(tt.wantOserReadfileArg)).
+				Return(tt.wantOserReadfileResult, nil).
+				Times(1)
+
+			got, err := certificates.LoadPublicKey(tt.args.filename, o)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadPublicKey() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadPublicKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

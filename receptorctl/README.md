@@ -57,3 +57,20 @@ Run the following `nox` sessions to test Receptorctl changes:
   # For example, this command tests Receptorctl against Python 3.11.
   nox -s tests-3.11
   ```
+
+# Updating dependencies
+
+Update dependencies in the `requirements` directory as follows:
+
+1. Make sure `pip-compile` is available.
+
+   ```
+   python -m pip install --upgrade pip-tools
+   ```
+
+2. Add any packages or pins to the `*.in` file.
+3. Generate the full dependency tree from the repository root, for example:
+
+   ```
+   pip-compile --output-file=receptorctl/requirements/tests.txt receptorctl/requirements/tests.in
+   ```

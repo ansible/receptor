@@ -1341,7 +1341,7 @@ func TestLoadPublicKey(t *testing.T) {
 		wantErr                bool
 	}{
 		{
-			name: "Positive Private Key",
+			name: "Positive Public Key",
 			args: args{
 				filename: positivePublicKeyFilename,
 			},
@@ -1361,7 +1361,7 @@ func TestLoadPublicKey(t *testing.T) {
 			wantErr:                true,
 		},
 		{
-			name: "Negative no private key test",
+			name: "Negative no public key test",
 			args: args{
 				filename: negativeNoPublicKeyFilename,
 			},
@@ -1392,6 +1392,91 @@ func TestLoadPublicKey(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("LoadPublicKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadRequest(t *testing.T) {
+	type args struct {
+		filename string
+	}
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
+	positiveRequestFilename := "request_test_filename"
+	goodRequest, err := setupGoodCertificateRequest()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "request", err)
+	}
+
+	negativeMultipleItemFilename := "negative_multiple_item_test"
+	multipleRequests := setupGoodCertificateRequestPEMData()
+	multipleRequests = append(multipleRequests, multipleRequests[0])
+
+	negativeNoRequestFilename := "negative_no_request_test"
+	noRequest := []byte{
+		0, 0, 0, 0,
+	}
+
+	tests := []struct {
+		name                   string
+		args                   args
+		wantOserReadfileArg    string
+		wantOserReadfileResult []byte
+		want                   *x509.CertificateRequest
+		wantErr                bool
+	}{
+		{
+			name: "Positive Request",
+			args: args{
+				filename: positiveRequestFilename,
+			},
+			wantOserReadfileArg:    positiveRequestFilename,
+			wantOserReadfileResult: setupGoodCertificateRequestPEMData(),
+			want:                   goodRequest,
+			wantErr:                false,
+		},
+		{
+			name: "Negative multi item test",
+			args: args{
+				filename: negativeMultipleItemFilename,
+			},
+			wantOserReadfileArg:    negativeMultipleItemFilename,
+			wantOserReadfileResult: multipleRequests,
+			want:                   nil,
+			wantErr:                true,
+		},
+		{
+			name: "Negative no request test",
+			args: args{
+				filename: negativeNoRequestFilename,
+			},
+			wantOserReadfileArg:    negativeNoRequestFilename,
+			wantOserReadfileResult: noRequest,
+			want:                   nil,
+			wantErr:                true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockOser(ctrl)
+			o.
+				EXPECT().
+				ReadFile(gomock.Eq(tt.wantOserReadfileArg)).
+				Return(tt.wantOserReadfileResult, nil).
+				Times(1)
+
+			got, err := certificates.LoadRequest(tt.args.filename, o)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadRequest() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadRequest() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -163,7 +163,7 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 		return err
 	}
 	var req *x509.CertificateRequest
-	req, err = LoadRequest(reqPath)
+	req, err = LoadRequest(reqPath, &OsWrapper{})
 	if err != nil {
 		return err
 	}

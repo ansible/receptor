@@ -1,5 +1,0 @@
--r requirements.txt
-pip
-build
-wheel
-pre-commit

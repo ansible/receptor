@@ -1,6 +1,0 @@
--r build-requirements.txt
-pytest==7.0.1
-urllib3
-black
-pylama
-pytest-github

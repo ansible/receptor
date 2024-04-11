@@ -89,7 +89,7 @@ lint:
 	@golint cmd/... pkg/... example/...
 
 receptorctl-lint: receptorctl/.VERSION
-	@cd receptorctl && tox -e lint
+	@cd receptorctl && nox -s lint
 
 format:
 	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
@@ -140,7 +140,7 @@ test: receptor
 	$(GO) test ./... $(TESTCMD) -count=1 -race -timeout 5m
 
 receptorctl-test: receptorctl/.VERSION
-	@cd receptorctl && tox -e py3
+	@cd receptorctl && nox -s tests
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \

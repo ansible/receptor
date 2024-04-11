@@ -205,8 +205,8 @@ func LoadCertificate(filename string, osWrapper Oser) (*x509.Certificate, error)
 }
 
 // LoadRequest loads a single certificate request from a file.
-func LoadRequest(filename string) (*x509.CertificateRequest, error) {
-	data, err := LoadFromPEMFile(filename, &OsWrapper{})
+func LoadRequest(filename string, osWrapper Oser) (*x509.CertificateRequest, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}

@@ -35,8 +35,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install tox
-        run: pip install tox
+      - name: Setup nox
+        uses: wntrblm/nox@2024.03.02
 
       - name: Run receptorctl linters
         run: make receptorctl-lint
@@ -135,8 +135,8 @@ jobs:
       - name: Upgrade pip
         run: pip install --upgrade pip
 
-      - name: Install tox
-        run: pip install tox
+      - name: Setup nox
+        uses: wntrblm/nox@2024.03.02
 
       - name: Run receptorctl tests
         run: make receptorctl-test

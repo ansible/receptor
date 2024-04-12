@@ -4,6 +4,7 @@
 package certificates_test
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -1476,6 +1477,82 @@ func TestLoadRequest(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadRequest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRsaWrapper_GenerateKey(t *testing.T) {
+	type args struct {
+		random io.Reader
+		bits   int
+	}
+
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
+	goodPrivateKey, err := setupGoodPrivateKey()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "private key", err)
+	}
+
+	tests := []struct {
+		name                            string
+		args                            args
+		wantGenerateKeyRandomArg        io.Reader
+		wantGenerateKeyBitsArg          int
+		wantGenerateKeyPrivateKeyResult *rsa.PrivateKey
+		wantGenerateKeyErrorResult      error
+		want                            *rsa.PrivateKey
+		wantErr                         bool
+	}{
+		{
+			name: "Positive test",
+			args: args{
+				random: rand.Reader,
+				bits:   2048,
+			},
+			wantGenerateKeyRandomArg:        nil,
+			wantGenerateKeyBitsArg:          2048,
+			wantGenerateKeyPrivateKeyResult: goodPrivateKey,
+			wantGenerateKeyErrorResult:      nil,
+			want:                            goodPrivateKey,
+			wantErr:                         false,
+		},
+		{
+			name: "Negative test",
+			args: args{
+				random: rand.Reader,
+				bits:   -1,
+			},
+			wantGenerateKeyRandomArg:        nil,
+			wantGenerateKeyBitsArg:          -1,
+			wantGenerateKeyPrivateKeyResult: nil,
+			wantGenerateKeyErrorResult:      fmt.Errorf("Error result"),
+			want:                            nil,
+			wantErr:                         true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			o := mock_certificates.NewMockRsaer(ctrl)
+			o.
+				EXPECT().
+				GenerateKey(gomock.Any(), gomock.Eq(tt.wantGenerateKeyBitsArg)).
+				Return(tt.wantGenerateKeyPrivateKeyResult, tt.wantGenerateKeyErrorResult).
+				Times(1)
+
+			got, err := o.GenerateKey(tt.args.random, tt.args.bits)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RsaWrapper.GenerateKey() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("RsaWrapper.GenerateKey() = %v, want %v", got, tt.want)
 				t.Errorf("LoadRequest() = %v, want %v", got, tt.want)
 			}
 		})

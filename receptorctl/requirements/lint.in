@@ -1,0 +1,3 @@
+# This requirements file is used for receptorctl lint and formatting checks
+
+black # <-- used to check Python code formatting

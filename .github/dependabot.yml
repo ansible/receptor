@@ -8,3 +8,14 @@ updates:
     directory: /
     schedule:
       interval: daily
+  - package-ecosystem: "pip"
+    directory: "/receptorctl"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "pip"
+      - "dependencies"

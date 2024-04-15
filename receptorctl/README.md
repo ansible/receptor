@@ -70,15 +70,24 @@ Run the following `nox` sessions to test Receptorctl changes:
 
 Update dependencies in the `requirements` directory as follows:
 
-1. Make sure `pip-compile` is available.
+1. Add any packages or pins to the `*.in` file.
+2. Do one of the following from the `receptorctl` directory:
 
-   ```bash
-   python -m pip install --upgrade pip-tools
-   ```
+  - Update all dependencies.
 
-2. Add any packages or pins to the `*.in` file.
-3. Generate the full dependency tree from the repository root, for example:
+    ```bash
+    nox -s pip-compile
+    ```
 
-   ```bash
-   pip-compile --output-file=receptorctl/requirements/tests.txt receptorctl/requirements/tests.in
-   ```
+  - Generate the full dependency tree for a single set of dependencies, for example:
+
+    ```bash
+    nox -s "pip-compile-3.12(tests)"
+    ```
+
+> You can also pass the `--no-upgrade` flag when adding a new package.
+> This avoids bumping transitive dependencies for other packages in the `*.in` file.
+
+```bash
+nox -s pip-compile -- --no-upgrade
+```

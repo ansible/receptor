@@ -1,5 +1,6 @@
 from glob import iglob
 
+import os
 import nox
 
 python_versions = ["3.8", "3.9", "3.10", "3.11"]
@@ -8,6 +9,14 @@ LINT_FILES: tuple[str, ...] = (
     *iglob("receptorctl/*.py"),
     "setup.py",
 )
+PINNED = os.environ.get("PINNED", "true").lower() in {"1", "true"}
+
+def install(session: nox.Session, *args, req: str, **kwargs):
+    if PINNED:
+        pip_constraint = f"requirements/{req}.txt"
+        kwargs.setdefault("env", {})["PIP_CONSTRAINT"] = pip_constraint
+        session.log(f"export PIP_CONSTRAINT={pip_constraint!r}")
+    session.install("-r", f"requirements/{req}.in", *args, **kwargs)
 
 
 @nox.session(python=python_versions)
@@ -15,7 +24,7 @@ def tests(session: nox.Session):
     """
     Run receptorctl tests
     """
-    session.install("pytest")
+    install(session, req="tests")
     session.install("-e", ".")
     session.run("pytest", "-v", "tests", *session.posargs)
 
@@ -25,7 +34,7 @@ def check_style(session: nox.Session):
     """
     Check receptorctl Python code style
     """
-    session.install("flake8")
+    install(session, req="lint")
     session.run("flake8", *session.posargs, *LINT_FILES)
 
 
@@ -34,7 +43,7 @@ def check_format(session: nox.Session):
     """
     Check receptorctl Python file formatting without making changes
     """
-    session.install("black")
+    install(session, req="lint")
     session.run("black", "--check", *session.posargs, *LINT_FILES)
 
 
@@ -43,7 +52,7 @@ def format(session: nox.Session):
     """
     Format receptorctl Python files
     """
-    session.install("black")
+    install(session, req="lint")
     session.run("black", *session.posargs, *LINT_FILES)
 
 

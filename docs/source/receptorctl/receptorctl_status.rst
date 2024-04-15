@@ -1,11 +1,11 @@
---------------------------
-Receptorctl status command
---------------------------
+------
+status
+------
 
 .. contents::
    :local:
 
-``receptorctl status`` shows the Receptor network status
+``receptorctl status`` displays the status of the Receptor network.
 
 The command syntax is: ``receptorctl --socket=<socket_path> status [--json]``
 
@@ -28,86 +28,86 @@ u_str         LISTEN         0              4096                   /tmp/local.so
 The output is divided into sections listed below.  Field values may be listed in their own section.
 Columns are the actual JSON node values.
 
-^^^^^^^^^^^^
-Node Section
-^^^^^^^^^^^^
+^^^^^^^^^^^
+Node output
+^^^^^^^^^^^
 
-.. list-table:: Node Section
+.. list-table:: Node output
       :header-rows: 1
       :widths: auto
 
       * - Column
         - Description
       * - ``."NodeID"``
-        - Node Identifier
+        - Node Identifier.
       * - ``."SystemCPUCount"``
-        - Number of CPUs on node
+        - Number of logical CPU cores on the node.
       * - ``.SystemMemoryMiB"``
-        - Memory (MiB)
+        - Available Mmemory (MiB) of the node.
       * - ``."Version"``
-        - Receptor version
+        - Receptor version.
 
-^^^^^^^^^^^^^^^^^^^
-Connections Section
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
+Connections output
+^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Connections Section
+.. list-table:: Connections output
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."Connections"``
-      - Connections section
+      - Connections
     * - ``."Connections"."Cost"``
-      - Cost to reach NodeID
+      - Metric (route preference) to reach NodeID
     * - ``."Connections"."NodeID"``
       - Node ID
 
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Known Connections Section
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
+Known Connections output
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Known Connections Section
+.. list-table:: Known Connections output
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``"KnownConnectionCosts"``
-      - Known Connections section
+      - Known Connections
     * - ``"KnownConnectionCosts"."<NodeID 1>"``
       - Remote node ID
     * - ``"KnownConnectionCosts"."<NodeID 1>"."<NodeID 2>"``
       - Cost to get to NodeID 1 through NodeID 2
 
-^^^^^^^^^^^^^^^^^^^^^
-Routing Table Section
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
+Routing Table Output
+^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Routing Table Section
+.. list-table:: Routing Table output
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."RoutingTable"``
-      - Routing Table section
+      - Routing Table
     * - ``."RoutingTable"."<NodeID>"``
       - List of NodeID(s) used to get to desired NodeID
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Service Advertisement Section
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Service Advertisement Output
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Service Advertisement Section
+.. list-table:: Service Advertisement Output
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."Advertisements"``
-      - Advertisements section
+      - Advertisements
     * - ``."Advertisements"."ConnType"``
       - Connection type (see below for values)
     * - ``."Advertisements"."NodeID"``
@@ -119,11 +119,11 @@ Service Advertisement Section
     * - ``."Advertisements"."Time"``
       - Timestamp when advertisement sent
 
-======================
-Execution Node Section
-======================
+=====================
+Execution Node Output
+=====================
 
-.. list-table:: Execution Node Section
+.. list-table:: Execution Node output
     :header-rows: 1
     :widths: auto
 

@@ -92,8 +92,8 @@ def pip_compile(session: nox.Session, req: str):
     )
     injected_extra_cli_args = () if has_upgrade_related_cli_flags else ("--upgrade",)
 
-    output_file = Path(f"requirements/{req}.txt")
-    input_file = Path(f"requirements/{req}.in")
+    output_file = os.path.relpath(Path(requirements_directory / f"{req}.txt"))
+    input_file = os.path.relpath(Path(requirements_directory / f"{req}.in"))
 
     session.run(
         "pip-compile",

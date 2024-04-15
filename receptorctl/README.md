@@ -13,31 +13,39 @@ Before you submit a PR, you should install `nox` and verify your changes.
 You can run `nox` with no arguments to execute all checks and tests.
 Alternatively, you can run only certain tasks as outlined in the following sections.
 
+> By default nox sessions install pinned dependencies from the `requirements` directory.
+
+You can use unpinned dependencies as follows:
+
+```bash
+PINNED=false nox -s lint
+```
+
 # Checking changes to Receptorctl
 
 Run the following `nox` sessions to check for code style and formatting issues:
 
 * Run all checks.
 
-  ``` bash
+  ```bash
   nox -s lint
   ```
 
 * Check code style.
 
-  ``` bash
+  ```bash
   nox -s check_style
   ```
 
 * Check formatting.
 
-  ``` bash
+  ```bash
   nox -s check_format
   ```
 
 * Format code if the check fails.
 
-  ``` bash
+  ```bash
   nox -s format
   ```
 
@@ -47,13 +55,39 @@ Run the following `nox` sessions to test Receptorctl changes:
 
 * Run tests against the complete matrix of Python versions.
 
-  ``` bash
+  ```bash
   nox -s tests
   ```
 
 * Run tests against a specific Python version.
 
-  ``` bash
+  ```bash
   # For example, this command tests Receptorctl against Python 3.11.
   nox -s tests-3.11
   ```
+
+# Updating dependencies
+
+Update dependencies in the `requirements` directory as follows:
+
+1. Add any packages or pins to the `*.in` file.
+2. Do one of the following from the `receptorctl` directory:
+
+  - Update all dependencies.
+
+    ```bash
+    nox -s pip-compile
+    ```
+
+  - Generate the full dependency tree for a single set of dependencies, for example:
+
+    ```bash
+    nox -s "pip-compile-3.12(tests)"
+    ```
+
+> You can also pass the `--no-upgrade` flag when adding a new package.
+> This avoids bumping transitive dependencies for other packages in the `*.in` file.
+
+```bash
+nox -s pip-compile -- --no-upgrade
+```

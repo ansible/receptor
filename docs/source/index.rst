@@ -16,6 +16,7 @@ Receptor is an overlay network intended to ease the distribution of work across 
    getting_started_guide/index
    user_guide/index
    developer_guide
+   receptorctl/index
    porting_guide/index
    roadmap/index
    upgrade/index

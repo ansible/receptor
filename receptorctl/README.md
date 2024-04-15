@@ -13,31 +13,39 @@ Before you submit a PR, you should install `nox` and verify your changes.
 You can run `nox` with no arguments to execute all checks and tests.
 Alternatively, you can run only certain tasks as outlined in the following sections.
 
+> By default nox sessions install pinned dependencies from the `requirements` directory.
+
+You can use unpinned dependencies as follows:
+
+```bash
+PINNED=false nox -s lint
+```
+
 # Checking changes to Receptorctl
 
 Run the following `nox` sessions to check for code style and formatting issues:
 
 * Run all checks.
 
-  ``` bash
+  ```bash
   nox -s lint
   ```
 
 * Check code style.
 
-  ``` bash
+  ```bash
   nox -s check_style
   ```
 
 * Check formatting.
 
-  ``` bash
+  ```bash
   nox -s check_format
   ```
 
 * Format code if the check fails.
 
-  ``` bash
+  ```bash
   nox -s format
   ```
 
@@ -47,13 +55,13 @@ Run the following `nox` sessions to test Receptorctl changes:
 
 * Run tests against the complete matrix of Python versions.
 
-  ``` bash
+  ```bash
   nox -s tests
   ```
 
 * Run tests against a specific Python version.
 
-  ``` bash
+  ```bash
   # For example, this command tests Receptorctl against Python 3.11.
   nox -s tests-3.11
   ```
@@ -64,13 +72,13 @@ Update dependencies in the `requirements` directory as follows:
 
 1. Make sure `pip-compile` is available.
 
-   ```
+   ```bash
    python -m pip install --upgrade pip-tools
    ```
 
 2. Add any packages or pins to the `*.in` file.
 3. Generate the full dependency tree from the repository root, for example:
 
-   ```
+   ```bash
    pip-compile --output-file=receptorctl/requirements/tests.txt receptorctl/requirements/tests.in
    ```

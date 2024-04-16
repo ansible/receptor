@@ -21,20 +21,6 @@ jobs:
         uses: golangci/golangci-lint-action@v5
         with:
           version: v1.56
-  lint-receptorctl:
-    name: lint-receptorctl
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup nox
-        uses: wntrblm/nox@2024.04.15
-
-      - name: Run receptorctl linters
-        run: make receptorctl-lint
   receptor:
     name: receptor (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
@@ -100,29 +86,10 @@ jobs:
           name: receptor
           path: /usr/local/bin/receptor
   receptorctl:
-    name: receptorctl
     needs: receptor
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download receptor
-        uses: actions/download-artifact@v4
-        with:
-          name: receptor
-          path: /usr/local/bin/
-
-      - name: Fix permissions on receptor binary
-        run: sudo chmod a+x /usr/local/bin/receptor
-
-      - name: Setup nox
-        uses: wntrblm/nox@2024.04.15
-
-      - name: Run receptorctl tests
-        run: make receptorctl-test
+    uses: ./.github/workflows/receptorctl.yml
+  lint-receptorctl:
+    uses: ./.github/workflows/receptorctl_checks.yml
   container:
     name: container
     runs-on: ubuntu-latest

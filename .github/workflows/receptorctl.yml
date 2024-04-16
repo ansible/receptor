@@ -1,0 +1,47 @@
+---
+name: receptorctl
+
+"on":
+  workflow_call:
+
+jobs:
+  receptorctl:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - session: tests-3.8
+          python-version: "3.8"
+        - session: tests-3.9
+          python-version: "3.9"
+        - session: tests-3.10
+          python-version: "3.10"
+        - session: tests-3.11
+          python-version: "3.11"
+
+    name: "Run receptorctl ${{ matrix.session }} session"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download receptor
+      uses: actions/download-artifact@v4
+      with:
+        name: receptor
+        path: /usr/local/bin/
+
+    - name: Fix permissions on receptor binary
+      run: sudo chmod a+x /usr/local/bin/receptor
+
+    - name: Setup nox
+      uses: wntrblm/nox@2024.04.15
+      with:
+        python-versions: "${{ matrix.python-version }}"
+
+    - name: "Run receptorctl nox ${{ matrix.session }} session"
+      run: |
+        nox -s "${{ matrix.session }}"
+      working-directory: ./receptorctl

@@ -7,25 +7,28 @@ status
 
 ``receptorctl status`` displays the status of the Receptor network.
 
-The command syntax is: ``receptorctl --socket=<socket_path> status [--json]``
+Command syntax: ``receptorctl --socket=<socket_path> status [--json]``
 
-``socket_path`` is the control socket address to connect to Receptor.
-   It defaults to Unix socket.
-   Use tcp:// for TCP socket.
-   The corresponding environment variable is ``RECEPTORCTL_SOCKET``
+``socket_path`` is the control socket address for the Receptor connection.
+   The default is ``unix:`` for a Unix socket.
+   Use ``tcp://`` for a TCP socket.
+   The corresponding environment variable is ``RECEPTORCTL_SOCKET``.
 
-``ss --listening --processes --unix 'src = unix:<socket_path>'``
-Netid         State          Recv-Q         Send-Q                   Local Address:Port                     Peer Address:Port        Process
-u_str         LISTEN         0              4096                   /tmp/local.sock 38130170                            * 0            users:(("receptor",pid=3226769,fd=7))
+.. code-block:: text
+
+  ss --listening --processes --unix 'src = unix:<socket_path>'
+  Netid         State          Recv-Q         Send-Q                   Local Address:Port                     Peer Address:Port        Process
+  u_str         LISTEN         0              4096                   /tmp/local.sock 38130170                            * 0            users:(("receptor",pid=3226769,fd=7))
 
 ``ps -fp $(pidof receptor)``
 ``lsof -p <<pid>``
 
-``--json`` will format the output as JSON.
-   The default is human-readable.
-   Using this argument allows output to be machine consumable.  For example, piping into ``jq``
+``--json`` option returns the output in JSON format.
+   The default output format is human-readable.
+   Using this argument allows output to be machine consumable.  For example, piping into ``jq``.
 
-The output is divided into sections listed below.  Field values may be listed in their own section.
+The output is divided into sections listed below.
+Field values may be listed in their own section.
 Columns are the actual JSON node values.
 
 ^^^^^^^^^^^^

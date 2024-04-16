@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
@@ -71,8 +72,10 @@ func WorkStateToString(workState int) string {
 		return "Succeeded"
 	case WorkStateFailed:
 		return "Failed"
+	case WorkStateCanceled:
+		return "Canceled"
 	default:
-		return "Unknown"
+		return "Unknown: " + strconv.Itoa(workState)
 	}
 }
 

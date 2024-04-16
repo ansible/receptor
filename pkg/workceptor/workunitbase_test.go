@@ -48,7 +48,8 @@ func TestWorkStateToString(t *testing.T) {
 		{"Running Work Description", workceptor.WorkStateRunning, "Running"},
 		{"Succeeded Work Description", workceptor.WorkStateSucceeded, "Succeeded"},
 		{"Failed Work Description", workceptor.WorkStateFailed, "Failed"},
-		{"Unknown Work Description", 999, "Unknown"},
+		{"Canceled Work Description", workceptor.WorkStateCanceled, "Canceled"},
+		{"Unknown Work Description", 999, "Unknown: 999"},
 	}
 
 	for _, tc := range testCases {

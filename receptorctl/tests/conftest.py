@@ -9,7 +9,7 @@ import json
 import yaml
 from click.testing import CliRunner
 
-from lib import create_certificate
+from .lib import create_certificate
 
 
 @pytest.fixture(scope="session")

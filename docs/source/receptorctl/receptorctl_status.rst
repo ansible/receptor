@@ -28,11 +28,11 @@ u_str         LISTEN         0              4096                   /tmp/local.so
 The output is divided into sections listed below.  Field values may be listed in their own section.
 Columns are the actual JSON node values.
 
-^^^^^^^^^^^
-Node output
-^^^^^^^^^^^
+^^^^^^^^^^^^
+Node section
+^^^^^^^^^^^^
 
-.. list-table:: Node output
+.. list-table:: Node section
       :header-rows: 1
       :widths: auto
 
@@ -47,94 +47,94 @@ Node output
       * - ``."Version"``
         - Receptor version.
 
-^^^^^^^^^^^^^^^^^^
-Connections output
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+Connections section
+^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Connections output
+.. list-table:: Connections section
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."Connections"``
-      - Connections
+      - Connections.
     * - ``."Connections"."Cost"``
-      - Metric (route preference) to reach NodeID
+      - Metric (route preference) to reach NodeID.
     * - ``."Connections"."NodeID"``
-      - Node ID
+      - Node ID.
 
-^^^^^^^^^^^^^^^^^^^^^^^^
-Known Connections output
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Known Connections section
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Known Connections output
+.. list-table:: Known Connections section
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``"KnownConnectionCosts"``
-      - Known Connections
+      - Known Connections.
     * - ``"KnownConnectionCosts"."<NodeID 1>"``
-      - Remote node ID
+      - Remote node ID.
     * - ``"KnownConnectionCosts"."<NodeID 1>"."<NodeID 2>"``
-      - Cost to get to NodeID 1 through NodeID 2
+      - Cost to get to NodeID 1 through NodeID 2.
 
-^^^^^^^^^^^^^^^^^^^^
-Routing Table Output
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+Routing Table Section
+^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Routing Table output
+.. list-table:: Routing Table section
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."RoutingTable"``
-      - Routing Table
+      - Routing Table.
     * - ``."RoutingTable"."<NodeID>"``
-      - List of NodeID(s) used to get to desired NodeID
+      - List of NodeID(s) used to get to desired NodeID.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Service Advertisement Output
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Service Advertisement Section
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Service Advertisement Output
+.. list-table:: Service Advertisement Section
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."Advertisements"``
-      - Advertisements
+      - Advertisements.
     * - ``."Advertisements"."ConnType"``
-      - Connection type (see below for values)
+      - Connection type (see below for values).
     * - ``."Advertisements"."NodeID"``
-      - Node identifier issuing advertisement
+      - Node identifier issuing advertisement.
     * - ``."Advertisements"."Service"``
-      - Receptor services on node
+      - Receptor services on node.
     * - ``."Advertisements"."Tags"``
-      - Tags associated with node
+      - Tags associated with node.
     * - ``."Advertisements"."Time"``
-      - Timestamp when advertisement sent
+      - Timestamp when advertisement sent.
 
-=====================
-Execution Node Output
-=====================
+======================
+Execution Node Section
+======================
 
-.. list-table:: Execution Node output
+.. list-table:: Execution Node section
     :header-rows: 1
     :widths: auto
 
     * - Column
       - Description
     * - ``."Advertisements"."WorkCommands"``
-      - Execution Node work commands
+      - Execution Node work commands.
     * - ``."Advertisements"."WorkCommands"."Secure"``
-      - Boolean indicating whether the work commands are signed
+      - Boolean indicating whether the work commands are signed.
     * - ``."Advertisements"."WorkCommands"."WorkType"``
-      - Work command(s) supported
+      - Work command(s) supported.
 
 ===============
 Connection Type
@@ -147,11 +147,11 @@ Connection Type
     * - ConnType Value
       - Description
     * - 0
-      - Datagram
+      - Datagram.
     * - 1
-      - Stream
+      - Stream.
     * - 2
-      - StreamTLS
+      - StreamTLS.
 
 ====
 Tags
@@ -164,8 +164,8 @@ Tags
     * - Tags
       - Description
     * - network
-      - Network name
+      - Network name.
     * - route_*
-      - Route information for specified node
+      - Route information for specified node.
     * - type
-      - Node type
+      - Node type.

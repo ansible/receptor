@@ -399,7 +399,7 @@ Websocket Peer
 Configure services that run on top of the Receptor mesh
 -------------------------------------------------------
 
-.. list-table:: Configure serivces that run on top of the Receptor mesh
+.. list-table:: Configure services that run on top of the Receptor mesh
     :header-rows: 1
     :widths: auto
 

@@ -42,11 +42,11 @@ Node section
       * - Column
         - Description
       * - ``."NodeID"``
-        - Node Identifier.
+        - Node identifier.
       * - ``."SystemCPUCount"``
         - Number of logical CPU cores on the node.
       * - ``.SystemMemoryMiB"``
-        - Available Mmemory (MiB) of the node.
+        - Available memory (MiB) of the node.
       * - ``."Version"``
         - Receptor version.
 
@@ -68,10 +68,10 @@ Connections section
       - Node ID.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-Known Connections section
+Known connections section
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Known Connections section
+.. list-table:: Known connections section
     :header-rows: 1
     :widths: auto
 

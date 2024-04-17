@@ -37,7 +37,7 @@ type acceptResult struct {
 type Listener struct {
 	s          *Netceptor
 	pc         PacketConner
-	ql         quic.Listener
+	ql         *quic.Listener
 	acceptChan chan *acceptResult
 	doneChan   chan struct{}
 	doneOnce   *sync.Once
@@ -90,10 +90,19 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
-		MaxIdleTimeout: MaxIdleTimeoutForQuicConnections,
+		HandshakeIdleTimeout:    15 * time.Second,
+		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
+		Allow0RTT:               true,
+		DisablePathMTUDiscovery: false,
+	}
+	statelessResetKey := make([]byte, 32)
+	rand.Read(statelessResetKey)
+	tr := quic.Transport{
+		Conn:              pc,
+		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := quic.Listen(pc, tlscfg, cfg)
+	ql, err := tr.Listen(tlscfg, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +294,10 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
-		HandshakeIdleTimeout: 15 * time.Second,
-		MaxIdleTimeout:       MaxIdleTimeoutForQuicConnections,
+		HandshakeIdleTimeout:    15 * time.Second,
+		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
+		Allow0RTT:               true,
+		DisablePathMTUDiscovery: false,
 	}
 
 	if KeepAliveForQuicConnections {
@@ -320,7 +331,13 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	doneChan := make(chan struct{}, 1)
 	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	qc, err := quic.DialContext(cctx, pc, rAddr, s.nodeID, tlscfg, cfg)
+	statelessResetKey := make([]byte, 32)
+	rand.Read(statelessResetKey)
+	tr := quic.Transport{
+		Conn:              pc,
+		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
+	}
+	qc, err := tr.Dial(cctx, rAddr, tlscfg, cfg)
 	if err != nil {
 		close(okChan)
 		pcClose()

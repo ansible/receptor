@@ -1,4 +1,4 @@
-FROM quay.io/centos/centos:stream9 as builder
+FROM quay.io/centos/centos:stream8 as builder
 ARG VERSION
 
 RUN dnf -y update && dnf install -y 'golang < 1.21' make python3 python3-pip git
@@ -8,7 +8,7 @@ ADD source.tar.gz /source
 WORKDIR /source
 RUN make VERSION=${VERSION}
 
-FROM quay.io/centos/centos:stream9
+FROM quay.io/centos/centos:stream8
 ARG VERSION
 
 LABEL license="ASL2"

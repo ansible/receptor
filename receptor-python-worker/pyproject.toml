@@ -1,3 +1,12 @@
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "receptor-python-worker"
+version = "v1.4.5+dd4efd9"
+
+[project.optional-dependencies]
+dev = [
+    "nox",
+]

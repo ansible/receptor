@@ -87,9 +87,9 @@ jobs:
           path: /usr/local/bin/receptor
   receptorctl:
     needs: receptor
-    uses: ./.github/workflows/receptorctl.yml
+    uses: ./.github/workflows/reusable_receptorctl_tests.yml
   lint-receptorctl:
-    uses: ./.github/workflows/receptorctl_checks.yml
+    uses: ./.github/workflows/reusable_receptorctl_checks.yml
   container:
     name: container
     runs-on: ubuntu-latest

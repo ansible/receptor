@@ -10,38 +10,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - session: tests-3.8
-          python-version: "3.8"
-        - session: tests-3.9
-          python-version: "3.9"
-        - session: tests-3.10
-          python-version: "3.10"
-        - session: tests-3.11
-          python-version: "3.11"
+        python-version:
+        # NOTE: The highest and the lowest versions come
+        # NOTE: first as their statuses are most likely to
+        # NOTE: signal problems early:
+        - 3.11
+        - 3.8
+        - >-
+          3.10
+        - 3.9
 
-    name: "Run receptorctl ${{ matrix.session }} session"
+    env:
+      FORCE_COLOR: 1
+      NOXSESSION: tests-${{ matrix.python-version }}
+
+    name: >-  # can't use `env` in this context:
+      Run `receptorctl` tests-${{ matrix.python-version }} session
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Download receptor
+    - name: Download the `receptor` binary
       uses: actions/download-artifact@v4
       with:
         name: receptor
         path: /usr/local/bin/
 
-    - name: Fix permissions on receptor binary
+    - name: Set executable bit on the `receptor` binary
       run: sudo chmod a+x /usr/local/bin/receptor
 
-    - name: Setup nox
+    - name: Set up nox
       uses: wntrblm/nox@2024.04.15
       with:
-        python-versions: "${{ matrix.python-version }}"
+        python-versions: ${{ matrix.python-version }}
 
-    - name: "Run receptorctl nox ${{ matrix.session }} session"
-      run: |
-        nox -s "${{ matrix.session }}"
+    - name: Check out the source code from Git
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+        sparse-checkout: receptorctl
+
+    - name: Provision nox environment for ${{ env.NOXSESSION }}
+      run: nox --install-only
+      working-directory: ./receptorctl
+    - name: Run `receptorctl` nox ${{ env.NOXSESSION }} session
+      run: nox --no-install
       working-directory: ./receptorctl

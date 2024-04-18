@@ -16,19 +16,25 @@ jobs:
         - check_style
         - check_format
 
-    name: "Run receptorctl ${{ matrix.session }} session"
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+    env:
+      NOXSESSION: ${{ matrix.session }}
 
-    - name: Setup nox
+    name: >- # can't use `env` in this context:
+      Run `receptorctl` ${{ matrix.session }} session
+
+    steps:
+    - name: Set up nox
       uses: wntrblm/nox@2024.04.15
       with:
-        python-versions: "${{ matrix.python-version }}"
+        python-versions: ${{ matrix.python-version }}
 
-    - name: "Run receptorctl nox ${{ matrix.session }} session"
+    - name: Check out the source code from Git
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: receptorctl
+
+    - name: >-
+        Run `receptorctl` ${{ env.NOXSESSION }} session
       run: |
-        nox -s "${{ matrix.session }}"
+        nox
       working-directory: ./receptorctl

@@ -1,4 +1,5 @@
 import os
+import subprocess
 from glob import iglob
 from pathlib import Path
 
@@ -34,30 +35,30 @@ def version(session: nox.Session):
     Create a .VERSION file.
     """
     try:
-        official_version = session.run(
+        official_version = session.run_install(
             "git",
             "describe",
             "--exact-match",
             "--tags",
             external=True,
-            stderr=open(os.devnull, "w"),
+            stderr=subprocess.DEVNULL,
         )
     except nox.command.CommandFailed:
         official_version = None
+        print("Using the closest annotated tag instead of an exact match.")
 
-    if not official_version:
-        print("Current commit not tagged. Using closest annotated tag instead.")
-        tag = session.run(
+    if official_version:
+        version = official_version.strip()
+    else:
+        tag = session.run_install(
             "git", "describe", "--tags", "--always", silent=True, external=True
         )
-        rev = session.run(
+        rev = session.run_install(
             "git", "rev-parse", "--short", "HEAD", silent=True, external=True
         )
         version = tag.split("-")[0] + "+" + rev
 
-    f = open(".VERSION", "w")
-    f.write(version)
-    f.close()
+    Path(".VERSION").write_text(version)
 
 
 @nox.session(python=python_versions)

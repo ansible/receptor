@@ -147,6 +147,8 @@ type Netceptor struct {
 	firewallLock             *sync.RWMutex
 	firewallRules            []FirewallRuleFunc
 	Logger                   *logger.ReceptorLogger
+	connectionObjects        map[string]*Conn
+	connObjLock              *sync.RWMutex
 }
 
 // ConnStatus holds information about a single connection in the Status struct.
@@ -343,6 +345,8 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		firewallLock:             &sync.RWMutex{},
 		workCommandsLock:         &sync.RWMutex{},
 		Logger:                   logger.NewReceptorLogger(""),
+		connectionObjects:        make(map[string]*Conn),
+		connObjLock:              &sync.RWMutex{},
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
@@ -1844,6 +1848,53 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 	return fmt.Errorf("%s: rejected connection with node %s because %s", s.nodeID, remoteNodeID, reason)
 }
 
+func (s *Netceptor) AddConnectionObj(remoteNode string, conn *Conn) error {
+	s.routingTableLock.Lock()
+	nextHop, found := s.routingTable[remoteNode]
+	if !found {
+
+		return fmt.Errorf("unable to find connection in routing table")
+	}
+	s.routingTableLock.Unlock()
+	s.connObjLock.Lock()
+	s.connectionObjects[nextHop] = conn
+	s.connObjLock.Unlock()
+
+	return nil
+}
+
+func (s *Netceptor) RemoveConnectionObj(remoteNode string) {
+	s.connObjLock.Lock()
+	delete(s.connectionObjects, remoteNode)
+	s.connObjLock.Unlock()
+}
+
+func (s *Netceptor) GetConnectionObj(remoteNode string) *Conn {
+	conn, found := s.connectionObjects[remoteNode]
+	if !found {
+		return nil
+	}
+
+	return conn
+}
+
+func (s *Netceptor) GetOrCreateConnectionObj(ctx context.Context, remoteNode string, service string, tlscfg *tls.Config) (*Conn, error) {
+	s.routingTableLock.Lock()
+	nextHop, found := s.routingTable[remoteNode]
+	if !found {
+
+		return s.DialContext(ctx, remoteNode, service, tlscfg)
+	}
+	s.routingTableLock.Unlock()
+	conn := s.GetConnectionObj(nextHop)
+	if conn == nil {
+
+		return s.DialContext(ctx, remoteNode, service, tlscfg)
+	}
+
+	return conn, nil
+}
+
 func (s *Netceptor) removeConnection(remoteNodeID string) {
 	if remoteNodeID != "" {
 		s.connLock.Lock()
@@ -1859,6 +1910,7 @@ func (s *Netceptor) removeConnection(remoteNodeID string) {
 			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
 		}
 		s.knownNodeLock.Unlock()
+		s.RemoveConnectionObj(remoteNodeID)
 	}
 }
 

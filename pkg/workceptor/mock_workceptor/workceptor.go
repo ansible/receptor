@@ -107,3 +107,18 @@ func (mr *MockNetceptorForWorkceptorMockRecorder) DialContext(ctx, node, service
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DialContext", reflect.TypeOf((*MockNetceptorForWorkceptor)(nil).DialContext), ctx, node, service, tlscfg)
 }
+
+// GetOrCreateConnectionObj mocks base method
+func (m *MockNetceptorForWorkceptor) GetOrCreateConnectionObj(ctx context.Context, node, service string, tlscfg *tls.Config) (*netceptor.Conn, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrCreateConnectionObj", ctx, node, service, tlscfg)
+	ret0, _ := ret[0].(*netceptor.Conn)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrCreateConnectionObj indicates an expected call of GetOrCreateConnectionObj
+func (mr *MockNetceptorForWorkceptorMockRecorder) GetOrCreateConnectionObj(ctx, node, service, tlscfg interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrCreateConnectionObj", reflect.TypeOf((*MockNetceptorForWorkceptor)(nil).GetOrCreateConnectionObj), ctx, node, service, tlscfg)
+}

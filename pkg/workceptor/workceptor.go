@@ -34,6 +34,7 @@ type NetceptorForWorkceptor interface {
 	GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType netceptor.ExpectedHostnameType) (*tls.Config, error) // have a common pkg for types
 	GetLogger() *logger.ReceptorLogger
 	DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error) // create an interface for Conn
+	GetOrCreateConnectionObj(ctx context.Context, node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error)
 }
 
 type ServerForWorkceptor interface {

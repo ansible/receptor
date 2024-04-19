@@ -392,6 +392,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		doneOnce: &sync.Once{},
 		ctx:      cctx,
 	}
+	s.AddConnectionObj(node, conn)
 
 	return conn, nil
 }

@@ -5,7 +5,7 @@ import signal
 import queue
 from pathlib import Path
 import json
-import pkg_resources
+import importlib.metadata
 from .plugin_utils import BUFFER_PAYLOAD, BYTES_PAYLOAD, FILE_PAYLOAD
 
 # Allow existing worker plugins to "import receptor" and get our version of plugin_utils

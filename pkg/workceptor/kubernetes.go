@@ -170,6 +170,8 @@ func (ku KubeAPIWrapper) NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter {
 // It is instantiated in the NewkubeWorker function and available throughout the package.
 var KubeAPIWrapperInstance KubeAPIer
 
+var KubeAPIWrapperLock *sync.RWMutex
+
 // ErrPodCompleted is returned when pod has already completed before we could attach.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
@@ -1501,10 +1503,13 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		}
 	}
 
+	KubeAPIWrapperLock = &sync.RWMutex{}
+	KubeAPIWrapperLock.Lock()
 	KubeAPIWrapperInstance = KubeAPIWrapper{}
 	if kawi != nil {
 		KubeAPIWrapperInstance = kawi
 	}
+	KubeAPIWrapperLock.Unlock()
 
 	ku := &KubeUnit{
 		BaseWorkUnitForWorkUnit: bwu,

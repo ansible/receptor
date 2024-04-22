@@ -74,7 +74,7 @@ def lint(session: nox.Session):
     session.notify("check_format")
 
 
-@nox.session(name="pip-compile", python=["3.12"])
+@nox.session(name="pip-compile", python=["3.11"])
 @nox.parametrize(["req"], arg_values_list=requirements_files, ids=requirements_files)
 def pip_compile(session: nox.Session, req: str):
     """Generate lock files from input files or upgrade packages in lock files."""

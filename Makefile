@@ -205,6 +205,8 @@ RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worke
 $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/.VERSION $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
 	@cd receptor-python-worker && python3 -m build --wheel
 
+receptor_python_worker_wheel: $(RECEPTOR_PYTHON_WORKER_WHEEL)
+
 # Container command can be docker or podman
 CONTAINERCMD ?= podman
 
@@ -220,7 +222,7 @@ EXTRA_OPTS ?=
 space := $(subst ,, )
 CONTAINER_FLAG_FILE = .container-flag-$(VERSION)$(subst $(space),,$(subst /,,$(EXTRA_OPTS)))
 container: $(CONTAINER_FLAG_FILE)
-$(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+$(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL) receptorctl_wheel receptor_python_worker_wheel
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container

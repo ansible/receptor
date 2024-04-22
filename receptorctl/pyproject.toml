@@ -4,3 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [tool.black]
 exclude = "(build|.eggs)"
+
+[project]
+name = "receptorctl"
+dynamic = ["version"]
+license = {text = "Apache License 2.0"}
+
+[project.optional-dependencies]
+dev = [
+    "nox",
+]

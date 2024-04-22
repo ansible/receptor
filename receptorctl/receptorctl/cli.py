@@ -51,7 +51,7 @@ def print_error(message, nl=True):
     envvar="RECEPTORCTL_SOCKET",
     required=True,
     show_envvar=True,
-    help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)",  # noqa: E501
+    help="Control socket address to for the Receptor connection (The default is 'unix:' for a Unix socket, use 'tcp://' for a TCP socket)",  # noqa: E501
 )
 @click.option(
     "--config",

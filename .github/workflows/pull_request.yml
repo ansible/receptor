@@ -178,6 +178,11 @@ jobs:
         run: |
           podman exec -i receptor echo $PATH
 
+      - name: List wheels
+        continue-on-error: true
+        run: |
+          ls /tmp/*.whl
+
       - name: Submit work and assert the output we expect
         run: |
           output=$(podman exec -i receptor receptorctl work submit cat -l 'hello world' -f)

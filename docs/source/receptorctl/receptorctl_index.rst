@@ -10,3 +10,4 @@ The Receptor client, ``receptorctl``, provides a command line interface for inte
    :caption: Receptorctl commands
 
    receptorctl_status
+   receptorctl_work_list

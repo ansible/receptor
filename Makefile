@@ -226,7 +226,13 @@ $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL) rec
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build $(EXTRA_OPTS) packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	$(CONTAINERCMD) build \
+			$(EXTRA_OPTS) \
+			packaging/container -\
+			-build-arg \
+			VERSION=$(VERSION:v%=%) \
+			-t $(REPO):$(TAG) \
+			$(if $(LATEST),-t $(REPO):latest,)
 	touch $@
 
 tc-image: container

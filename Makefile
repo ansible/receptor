@@ -228,9 +228,8 @@ $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL) rec
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
 	$(CONTAINERCMD) build \
 			$(EXTRA_OPTS) \
-			packaging/container -\
-			-build-arg \
-			VERSION=$(VERSION:v%=%) \
+			packaging/container \
+			--build-arg VERSION=$(VERSION:v%=%) \
 			-t $(REPO):$(TAG) \
 			$(if $(LATEST),-t $(REPO):latest,)
 	touch $@

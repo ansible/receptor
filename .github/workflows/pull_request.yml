@@ -168,6 +168,11 @@ jobs:
           sleep 3
           podman logs receptor
 
+      - name: Find receptor
+        run: |
+          podman exec -i receptor find / -name 'receptorctl' -print
+          podman exec -i receptor echo $PATH
+
       - name: Submit work and assert the output we expect
         run: |
           output=$(podman exec -i receptor receptorctl work submit cat -l 'hello world' -f)

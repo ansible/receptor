@@ -169,8 +169,13 @@ jobs:
           podman logs receptor
 
       - name: Find receptor
+        continue-on-error: true
         run: |
           podman exec -i receptor find / -name 'receptorctl' -print
+
+      - name: Display path
+        continue-on-error: true
+        run: |
           podman exec -i receptor echo $PATH
 
       - name: Submit work and assert the output we expect

@@ -107,13 +107,23 @@ build-all:
 	$(GO) build -o receptor --tags no_backends,no_services,no_tls_config ./cmd/receptor-cl && \
 	$(GO) build -o receptor ./cmd/receptor-cl
 
+BINNAME='receptor'
+CHECKSUM_PROGRAM='sha256sum'
+GOARCH=$(ARCH)
+GOOS=$(OS)
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
 build-package:
 	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
 	mkdir -p dist/$(DIST) && \
-	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build -o dist/$(DIST)/$(BINNAME) $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl && \
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build \
+		-o dist/$(DIST)/$(BINNAME) \
+		$(DEBUGFLAGS) \
+		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
+		$(TAGPARAM) \
+		./cmd/receptor-cl && \
 	tar -C dist/$(DIST) -zcf dist/$(DIST).tar.gz $(BINNAME) && \
-	cd dist/ && sha256sum $(DIST).tar.gz >> checksums.txt
+	cd dist/ && \
+	$(CHECKSUM_PROGRAM) $(DIST).tar.gz >> checksums.txt
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)

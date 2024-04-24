@@ -49,7 +49,12 @@ endif
 GO ?= go
 
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" $(GO) build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" $(GO) build \
+		-o receptor \
+		$(DEBUGFLAGS) \
+		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
+		$(TAGPARAM) \
+		./cmd/receptor-cl
 
 clean:
 	@rm -fv .container-flag*
@@ -101,11 +106,22 @@ pre-commit:
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows $(GO) build -o receptor.exe ./cmd/receptor-cl && \
-	GOOS=darwin $(GO) build -o receptor.app ./cmd/receptor-cl && \
-	$(GO) build example/*.go && \
-	$(GO) build -o receptor --tags no_backends,no_services,no_tls_config ./cmd/receptor-cl && \
-	$(GO) build -o receptor ./cmd/receptor-cl
+	GOOS=windows $(GO) build \
+		-o receptor.exe \
+		./cmd/receptor-cl && \
+	GOOS=darwin $(GO) build \
+		-o receptor.app \
+		./cmd/receptor-cl && \
+	$(GO) build \
+		example/*.go && \
+	$(GO) build \
+		-o receptor \
+		--tags no_backends,no_services,no_tls_config \
+		./cmd/receptor-cl && \
+	$(GO) build \
+		-o receptor \
+		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
+		./cmd/receptor-cl
 
 BINNAME='receptor'
 CHECKSUM_PROGRAM='sha256sum'

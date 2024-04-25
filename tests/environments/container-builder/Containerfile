@@ -1,4 +1,4 @@
-FROM centos:stream9
+FROM quay.io/centos/centos:stream9
 
 # Python options = [3.9, 3.11, 3.12]
 ARG PYTHON_VERSION=3.11

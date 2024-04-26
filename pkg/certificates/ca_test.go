@@ -1558,3 +1558,207 @@ func TestRsaWrapper_GenerateKey(t *testing.T) {
 		})
 	}
 }
+
+func TestSaveToPEMFile(t *testing.T) {
+	type args struct {
+		filename string
+		data     []interface{}
+	}
+
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
+	certificateRequestTestFilename := "certificate_request_test_filename"
+	goodRequest, err := setupGoodCertificateRequest()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "request", err)
+	}
+
+	certificateTestFilename := "certificate_test_filename"
+	goodCaCertificate, err := setupGoodCertificate()
+	if err != nil {
+		t.Errorf("Error setting up certificate: %v", err)
+	}
+
+	failedToEncodeTestFilename := "failed_to_encode_test_filename"
+
+	privateKeyTestFilename := "private_key_test_filename"
+	goodPrivateKey, err := setupGoodPrivateKey()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "private key", err)
+	}
+
+	publicKeyTestFilename := "public_key_test_filename"
+	goodPublicKey, err := setupGoodPublicKey()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "public key", err)
+	}
+
+	rsaPrivateKeyTestFilename := "rsa_private_key_test_filename"
+	goodCaPrivateKey, err := setupGoodRSAPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unknownBlockTypeTestFilename := "unknown_block_type_test_filename"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	o := mock_certificates.NewMockOser(ctrl)
+
+	tests := []struct {
+		name                   string
+		args                   args
+		wantOserWritefileCalls func()
+		want                   []interface{}
+		wantErr                bool
+	}{
+		{
+			name: "Certificate",
+			args: args{
+				filename: certificateTestFilename,
+				data: []interface{}{
+					goodCaCertificate,
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(1)
+			},
+			want: []interface{}{
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Certificate Request",
+			args: args{
+				filename: certificateRequestTestFilename,
+				data: []interface{}{
+					goodRequest,
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(1)
+			},
+			want: []interface{}{
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "RSA Private Key",
+			args: args{
+				filename: rsaPrivateKeyTestFilename,
+				data: []interface{}{
+					goodCaPrivateKey,
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(1)
+			},
+			want: []interface{}{
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Private Key",
+			args: args{
+				filename: privateKeyTestFilename,
+				data: []interface{}{
+					goodPrivateKey,
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(1)
+			},
+			want: []interface{}{
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Public Key",
+			args: args{
+				filename: publicKeyTestFilename,
+				data: []interface{}{
+					goodPublicKey,
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(1)
+			},
+			want: []interface{}{
+				nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Failed to encode",
+			args: args{
+				filename: failedToEncodeTestFilename,
+				data: []interface{}{
+					[]byte{
+						0, 0, 0, 0,
+					},
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(0)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Unknown block type",
+			args: args{
+				filename: unknownBlockTypeTestFilename,
+				data: []interface{}{
+					nil,
+				},
+			},
+			wantOserWritefileCalls: func() {
+				o.
+					EXPECT().
+					WriteFile(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(interface{}(nil)).
+					Times(0)
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.wantOserWritefileCalls()
+
+			if err := certificates.SaveToPEMFile(tt.args.filename, tt.args.data, o); (err != nil) != tt.wantErr {
+				t.Errorf("SaveToPEMFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

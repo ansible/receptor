@@ -17,10 +17,10 @@ import (
 func InitCA(opts *CertOptions, certOut, keyOut string) error {
 	ca, err := CreateCA(opts, &RsaWrapper{})
 	if err == nil {
-		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate})
+		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate}, &OsWrapper{})
 	}
 	if err == nil {
-		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey})
+		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey}, &OsWrapper{})
 	}
 
 	return err
@@ -88,12 +88,12 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 			return err
 		}
 	}
-	err := SaveToPEMFile(reqOut, []interface{}{req})
+	err := SaveToPEMFile(reqOut, []interface{}{req}, &OsWrapper{})
 	if err != nil {
 		return err
 	}
 	if keyOut != "" {
-		err = SaveToPEMFile(keyOut, []interface{}{key})
+		err = SaveToPEMFile(keyOut, []interface{}{key}, &OsWrapper{})
 		if err != nil {
 			return err
 		}
@@ -212,7 +212,7 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 		return err
 	}
 
-	return SaveToPEMFile(certOut, []interface{}{cert})
+	return SaveToPEMFile(certOut, []interface{}{cert}, &OsWrapper{})
 }
 
 type signReq struct {

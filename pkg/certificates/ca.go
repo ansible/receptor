@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/big"
 	"net"
 	"os"
@@ -23,12 +24,17 @@ import (
 
 type Oser interface {
 	ReadFile(name string) ([]byte, error)
+	WriteFile(name string, data []byte, perm fs.FileMode) error
 }
 
 type OsWrapper struct{}
 
 func (ow *OsWrapper) ReadFile(name string) ([]byte, error) {
 	return os.ReadFile(name)
+}
+
+func (ow *OsWrapper) WriteFile(name string, data []byte, perm fs.FileMode) error {
+	return os.WriteFile(name, data, perm)
 }
 
 type Rsaer interface {
@@ -113,7 +119,7 @@ func LoadFromPEMFile(filename string, osWrapper Oser) ([]interface{}, error) {
 }
 
 // SaveToPEMFile saves certificate data to a PEM file.
-func SaveToPEMFile(filename string, data []interface{}) error {
+func SaveToPEMFile(filename string, data []interface{}, osWrapper Oser) error {
 	var err error
 	var ok bool
 	content := make([]string, 0)
@@ -182,9 +188,11 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 
 			continue
 		}
+
+		return fmt.Errorf("unknown block type %s", elem)
 	}
 
-	return os.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
+	return Oser.WriteFile(osWrapper, filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
 // LoadCertificate loads a single certificate from a file.

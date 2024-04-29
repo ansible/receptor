@@ -56,6 +56,7 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 		return nil, nil, err
 	}
 	conn, err := rw.GetWorkceptor().nc.GetOrCreateConnectionObj(ctx, red.RemoteNode, "control", tlsConfig)
+	//conn, err := rw.GetWorkceptor().nc.DialContext(ctx, red.RemoteNode, "control", tlsConfig)
 	if err != nil {
 		return nil, nil, err
 	}

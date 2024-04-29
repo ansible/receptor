@@ -1879,14 +1879,7 @@ func (s *Netceptor) GetConnectionObj(remoteNode string) *Conn {
 }
 
 func (s *Netceptor) GetOrCreateConnectionObj(ctx context.Context, remoteNode string, service string, tlscfg *tls.Config) (*Conn, error) {
-	s.routingTableLock.Lock()
-	nextHop, found := s.routingTable[remoteNode]
-	if !found {
-
-		return s.DialContext(ctx, remoteNode, service, tlscfg)
-	}
-	s.routingTableLock.Unlock()
-	conn := s.GetConnectionObj(nextHop)
+	conn := s.GetConnectionObj(remoteNode)
 	if conn == nil {
 
 		return s.DialContext(ctx, remoteNode, service, tlscfg)

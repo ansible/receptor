@@ -27,11 +27,11 @@ func GenerateCA(name, commonName string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(crtPath, []interface{}{CA.Certificate})
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{CA.Certificate}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(keyPath, []interface{}{CA.PrivateKey})
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{CA.PrivateKey}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -71,11 +71,11 @@ func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, 
 		return "", "", err
 	}
 	// Save cert and key to files
-	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert})
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(keyPath, []interface{}{key})
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{key}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -119,11 +119,11 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 		return "", "", err
 	}
 	// Save cert and key to files
-	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert})
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(keyPath, []interface{}{key})
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{key}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -143,13 +143,13 @@ func GenerateRSAPair() (string, string, error) {
 	publicKey := &privateKey.PublicKey
 
 	privateKeyPath := filepath.Join(dir, "private.pem")
-	err = certificates.SaveToPEMFile(privateKeyPath, []interface{}{privateKey})
+	err = certificates.SaveToPEMFile(privateKeyPath, []interface{}{privateKey}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
 
 	publicKeyPath := filepath.Join(dir, "public.pem")
-	err = certificates.SaveToPEMFile(publicKeyPath, []interface{}{publicKey})
+	err = certificates.SaveToPEMFile(publicKeyPath, []interface{}{publicKey}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}

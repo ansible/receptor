@@ -86,7 +86,8 @@ jobs:
           name: receptor
           path: /usr/local/bin/receptor
   receptorctl:
-    needs: receptor
+    name: Run receptorctl tests${{ '' }} # Nest jobs under the same sidebar category
+    #needs: receptor
     strategy:
       fail-fast: false
       matrix:
@@ -103,8 +104,10 @@ jobs:
     with:
       python-version: ${{ matrix.python-version }}
       session: tests-${{ matrix.python-version }}
+      download-receptor: true
 
   lint-receptorctl:
+    name: Lint receptorctl${{ '' }} # Nest jobs under the same sidebar category
     strategy:
       fail-fast: false
       matrix:

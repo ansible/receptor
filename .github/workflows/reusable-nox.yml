@@ -1,46 +1,50 @@
 ---
-name: receptorctl
+name: Receptorctl nox sessions
 
-"on":
+on:
   workflow_call:
+    inputs:
+      python-version:
+        type: string
+        description: The Python version to use.
+        required: true
+      session:
+        type: string
+        description: The nox session to run.
+        required: true
+      download-receptor:
+        type: boolean
+        description: Whether to perform go binary download.
+        required: false
+        default: false
+
+env:
+  FORCE_COLOR: 1
+  NOXSESSION: ${{ inputs.session }}
 
 jobs:
-  receptorctl:
+  nox:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-        # NOTE: The highest and the lowest versions come
-        # NOTE: first as their statuses are most likely to
-        # NOTE: signal problems early:
-        - 3.11
-        - 3.8
-        - >-
-          3.10
-        - 3.9
-
-    env:
-      FORCE_COLOR: 1
-      NOXSESSION: tests-${{ matrix.python-version }}
 
     name: >-  # can't use `env` in this context:
-      Run `receptorctl` tests-${{ matrix.python-version }} session
+      Run `receptorctl` ${{ inputs.session }} session
 
     steps:
     - name: Download the `receptor` binary
+      if: fromJSON(inputs.download-receptor)
       uses: actions/download-artifact@v4
       with:
         name: receptor
         path: /usr/local/bin/
 
     - name: Set executable bit on the `receptor` binary
+      if: fromJSON(inputs.download-receptor)
       run: sudo chmod a+x /usr/local/bin/receptor
 
     - name: Set up nox
       uses: wntrblm/nox@2024.04.15
       with:
-        python-versions: ${{ matrix.python-version }}
+        python-versions: ${{ inputs.python-version }}
 
     - name: Check out the source code from Git
       uses: actions/checkout@v4
@@ -51,6 +55,7 @@ jobs:
     - name: Provision nox environment for ${{ env.NOXSESSION }}
       run: nox --install-only
       working-directory: ./receptorctl
+
     - name: Run `receptorctl` nox ${{ env.NOXSESSION }} session
       run: nox --no-install
       working-directory: ./receptorctl

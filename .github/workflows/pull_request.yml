@@ -87,7 +87,7 @@ jobs:
           path: /usr/local/bin/receptor
   receptorctl:
     name: Run receptorctl tests${{ '' }} # Nest jobs under the same sidebar category
-    #needs: receptor
+    needs: receptor
     strategy:
       fail-fast: false
       matrix:

@@ -87,9 +87,34 @@ jobs:
           path: /usr/local/bin/receptor
   receptorctl:
     needs: receptor
-    uses: ./.github/workflows/reusable_receptorctl_tests.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+        # NOTE: The highest and the lowest versions come
+        # NOTE: first as their statuses are most likely to
+        # NOTE: signal problems early:
+        - 3.11
+        - 3.8
+        - >-
+          3.10
+        - 3.9
+    uses: ./.github/workflows/reusable-nox.yml
+    with:
+      python-version: ${{ matrix.python-version }}
+      session: tests-${{ matrix.python-version }}
+
   lint-receptorctl:
-    uses: ./.github/workflows/reusable_receptorctl_checks.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        session:
+        - check_style
+        - check_format
+    uses: ./.github/workflows/reusable-nox.yml
+    with:
+      python-version: 3.11
+      session: ${{ matrix.session }}
   container:
     name: container
     runs-on: ubuntu-latest

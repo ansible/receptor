@@ -1,8 +1,10 @@
 import os
+import subprocess
 from glob import iglob
 from pathlib import Path
 
 import nox
+import nox.command
 
 python_versions = ["3.8", "3.9", "3.10", "3.11"]
 
@@ -28,12 +30,44 @@ def install(session: nox.Session, *args, req: str, **kwargs):
     session.install("-r", requirements_directory / f"{req}.in", *args, **kwargs)
 
 
+def version(session: nox.Session):
+    """
+    Create a .VERSION file.
+    """
+    try:
+        official_version = session.run_install(
+            "git",
+            "describe",
+            "--exact-match",
+            "--tags",
+            external=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except nox.command.CommandFailed:
+        official_version = None
+        print("Using the closest annotated tag instead of an exact match.")
+
+    if official_version:
+        version = official_version.strip()
+    else:
+        tag = session.run_install(
+            "git", "describe", "--tags", "--always", silent=True, external=True
+        )
+        rev = session.run_install(
+            "git", "rev-parse", "--short", "HEAD", silent=True, external=True
+        )
+        version = tag.split("-")[0] + "+" + rev
+
+    Path(".VERSION").write_text(version)
+
+
 @nox.session(python=python_versions)
 def tests(session: nox.Session):
     """
     Run receptorctl tests
     """
     install(session, req="tests")
+    version(session)
     session.install("-e", ".")
     session.run("pytest", "-v", "tests", *session.posargs)
 

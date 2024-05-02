@@ -1,3 +1,4 @@
 # This requirements file is used for receptorctl tests
 
 pytest==8.2.0 # <-- used to run receptorctl tests
+pytest-cov

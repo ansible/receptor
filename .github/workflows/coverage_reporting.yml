@@ -86,9 +86,9 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.20
+          - "1.20"
         python-version:
-          - 3.11
+          - "3.11"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

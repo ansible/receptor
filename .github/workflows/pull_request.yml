@@ -120,6 +120,7 @@ jobs:
     with:
       python-version: 3.11
       session: ${{ matrix.session }}
+
   container:
     name: container
     runs-on: ubuntu-latest
@@ -182,6 +183,11 @@ jobs:
         python-version:
           - "3.11"
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Run coverage test
         uses: ./.github/workflows/reusable-nox.yml
         with:

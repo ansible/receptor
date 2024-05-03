@@ -21,11 +21,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           cache: false
-          go-version: $DESIRED_GO_VERSION
+          go-version: ${{ env.DESIRED_GO_VERSION }}
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: $DESIRED_GOLANGCI_LINT_VERSION
+          version: ${{ env.DESIRED_GOLANGCI_LINT_VERSION }}
 
   receptor:
     name: receptor (Go ${{ matrix.go-version }})
@@ -123,7 +123,7 @@ jobs:
           - check_format
     uses: ./.github/workflows/reusable-nox.yml
     with:
-      python-version: $DESIRED_PYTHON_VERSION
+      python-version: ${{ env.DESIRED_PYTHON_VERSION }}
       session: ${{ matrix.session }}
 
   container:
@@ -138,7 +138,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: $DESIRED_PYTHON_VERSION
+          python-version: ${{ env.DESIRED_PYTHON_VERSION }}
 
       - name: Install python dependencies
         run: pip install build
@@ -190,7 +190,7 @@ jobs:
         uses: ./.github/workflows/reusable-nox.yml
         with:
           download-receptor: true
-          python-version: $DESIRED_PYTHON_VERSION
+          python-version: ${{ env.DESIRED_PYTHON_VERSION }}
           session: ${{ matrix.session }}
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4

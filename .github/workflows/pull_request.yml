@@ -180,19 +180,18 @@ jobs:
       matrix:
         python-version:
           - "3.11"
-    uses: ./.github/workflows/reusable-nox.yml
-    with:
-      python-version: ${{ matrix.python-version }}
-      session: coverage-${{ matrix.python-version }}
-      download-receptor: true
-
-  receptorctl-upload-coverage:
-    name: Upload coverage reports to Codecov
-    needs: receptorctl-test-coverage
-    uses: codecov/codecov-action@v4
-    with:
-      directory: receptorctl
-      fail_ci_if_error: true
-      flags: receptorctl
-      token: ${{ secrets.CODECOV_TOKEN }}
-      verbose: true
+    steps:
+      - name: Receptorctl test coverage using nox
+        uses: ./.github/workflows/reusable-nox.yml
+        with:
+          python-version: ${{ matrix.python-version }}
+          session: coverage-${{ matrix.python-version }}
+          download-receptor: true
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: receptorctl
+          fail_ci_if_error: true
+          flags: receptorctl
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

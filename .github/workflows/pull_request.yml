@@ -5,9 +5,9 @@ on:  # yamllint disable-line rule:truthy
   pull_request:  # yamllint disable-line rule:empty-values
 
 env:
-  DESIRED_GO_VERSION: "1.20"
-  DESIRED_GOLANGCI_LINT_VERSION: "v1.56"
-  DESIRED_PYTHON_VERSION: "3.11"
+  DESIRED_GO_VERSION: '1.20'
+  DESIRED_GOLANGCI_LINT_VERSION: 'v1.56'
+  DESIRED_PYTHON_VERSION: '3.11'
 
 jobs:
   lint-receptor:

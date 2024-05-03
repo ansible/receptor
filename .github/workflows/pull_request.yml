@@ -21,6 +21,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.56
+
   receptor:
     name: receptor (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
@@ -85,21 +86,22 @@ jobs:
         with:
           name: receptor
           path: /usr/local/bin/receptor
+
   receptorctl:
-    name: Run receptorctl tests${{ '' }} # Nest jobs under the same sidebar category
+    name: Run receptorctl tests${{ '' }}  # Nest jobs under the same sidebar category
     needs: receptor
     strategy:
       fail-fast: false
       matrix:
         python-version:
-        # NOTE: The highest and the lowest versions come
-        # NOTE: first as their statuses are most likely to
-        # NOTE: signal problems early:
-        - 3.11
-        - 3.8
-        - >-
-          3.10
-        - 3.9
+          # NOTE: The highest and the lowest versions come
+          # NOTE: first as their statuses are most likely to
+          # NOTE: signal problems early:
+          - 3.11
+          - 3.8
+          - >-
+            3.10
+          - 3.9
     uses: ./.github/workflows/reusable-nox.yml
     with:
       python-version: ${{ matrix.python-version }}
@@ -107,13 +109,13 @@ jobs:
       download-receptor: true
 
   lint-receptorctl:
-    name: Lint receptorctl${{ '' }} # Nest jobs under the same sidebar category
+    name: Lint receptorctl${{ '' }}  # Nest jobs under the same sidebar category
     strategy:
       fail-fast: false
       matrix:
         session:
-        - check_style
-        - check_format
+          - check_style
+          - check_format
     uses: ./.github/workflows/reusable-nox.yml
     with:
       python-version: 3.11
@@ -167,3 +169,31 @@ jobs:
             echo "Output did not contain expected value"
             exit 1
           fi
+
+  receptorctl-test-coverage:
+    name: receptorctl test coverage
+    needs: receptor
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+          - "1.20"
+        python-version:
+          - "3.11"
+    steps:
+      - name: Run coverage test
+        uses: ./.github/workflows/reusable-nox.yml
+        with:
+          python-version: ${{ matrix.python-version }}
+          session: coverage-${{ matrix.python-version }}
+          download-receptor: true
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          flags: receptorctl
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

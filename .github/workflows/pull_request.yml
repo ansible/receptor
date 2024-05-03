@@ -173,20 +173,20 @@ jobs:
 
   receptorctl-test-coverage:
     name: receptorctl test coverage
-    needs: receptor
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        strategy:
-          fail-fast: false
-          matrix:
-            python-version:
-              - "3.11"
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Run coverage test
+        needs: receptor
+        strategy:
+          fail-fast: false
+          matrix:
+            python-version:
+              - "3.11"
         uses: ./.github/workflows/reusable-nox.yml
         with:
           python-version: ${{ matrix.python-version }}

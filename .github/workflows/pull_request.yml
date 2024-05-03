@@ -173,6 +173,7 @@ jobs:
 
   receptorctl-test-coverage:
     name: receptorctl test coverage
+    needs: receptor
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -181,7 +182,6 @@ jobs:
           fetch-depth: 0
 
       - name: Run coverage test
-        needs: receptor
         strategy:
           fail-fast: false
           matrix:

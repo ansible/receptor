@@ -1955,7 +1955,7 @@ func TestSignCertReq(t *testing.T) {
 				return
 			}
 
-			if ( err == nil ) {
+			if err == nil {
 				if certGot.BasicConstraintsValid != false {
 					t.Errorf("CreateCA() Certificate BasicConstraintsValid got = %+v, want = %+v", certGot.BasicConstraintsValid, false)
 

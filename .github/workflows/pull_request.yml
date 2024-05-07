@@ -186,12 +186,34 @@ jobs:
         session:
           - coverage
     steps:
-      - name: Receptorctl test coverage using nox
-        uses: ./.github/workflows/reusable-nox.yml
+      - name: Download the `receptor` binary
+        uses: actions/download-artifact@v4
         with:
-          download-receptor: true
-          python-version: ${{ env.DESIRED_PYTHON_VERSION }}
-          session: ${{ matrix.session }}
+          name: receptor
+          path: /usr/local/bin/
+
+      - name: Set executable bit on the `receptor` binary
+        run: sudo chmod a+x /usr/local/bin/receptor
+
+      - name: Set up nox
+        uses: wntrblm/nox@2024.04.15
+        with:
+          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Check out the source code from Git
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+          sparse-checkout: receptorctl
+
+      - name: Provision nox environment for ${{ matrix.session }}
+        run: nox --install-only
+        working-directory: ./receptorctl
+
+      - name: Run `receptorctl` nox ${{ matrix.session }} session
+        run: nox --no-install
+        working-directory: ./receptorctl
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:

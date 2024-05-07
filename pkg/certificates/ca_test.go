@@ -26,6 +26,35 @@ var excessPEMDataFormatString string = "Excess PEM Data: %v"
 
 var wrongPEMBlockTypeFormatString string = "PEM Block is not a %s: %v"
 
+func setupGoodCA(certOpts *certificates.CertOptions, rsaer certificates.Rsaer) (*certificates.CA, error) {
+	certOpts.Bits = 4096
+	certOpts.CommonName = "Ansible Automation Controller Nodes Mesh ROOT CA"
+	certOpts.DNSNames = nil
+	certOpts.NodeIDs = nil
+	certOpts.IPAddresses = nil
+
+	goodCaTimeAfterString := "2032-01-07T00:03:51Z"
+	goodCaTimeAfter, err := time.Parse(time.RFC3339, goodCaTimeAfterString)
+	if err != nil {
+		return nil, err
+	}
+	certOpts.NotAfter = goodCaTimeAfter
+
+	goodCaTimeBeforeString := "2022-01-07T00:03:51Z"
+	goodCaTimeBefore, err := time.Parse(time.RFC3339, goodCaTimeBeforeString)
+	if err != nil {
+		return nil, err
+	}
+	certOpts.NotBefore = goodCaTimeBefore
+
+	goodCA, err := certificates.CreateCA(certOpts, rsaer)
+	if err != nil {
+		return nil, err
+	}
+
+	return goodCA, nil
+}
+
 func setupGoodCertificate() (*x509.Certificate, error) {
 	goodCertificatePEMData := setupGoodCertificatePEMData()
 	goodCertificateBlock, rest := pem.Decode(goodCertificatePEMData)
@@ -375,7 +404,7 @@ func TestCreateCAValid(t *testing.T) {
 
 			got, _ := certificates.CreateCA(tt.args.opts, mockRsa)
 			if !reflect.DeepEqual(got.PrivateKey, tt.want.PrivateKey) {
-				t.Errorf("CreateCA() Private Key got = %v, want = %v", got.PrivateKey, tt.want.PrivateKey)
+				t.Errorf("CreateCA() Private Key got = %+v, want = %+v", got.PrivateKey, tt.want.PrivateKey)
 
 				return
 			}
@@ -383,73 +412,73 @@ func TestCreateCAValid(t *testing.T) {
 			certWant := tt.want.Certificate
 			certGot := got.Certificate
 			if certGot.BasicConstraintsValid != true {
-				t.Errorf("CreateCA() Certificate BasicConstraintsValid got = %v, want = %v", certGot.BasicConstraintsValid, true)
+				t.Errorf("CreateCA() Certificate BasicConstraintsValid got = %+v, want = %+v", certGot.BasicConstraintsValid, true)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.ExtraExtensions, certWant.ExtraExtensions) {
-				t.Errorf("CreateCA() Certificate ExtraExtensions got = %v, want = %v", certGot.ExtraExtensions, certWant.ExtraExtensions)
+				t.Errorf("CreateCA() Certificate ExtraExtensions got = %+v, want = %+v", certGot.ExtraExtensions, certWant.ExtraExtensions)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.ExtKeyUsage, certWant.ExtKeyUsage) {
-				t.Errorf("CreateCA() Certificate ExtKeyUsage got = %v, want = %v", certGot.ExtKeyUsage, certWant.ExtKeyUsage)
+				t.Errorf("CreateCA() Certificate ExtKeyUsage got = %+v, want = %+v", certGot.ExtKeyUsage, certWant.ExtKeyUsage)
 
 				return
 			}
 
 			if certGot.IsCA != true {
-				t.Errorf("CreateCA() Certificate IsCA got = %v, want = %v", certGot.IsCA, true)
+				t.Errorf("CreateCA() Certificate IsCA got = %+v, want = %+v", certGot.IsCA, true)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.Issuer, certWant.Issuer) {
-				t.Errorf("CreateCA() Certificate Issuer got = %v, want = %v", certGot.Issuer, certWant.Issuer)
+				t.Errorf("CreateCA() Certificate Issuer got = %+v, want = %+v", certGot.Issuer, certWant.Issuer)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.KeyUsage, certWant.KeyUsage) {
-				t.Errorf("CreateCA() Certificate KeyUsage got = %v, want = %v", certGot.KeyUsage, certWant.KeyUsage)
+				t.Errorf("CreateCA() Certificate KeyUsage got = %+v, want = %+v", certGot.KeyUsage, certWant.KeyUsage)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.NotAfter, certWant.NotAfter) {
-				t.Errorf("CreateCA() Certificate NotAfter got = %v, want = %v", certGot.NotAfter, certWant.NotAfter)
+				t.Errorf("CreateCA() Certificate NotAfter got = %+v, want = %+v", certGot.NotAfter, certWant.NotAfter)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.NotBefore, certWant.NotBefore) {
-				t.Errorf("CreateCA() Certificate NotBefore got = %v, want = %v", certGot.NotBefore, certWant.NotBefore)
+				t.Errorf("CreateCA() Certificate NotBefore got = %+v, want = %+v", certGot.NotBefore, certWant.NotBefore)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.PublicKeyAlgorithm, certWant.PublicKeyAlgorithm) {
-				t.Errorf("CreateCA() Certificate PublicKeyAlgorithm got = %v, want = %v", certGot.PublicKeyAlgorithm, certWant.PublicKeyAlgorithm)
+				t.Errorf("CreateCA() Certificate PublicKeyAlgorithm got = %+v, want = %+v", certGot.PublicKeyAlgorithm, certWant.PublicKeyAlgorithm)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.SignatureAlgorithm, certWant.SignatureAlgorithm) {
-				t.Errorf("CreateCA() Certificate SignatureAlgorithm got = %v, want = %v", certGot.SignatureAlgorithm, certWant.SignatureAlgorithm)
+				t.Errorf("CreateCA() Certificate SignatureAlgorithm got = %+v, want = %+v", certGot.SignatureAlgorithm, certWant.SignatureAlgorithm)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.Subject, certWant.Subject) {
-				t.Errorf("CreateCA() Certificate Subject got = %v, want = %v", certGot.Subject, certWant.Subject)
+				t.Errorf("CreateCA() Certificate Subject got = %+v, want = %+v", certGot.Subject, certWant.Subject)
 
 				return
 			}
 
 			if !reflect.DeepEqual(certGot.Version, certWant.Version) {
-				t.Errorf("CreateCA() Certificate Version got = %v, want = %v", certGot.Version, certWant.Version)
+				t.Errorf("CreateCA() Certificate Version got = %+v, want = %+v", certGot.Version, certWant.Version)
 
 				return
 			}
@@ -490,6 +519,73 @@ func TestCreateCANegative(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setupBadCertRequest() (certificates.CertOptions, *x509.CertificateRequest, error) {
+	badCaTimeAfterString := "2021-01-07T00:03:51Z"
+	badCaTimeAfter, err := time.Parse(time.RFC3339, badCaTimeAfterString)
+	if err != nil {
+		return certificates.CertOptions{}, &x509.CertificateRequest{}, err
+	}
+
+	badCaTimeBeforeString := "2022-01-07T00:03:51Z"
+	badCaTimeBefore, err := time.Parse(time.RFC3339, badCaTimeBeforeString)
+	if err != nil {
+		return certificates.CertOptions{}, &x509.CertificateRequest{}, err
+	}
+
+	badDNSName := "receptor.TEST.BAD"
+	badIPAddress := net.ParseIP("127.0.0.1").To4()
+	badNodeIDs := badDNSName
+
+	badCertOptions := certificates.CertOptions{
+		Bits:       -1,
+		CommonName: "Ansible Automation Controller Nodes Mesh Bad",
+		CertNames: certificates.CertNames{
+			DNSNames:    []string{badDNSName},
+			IPAddresses: []net.IP{badIPAddress},
+			NodeIDs:     []string{badNodeIDs},
+		},
+		NotAfter:  badCaTimeAfter,
+		NotBefore: badCaTimeBefore,
+	}
+
+	badSubjectAltNamesExtension, err := utils.MakeReceptorSAN(badCertOptions.CertNames.DNSNames,
+		badCertOptions.IPAddresses,
+		badCertOptions.NodeIDs)
+	if err != nil {
+		return badCertOptions, &x509.CertificateRequest{}, err
+	}
+
+	badCertificateRequest := &x509.CertificateRequest{
+		Attributes:     nil,
+		DNSNames:       []string{badDNSName},
+		EmailAddresses: nil,
+		Extensions: []pkix.Extension{
+			*badSubjectAltNamesExtension,
+		},
+		ExtraExtensions:    nil,
+		IPAddresses:        []net.IP{badIPAddress},
+		PublicKeyAlgorithm: x509.RSA,
+		SignatureAlgorithm: x509.SHA256WithRSA,
+		Subject: pkix.Name{
+			CommonName:         badCertOptions.CommonName,
+			Country:            nil,
+			ExtraNames:         []pkix.AttributeTypeAndValue{},
+			Locality:           nil,
+			Names:              []pkix.AttributeTypeAndValue{},
+			Organization:       nil,
+			OrganizationalUnit: nil,
+			PostalCode:         nil,
+			Province:           nil,
+			SerialNumber:       "",
+			StreetAddress:      nil,
+		},
+		URIs:    nil,
+		Version: 0,
+	}
+
+	return badCertOptions, badCertificateRequest, nil
 }
 
 func setupGoodCertRequest() (certificates.CertOptions, *x509.CertificateRequest, error) {
@@ -598,49 +694,49 @@ func TestCreateCertReqValid(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got.DNSNames, tt.want.DNSNames) {
-				t.Errorf("CreateCertReq() DNSNames got = %v, want = %v", got.DNSNames, tt.want.DNSNames)
+				t.Errorf("CreateCertReq() DNSNames got = %+v, want = %+v", got.DNSNames, tt.want.DNSNames)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.EmailAddresses, tt.want.EmailAddresses) {
-				t.Errorf("CreateCertReq() EmailAddresses got = %v, want = %v", got.EmailAddresses, tt.want.EmailAddresses)
+				t.Errorf("CreateCertReq() EmailAddresses got = %+v, want = %+v", got.EmailAddresses, tt.want.EmailAddresses)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.ExtraExtensions, tt.want.ExtraExtensions) {
-				t.Errorf("CreateCertReq() ExtraExtensions got = %v, want = %v", got.ExtraExtensions, tt.want.ExtraExtensions)
+				t.Errorf("CreateCertReq() ExtraExtensions got = %+v, want = %+v", got.ExtraExtensions, tt.want.ExtraExtensions)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.IPAddresses, tt.want.IPAddresses) {
-				t.Errorf("CreateCertReq() IPAddresses got = %v, want = %v", got.IPAddresses, tt.want.IPAddresses)
+				t.Errorf("CreateCertReq() IPAddresses got = %+v, want = %+v", got.IPAddresses, tt.want.IPAddresses)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.PublicKeyAlgorithm, tt.want.PublicKeyAlgorithm) {
-				t.Errorf("CreateCertReq() PublicKeyAlgorithm = %v, want = %v", got.PublicKeyAlgorithm, tt.want.PublicKeyAlgorithm)
+				t.Errorf("CreateCertReq() PublicKeyAlgorithm = %+v, want = %+v", got.PublicKeyAlgorithm, tt.want.PublicKeyAlgorithm)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.SignatureAlgorithm, tt.want.SignatureAlgorithm) {
-				t.Errorf("CreateCertReq() SignatureAlgorithm got = %v, want = %v", got.SignatureAlgorithm, tt.want.SignatureAlgorithm)
+				t.Errorf("CreateCertReq() SignatureAlgorithm got = %+v, want = %+v", got.SignatureAlgorithm, tt.want.SignatureAlgorithm)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.URIs, tt.want.URIs) {
-				t.Errorf("CreateCertReq() URIs got = %v, want = %v", got.URIs, tt.want.URIs)
+				t.Errorf("CreateCertReq() URIs got = %+v, want = %+v", got.URIs, tt.want.URIs)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got.Version, tt.want.Version) {
-				t.Errorf("CreateCertReq() Version got = %v, want = %v", got.Version, tt.want.Version)
+				t.Errorf("CreateCertReq() Version got = %+v, want = %+v", got.Version, tt.want.Version)
 
 				return
 			}
@@ -752,7 +848,7 @@ func TestCreateCertReqWithKeyNegative(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, gotErr := certificates.CreateCertReqWithKey(tt.args.opts)
 			if gotErr == nil || gotErr.Error() != tt.wantErr.Error() {
-				t.Errorf("CreateCA() error = %v, wantErr = %v", gotErr, tt.wantErr)
+				t.Errorf("CreateCertReqWithKey() error = %v, wantErr = %v", gotErr, tt.wantErr)
 			}
 		})
 	}
@@ -1538,14 +1634,14 @@ func TestRsaWrapper_GenerateKey(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			o := mock_certificates.NewMockRsaer(ctrl)
-			o.
+			mockRsa := mock_certificates.NewMockRsaer(ctrl)
+			mockRsa.
 				EXPECT().
 				GenerateKey(gomock.Any(), gomock.Eq(tt.wantGenerateKeyBitsArg)).
 				Return(tt.wantGenerateKeyPrivateKeyResult, tt.wantGenerateKeyErrorResult).
 				Times(1)
 
-			got, err := o.GenerateKey(tt.args.random, tt.args.bits)
+			got, err := mockRsa.GenerateKey(tt.args.random, tt.args.bits)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RsaWrapper.GenerateKey() error = %v, wantErr %v", err, tt.wantErr)
 
@@ -1758,6 +1854,179 @@ func TestSaveToPEMFile(t *testing.T) {
 
 			if err := certificates.SaveToPEMFile(tt.args.filename, tt.args.data, o); (err != nil) != tt.wantErr {
 				t.Errorf("SaveToPEMFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSignCertReq(t *testing.T) {
+	type args struct {
+		req *x509.CertificateRequest
+		// ca   *certificates.CA
+		caOpts *certificates.CertOptions
+		opts   *certificates.CertOptions
+	}
+
+	badCertOptions, badCertificateRequest, err := setupBadCertRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	badCertOptions.Bits = -1
+	badCertificateRequest.SignatureAlgorithm = x509.DSAWithSHA1
+
+	goodCaCertOptions, _, err := setupGoodCertRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	goodCaPrivateKey, err := setupGoodRSAPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	goodCaPublicKey := goodCaPrivateKey.Public()
+
+	errorSettingUpTypeFormatString := "Error setting up %s: %v"
+
+	goodCertificate, err := setupGoodCertificate()
+	if err != nil {
+		t.Errorf(errorSettingUpTypeFormatString, "certificate", err)
+	}
+	goodCertificate.KeyUsage = 1
+
+	goodCertOptions, goodCertificateRequest, err := setupGoodCertRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	goodCertOptions.CommonName = "Ansible Automation Controller Nodes Mesh"
+	goodCertificateRequest.PublicKey = goodCaPublicKey
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *x509.Certificate
+		wantErr bool
+	}{
+		{
+			name: "Positive test",
+			args: args{
+				req:    goodCertificateRequest,
+				caOpts: &goodCaCertOptions,
+				opts:   &goodCertOptions,
+			},
+			want:    goodCertificate,
+			wantErr: false,
+		},
+		{
+			name: "Negative test",
+			args: args{
+				req:    badCertificateRequest,
+				caOpts: &goodCaCertOptions,
+				opts:   &badCertOptions,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockRsa := mock_certificates.NewMockRsaer(ctrl)
+
+			mockRsa.EXPECT().GenerateKey(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
+					return goodCaPrivateKey, nil
+				},
+			)
+
+			CA, err := setupGoodCA(tt.args.caOpts, mockRsa)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			certGot, err := certificates.SignCertReq(tt.args.req, CA, tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SignCertReq() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if err == nil {
+				if certGot.BasicConstraintsValid != false {
+					t.Errorf("CreateCA() Certificate BasicConstraintsValid got = %+v, want = %+v", certGot.BasicConstraintsValid, false)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.ExtraExtensions, tt.want.ExtraExtensions) {
+					t.Errorf("CreateCA() Certificate ExtraExtensions got = %+v, want = %+v", certGot.ExtraExtensions, tt.want.ExtraExtensions)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.ExtKeyUsage, tt.want.ExtKeyUsage) {
+					t.Errorf("CreateCA() Certificate ExtKeyUsage got = %+v, want = %+v", certGot.ExtKeyUsage, tt.want.ExtKeyUsage)
+
+					return
+				}
+
+				if certGot.IsCA != false {
+					t.Errorf("CreateCA() Certificate IsCA got = %+v, want = %+v", certGot.IsCA, false)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.Issuer, tt.want.Issuer) {
+					t.Errorf("CreateCA() Certificate Issuer got = %+v, want = %+v", certGot.Issuer, tt.want.Issuer)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.KeyUsage, tt.want.KeyUsage) {
+					t.Errorf("CreateCA() Certificate KeyUsage got = %+v, want = %+v", certGot.KeyUsage, tt.want.KeyUsage)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.NotAfter, tt.want.NotAfter) {
+					t.Errorf("CreateCA() Certificate NotAfter got = %+v, want = %+v", certGot.NotAfter, tt.want.NotAfter)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.NotBefore, tt.want.NotBefore) {
+					t.Errorf("CreateCA() Certificate NotBefore got = %+v, want = %+v", certGot.NotBefore, tt.want.NotBefore)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.PublicKeyAlgorithm, tt.want.PublicKeyAlgorithm) {
+					t.Errorf("CreateCA() Certificate PublicKeyAlgorithm got = %+v, want = %+v", certGot.PublicKeyAlgorithm, tt.want.PublicKeyAlgorithm)
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.SignatureAlgorithm, tt.want.SignatureAlgorithm) {
+					t.Errorf("CreateCA() Certificate SignatureAlgorithm got = %+v, want = %+v", certGot.SignatureAlgorithm, tt.want.SignatureAlgorithm)
+
+					return
+				}
+
+				if certGot.Subject.String() != "CN=Ansible Automation Controller Nodes Mesh" {
+					t.Errorf("CreateCA() Certificate Subject got = %+v, want = %+v", certGot.Subject, "CN=Ansible Automation Controller Nodes Mesh")
+
+					return
+				}
+
+				if !reflect.DeepEqual(certGot.Version, tt.want.Version) {
+					t.Errorf("CreateCA() Certificate Version got = %+v, want = %+v", certGot.Version, tt.want.Version)
+
+					return
+				}
 			}
 		})
 	}

@@ -204,7 +204,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Needed for the automation in Nox to find the last tag
-          sparse-checkout: receptorctl
 
       - name: Provision nox environment for ${{ matrix.session }}
         run: nox --install-only --session ${{ matrix.session }}
@@ -218,6 +217,7 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           directory: receptorctl
+          files: receptorctl_coverage.xml
           fail_ci_if_error: true
           flags: receptorctl
           token: ${{ secrets.CODECOV_TOKEN }}

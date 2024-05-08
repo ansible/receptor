@@ -10,7 +10,7 @@ coverage:
         target: auto
         threshold: 5%
 comment:
-  layout: "header, diff, files, flags, components"  # PR comment layout
+  layout: "header, diff, files, components"  # PR comment layout
   behavior: default
   require_changes: false
   require_base: false

@@ -489,7 +489,7 @@ type cmdlineConfigWindows struct {
 }
 
 // cmdlineConfigUnix is the cmdline configuration object for a control service on Unix.
-type cmdlineConfigUnix struct {
+type CmdlineConfigUnix struct {
 	Service     string `description:"Receptor service name to listen on" default:"control"`
 	Filename    string `description:"Specifies the filename of a local Unix socket to bind to the service."`
 	Permissions int    `description:"Socket file permissions" default:"0600"`
@@ -499,7 +499,7 @@ type cmdlineConfigUnix struct {
 }
 
 // Run runs the action.
-func (cfg cmdlineConfigUnix) Run() error {
+func (cfg CmdlineConfigUnix) Run() error {
 	if cfg.TLS != "" && cfg.TCPListen != "" && cfg.TCPTLS == "" {
 		netceptor.MainInstance.Logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
 	}
@@ -525,7 +525,7 @@ func (cfg cmdlineConfigUnix) Run() error {
 
 // Run runs the action.
 func (cfg cmdlineConfigWindows) Run() error {
-	return cmdlineConfigUnix{
+	return CmdlineConfigUnix{
 		Service:   cfg.Service,
 		TLS:       cfg.TLS,
 		TCPListen: cfg.TCPListen,
@@ -539,6 +539,6 @@ func init() {
 			"control-service", "Runs a control service", cmdlineConfigWindows{})
 	} else {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
-			"control-service", "Runs a control service", cmdlineConfigUnix{})
+			"control-service", "Runs a control service", CmdlineConfigUnix{})
 	}
 }

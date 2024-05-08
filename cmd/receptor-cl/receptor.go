@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/ansible/receptor/cmd"
 	_ "github.com/ansible/receptor/internal/version"
 	_ "github.com/ansible/receptor/pkg/backends"
 	_ "github.com/ansible/receptor/pkg/certificates"
@@ -46,7 +47,8 @@ func (cfg nullBackendCfg) Reload() error {
 	return cfg.Run()
 }
 
-func main() {
+func oldCLI() {
+
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Specifies the node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Runs a self-contained node with no backend", nullBackendCfg{}, cmdline.Singleton)
@@ -103,6 +105,12 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+}
+
+func main() {
+	cmd.Execute()
+	// oldCLI()
 
 	if netceptor.MainInstance.BackendCount() == 0 {
 		netceptor.MainInstance.Logger.Warning("Nothing to do - no backends are running.\n")

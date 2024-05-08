@@ -10,7 +10,7 @@ coverage:
         target: auto
         threshold: 5%
 comment:
-  layout: " diff, flags, files"
+  layout: "header, diff, files, components"  # PR comment layout
   behavior: default
   require_changes: false
   require_base: false
@@ -21,13 +21,22 @@ codecov:
   notify:
     wait_for_ci: false
     after_n_builds: 1
-flag_management:
-  default_rules: # the rules that will be followed for any flag added, generally
-    carryforward: true
-    statuses:
-      - type: project
+component_management:
+  default_rules:  # default rules that will be inherited by all components
+    statuses:   # Status definitions
+      - type: project  # Default status = project
         target: auto
         threshold: 5%
-      - type: patch
-        target: auto
-        threshold: 5%
+        branches:
+          - "!devel"
+  individual_components:   # Actual component breakdown
+    - component_id: go  # Required unique identifier for component (Should not be changed)
+      name: Go  # Display name (can be changed)
+      paths:
+        - cmd/**
+        - internal/**
+        - pkg/**
+    - component_id: receptorctl
+      name: Receptorctl
+      paths:
+        - receptorctl/**

@@ -31,7 +31,11 @@ jobs:
         run: echo pypi_repo=testpypi >> $GITHUB_ENV
         if: ${{ github.repository_owner != 'ansible' }}
 
+      - name: Set receptor pypi version
+        run: echo RECEPTORCTL_PYPI_VERSION_CALL=$(curl -s -o /dev/null -w "%{http_code}" 'https://pypi.org/pypi/receptorctl/${{ env.TAG }}/json') >> $GITHUB_ENV
+
       - name: Build receptorctl and upload to pypi
+        if: ${{ env.RECEPTORCTL_PYPI_VERSION_CALL == '404' }}
         run: |
           make receptorctl_wheel receptorctl_sdist VERSION=$TAG
           twine upload \

@@ -63,7 +63,9 @@ def coverage(session: nox.Session):
     install(session, req="tests")
     version(session)
     session.install("-e", ".")
-    session.run("pytest", "--cov", "--cov-report", "xml:receptorctl_coverage.xml" "-v", "tests", *session.posargs)
+    session.run(
+        "pytest", "--cov", "--cov-report", "term-missing:skip-covered", "--cov-report", "xml:receptorctl_coverage.xml", "--verbose", "tests", *session.posargs
+    )
 
 
 @nox.session(python=python_versions)

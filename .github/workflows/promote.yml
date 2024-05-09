@@ -35,7 +35,7 @@ jobs:
         run: echo RECEPTORCTL_PYPI_VERSION=$(curl --silent https://pypi.org/pypi/receptorctl/json | jq --raw-output '"v" + .info.version') >> $GITHUB_ENV
 
       - name: Build receptorctl and upload to pypi
-        if: ${{ env.RECEPTORCTL_PYPI_VERSION != env.TAG }}
+        if: ${{ 'v%{env.RECEPTORCTL_PYPI_VERSION}' != env.TAG }}
         run: |
           make receptorctl_wheel receptorctl_sdist VERSION=$TAG
           twine upload \

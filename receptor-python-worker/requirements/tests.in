@@ -1,3 +1,5 @@
 # This requirements file is used for receptor-python-worker tests
 click
-pytest==8.1.1 # <-- used to run receptor-python-worker tests
+coverage
+pytest
+pytest-coverage

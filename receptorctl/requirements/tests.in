@@ -1,7 +1,7 @@
 # This requirements file is used for receptorctl tests
 
 click
-dateutil
+coverage
 pytest==8.2.1 # <-- used to run receptorctl tests
 pytest-cov
-coverage
+python-dateutil

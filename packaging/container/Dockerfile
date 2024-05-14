@@ -26,7 +26,7 @@ RUN dnf -y update && \
     dnf clean all && \
     pip3.11 install --no-cache-dir wheel && \
     pip3.11 install --no-cache-dir dumb-init && \
-    pip3.11 install --no-cache-dir /tmp/*.whl && \
+    pip3.11 install --no-cache-dir /tmp/receptorctl-${VERSION}-py3-none-any.whl && \
     rm /tmp/*.whl
 
 COPY --from=builder /source/receptor /usr/bin/receptor

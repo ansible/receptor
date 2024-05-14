@@ -69,8 +69,9 @@ clean:
 	@rm -fv packaging/container/*.whl
 	@rm -fv receptor receptor.exe receptor.app net
 	@rm -fv receptorctl/dist/*
-	@rm -fv receptor-python-worker/dist/*
 	@rm -rfv receptorctl-test-venv/
+	@rm -fv receptor-python-worker/dist/*
+	@rm -rfv receptor-python-worker-test-venv/
 
 ARCH=amd64
 OS=linux
@@ -179,11 +180,11 @@ testloop: receptor
 kubetest: kubectl
 	./kubectl get nodes
 
-version:
+version: FORCE
 	@echo $(VERSION) > .VERSION
 	@echo ".VERSION created for $(VERSION)"
 
-receptorctl/.VERSION:
+receptorctl/.VERSION: FORCE
 	echo $(VERSION) > $@
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
@@ -198,8 +199,16 @@ $(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/.VERSION $(shell find re
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-receptor-python-worker/.VERSION:
+receptor-python-worker/.VERSION: FORCE
 	echo $(VERSION) > $@
+
+FORCE:
+
+receptor-python-worker-lint: receptor-python-worker/.VERSION
+	@cd receptor-python-worker && nox -s lint
+
+receptor-python-worker-test: receptor-python-worker/.VERSION
+	@cd receptor-python-worker && nox -s tests
 
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION:v%=%)-py3-none-any.whl
 $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/.VERSION $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
@@ -238,4 +247,4 @@ tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version kubetest receptorctl-test receptor-python-worker-test

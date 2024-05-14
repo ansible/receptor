@@ -4,6 +4,8 @@
 #
 #    pip-compile --allow-unsafe --output-file=requirements/tests.txt --strip-extras requirements/tests.in
 #
+click==8.1.7
+    # via -r requirements/tests.in
 coverage==7.5.3
     # via
     #   -r requirements/tests.in
@@ -20,3 +22,9 @@ pytest==8.2.1
     #   pytest-cov
 pytest-cov==5.0.0
     # via -r requirements/tests.in
+python-dateutil==2.9.0.post0
+    # via -r requirements/tests.in
+pyyaml==6.0.1
+    # via -r requirements/tests.in
+six==1.16.0
+    # via python-dateutil

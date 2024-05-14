@@ -5,3 +5,4 @@ coverage
 pytest==8.2.1 # <-- used to run receptorctl tests
 pytest-cov
 python-dateutil
+pyyaml

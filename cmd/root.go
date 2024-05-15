@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"reflect"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -122,40 +121,12 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	var config Config
-	err := viper.Unmarshal(&config)
+	config, err := ParseConfig()
 	if err != nil {
 		fmt.Printf("unable to decode into struct, %v", err)
+		os.Exit(1)
 	}
+	RunConfig(*config)
 
-	v := reflect.ValueOf(config)
-	phases := []string{"Init", "Prepare", "Run"}
-
-	for _, phase := range phases {
-		for i := 0; i < v.NumField(); i++ {
-			cmd := v.Field(i).Interface()
-			if phase == "Init" {
-				switch c := cmd.(type) {
-				case Initer:
-					c.Init()
-					fmt.Printf("%s: %s\n", phase, v.Type().Field(i).Name)
-				}
-			}
-			if phase == "Prepare" {
-				switch c := cmd.(type) {
-				case Preparer:
-					c.Prepare()
-					fmt.Printf("%s: %s\n", phase, v.Type().Field(i).Name)
-				}
-			}
-			if phase == "Run" {
-				switch c := cmd.(type) {
-				case Runer:
-					c.Run()
-					fmt.Printf("%s: %s\n", phase, v.Type().Field(i).Name)
-				}
-			}
-		}
-	}
-
+	// pp.Printf("%+V\n", config)
 }

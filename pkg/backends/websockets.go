@@ -435,7 +435,7 @@ func (cfg WebsocketListenerCfg) Run() error {
 }
 
 // websocketDialerCfg is the cmdline configuration object for a Websocket listener.
-type websocketDialerCfg struct {
+type WebsocketDialerCfg struct {
 	Address      string   `description:"URL to connect to" barevalue:"yes" required:"yes"`
 	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
 	ExtraHeader  string   `description:"Sends extra HTTP header on initial connection"`
@@ -445,7 +445,7 @@ type websocketDialerCfg struct {
 }
 
 // Prepare verifies that we are reasonably ready to go.
-func (cfg websocketDialerCfg) Prepare() error {
+func (cfg WebsocketDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -460,7 +460,7 @@ func (cfg websocketDialerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg websocketDialerCfg) Run() error {
+func (cfg WebsocketDialerCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running Websocket peer connection %s\n", cfg.Address)
 	u, err := url.Parse(cfg.Address)
 	if err != nil {
@@ -490,7 +490,7 @@ func (cfg websocketDialerCfg) Run() error {
 	return nil
 }
 
-func (cfg websocketDialerCfg) PreReload() error {
+func (cfg WebsocketDialerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
@@ -498,7 +498,7 @@ func (cfg WebsocketListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg websocketDialerCfg) Reload() error {
+func (cfg WebsocketDialerCfg) Reload() error {
 	return cfg.Run()
 }
 
@@ -510,5 +510,5 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"ws-peer", "Connect outbound to a websocket peer", websocketDialerCfg{}, cmdline.Section(backendSection))
+		"ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, cmdline.Section(backendSection))
 }

@@ -59,9 +59,7 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 		$(TAGPARAM) \
 		./cmd/receptor-cl
 
-FORCE:
-
-clean:	FORCE
+clean:
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv dist/
@@ -80,7 +78,7 @@ OS=linux
 
 KUBECTL_BINARY=./kubectl
 STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-kubectl:	FORCE
+kubectl:
 	if [ "$(wildcard $(KUBECTL_BINARY))" != "" ]; \
 	then \
 		FOUND_KUBECTL_VERSION=$$(./kubectl version --client=true | head --lines=1 | cut --delimiter=' ' --field=3); \
@@ -96,21 +94,21 @@ kubectl:	FORCE
 		chmod 0700 $(KUBECTL_BINARY); \
 	fi
 
-lint:	FORCE
+lint:
 	@golint cmd/... pkg/... example/...
 
 receptorctl-lint: receptorctl/.VERSION
 	@cd receptorctl && nox -s lint
 
-format:	FORCE
+format:
 	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
 
-fmt: format
+fmt:
 
-pre-commit:	FORCE
+pre-commit:
 	@pre-commit run --all-files
 
-build-all:	FORCE
+build-all:
 	@echo "Running Go builds..." && \
 	GOOS=windows $(GO) build \
 		-o receptor.exe \
@@ -134,7 +132,7 @@ CHECKSUM_PROGRAM='sha256sum'
 GOARCH=$(ARCH)
 GOOS=$(OS)
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
-build-package:	FORCE
+build-package:
 	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
 	mkdir -p dist/$(DIST) && \
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build \
@@ -182,12 +180,13 @@ testloop: receptor
 kubetest: kubectl
 	./kubectl get nodes
 
-version:	FORCE
+version:
 	@echo $(VERSION) > .VERSION
-	@echo ".VERSION created for $(VERSION)"
+	@echo "receptor version file set to $(VERSION)"
 
-receptorctl/.VERSION:	FORCE
-	echo $(VERSION) > $@
+receptorctl/.VERSION:
+	@echo $(VERSION) > $@
+	@echo "receptorctl version file set to $(VERSION)"
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
 $(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/.VERSION $(shell find receptorctl/receptorctl -type f -name '*.py')
@@ -201,8 +200,9 @@ $(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/.VERSION $(shell find re
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-receptor-python-worker/.VERSION:	FORCE
-	echo $(VERSION) > $@
+receptor-python-worker/.VERSION:
+	@echo $(VERSION) > $@
+	@echo "receptor-python-worker file set to $(VERSION)"
 
 receptor-python-worker-lint: receptor-python-worker/.VERSION
 	@cd receptor-python-worker && nox -s lint
@@ -247,4 +247,4 @@ tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version kubetest receptorctl-test receptor-python-worker-test
+.PHONY: build-all build-package clean container fmt format kubectl kubetest lint pre-commit receptor-python-worker/.VERSION receptor-python-worker-test receptorctl/.VERSION receptorctl-test test testloop version

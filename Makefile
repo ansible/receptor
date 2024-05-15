@@ -59,7 +59,9 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 		$(TAGPARAM) \
 		./cmd/receptor-cl
 
-clean:
+FORCE:
+
+clean:	FORCE
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv dist/
@@ -78,7 +80,7 @@ OS=linux
 
 KUBECTL_BINARY=./kubectl
 STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-kubectl:
+kubectl:	FORCE
 	if [ "$(wildcard $(KUBECTL_BINARY))" != "" ]; \
 	then \
 		FOUND_KUBECTL_VERSION=$$(./kubectl version --client=true | head --lines=1 | cut --delimiter=' ' --field=3); \
@@ -94,21 +96,21 @@ kubectl:
 		chmod 0700 $(KUBECTL_BINARY); \
 	fi
 
-lint:
+lint:	FORCE
 	@golint cmd/... pkg/... example/...
 
 receptorctl-lint: receptorctl/.VERSION
 	@cd receptorctl && nox -s lint
 
-format:
+format:	FORCE
 	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
 
 fmt: format
 
-pre-commit:
+pre-commit:	FORCE
 	@pre-commit run --all-files
 
-build-all:
+build-all:	FORCE
 	@echo "Running Go builds..." && \
 	GOOS=windows $(GO) build \
 		-o receptor.exe \
@@ -132,7 +134,7 @@ CHECKSUM_PROGRAM='sha256sum'
 GOARCH=$(ARCH)
 GOOS=$(OS)
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
-build-package:
+build-package:	FORCE
 	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
 	mkdir -p dist/$(DIST) && \
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build \
@@ -180,11 +182,11 @@ testloop: receptor
 kubetest: kubectl
 	./kubectl get nodes
 
-version: FORCE
+version:	FORCE
 	@echo $(VERSION) > .VERSION
 	@echo ".VERSION created for $(VERSION)"
 
-receptorctl/.VERSION: FORCE
+receptorctl/.VERSION:	FORCE
 	echo $(VERSION) > $@
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
@@ -199,10 +201,8 @@ $(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/.VERSION $(shell find re
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-receptor-python-worker/.VERSION: FORCE
+receptor-python-worker/.VERSION:	FORCE
 	echo $(VERSION) > $@
-
-FORCE:
 
 receptor-python-worker-lint: receptor-python-worker/.VERSION
 	@cd receptor-python-worker && nox -s lint

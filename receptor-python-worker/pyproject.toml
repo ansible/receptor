@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-authors = "Red Hat"
+authors = ["Red Hat"]
 description = "The receptor-python-worker command is called by Receptor to supervise the operation of a Python worker plugin."
 dynamic = ["version"]
 name = "receptor-python-worker"

@@ -168,15 +168,10 @@ jobs:
           sleep 3
           podman logs receptor
 
-      - name: Find receptor
+      - name: DEBUG - Find receptorctl
         continue-on-error: true
         run: |
-          podman exec -i receptor find / -name 'receptorctl*' -print
-
-      - name: Display path
-        continue-on-error: true
-        run: |
-          podman exec -i receptor echo $PATH
+          podman exec -i receptor command -v receptorctl
 
       - name: Submit work and assert the output we expect
         run: |

@@ -5,7 +5,7 @@ ping
 .. contents::
    :local:
 
-``receptorctl ping`` Pings a receptornode.
+``receptorctl ping`` tests the network reachability of Receptor nodes.
 
 Command syntax: ``receptorctl --socket=<socket_path> [--count <count>] [--delay <delay>] ping <remote_node>``
 
@@ -23,6 +23,6 @@ Command syntax: ``receptorctl --socket=<socket_path> [--count <count>] [--delay 
 ``ps -fp $(pidof receptor)``
 ``lsof -p <<pid>``
 
-``count`` (positive integer) is the number of pings to send (default is 4).
+``count`` specifies the number of pings to send.  The value must be a positive integer. The default is ``4``.
 
-``delay`` (positive float) is the time (in seconds) to wait between pings (default = 1.0)
+``delay`` specifies the time, in seconds, to wait between pings.  The value must be a positive float. The default is ``1.0``.

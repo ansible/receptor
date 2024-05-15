@@ -7,8 +7,6 @@ else
 VERSION := $(OFFICIAL_VERSION)
 endif
 
-FORCE:
-
 # When building Receptor, tags can be used to remove undesired
 # features.  This is primarily used for deploying Receptor in a
 # security sensitive role, where it is desired to have no possibility
@@ -56,6 +54,8 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
 		$(TAGPARAM) \
 		./cmd/receptor-cl
+
+FORCE:
 
 clean:	FORCE
 	@rm -fv .container-flag*
@@ -217,7 +217,9 @@ EXTRA_OPTS ?=
 
 space := $(subst ,, )
 CONTAINER_FLAG_FILE = .container-flag-$(VERSION)$(subst $(space),,$(subst /,,$(EXTRA_OPTS)))
+
 container: $(CONTAINER_FLAG_FILE)
+
 $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container

@@ -7,6 +7,7 @@ else
 VERSION := $(OFFICIAL_VERSION)
 endif
 
+FORCE:
 
 # When building Receptor, tags can be used to remove undesired
 # features.  This is primarily used for deploying Receptor in a
@@ -56,7 +57,7 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 		$(TAGPARAM) \
 		./cmd/receptor-cl
 
-clean:
+clean:	FORCE
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
 	@rm -rfv dist/
@@ -74,7 +75,7 @@ OS=linux
 
 KUBECTL_BINARY=./kubectl
 STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
-kubectl:
+kubectl:	FORCE
 	if [ "$(wildcard $(KUBECTL_BINARY))" != "" ]; \
 	then \
 		FOUND_KUBECTL_VERSION=$$(./kubectl version --client=true | head --lines=1 | cut --delimiter=' ' --field=3); \
@@ -90,21 +91,21 @@ kubectl:
 		chmod 0700 $(KUBECTL_BINARY); \
 	fi
 
-lint:
+lint:	FORCE
 	@golint cmd/... pkg/... example/...
 
 receptorctl-lint: receptorctl/.VERSION
 	@cd receptorctl && nox -s lint
 
-format:
+format:	FORCE
 	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
 
 fmt: format
 
-pre-commit:
+pre-commit:	FORCE
 	@pre-commit run --all-files
 
-build-all:
+build-all:	FORCE
 	@echo "Running Go builds..." && \
 	GOOS=windows $(GO) build \
 		-o receptor.exe \
@@ -128,7 +129,7 @@ CHECKSUM_PROGRAM='sha256sum'
 GOARCH=$(ARCH)
 GOOS=$(OS)
 DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
-build-package:
+build-package:	FORCE
 	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
 	mkdir -p dist/$(DIST) && \
 	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build \
@@ -176,11 +177,11 @@ testloop: receptor
 kubetest: kubectl
 	./kubectl get nodes
 
-version:
+version:	FORCE
 	@echo $(VERSION) > .VERSION
 	@echo ".VERSION created for $(VERSION)"
 
-receptorctl/.VERSION:
+receptorctl/.VERSION:	FORCE
 	echo $(VERSION) > $@
 
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
@@ -195,7 +196,7 @@ $(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/.VERSION $(shell find re
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-receptor-python-worker/.VERSION:
+receptor-python-worker/.VERSION:	FORCE
 	echo $(VERSION) > $@
 
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION:v%=%)-py3-none-any.whl
@@ -228,4 +229,4 @@ tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-test kubetest

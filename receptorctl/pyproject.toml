@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-authors = 'Red Hat'
+authors = ["Red Hat"]
 description = "Receptorctl is a front-end CLI and importable Python library that interacts with Receptor over its control socket interface."
 dynamic = ["version"]
 license = {text = "Apache License 2.0"}

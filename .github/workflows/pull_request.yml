@@ -227,3 +227,50 @@ jobs:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
+
+
+  receptor-python-worker-test-coverage:
+    name: Receptor-python-worker test coverage
+    needs: receptor
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        session:
+          - coverage
+    steps:
+      - name: Download the `receptor` binary
+        uses: actions/download-artifact@v4
+        with:
+          name: receptor
+          path: /usr/local/bin/
+
+      - name: Set executable bit on the `receptor` binary
+        run: sudo chmod a+x /usr/local/bin/receptor
+
+      - name: Set up nox
+        uses: wntrblm/nox@2024.04.15
+        with:
+          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Check out the source code from Git
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+
+      - name: Provision nox environment for ${{ matrix.session }}
+        run: nox --install-only --session ${{ matrix.session }}
+        working-directory: ./receptor-python-worker
+
+      - name: Run `receptor-python-worker` nox ${{ matrix.session }} session
+        run: nox --no-install --session ${{ matrix.session }}
+        working-directory: ./receptor-python-worker
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: receptor-python-worker
+          files: receptor-python-worker_coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

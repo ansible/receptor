@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/ansible/receptor/pkg/backends"
@@ -12,8 +14,22 @@ import (
 	"github.com/spf13/viper"
 )
 
+type Initer interface {
+	Init() error
+}
+
+type Preparer interface {
+	Prepare() error
+}
+
+type Runer interface {
+	Run() error
+}
+
 type Config struct {
 	Node             types.NodeCfg
+	Trace            logger.TraceCfg
+	LocalOnly        backends.NullBackendCfg          `mapstructure:"local-only"`
 	LogLevel         logger.LoglevelCfg               `mapstructure:"log-level"`
 	ControlServices  []controlsvc.CmdlineConfigUnix   `mapstructure:"control-services"`
 	TCPPeers         []backends.TCPDialerCfg          `mapstructure:"tcp-peers"`
@@ -28,10 +44,15 @@ type Config struct {
 	WorkKubernetes   []workceptor.KubeWorkerCfg       `mapstructure:"work-kubernetes"`
 	WorkSigning      workceptor.SigningKeyPrivateCfg  `mapstructure:"work-signing"`
 	WorkVerification workceptor.VerifyingKeyPublicCfg `mapstructure:"work-verification"`
+	// need certs
 }
 
 // ParseConfig returns a config struct that has unmarshaled a yaml config file
-func ParseConfig() (*Config, error) {
+func ParseConfig(configFile string) (*Config, error) {
+	if configFile == "" {
+		fmt.Fprintln(os.Stderr, "Could not locate config file (default is $HOME/.receptor.yaml)")
+		os.Exit(1)
+	}
 	var config Config
 	err := viper.Unmarshal(&config)
 	if err != nil {
@@ -65,7 +86,7 @@ func RunConfig(config Config) {
 	}
 }
 
-// RunPhases runs the appropriate function (Init, Prepare, Run) depending on the current phase
+// RunPhases runs the appropriate function (Init, Prepare, Run) on a command
 func RunPhases(phase string, v reflect.Value) {
 	cmd := v.Interface()
 	// may add logging for the phases when they are invoked

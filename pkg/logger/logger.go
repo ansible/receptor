@@ -276,9 +276,9 @@ func (cfg LoglevelCfg) Init() error {
 	return nil
 }
 
-type traceCfg struct{}
+type TraceCfg struct{}
 
-func (cfg traceCfg) Prepare() error {
+func (cfg TraceCfg) Prepare() error {
 	return nil
 }
 
@@ -291,5 +291,5 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
 		"log-level", "Specifies the verbosity level for command output", LoglevelCfg{}, cmdline.Singleton)
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+		"trace", "Enables packet tracing output", TraceCfg{}, cmdline.Singleton)
 }

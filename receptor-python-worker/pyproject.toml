@@ -7,11 +7,12 @@ authors = [
     {email = "info@ansible.com"},
 ]
 description = "The receptor-python-worker command is called by Receptor to supervise the operation of a Python worker plugin."
-dynamic = ["version"]
+dynamic = [
+    "dependencies",
+    "scripts",
+    "version"
+]
 name = "receptor-python-worker"
-
-[projects.scripts]
-receptor-python-worker = "receptor_python_worker:run"
 
 [project.optional-dependencies]
 dev = [

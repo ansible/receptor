@@ -7,7 +7,11 @@ authors = [
     {email = "info@ansible.com"},
 ]
 description = "Receptorctl is a front-end CLI and importable Python library that interacts with Receptor over its control socket interface."
-dynamic = ["version"]
+dynamic = [
+    "dependencies",
+    "scripts",
+    "version"
+]
 license = {text = "Apache License 2.0"}
 name = "receptorctl"
 

@@ -1,13 +1,13 @@
-----
-ping
-----
+----------
+traceroute
+----------
 
 .. contents::
    :local:
 
-``receptorctl ping`` tests the network reachability of Receptor nodes.
+``receptorctl traceroute`` Displays the network route that packets follow to Receptor nodes.
 
-Command syntax: ``receptorctl --socket=<socket_path> [--count <count>] [--delay <delay>] ping <remote_node>``
+Command syntax: ``receptorctl --socket=<socket_path> traceroute <remote_node>``
 
 ``socket_path`` is the control socket address for the Receptor connection.
    The default is ``unix:`` for a Unix socket.
@@ -22,7 +22,3 @@ Command syntax: ``receptorctl --socket=<socket_path> [--count <count>] [--delay 
 
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
-
-``count`` specifies the number of pings to send.  The value must be a positive integer. The default is ``4``.
-
-``delay`` specifies the time, in seconds, to wait between pings.  The value must be a positive float. The default is ``1.0``.

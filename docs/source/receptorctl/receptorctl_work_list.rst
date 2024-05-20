@@ -21,7 +21,7 @@ Command syntax: ``receptorctl --socket=<socket_path> work list``
   u_str         LISTEN         0              4096                   /tmp/local.sock 38130170                            * 0            users:(("receptor",pid=3226769,fd=7))
 
 ``ps -fp $(pidof receptor)``
-``lsof -p <<pid>``
+``lsof -p <pid>``
 
 The output is divided into work unit sections listed below.
 Field values might be listed separately.

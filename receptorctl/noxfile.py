@@ -9,10 +9,7 @@ LATEST_PYTHON_VERSION = ["3.11"]
 
 python_versions = ["3.8", "3.9", "3.10", "3.11"]
 
-LINT_FILES: tuple[str, ...] = (
-    *iglob("receptorctl/*.py"),
-    "setup.py",
-)
+LINT_FILES: tuple[str, ...] = (*iglob("**/*.py"),)
 PINNED = os.environ.get("PINNED", "true").lower() in {"1", "true"}
 
 requirements_directory = Path("requirements").resolve()
@@ -64,7 +61,15 @@ def coverage(session: nox.Session):
     version(session)
     session.install("-e", ".")
     session.run(
-        "pytest", "--cov", "--cov-report", "term-missing:skip-covered", "--cov-report", "xml:receptorctl_coverage.xml", "--verbose", "tests", *session.posargs
+        "pytest",
+        "--cov",
+        "--cov-report",
+        "term-missing:skip-covered",
+        "--cov-report",
+        "xml:receptorctl_coverage.xml",
+        "--verbose",
+        "tests",
+        *session.posargs,
     )
 
 

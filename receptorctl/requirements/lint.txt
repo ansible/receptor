@@ -18,7 +18,7 @@ packaging==24.0
     # via black
 pathspec==0.12.1
     # via black
-platformdirs==4.2.0
+platformdirs==4.2.2
     # via black
 pycodestyle==2.11.1
     # via flake8

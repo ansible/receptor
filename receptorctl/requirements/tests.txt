@@ -4,6 +4,10 @@
 #
 #    pip-compile --allow-unsafe --output-file=requirements/tests.txt --strip-extras requirements/tests.in
 #
+coverage==7.5.1
+    # via
+    #   -r requirements/tests.in
+    #   pytest-cov
 iniconfig==2.0.0
     # via pytest
 packaging==24.0
@@ -11,4 +15,8 @@ packaging==24.0
 pluggy==1.5.0
     # via pytest
 pytest==8.2.0
+    # via
+    #   -r requirements/tests.in
+    #   pytest-cov
+pytest-cov==5.0.0
     # via -r requirements/tests.in

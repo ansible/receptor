@@ -21,7 +21,7 @@ Command syntax: ``receptorctl --socket=<socket_path> [--count <count>] [--delay 
   u_str         LISTEN         0              4096                   /tmp/local.sock 38130170                            * 0            users:(("receptor",pid=3226769,fd=7))
 
 ``ps -fp $(pidof receptor)``
-``lsof -p <<pid>``
+``lsof -p <pid>``
 
 ``count`` specifies the number of pings to send.  The value must be a positive integer. The default is ``4``.
 

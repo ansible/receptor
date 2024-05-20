@@ -9,10 +9,7 @@ LATEST_PYTHON_VERSION = ["3.11"]
 
 python_versions = ["3.8", "3.9", "3.10", "3.11"]
 
-LINT_FILES: tuple[str, ...] = (
-    *iglob("receptor-python-worker/*.py"),
-    "setup.py",
-)
+LINT_FILES: tuple[str, ...] = (*iglob("**/*.py"),)
 
 PINNED = os.environ.get("PINNED", "true").lower() in {"1", "true"}
 

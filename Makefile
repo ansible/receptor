@@ -5,8 +5,9 @@ ifneq ($(OFFICIAL_VERSION),)
 	VERSION := $(OFFICIAL_VERSION)
 else ifneq ($(shell git tag --list),)
 	VERSION := $(shell git describe --tags | cut -d - -f -1)+$(shell git rev-parse --short HEAD)
-else
+else ifeq ($(VERSION),)
 	VERSION := $(error No tags found in git repository)
+# else VERSION was passed as a command-line argument to make
 endif
 
 

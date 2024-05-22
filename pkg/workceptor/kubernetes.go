@@ -1413,7 +1413,7 @@ func (kw *KubeUnit) Restart() error {
 		if err != nil {
 			kw.GetWorkceptor().nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
-			err := KubeAPIWrapperInstance.Delete(kw.GetContext(), kw.clientset, ked.KubeNamespace, ked.PodName, metav1.DeleteOptions{})
+			err := KubeAPIWrapperInstance.Delete(context.Background(), kw.clientset, ked.KubeNamespace, ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
 				kw.GetWorkceptor().nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
@@ -1438,7 +1438,7 @@ func (kw *KubeUnit) Cancel() error {
 	kw.CancelContext()
 	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
 	if kw.pod != nil {
-		err := KubeAPIWrapperInstance.Delete(kw.GetContext(), kw.clientset, kw.pod.Namespace, kw.pod.Name, metav1.DeleteOptions{})
+		err := KubeAPIWrapperInstance.Delete(context.Background(), kw.clientset, kw.pod.Namespace, kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			kw.GetWorkceptor().nc.GetLogger().Error("Error deleting pod %s: %s", kw.pod.Name, err)
 		}

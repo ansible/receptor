@@ -5,7 +5,7 @@ version
 .. contents::
    :local:
 
-``receptorctl version`` Displays the version information for receptorctl and the receptor node.
+``receptorctl version`` Displays version information for receptorctl and the Receptor node to which it is connected.
 
 Command syntax: ``receptorctl --socket=<socket_path> version``
 

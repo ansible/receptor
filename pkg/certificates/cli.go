@@ -14,6 +14,7 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
+// InitCA Initialize Certificate Authority.
 func InitCA(opts *CertOptions, certOut, keyOut string) error {
 	ca, err := CreateCA(opts, &RsaWrapper{})
 	if err == nil {
@@ -56,6 +57,7 @@ func (ica initCA) Run() (err error) {
 	return InitCA(opts, ica.OutCert, ica.OutKey)
 }
 
+// MakeReq Create Certificate Request.
 func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 	var req *x509.CertificateRequest
 	var key *rsa.PrivateKey
@@ -151,6 +153,7 @@ func (mr makeReq) Run() error {
 	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq)
 }
 
+// SignReq Sign Certificate Request.
 func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool) error {
 	ca := &CA{}
 	var err error

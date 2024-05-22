@@ -27,8 +27,8 @@ func TestInitCA(t *testing.T) {
 					Bits:       8192,
 					CommonName: "Ansible Automation Controller Nodes Mesh",
 				},
-				certOut: "receptor_cert.pem",
-				keyOut:  "receptor_key.pem",
+				certOut: "/tmp/receptor_cert.pem",
+				keyOut:  "/tmp/receptor_key.pem",
 			},
 			wantErr: false,
 		},
@@ -39,8 +39,8 @@ func TestInitCA(t *testing.T) {
 					Bits:       -1,
 					CommonName: "Ansible Automation Controller Nodes Mesh",
 				},
-				certOut: "receptor_cert.pem",
-				keyOut:  "receptor_key.pem",
+				certOut: "/tmp/receptor_cert.pem",
+				keyOut:  "/tmp/receptor_key.pem",
 			},
 			wantErr: true,
 		},
@@ -68,28 +68,28 @@ func TestMakeReq(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:	"Positive test",
+			name: "Positive test",
 			args: args{
-				opts:	&certificates.CertOptions{
+				opts: &certificates.CertOptions{
 					Bits:       8192,
 					CommonName: "Ansible Automation Controller Nodes Mesh",
 				},
-				keyIn:	"receptor_key.pem",
-				keyOut:	"receptor_key_out.pem",
-				reqOut:	"receptor_request_out.pem",
+				keyIn:  "/tmp/receptor_key.pem",
+				keyOut: "/tmp/receptor_key_out.pem",
+				reqOut: "/tmp/receptor_request_out.pem",
 			},
 			wantErr: false,
 		},
 		{
-			name:	"Negative test",
+			name: "Negative test",
 			args: args{
-				opts:	&certificates.CertOptions{
+				opts: &certificates.CertOptions{
 					Bits:       -1,
 					CommonName: "Ansible Automation Controller Nodes Mesh",
 				},
-				keyIn:	"/tmp/",
-				keyOut:	"receptor_key_out.pem",
-				reqOut:	"receptor_request_out.pem",
+				keyIn:  "/tmp/",
+				keyOut: "/tmp/receptor_key_out.pem",
+				reqOut: "/tmp/receptor_request_out.pem",
 			},
 			wantErr: true,
 		},

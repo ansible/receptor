@@ -10,6 +10,7 @@ The Receptor client, ``receptorctl``, provides a command line interface for inte
    :caption: Receptorctl commands
 
    receptorctl_ping
+   receptorctl_reload
    receptorctl_status
    receptorctl_traceroute
    receptorctl_version

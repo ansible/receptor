@@ -1570,6 +1570,12 @@ func (cfg KubeWorkerCfg) GetVerifySignature() bool {
 
 // Run runs the action.
 func (cfg KubeWorkerCfg) Run() error {
+	if cfg.AuthMethod == "" {
+		cfg.AuthMethod = "incluster"
+	}
+	if cfg.StreamMethod == "" {
+		cfg.StreamMethod = "logger"
+	}
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, cfg.VerifySignature)
 
 	return err

@@ -24,5 +24,4 @@ func main() {
 	netceptor.MainInstance.Logger.Info("Initialization complete\n")
 
 	<-netceptor.MainInstance.NetceptorDone()
-	fmt.Println("Stopped")
 }

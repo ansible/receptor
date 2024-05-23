@@ -282,6 +282,14 @@ func (cfg TCPListenerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg TCPListenerCfg) Run() error {
+	if cfg.Cost == 0 {
+		cfg.Cost = 1.0
+	}
+
+	if cfg.BindAddr == "" {
+		cfg.BindAddr = "0.0.0.0"
+	}
+
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -325,6 +333,10 @@ func (cfg TCPDialerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg TCPDialerCfg) Run() error {
+	if cfg.Cost == 0 {
+		cfg.Cost = 1.0
+	}
+
 	netceptor.MainInstance.Logger.Debug("Running TCP peer connection %s\n", cfg.Address)
 	host, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {

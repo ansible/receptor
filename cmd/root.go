@@ -33,7 +33,13 @@ var rootCmd = &cobra.Command{
 			fmt.Printf("unable to decode into struct, %v", err)
 			os.Exit(1)
 		}
-		RunConfig(*config)
+		version := viper.GetInt("version")
+		switch version {
+		case 2:
+			RunConfigV2(*config)
+		default:
+			RunConfigV1()
+		}
 	},
 }
 

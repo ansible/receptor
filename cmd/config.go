@@ -11,6 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/types"
 	"github.com/ansible/receptor/pkg/workceptor"
+	"github.com/ghjm/cmdline"
 	"github.com/spf13/viper"
 )
 
@@ -63,7 +64,7 @@ func ParseConfig(configFile string) (*Config, error) {
 }
 
 // RunConfig spins up receptor based on the provided yaml config
-func RunConfig(config Config) {
+func RunConfigV2(config Config) {
 	v := reflect.ValueOf(config)
 	phases := []string{"Init", "Prepare", "Run"}
 
@@ -106,6 +107,66 @@ func RunPhases(phase string, v reflect.Value) {
 		switch c := cmd.(type) {
 		case Runer:
 			c.Run()
+		}
+	}
+}
+
+func RunConfigV1() {
+
+	cl := cmdline.NewCmdline()
+	cl.AddConfigType("node", "Specifies the node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
+	cl.AddConfigType("local-only", "Runs a self-contained node with no backend", backends.NullBackendCfg{}, cmdline.Singleton)
+
+	// Add registered config types from imported modules
+	for _, appName := range []string{
+		"receptor-version",
+		"receptor-logging",
+		"receptor-tls",
+		"receptor-certificates",
+		"receptor-control-service",
+		"receptor-command-service",
+		"receptor-ip-router",
+		"receptor-proxies",
+		"receptor-backends",
+		"receptor-workers",
+	} {
+		cl.AddRegisteredConfigTypes(appName)
+	}
+
+	osArgs := os.Args[1:]
+
+	err := cl.ParseAndRun(osArgs, []string{"Init", "Prepare", "Run"}, cmdline.ShowHelpIfNoArgs)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
+	}
+	if cl.WhatRan() != "" {
+		// We ran an exclusive command, so we aren't starting any back-ends
+		os.Exit(0)
+	}
+
+	configPath := ""
+	for i, arg := range osArgs {
+		if arg == "--config" || arg == "-c" {
+			if len(osArgs) > i+1 {
+				configPath = osArgs[i+1]
+			}
+
+			break
+		}
+	}
+
+	// only allow reloading if a configuration file was provided. If ReloadCL is
+	// not set, then the control service reload command will fail
+	if configPath != "" {
+		// create closure with the passed in args to be ran during a reload
+		reloadParseAndRun := func(toRun []string) error {
+			return cl.ParseAndRun(osArgs, toRun)
+		}
+		err = controlsvc.InitReload(configPath, reloadParseAndRun)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+			os.Exit(1)
 		}
 	}
 }

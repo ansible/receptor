@@ -266,6 +266,10 @@ type LoglevelCfg struct {
 }
 
 func (cfg LoglevelCfg) Init() error {
+	if cfg.Level == "" {
+		cfg.Level = "error"
+	}
+
 	var err error
 	val, err := GetLogLevelByName(cfg.Level)
 	if err != nil {

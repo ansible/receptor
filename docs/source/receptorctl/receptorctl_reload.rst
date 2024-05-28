@@ -1,11 +1,11 @@
--------
-version
--------
+------
+reload
+------
 
 .. contents::
    :local:
 
-``receptorctl version`` displays version information for receptorctl and the Receptor node to which it is connected.
+``receptorctl reload`` reloads the Receptor configuration for the connected node.
 
 Command syntax: ``receptorctl --socket=<socket_path> version``
 

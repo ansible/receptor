@@ -5,7 +5,7 @@ reload
 .. contents::
    :local:
 
-``receptorctl reload`` Reload configuration on the Receptor node to which it is connected.
+``receptorctl reload`` reloads the Receptor configuration for the connected node.
 
 Command syntax: ``receptorctl --socket=<socket_path> version``
 

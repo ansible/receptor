@@ -1,13 +1,13 @@
-------
-reload
-------
+-------
+connect
+-------
 
 .. contents::
    :local:
 
-``receptorctl reload`` reloads the Receptor configuration for the connected node.
+``receptorctl connect`` connects the local client to the Receptor connected node.
 
-Command syntax: ``receptorctl --socket=<socket_path> reload``
+Command syntax: ``receptorctl --socket=<socket_path> connect <remote_node> <remote_control_service>``
 
 ``socket_path`` is the control socket address for the Receptor connection.
    The default is ``unix:`` for a Unix socket.
@@ -22,3 +22,12 @@ Command syntax: ``receptorctl --socket=<socket_path> reload``
 
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
+
+``remote_node`` is the node identifier for the Receptor connected node.
+
+``remote_control_service`` is the service name of the Receptor connected node.
+
+.. seealso::
+
+    :ref:`connect_to_csv`
+        Connect to any Receptor control service running on the mesh.

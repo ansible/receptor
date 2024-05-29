@@ -5,7 +5,7 @@ connect
 .. contents::
    :local:
 
-``receptorctl connect`` connects the local client to the Receptor connected node.
+``receptorctl connect`` establishes a connection between local client and a Receptor node.
 
 Command syntax: ``receptorctl --socket=<socket_path> connect <remote_node> <remote_control_service>``
 
@@ -23,9 +23,9 @@ Command syntax: ``receptorctl --socket=<socket_path> connect <remote_node> <remo
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``remote_node`` is the node identifier for the Receptor connected node.
+``remote_node`` is the identifier of a Receptor node.
 
-``remote_control_service`` is the service name of the Receptor connected node.
+``remote_control_service`` is the service name of a Receptor node.
 
 .. seealso::
 

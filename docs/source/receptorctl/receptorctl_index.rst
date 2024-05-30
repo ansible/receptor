@@ -15,4 +15,5 @@ The Receptor client, ``receptorctl``, provides a command line interface for inte
    receptorctl_status
    receptorctl_traceroute
    receptorctl_version
+   receptorctl_work_cancel
    receptorctl_work_list

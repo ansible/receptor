@@ -1,7 +1,7 @@
 ---
 name: Receptorctl nox sessions
 
-on:
+on:  # yamllint disable-line rule:truthy
   workflow_call:
     inputs:
       python-version:
@@ -17,7 +17,10 @@ on:
         description: Whether to perform go binary download.
         required: false
         default: false
-
+      go-version:
+        type: string
+        description: The Go version to use.
+        required: false
 env:
   FORCE_COLOR: 1
   NOXSESSION: ${{ inputs.session }}
@@ -30,32 +33,32 @@ jobs:
       Run `receptorctl` ${{ inputs.session }} session
 
     steps:
-    - name: Download the `receptor` binary
-      if: fromJSON(inputs.download-receptor)
-      uses: actions/download-artifact@v4
-      with:
-        name: receptor
-        path: /usr/local/bin/
+      - name: Download the `receptor` binary
+        if: fromJSON(inputs.download-receptor)
+        uses: actions/download-artifact@v4
+        with:
+          name: receptor-${{ inputs.go-version }}
+          path: /usr/local/bin/
 
-    - name: Set executable bit on the `receptor` binary
-      if: fromJSON(inputs.download-receptor)
-      run: sudo chmod a+x /usr/local/bin/receptor
+      - name: Set executable bit on the `receptor` binary
+        if: fromJSON(inputs.download-receptor)
+        run: sudo chmod a+x /usr/local/bin/receptor
 
-    - name: Set up nox
-      uses: wntrblm/nox@2024.04.15
-      with:
-        python-versions: ${{ inputs.python-version }}
+      - name: Set up nox
+        uses: wntrblm/nox@2024.04.15
+        with:
+          python-versions: ${{ inputs.python-version }}
 
-    - name: Check out the source code from Git
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Needed for the automation in Nox to find the last tag
-        sparse-checkout: receptorctl
+      - name: Check out the source code from Git
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+          sparse-checkout: receptorctl
 
-    - name: Provision nox environment for ${{ env.NOXSESSION }}
-      run: nox --install-only
-      working-directory: ./receptorctl
+      - name: Provision nox environment for ${{ env.NOXSESSION }}
+        run: nox --install-only
+        working-directory: ./receptorctl
 
-    - name: Run `receptorctl` nox ${{ env.NOXSESSION }} session
-      run: nox --no-install
-      working-directory: ./receptorctl
+      - name: Run `receptorctl` nox ${{ env.NOXSESSION }} session
+        run: nox --no-install
+        working-directory: ./receptorctl

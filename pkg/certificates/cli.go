@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 func InitCA(opts *CertOptions, certOut, keyOut string) error {
@@ -246,6 +247,10 @@ func (sr signReq) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
 		"cert-init", "Initialize PKI CA", initCA{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",

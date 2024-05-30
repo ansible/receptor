@@ -13,6 +13,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network.
@@ -117,6 +118,10 @@ func (cfg unixProxyOutboundCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	if runtime.GOOS != "windows" {
 		cmdline.RegisterConfigTypeForApp("receptor-proxies",
 			"unix-socket-server", "Listen on a Unix socket and forward via Receptor", unixProxyInboundCfg{}, cmdline.Section(servicesSection))

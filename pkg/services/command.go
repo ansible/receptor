@@ -14,6 +14,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.com/spf13/viper"
 )
 
 func runCommand(qc net.Conn, command string, logger *logger.ReceptorLogger) error {
@@ -78,6 +79,10 @@ func (cfg CommandSvcCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-command-service",
 		"command-service", "Run an interactive command via a Receptor service", CommandSvcCfg{}, cmdline.Section(servicesSection))
 }

@@ -1623,6 +1623,10 @@ func (cfg KubeWorkerCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-kubernetes", "Run a worker using Kubernetes", KubeWorkerCfg{}, cmdline.Section(workersSection))
 }

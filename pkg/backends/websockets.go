@@ -18,6 +18,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ghjm/cmdline"
 	"github.com/gorilla/websocket"
+	"github.com/spf13/viper"
 )
 
 // WebsocketDialer implements Backend for outbound Websocket.
@@ -516,6 +517,10 @@ func (cfg WebsocketListenerCfg) Reload() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",

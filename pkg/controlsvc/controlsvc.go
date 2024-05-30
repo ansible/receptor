@@ -22,6 +22,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -541,6 +542,10 @@ func (cfg cmdlineConfigWindows) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	if runtime.GOOS == "windows" {
 		cmdline.RegisterConfigTypeForApp("receptor-control-service",
 			"control-service", "Runs a control service", cmdlineConfigWindows{})

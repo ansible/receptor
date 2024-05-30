@@ -16,6 +16,7 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 	"github.com/songgao/water"
+	"github.com/spf13/viper"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -379,6 +380,10 @@ func (cfg ipRouterCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-ip-router",
 		"ip-router", "Run an IP router using a tun interface", ipRouterCfg{}, cmdline.Section(servicesSection))
 }

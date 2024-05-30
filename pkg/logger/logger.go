@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -287,6 +288,10 @@ func (cfg TraceCfg) Prepare() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	logLevel = InfoLevel
 	showTrace = false
 	log.SetOutput(os.Stdout)

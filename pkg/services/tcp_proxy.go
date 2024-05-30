@@ -12,6 +12,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // TCPProxyServiceInbound listens on a TCP port and forwards the connection over the Receptor network.
@@ -137,6 +138,10 @@ func (cfg tcpProxyOutboundCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
 		"tcp-server", "Listen for TCP and forward via Receptor", tcpProxyInboundCfg{}, cmdline.Section(servicesSection))
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",

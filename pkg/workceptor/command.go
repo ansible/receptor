@@ -18,6 +18,7 @@ import (
 
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.com/spf13/viper"
 )
 
 type BaseWorkUnitForWorkUnit interface {
@@ -482,6 +483,10 @@ func (cfg VerifyingKeyPublicCfg) PrepareVerifyingKeyPublicCfg() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-signing", "Private key to sign work submissions", SigningKeyPrivateCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",

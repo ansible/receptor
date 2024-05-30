@@ -9,6 +9,7 @@ import (
 	"os/exec"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // pythonUnit implements the WorkUnit interface.
@@ -76,6 +77,10 @@ func (cfg workPythonCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-python", "Run a worker using a Python plugin", workPythonCfg{}, cmdline.Section(workersSection))
 }

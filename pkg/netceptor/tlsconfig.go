@@ -14,6 +14,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // **************************************************************************
@@ -239,6 +240,10 @@ func (cfg TLSClientConfig) Prepare() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
 		"tls-server", "Define a TLS server configuration", TLSServerConfig{}, cmdline.Section(configSection))
 	cmdline.RegisterConfigTypeForApp("receptor-tls",

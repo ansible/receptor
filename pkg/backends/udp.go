@@ -15,6 +15,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // UDPMaxPacketLen is the maximum size of a message that can be sent over UDP.
@@ -416,6 +417,10 @@ func (cfg UDPListenerCfg) Reload() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"UDP-listener", "Run a backend listener on a UDP port", UDPListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",

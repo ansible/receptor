@@ -11,6 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service.
@@ -202,6 +203,10 @@ func (cfg udpProxyOutboundCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
 		"udp-server", "Listen for UDP and forward via Receptor", udpProxyInboundCfg{}, cmdline.Section(servicesSection))
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",

@@ -17,7 +17,10 @@ on:  # yamllint disable-line rule:truthy
         description: Whether to perform go binary download.
         required: false
         default: false
-
+      go-version:
+        type: string
+        description: The Go version to use.
+        required: false
 env:
   FORCE_COLOR: 1
   NOXSESSION: ${{ inputs.session }}
@@ -34,7 +37,7 @@ jobs:
         if: fromJSON(inputs.download-receptor)
         uses: actions/download-artifact@v4
         with:
-          name: receptor
+          name: receptor-${{ inputs.go-version }}
           path: /usr/local/bin/
 
       - name: Set executable bit on the `receptor` binary

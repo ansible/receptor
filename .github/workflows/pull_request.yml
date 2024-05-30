@@ -112,6 +112,7 @@ jobs:
       python-version: ${{ matrix.python-version }}
       session: tests-${{ matrix.python-version }}
       download-receptor: true
+      go-version: ${{ env.DESIRED_GO_VERSION }}
 
   lint-receptorctl:
     name: Lint receptorctl${{ '' }}  # Nest jobs under the same sidebar category
@@ -189,7 +190,7 @@ jobs:
       - name: Download the `receptor` binary
         uses: actions/download-artifact@v4
         with:
-          name: receptor
+          name: receptor-${{ env.DESIRED_GO_VERSION }}
           path: /usr/local/bin/
 
       - name: Set executable bit on the `receptor` binary

@@ -19,6 +19,7 @@ import (
 
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -909,7 +910,18 @@ func ShouldUseReconnect(kw *KubeUnit) bool {
 	// accepted values: "enabled", "disabled", "auto".  The default is "enabled"
 	// all invalid values will assume to be "disabled"
 
-	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+	version := viper.GetInt("version")
+	var env string
+	ok := false
+	switch version {
+	case 2:
+		env = viper.GetString("node.ReceptorKubeSupportReconnect")
+		if env != "" {
+			ok = true
+		}
+	default:
+		env, ok = os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+	}
 	if ok {
 		switch env {
 		case "enabled":
@@ -1199,7 +1211,18 @@ func (kw *KubeUnit) connectToKube() error {
 
 	// RECEPTOR_KUBE_CLIENTSET_QPS
 	// default: 100
-	envQPS, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_QPS")
+	version := viper.GetInt("version")
+	var envQPS string
+	ok := false
+	switch version {
+	case 2:
+		envQPS = viper.GetString("node.ReceptorKubeClientsetQPS")
+		if envQPS != "" {
+			ok = true
+		}
+	default:
+		envQPS, ok = os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_QPS")
+	}
 	if ok {
 		qps, err := strconv.Atoi(envQPS)
 		if err != nil {
@@ -1215,7 +1238,16 @@ func (kw *KubeUnit) connectToKube() error {
 
 	// RECEPTOR_KUBE_CLIENTSET_BURST
 	// default: 10 x QPS
-	envBurst, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_BURST")
+	var envBurst string
+	switch version {
+	case 2:
+		envBurst = viper.GetString("node.ReceptorKubeClientsetBurst")
+		if envBurst != "" {
+			ok = true
+		}
+	default:
+		envBurst, ok = os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_BURST")
+	}
 	if ok {
 		burst, err := strconv.Atoi(envBurst)
 		if err != nil {
@@ -1231,7 +1263,16 @@ func (kw *KubeUnit) connectToKube() error {
 	// RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER
 	// default: tokenbucket
 	// options: never, always, tokenbucket
-	envRateLimiter, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER")
+	var envRateLimiter string
+	switch version {
+	case 2:
+		envRateLimiter = viper.GetString("node.ReceptorKubeClientsetRateLimiter")
+		if envRateLimiter != "" {
+			ok = true
+		}
+	default:
+		envRateLimiter, ok = os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER")
+	}
 	if ok {
 		switch envRateLimiter {
 		case "never":

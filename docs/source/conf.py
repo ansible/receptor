@@ -3,9 +3,7 @@
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
 # -- Path setup --------------------------------------------------------------
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -13,13 +11,11 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-
-
 # -- Project information -----------------------------------------------------
 
-project = 'receptor'
-copyright = 'Red Hat Ansible'
-author = 'Red Hat Ansible'
+project = "receptor"
+copyright = "Red Hat Ansible"
+author = "Red Hat Ansible"
 
 # The full version, including alpha/beta/rc tags
 # release = '0.0.0'
@@ -31,29 +27,29 @@ author = 'Red Hat Ansible'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autosectionlabel',
-    'pbr.sphinxext',
+    "sphinx.ext.autosectionlabel",
+    "pbr.sphinxext",
 ]
 
 autosectionlabel_prefix_document = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['Thumbs.db', '.DS_Store']
+exclude_patterns = ["Thumbs.db", ".DS_Store"]
 
-pygments_style = 'ansible'
-language = 'en'
-master_doc = 'index'
-source_suffix = '.rst'
+pygments_style = "ansible"
+language = "en"
+master_doc = "index"
+source_suffix = ".rst"
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_ansible_theme'
+html_theme = "sphinx_ansible_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -66,7 +62,7 @@ sidebar_collapse = False
 # -- Options for HTML output -------------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'receptorrdoc'
+htmlhelp_basename = "receptorrdoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -74,33 +70,26 @@ latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     #
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     #
     # 'preamble': '',
-
     # Latex figure (float) alignment
     #
     # 'figure_align': 'htbp',
 }
 
 latex_documents = [
-    (master_doc, 'receptor.tex', 'receptor Documentation',
-     'Red Hat Ansible', 'manual'),
+    (master_doc, "receptor.tex", "receptor Documentation", "Red Hat Ansible", "manual"),
 ]
 
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'receptor', 'receptor Documentation',
-     [author], 1)
-]
+man_pages = [(master_doc, "receptor", "receptor Documentation", [author], 1)]
 
 # -- Options for Texinfo output -------------------------------------------
 
@@ -108,7 +97,13 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'receptor', 'receptor Documentation',
-     author, 'receptor', 'Overlay network to establish a persistent mesh.',
-     'Miscellaneous'),
+    (
+        master_doc,
+        "receptor",
+        "receptor Documentation",
+        author,
+        "receptor",
+        "Overlay network to establish a persistent mesh.",
+        "Miscellaneous",
+    ),
 ]

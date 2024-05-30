@@ -7,7 +7,7 @@ on:  # yamllint disable-line rule:truthy
     branches: [devel]
 
 env:
-  DESIRED_GO_VERSION: ${{ env.DESIRED_GO_VERSION }}
+  DESIRED_GO_VERSION: '1.20'
 
 jobs:
   go_test_coverage:

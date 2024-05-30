@@ -79,22 +79,22 @@ jobs:
         if: ${{ failure() }}
         run: find /tmp/receptor-testing -name controlsock -delete
 
-      - name: Artifact receptor data
+      - name: Artifact receptor data for ${{ matrix.go-version }}
         uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
-          name: test-logs
+          name: test-logs-${{ matrix.go-version }}
           path: /tmp/receptor-testing
 
-      - name: Archive receptor binary
+      - name: Archive receptor binary for ${{ matrix.go-version }}
         uses: actions/upload-artifact@v4
         with:
-          name: receptor
+          name: receptor-${{ matrix.go-version }}
           path: /usr/local/bin/receptor
 
   receptorctl:
     name: Run receptorctl tests${{ '' }}  # Nest jobs under the same sidebar category
-    needs: receptor
+    needs: go_test_coverage
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +123,7 @@ jobs:
           - check_format
     uses: ./.github/workflows/reusable-nox.yml
     with:
-      python-version: '3.11'
+      python-version: ${{ env.DESIRED_GO_VERSION }}
       session: ${{ matrix.session }}
 
   container:

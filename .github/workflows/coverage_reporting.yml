@@ -6,6 +6,9 @@ on:  # yamllint disable-line rule:truthy
   push:
     branches: [devel]
 
+env:
+  DESIRED_GO_VERSION: ${{ env.DESIRED_GO_VERSION }}
+
 jobs:
   go_test_coverage:
     name: go test coverage
@@ -21,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.20"
+          go-version: ${{ env.DESIRED_GO_VERSION }}
 
       - uses: actions/cache@v4
         with:

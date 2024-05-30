@@ -28,10 +28,10 @@ jobs:
 
       - uses: actions/cache@v4
         with:
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 

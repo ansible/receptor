@@ -112,7 +112,7 @@ jobs:
       python-version: ${{ matrix.python-version }}
       session: tests-${{ matrix.python-version }}
       download-receptor: true
-      go-version: ${{ env.DESIRED_GO_VERSION }}
+      go-version: '1.20'
 
   lint-receptorctl:
     name: Lint receptorctl${{ '' }}  # Nest jobs under the same sidebar category

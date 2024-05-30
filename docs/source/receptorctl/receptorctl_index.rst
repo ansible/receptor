@@ -9,6 +9,7 @@ The Receptor client, ``receptorctl``, provides a command line interface for inte
    :glob:
    :caption: Receptorctl commands
 
+   receptorctl_connect
    receptorctl_ping
    receptorctl_reload
    receptorctl_status

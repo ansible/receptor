@@ -26,15 +26,6 @@ jobs:
         with:
           go-version: ${{ env.DESIRED_GO_VERSION }}
 
-      - uses: actions/cache@v4
-        with:
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: build and install receptor
         run: |
           make build-all

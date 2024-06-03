@@ -40,7 +40,17 @@ component_management:
       name: Receptor-python-worker
       paths:
         - receptor-python-worker/**
+        - "!receptor-python-worker/tests"
+    - component_id: receptor-python-worker-tests
+      name: Receptor-python-worker tests
+      paths:
+        - receptor-python-worker/tests/**
     - component_id: receptorctl
       name: Receptorctl
       paths:
         - receptorctl/**
+        - "!receptorctl/tests"
+    - component_id: receptorctl-tests
+      name: Receptorctl tests
+      paths:
+        - receptorctl/tests/**

@@ -242,7 +242,7 @@ jobs:
       - name: Download the `receptor` binary
         uses: actions/download-artifact@v4
         with:
-          name: receptor
+          name: receptor-${{ env.DESIRED_GO_VERSION }}
           path: /usr/local/bin/
 
       - name: Set executable bit on the `receptor` binary

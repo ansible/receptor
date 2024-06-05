@@ -5,7 +5,7 @@ work cancel
 .. contents::
    :local:
 
-``receptorctl work cancel`` cancels (kills) one or more units of work.
+``receptorctl work cancel`` terminates one or more units of work.
 
 Command syntax: ``receptorctl --socket=<socket_path> work cancel <<Unit ID>> [...]``
 
@@ -23,4 +23,4 @@ Command syntax: ``receptorctl --socket=<socket_path> work cancel <<Unit ID>> [..
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``Unit ID`` is a unique identifier for a work unit (job).  This should be the local Unit ID for the Receptor instance you are connected to,
+``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work cancel``command, you should specify the ``Unit ID`` for the Receptor instance to which you are connected.

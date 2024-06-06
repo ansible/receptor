@@ -23,4 +23,4 @@ Command syntax: ``receptorctl --socket=<socket_path> work cancel <<Unit ID>> [..
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work cancel``command, you should specify the ``Unit ID`` for the Receptor instance to which you are connected.
+``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work cancel`` command, you should specify the ``Unit ID`` for the Receptor instance to which you are connected.

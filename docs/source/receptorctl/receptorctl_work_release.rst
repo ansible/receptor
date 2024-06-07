@@ -5,7 +5,7 @@ work release
 .. contents::
    :local:
 
-``receptorctl work release`` Deletes one or more units of work.
+``receptorctl work release`` deletes one or more units of work.
 
 Command syntax: ``receptorctl --socket=<socket_path> work release [<<Options>>] <<Unit ID>> [...]``
 
@@ -23,8 +23,7 @@ Command syntax: ``receptorctl --socket=<socket_path> work release [<<Options>>] 
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work release`` command, you should specify the ``Unit ID`` for the Receptor instance to which you are connected.
+``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work release`` command, you should specify the ``Unit ID`` for the Receptor node to which you are connected.
 
-Options:
-``--all`` will delete all work units.
-``--force`` will delete locally (even if the remote node is unreachable).
+``--all`` deletes all work units known by the Receptor node to which you are connected.
+``--force`` deletes work units locally on the Receptor node to which you are connected and takes effect even if the remote Receptor node is unreachable.

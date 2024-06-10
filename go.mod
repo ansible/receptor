@@ -10,7 +10,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.2
 	github.com/jupp0r/go-priority-queue v0.0.0-20160601094913-ab1073853bde
 	github.com/minio/highwayhash v1.0.2
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58

@@ -1,13 +1,13 @@
------------
-work cancel
------------
+------------
+work release
+------------
 
 .. contents::
    :local:
 
-``receptorctl work cancel`` terminates one or more units of work.
+``receptorctl work release`` deletes one or more units of work.
 
-Command syntax: ``receptorctl --socket=<socket_path> work cancel <<Unit ID>> [...]``
+Command syntax: ``receptorctl --socket=<socket_path> work release [<<Options>>] <<Unit ID>> [...]``
 
 ``socket_path`` is the control socket address for the Receptor connection.
    The default is ``unix:`` for a Unix socket.
@@ -23,4 +23,7 @@ Command syntax: ``receptorctl --socket=<socket_path> work cancel <<Unit ID>> [..
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work cancel`` command, you should specify the ``Unit ID`` for the Receptor node to which you are connected.
+``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work release`` command, you should specify the ``Unit ID`` for the Receptor node to which you are connected.
+
+``--all`` deletes all work units known by the Receptor node to which you are connected.
+``--force`` deletes work units locally on the Receptor node to which you are connected and takes effect even if the remote Receptor node is unreachable.

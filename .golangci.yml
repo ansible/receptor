@@ -97,6 +97,7 @@ linters-settings:
           - "k8s.io/client-go/rest"
           - "k8s.io/client-go/tools/remotecommand"
           - "go.uber.org/goleak"
+          - "go.uber.org/mock/gomock"
 
 issues:
   # Dont commit the following line.

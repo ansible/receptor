@@ -2,69 +2,75 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
-	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"go.uber.org/goleak"
 
 	"github.com/ansible/receptor/pkg/backends"
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 func TestGoleakSimpleConfig(t *testing.T) {
 	defer goleak.VerifyNone(t)
+	//
+	// Note!
+	// It is important that this test do not run in parellel since it modifies package-level variables.
+	//
 
-	// Suppress log output.  Remove this if you want to see log information.
-	logger.SetGlobalQuietMode()
+	defaultIdleTimeout := netceptor.MaxIdleTimeoutForQuicConnections
+	defaultQuicKeepAlive := netceptor.KeepAliveForQuicConnections
+
+	defer func() {
+		netceptor.MaxIdleTimeoutForQuicConnections = defaultIdleTimeout
+		netceptor.KeepAliveForQuicConnections = defaultQuicKeepAlive
+	}()
+
+	// Change MaxIdleTimeoutForQuicConnections to 1 seconds (default in lib is 30, our code is 60)
+	netceptor.MaxIdleTimeoutForQuicConnections = 1 * time.Second
+	// We also have to disable heart beats or the connection will not properly timeout
+	netceptor.KeepAliveForQuicConnections = false
 
 	// Create two nodes of the Receptor network-layer protocol (Netceptors).
 	n1 := netceptor.New(context.Background(), "node1")
 	n2 := netceptor.New(context.Background(), "node2")
 
 	// Start a TCP listener on the first node
-	b1, err := backends.NewTCPListener("localhost:3333", nil, n1.Logger)
+	b1, err := backends.NewTCPListener("localhost:3334", nil, n1.Logger)
 	if err != nil {
-		fmt.Printf("Error listening on TCP: %s\n", err)
-		os.Exit(1)
+		t.Fatalf("Error listening on TCP: %s\n", err)
 	}
 	err = n1.AddBackend(b1)
 	if err != nil {
-		fmt.Printf("Error starting backend: %s\n", err)
-		os.Exit(1)
+		t.Fatalf("Error starting backend: %s\n", err)
 	}
 
 	// Start a TCP dialer on the second node - this will connect to the listener we just started
-	b2, err := backends.NewTCPDialer("localhost:3333", false, nil, n2.Logger)
+	b2, err := backends.NewTCPDialer("localhost:3334", false, nil, n2.Logger)
 	if err != nil {
-		fmt.Printf("Error dialing on TCP: %s\n", err)
-		os.Exit(1)
+		t.Fatalf("Error dialing on TCP: %s\n", err)
 	}
 	err = n2.AddBackend(b2)
 	if err != nil {
-		fmt.Printf("Error starting backend: %s\n", err)
-		os.Exit(1)
+		t.Fatalf("Error starting backend: %s\n", err)
 	}
 
 	// Start an echo server on node 1
 	l1, err := n1.Listen("echo", nil)
 	if err != nil {
-		fmt.Printf("Error listening on Receptor network: %s\n", err)
-		os.Exit(1)
+		t.Fatalf("Error listening on Receptor network: %s\n", err)
 	}
 	go func() {
 		// Accept an incoming connection - note that conn is just a regular net.Conn
 		conn, err := l1.Accept()
 		if err != nil {
-			fmt.Printf("Error accepting connection: %s\n", err)
+			t.Fatalf("Error accepting connection: %s\n", err)
 
 			return
 		}
-		fmt.Printf("Accepted a connection\n")
 		go func() {
 			defer conn.Close()
 			buf := make([]byte, 1024)
@@ -74,15 +80,19 @@ func TestGoleakSimpleConfig(t *testing.T) {
 				if err == io.EOF {
 					done = true
 				} else if err != nil {
-					fmt.Printf("Read error in Receptor listener: %s\n", err)
+					// Is ok if we got a 'NO_ERROR: No recent network activity' error but anything else is a test failure.
+					if strings.Contains(err.Error(), "no recent network activity") {
+						t.Log("Successfully got the desired timeout error")
+					} else {
+						t.Fatalf("Read error in Receptor listener: %s\n", err)
+					}
 
 					return
 				}
-				fmt.Printf("Echo server got %d bytes\n", n)
 				if n > 0 {
 					_, err := conn.Write(buf[:n])
 					if err != nil {
-						fmt.Printf("Write error in Receptor listener: %s\n", err)
+						t.Fatalf("Write error in Receptor listener: %s\n", err)
 
 						return
 					}
@@ -93,13 +103,11 @@ func TestGoleakSimpleConfig(t *testing.T) {
 
 	// Connect to the echo server from node 2.  We expect this to error out at first with
 	// "no route to node" because it takes a second or two for node1 and node2 to exchange
-	// routing information and form a mesh.
+	// routing information and form a mesh
 	var c2 net.Conn
 	for {
-		fmt.Printf("Dialing node1\n")
 		c2, err = n2.Dial("node1", "echo", nil)
 		if err != nil {
-			fmt.Printf("Error dialing on Receptor network: %s\n", err)
 			time.Sleep(1 * time.Second)
 
 			continue
@@ -108,6 +116,9 @@ func TestGoleakSimpleConfig(t *testing.T) {
 		break
 	}
 
+	// Sleep longer than MaxIdleTimeout (see pkg/netceptor/conn.go for current setting)
+	sleepDuration := 6 * time.Second
+	time.Sleep(sleepDuration)
 	// Start a listener function that prints received data to the screen
 	// Note that because net.Conn is a stream connection, it is not guaranteed
 	// that received messages will be the same size as the messages that are sent.
@@ -117,16 +128,20 @@ func TestGoleakSimpleConfig(t *testing.T) {
 		for {
 			n, err := c2.Read(rbuf)
 			if n > 0 {
-				fmt.Printf("Received data: %s\n", rbuf[:n])
+				n2.Shutdown()
+				t.Fatal("Should not have gotten data back")
+
+				return
 			}
 			if err == io.EOF {
 				// Shut down the whole Netceptor when any connection closes, because this is just a demo
 				n2.Shutdown()
+				t.Fatal("Should not have gotten an EOF")
 
 				return
 			}
 			if err != nil {
-				fmt.Printf("Read error in Receptor dialer: %s\n", err)
+				n2.Shutdown()
 
 				return
 			}
@@ -136,8 +151,8 @@ func TestGoleakSimpleConfig(t *testing.T) {
 	// Send some data, which should be processed through the echo server back to our
 	// receive function and printed to the screen.
 	_, err = c2.Write([]byte("Hello, world!"))
-	if err != nil && err != io.EOF {
-		fmt.Printf("Write error in Receptor dialer: %s\n", err)
+	if !(err != nil && err != io.EOF) {
+		t.Fatal("We should have gotten an error here")
 	}
 
 	// Close our end of the connection
@@ -149,4 +164,6 @@ func TestGoleakSimpleConfig(t *testing.T) {
 	// Gracefully shut down n1
 	n1.Shutdown()
 	n1.BackendWait()
+
+	time.Sleep(10 * time.Second)
 }

@@ -77,6 +77,7 @@ linters-settings:
         files:
           - "$test"
           - "**/functional/**/*.go"
+          - "**/goroutines/**/*.go"
         allow:
           - "$gostd"
           - "github.com/ansible/receptor/pkg"

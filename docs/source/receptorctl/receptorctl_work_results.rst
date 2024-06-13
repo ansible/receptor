@@ -5,7 +5,7 @@ work results
 .. contents::
    :local:
 
-``receptorctl work results`` Get results for previously or currently running unit(s) of work.
+``receptorctl work results`` Get results for successfully completed, failed, stopped, or currently running, units of work.
 
 Command syntax: ``receptorctl --socket=<socket_path> work results [<<Options>>] <<Unit ID>> [...]``
 
@@ -23,4 +23,4 @@ Command syntax: ``receptorctl --socket=<socket_path> work results [<<Options>>] 
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``Unit ID`` is a unique identifier for a work unit (job).  When running the ``work results`` command, you should specify the ``Unit ID`` for the Receptor node to which you are connected.
+``Unit ID`` is a unique identifier for a work unit (job). When running the ``work results`` command, you should specify the ``Unit ID`` for the Receptor node to which you are connected.

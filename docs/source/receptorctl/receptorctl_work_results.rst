@@ -5,7 +5,7 @@ work results
 .. contents::
    :local:
 
-``receptorctl work results`` Get results for successfully completed, failed, stopped, or currently running, units of work.
+``receptorctl work results`` gets results for successfully completed, failed, stopped, or currently running, units of work.
 
 Command syntax: ``receptorctl --socket=<socket_path> work results [<<Options>>] <<Unit ID>> [...]``
 

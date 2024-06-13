@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/goleak"
-
 	"github.com/ansible/receptor/pkg/backends"
 	"github.com/ansible/receptor/pkg/netceptor"
+	"go.uber.org/goleak"
 )
 
 func TestGoleakSimpleConfig(t *testing.T) {

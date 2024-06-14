@@ -126,7 +126,6 @@ lsHyE+lNowsx+F2Ogy3sjivsGiyRHq5/gC37H9HSUDdqTTruX5219TPNQw58KAuE
 tUxX07xI1GjHRXMS60VKYLeVkFRoYGNAF8q6VOZQgY52412ujEbH5C7lYXXWROeR
 GbTkczs=
 -----END CERTIFICATE-----`)
-
 }
 
 func setupGoodCaRsaPrivateKeyPEMData() []byte {
@@ -252,6 +251,16 @@ func setupGoodCertificateRequest() (*x509.CertificateRequest, error) {
 	goodCertificateRequest, err := x509.ParseCertificateRequest(goodCertificateRequestBlock.Bytes)
 	if err != nil {
 		return &x509.CertificateRequest{}, err
+	}
+
+	goodCertificateRequestPrivateKeyPEMData := setupGoodCertificateRequestRSAPrivateKeyPEMData()
+	goodCertificateRequestPrivateKeyBlock, rest := pem.Decode(goodCertificateRequestPrivateKeyPEMData)
+	if len(rest) != 0 {
+		return &x509.CertificateRequest{}, fmt.Errorf(excessPEMDataFormatString, rest)
+	}
+
+	if goodCertificateRequestPrivateKeyBlock.Type != "RSA PRIVATE KEY" {
+		return &x509.CertificateRequest{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "rsa private key", goodCertificateRequestPrivateKeyBlock.Type)
 	}
 
 	return goodCertificateRequest, nil

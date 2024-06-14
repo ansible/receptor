@@ -541,7 +541,7 @@ func TestCreateCAValid(t *testing.T) {
 	}
 
 	goodCaCertificate.KeyUsage = x509.KeyUsageDigitalSignature |
-									x509.KeyUsageCertSign
+		x509.KeyUsageCertSign
 
 	goodCaCertificate.ExtKeyUsage = []x509.ExtKeyUsage{
 		x509.ExtKeyUsageClientAuth,
@@ -601,7 +601,7 @@ func TestCreateCAValid(t *testing.T) {
 				DoAndReturn(
 					func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
 						return goodCaPrivateKey, nil
-				}	,
+					},
 				)
 
 			got, _ := certificates.CreateCA(tt.args.opts, mockRsa)

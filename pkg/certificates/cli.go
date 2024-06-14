@@ -14,14 +14,23 @@ import (
 	"github.com/ghjm/cmdline"
 )
 
+// Oser is the function calls interfaces for mocking os.
+//type Oser interface {
+//	ReadFile(name string) ([]byte, error)
+//	WriteFile(name string, data []byte, perm fs.FileMode) error
+//}
+
+// OsWrapper is the Wrapper structure for Oser.
+//type OsWrapper struct{}
+
 // InitCA Initialize Certificate Authority.
-func InitCA(opts *CertOptions, certOut, keyOut string) error {
+func InitCA(opts *CertOptions, certOut, keyOut string, osWrapper Oser) error {
 	ca, err := CreateCA(opts, &RsaWrapper{})
 	if err == nil {
-		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate}, &OsWrapper{})
+		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate}, osWrapper)
 	}
 	if err == nil {
-		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey}, &OsWrapper{})
+		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey}, osWrapper)
 	}
 
 	return err
@@ -54,15 +63,15 @@ func (ica initCA) Run() (err error) {
 		}
 	}
 
-	return InitCA(opts, ica.OutCert, ica.OutKey)
+	return InitCA(opts, ica.OutCert, ica.OutKey, &OsWrapper{})
 }
 
 // MakeReq Create Certificate Request.
-func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
+func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string, osWrapper Oser) error {
 	var req *x509.CertificateRequest
 	var key *rsa.PrivateKey
 	if keyIn != "" {
-		data, err := LoadFromPEMFile(keyIn, &OsWrapper{})
+		data, err := LoadFromPEMFile(keyIn, osWrapper)
 		if err != nil {
 			return err
 		}
@@ -90,12 +99,12 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 			return err
 		}
 	}
-	err := SaveToPEMFile(reqOut, []interface{}{req}, &OsWrapper{})
+	err := SaveToPEMFile(reqOut, []interface{}{req}, osWrapper)
 	if err != nil {
 		return err
 	}
 	if keyOut != "" {
-		err = SaveToPEMFile(keyOut, []interface{}{key}, &OsWrapper{})
+		err = SaveToPEMFile(keyOut, []interface{}{key}, osWrapper)
 		if err != nil {
 			return err
 		}
@@ -150,23 +159,23 @@ func (mr makeReq) Run() error {
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
 
-	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq)
+	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, &OsWrapper{})
 }
 
 // SignReq Sign Certificate Request.
-func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool) error {
+func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool, osWrapper Oser) error {
 	ca := &CA{}
 	var err error
-	ca.Certificate, err = LoadCertificate(caCrtPath, &OsWrapper{})
+	ca.Certificate, err = LoadCertificate(caCrtPath, osWrapper)
 	if err != nil {
 		return err
 	}
-	ca.PrivateKey, err = LoadPrivateKey(caKeyPath, &OsWrapper{})
+	ca.PrivateKey, err = LoadPrivateKey(caKeyPath, osWrapper)
 	if err != nil {
 		return err
 	}
 	var req *x509.CertificateRequest
-	req, err = LoadRequest(reqPath, &OsWrapper{})
+	req, err = LoadRequest(reqPath, osWrapper)
 	if err != nil {
 		return err
 	}
@@ -245,7 +254,7 @@ func (sr signReq) Run() error {
 		opts.NotAfter = t
 	}
 
-	return SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify)
+	return SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify, &OsWrapper{})
 }
 
 func init() {

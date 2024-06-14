@@ -28,7 +28,7 @@ var wrongPEMBlockTypeFormatString string = "PEM Block is not a %s: %v"
 
 func setupGoodCA(certOpts *certificates.CertOptions, rsaer certificates.Rsaer) (*certificates.CA, error) {
 	certOpts.Bits = 4096
-	certOpts.CommonName = "Ansible Automation Controller Nodes Mesh ROOT CA"
+	certOpts.CommonName = "Ansible Automation Controller Nodes Mesh Certificate Authority"
 	certOpts.DNSNames = nil
 	certOpts.NodeIDs = nil
 	certOpts.IPAddresses = nil
@@ -55,6 +55,134 @@ func setupGoodCA(certOpts *certificates.CertOptions, rsaer certificates.Rsaer) (
 	return goodCA, nil
 }
 
+func setupGoodCaRsaPrivateKey() (*rsa.PrivateKey, error) {
+	goodCaRsaPrivateKeyPEMData := setupGoodCaRsaPrivateKeyPEMData()
+	goodCaRsaPrivateKeyBlock, rest := pem.Decode(goodCaRsaPrivateKeyPEMData)
+	if len(rest) != 0 {
+		return &rsa.PrivateKey{}, fmt.Errorf(excessPEMDataFormatString, rest)
+	}
+
+	if goodCaRsaPrivateKeyBlock.Type != "RSA PRIVATE KEY" {
+		return &rsa.PrivateKey{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "RSA Private Key", goodCaRsaPrivateKeyBlock.Type)
+	}
+
+	goodCaRsaPrivateKey, err := x509.ParsePKCS1PrivateKey(goodCaRsaPrivateKeyBlock.Bytes)
+	if err != nil {
+		return &rsa.PrivateKey{}, err
+	}
+
+	return goodCaRsaPrivateKey, nil
+}
+
+func setupGoodCaCertificate() (*x509.Certificate, error) {
+	goodCaCertificatePEMData := setupGoodCaCertificatePEMData()
+	goodCaCertificateBlock, rest := pem.Decode(goodCaCertificatePEMData)
+	if len(rest) != 0 {
+		return &x509.Certificate{}, fmt.Errorf(excessPEMDataFormatString, rest)
+	}
+
+	if goodCaCertificateBlock.Type != "CERTIFICATE" {
+		return &x509.Certificate{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "certificate", goodCaCertificateBlock.Type)
+	}
+
+	goodCaCertificate, err := x509.ParseCertificate(goodCaCertificateBlock.Bytes)
+	if err != nil {
+		return &x509.Certificate{}, err
+	}
+
+	return goodCaCertificate, nil
+}
+
+func setupGoodCaCertificatePEMData() []byte {
+	return []byte(`-----BEGIN CERTIFICATE-----
+MIIFcTCCA1mgAwIBAgIEZmwvHzANBgkqhkiG9w0BAQsFADBJMUcwRQYDVQQDEz5B
+bnNpYmxlIEF1dG9tYXRpb24gQ29udHJvbGxlciBOb2RlcyBNZXNoIENlcnRpZmlj
+YXRlIEF1dGhvcml0eTAeFw0yMjAxMDcwMDAzNTFaFw0zMjAxMDcwMDAzNTFaMEkx
+RzBFBgNVBAMTPkFuc2libGUgQXV0b21hdGlvbiBDb250cm9sbGVyIE5vZGVzIE1l
+c2ggQ2VydGlmaWNhdGUgQXV0aG9yaXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8A
+MIICCgKCAgEA85o/C8zq1u1H+Cv+1o8tVk4scAQpwisifG0/fEXyoxliV5bmb5fo
+VXSxPAehBYHDu1w9ncT05AFHwe8gX4Iz8xCkjtiGDls9D+JDuZgxFif0RRh7bgwK
+VagmSIMUKaueqWJoIxtfq7n77UysKmby28V3GvIlF+H4nWzrH+RjuYLH9MeKptHK
+4RW3FU0fLAPszD8erfgyl66Ka0vi6nX3ey0O15RPo/+rnBivdM9md6H6HXAGpbu6
+n+Zs3AaMy4EyCSz0kPNY7A8qYCm4ZtmmQh7IHvtTQFUad/KWXYquSijKGkEJEpsP
+jDjPLkX4jJvwA8SVYv4wVD3Ou4eVWcXxMQfPucIb20cAgy/6JMWyWQSgvh6E+Wit
+2c4PT6ivk5DwVLF9qTFvsZzVFDuFRs5sITxtFENh573DCbRM6wLkDMsLcGqDLQ3N
+KE4rD7yTq8Akg8ag28ktAtyCkss/8/AViVgo0EsDIpTU1+FKu6tu+jy9PQXJPgjm
+xae8g2KdozuO9gaAfTznze8olZCdbQSCMaSdrbV69N8dmJkh046d7OSad5+zILxW
+uo+K62p37wwEjrSD5dXynkHfEdQv7RZB5DvhswRVz2rMrJKyLYwj7ligUj7+ukMJ
+rwm+IRiGL1e/KRt1wbBOPFaDFqAr9oGBIRe/9f4RTB+d4h6TL3G9ukcCAwEAAaNh
+MF8wDgYDVR0PAQH/BAQDAgKEMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcD
+ATAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRisPLfHjVNCLRBsbFPatzvlYGn
+rTANBgkqhkiG9w0BAQsFAAOCAgEANE65T3tLEXzq2w0dxEorqi14ctXg/coooG6A
+x5z1tEY6nQhj9/W4CIg+fQ0z82MXOIr29xDyRHmK3BX4FQ4mCYmJROL3sOkJtpwE
+dXJXt8MwsbtLF+8+rq98f0jnBR0AlnSzZMKNj7mfLWGnDr/DaCnjkmqzI4hA59m2
+L1Jp8krAhfALkUaulQr/ceFRkmsW9sJ7HfhokxuBOXELJKB0w7IVo6oyOUwGICVd
+YMKKss638nPCYBEf/AlDgHlpBAbhsegllWQ5WKh6MYZNOecOaSD58CIyDmngUhPW
+djmbF9Gv85gZpQAcsGNPrh9VbxWMB52zdcOAD9YUHaaLYQtJ/v+tqRv61v381rtH
+5Dm8LiKbkQOgmQS1YaWR707uyjHvDPoE0lO7lg66dW4zSspfVfqZ/DIHTqj+iA2N
+SMDcTfs6YLxrOEm8ZM7wF8LTSWTSoIYuMsTatMi/V7VwS3qlMY8wARmpduv1qz57
+unWHC+aT6XA4CnrhZql0NVcfKoDZTDX8uMp1iPF1hdlPImBgpEpHjBMOxdiJ3KyY
+lsHyE+lNowsx+F2Ogy3sjivsGiyRHq5/gC37H9HSUDdqTTruX5219TPNQw58KAuE
+tUxX07xI1GjHRXMS60VKYLeVkFRoYGNAF8q6VOZQgY52412ujEbH5C7lYXXWROeR
+GbTkczs=
+-----END CERTIFICATE-----`)
+
+}
+
+func setupGoodCaRsaPrivateKeyPEMData() []byte {
+	return []byte(`-----BEGIN RSA PRIVATE KEY-----
+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
+-----END RSA PRIVATE KEY-----`)
+}
+
 func setupGoodCertificate() (*x509.Certificate, error) {
 	goodCertificatePEMData := setupGoodCertificatePEMData()
 	goodCertificateBlock, rest := pem.Decode(goodCertificatePEMData)
@@ -76,35 +204,36 @@ func setupGoodCertificate() (*x509.Certificate, error) {
 
 func setupGoodCertificatePEMData() []byte {
 	return []byte(`-----BEGIN CERTIFICATE-----
-MIIFVTCCAz2gAwIBAgIEYdeDaTANBgkqhkiG9w0BAQsFADA7MTkwNwYDVQQDEzBB
-bnNpYmxlIEF1dG9tYXRpb24gQ29udHJvbGxlciBOb2RlcyBNZXNoIFJPT1QgQ0Ew
-HhcNMjIwMTA3MDAwMzUxWhcNMzIwMTA3MDAwMzUxWjA7MTkwNwYDVQQDEzBBbnNp
-YmxlIEF1dG9tYXRpb24gQ29udHJvbGxlciBOb2RlcyBNZXNoIFJPT1QgQ0EwggIi
-MA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCxAErOWvVDU8mfZgtE6BSygTWU
-MkPxxIEQSYs/UesRAHaB+QXa7/0Foa0VUJKcWwUE+2yYkNRrg8MmE8VWMSewcaNI
-As407stFXP+A2anPEglwemTskpO72sigiYDKShC5n5ciyPsHckwVlOCTtac5TwFe
-eTmGnHWRcd4uBGvaEXx98fw/wLgYtr9vmKTdnOQjriX9EaAWrjlrlzm54Bs3uVUj
-GSL7zY381EuUVV4AjbqQyThbY9cVfsK0nmzLUqpiHG2IhGZDZA9+jxtz2wJWFkNQ
-nWA3afCUjcWV+4FpP3p1U1myCeh2yR2uCHs9pkUK3ts9uD/Wd5j9M1oBMlymbN/C
-5Fahd+cTXrPAjsoRqCso9TBP4mIlNl1Jq8MRUWTL5HOuwn+KnufBtuQ1hIb71Eso
-kj90eWeo/P+temYAEquUVWiej7lnHyZVW647lE+o+xJEOmW+tY5H4jgA/twP4s7U
-BgR545usWF9/utvnhsGSkg1EYcdzaM01pkrWrw1GvHT++HshsrG6Tse8gY7JrTds
-LDtU8LPhPUEnSfVBcgcMg2Dg8lEbaODtdp2xtCJwZHy9CiAx3CKcogVEfecrKSSr
-2iSocft9/l8J+mhVG2CI6ekG6Cy9hDct/3SV01Dfd4FG7xXJIE3mTDLILpi1AVIW
-MHxYD3skuQMyLhJDAwIDAQABo2EwXzAOBgNVHQ8BAf8EBAMCAoQwHQYDVR0lBBYw
-FAYIKwYBBQUHAwIGCCsGAQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYE
-FFAlC81rH211fPJoWglERKb/7/NfMA0GCSqGSIb3DQEBCwUAA4ICAQCWCP/O6YQ9
-jhae2/BeUeeKsnoxf90prg3o6/QHbelF6yL+MvGg5ZbPSlt+ywLDNR2CYvXk/4SD
-5To7CPKhSPBwwUJpafvQfAOZijU30fvXvp5yZEFoOzOyvBP58NfzL5qH6Pf5A6i3
-rHvtR1v7DgS7u2qWWcSimIM0UPoV3JubLTEORjOR6FIyNkIxdjhrP3SxyZ54xxde
-G3bchKaRcGVNoFYSDN4bAA22JAjlD8kXNYKzIS/0cOR/9SnHd1wMIQ2trx0+TfyG
-FAA1mW1mjzQd+h5SGBVeCz2W2XttNSIfQDndJCsyACxmIaOK99AQxdhZsWfHtGO1
-3TjnyoiHjf8rozJbAVYqrIdB6GDf6fUlxwhUXT0qkgOvvAzjNnLoOBUkE4TWqXHl
-38a+ITDNVzaUlrTd63eexS69V6kHe7mrqjywNQ9EXF9kaVeoNTzRf/ztT/DEVAl+
-rKshMt4IOKQf1ScE+EJe1njpREHV+fa+kYvQB6cRuxW9a8sOSeQNaSL73Zv54elZ
-xffYhMv6yXvVxVnJHEsG3kM/CsvsU364BBd9kDcZbHpjNcDHMu+XxECJjD2atVtu
-FdaOLykGKfMCYVBP+xs97IJO8En/5N9QQwc+N4cfCg9/BWoZKHPbRx/V+57VEj0m
-69EpJXbL15ZQLCPsaIcqJqpK23VyJKc8fA==
+MIIFijCCA3KgAwIBAgIEZmww8zANBgkqhkiG9w0BAQsFADBJMUcwRQYDVQQDEz5B
+bnNpYmxlIEF1dG9tYXRpb24gQ29udHJvbGxlciBOb2RlcyBNZXNoIENlcnRpZmlj
+YXRlIEF1dGhvcml0eTAeFw0yMjAxMDcwMDAzNTFaFw0zMjAxMDcwMDAzNTFaMDMx
+MTAvBgNVBAMMKEFuc2libGUgQXV0b21hdGlvbiBQbGF0Zm9ybSBoeWJyaWRfbm9k
+ZTEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC9aBV0TmDicwokCFx7
+CL5oTsSxPU5CEffc3D+xPJ1Ymi0aWyRkNMKGJPRBvYz+PX/d1Sqd4XZ6pW/FESFr
+zt5filtgY/zSxGlHobIw0JPHr7atLcw8KbuB5vHpe4GewF/87SZjOlKPyG2dMJTG
+s0msYa6cNzbAIjPFFYtc5BzmlDVTqQ+0TtlcpM/u5RiIc6hQvYgNvRIlinw+pA9R
+tIH0RLUo8E/jlUIlFNhW1J73zPWUxn7RppeK6hJjQmkByS4cd8m/v/of42XcXQHf
+xg+tvuxw7TR+WP3fYvKoh4NpCdLc1IbusMJ0zf8l2r31jUkgm895j/Z57GlQFYxV
+WqPM2QJjcZMg2PvsFpVPrMaTj+cGXrsWufR39SNfXbVznmSdJ5pcCPdhXQ6P1ynb
+goX5BcniBunPTq70OEgN2999GycUAc3i9X1+Q4GX9PR2o8spqtI2OC3Aaxy7K+VJ
+Hhw0ikfPX2Ek68YFeyTXXr+7Sh7M/zg42pIJsIXzsT/L65N5DcsHJqaCA72deRHg
+ROzQIclg+HC5mrCFg7QS16+7IB4U5of+OYnxJwupNwaCfPtQq0UqE/SSvR/xJZcz
+pB3qO6Kz9euC+0t41+mY4IMyCA9muGSrteBh04d+ra4h1DpE7Alrs4aPDXracnp2
+Nb35AuRKw8kOtB/HEaamZGVZ0wIDAQABo4GPMIGMMA4GA1UdDwEB/wQEAwIHgDAd
+BgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwEwHwYDVR0jBBgwFoAUYrDy3x41
+TQi0QbGxT2rc75WBp60wOgYDVR0RBDMwMYIMaHlicmlkX25vZGUxhwTAqAQBoBsG
+CSsGAQQBkggTAaAODAxoeWJyaWRfbm9kZTEwDQYJKoZIhvcNAQELBQADggIBALYs
+YoxuimM9E2I2x3FyUNEqtQ7lPEuANSJJfPWAIk5ApccLYWGfvIzQjCqJ76JBWug2
+ACrFy2xqa8JuMSFswATBI6SsGE0/q2QH/Zw3seiciwOtsAgAr2I8MRTtzuSS0fd9
+NjLRUSSc338cbeUKooWBCqMGJ1O2EzaTP114V4NNb2naO1xmmFqEjhd3yIPKpc+G
+A1RJm3bqyrvwpSDbhRSGLRe65WPD4Q8roCa7E0TCsZalhhmYdFOOVjPEsSrsgpj/
+uf8dkSk+mWv3/Xc8TIBTyxtzhZsYATHpFcKm3Xc2TZkxnsAehOBVGwsQE0iv7ejz
+vglty4bLda0Fv5kTqBHwFNwjEIEwBTvrOITjImofIz+NxSQ9NdRydBrdQFc2rwpX
+T58l96LeiqfpI9H2neIWmEjV41hdL8u1jZVDrq/6nnnYy6itR/WPBmUGxsCIPDNb
+XvgSwTEn/WkRO5eq0lVp8zzRSB2MZuhDagqV0Whifi2Eh0xrapC3IaFv02Uba/fh
+vl5i2UFRbZhWQIOTGkbUmk1ePFycKctAeBFneZE8RtT70hDcxgNxq2m0wVPIGDBL
+afbTv3SDMV2eDorOKPfDI30/C9692GlkS/k7Y8sOvQ4Fgs/T0cZ91uNzqs5GNvkI
+59ynl0jGocRDVl5tBNlgBC8VdisrMhPEmeXGIfSN
 -----END CERTIFICATE-----`)
 }
 
@@ -128,44 +257,111 @@ func setupGoodCertificateRequest() (*x509.CertificateRequest, error) {
 	return goodCertificateRequest, nil
 }
 
+func setupGoodCertificateRequestRSAPrivateKeyPEMData() []byte {
+	return []byte(`-----BEGIN RSA PRIVATE KEY-----
+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
+-----END RSA PRIVATE KEY-----`)
+}
+
 func setupGoodCertificateRequestPEMData() []byte {
 	return []byte(`-----BEGIN CERTIFICATE REQUEST-----
-MIICUjCCAToCAQAwDTELMAkGA1UEBhMCVVMwggEiMA0GCSqGSIb3DQEBAQUAA4IB
-DwAwggEKAoIBAQDQUtV5/hb2b2EwJUIhhMtGK42qAzWmd+n0zJTifiMIUYdMRmJS
-1OGfzk9aNyuxYXeT5rWRD64o2Zh7KdFhNtLOgYjIczeYQXH8zdYxHtyJjkXaYZNC
-8VavhCNriRWP+BET7bAFmDIRvSoWf/ZzjCYS24XI2iR3bTxevW8avE3KwiUYe+sR
-OfxT6g86MojD3T7Sv8aaR1w8CoP7GceibYwVG53UqrZb9LTBPP6FgHNCTZmpIclH
-o6YFpObpsttbbNIaHXRwIVRaRKHgPc2vY/yt0HgDgk1Qke8LRMUGdR+5P8VJL1k1
-618t2uc6nK/OOKRuED9ovbJ29TKhVzWrSc5JAgMBAAGgADANBgkqhkiG9w0BAQsF
-AAOCAQEAF/V/ZE6kLbVzH3wgpLbBweotKmA68pPMsYmouvhGsecYWG/Dk6x51r2I
-45HT9RfRIfIFKJEso46OzWxPKlmjVIYnqsQHjMQWSIX9FthvqZUrw+R0GTctJymo
-qhMS+OWFzbq/eYBZ/kfCIErlyytwAu7TqknAbwUBsyOonLp9ViLepTihawkKKyUk
-JvML8+p5qpQEwZ+shqr1J5kkqU44KHiADslqY6Af8q5LPHaLCj0STeTlJ/pgL9I3
-IaXWfGohy0VQ0OTftwnNFo48r/KE9JRbYJCAvN4yzUx1zuBgCOy2y6JYeXV3eFTJ
-v8wHZVYzsGTM7Rfr6EbECCPahojLDw==
+MIIExTCCAq0CAQAwMzExMC8GA1UEAwwoQW5zaWJsZSBBdXRvbWF0aW9uIFBsYXRm
+b3JtIGh5YnJpZF9ub2RlMTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB
+AL1oFXROYOJzCiQIXHsIvmhOxLE9TkIR99zcP7E8nViaLRpbJGQ0woYk9EG9jP49
+f93VKp3hdnqlb8URIWvO3l+KW2Bj/NLEaUehsjDQk8evtq0tzDwpu4Hm8el7gZ7A
+X/ztJmM6Uo/IbZ0wlMazSaxhrpw3NsAiM8UVi1zkHOaUNVOpD7RO2Vykz+7lGIhz
+qFC9iA29EiWKfD6kD1G0gfREtSjwT+OVQiUU2FbUnvfM9ZTGftGml4rqEmNCaQHJ
+Lhx3yb+/+h/jZdxdAd/GD62+7HDtNH5Y/d9i8qiHg2kJ0tzUhu6wwnTN/yXavfWN
+SSCbz3mP9nnsaVAVjFVao8zZAmNxkyDY++wWlU+sxpOP5wZeuxa59Hf1I19dtXOe
+ZJ0nmlwI92FdDo/XKduChfkFyeIG6c9OrvQ4SA3b330bJxQBzeL1fX5DgZf09Haj
+yymq0jY4LcBrHLsr5UkeHDSKR89fYSTrxgV7JNdev7tKHsz/ODjakgmwhfOxP8vr
+k3kNywcmpoIDvZ15EeBE7NAhyWD4cLmasIWDtBLXr7sgHhTmh/45ifEnC6k3BoJ8
++1CrRSoT9JK9H/EllzOkHeo7orP164L7S3jX6ZjggzIID2a4ZKu14GHTh36triHU
+OkTsCWuzho8NetpyenY1vfkC5ErDyQ60H8cRpqZkZVnTAgMBAAGgTTBLBgkqhkiG
+9w0BCQ4xPjA8MDoGA1UdEQQzMDGCDGh5YnJpZF9ub2RlMYcEwKgEAaAbBgkrBgEE
+AZIIEwGgDgwMaHlicmlkX25vZGUxMA0GCSqGSIb3DQEBCwUAA4ICAQAhxpmJItCN
+qn/FRV8p0PpkgtgXb4BKgmKCIKl8sLV+4oaxVVPBV4fb8qD6cm2/BhlSTGiAIy0i
+HYoL7yZafyICl+9fVF3hqaN7LwAVs2K/ijD4XSW/24UG56YW55CmIKj/PqPL/dRy
+1mrfoDnUKS28zEjBlv1n/87RwULjjGwbUHc3PQxZGecfhfVzLsM5/eSn1Mc38Xdo
+QEsq7ByJLKZC6sgLwk9hzvEq9d4dWLvpQKXgvQfsTPIN0aezi/gA/Ga41FxhPqwf
+D1dHKH6Btt74AlZIRNVocY7MmMgWWRD+y4Rhf2LKs0dd5Id21JGGdrZ3GUMnn0i/
+k1lhXhT/V49vEGcpQVp1ltzq16A/i3HZD8cclf7vO7i3Vt5KMmYlq2ulvJv7ufho
+kEoxUm4vffX2XMbBXBWgXrA8zaz06X9mwqglCwMw/2dGvKnXUmdK8Q63EZRlM92d
+FD2xRVgnG0qdElOI5Df162X+TikKNy6ud0ATRY/PcNqRcPfJBxviRdpkpOcgAv2e
+YiV449ZkiDxWyQ3A/x88YZ4e34Ca9fs20e7iflz0ezUcc8so9I5K0jbm8Cdmyj7R
+y6WbCHkbpqxRV/05sHzG0apj07qTNyv8RJSXqw8FSbd+4g4c7u9xaUaLr2OSg8hn
+IemSZj8QaR2JNPwXEbBEh8uPDhNvPBQFrw==
 -----END CERTIFICATE REQUEST-----`)
 }
 
-func setupGoodRSAPrivateKey() (*rsa.PrivateKey, error) {
-	goodRSAPrivateKeyPEMData := setupGoodRSAPrivateKeyPEMData()
-	goodRSAPrivateKeyBlock, rest := pem.Decode(goodRSAPrivateKeyPEMData)
+func setupGoodCertificateRequestRsaPrivateKey() (*rsa.PrivateKey, error) {
+	goodCertificateRequestRsaPrivateKeyPEMData := setupGoodCertificateRequestRsaPrivateKeyPEMData()
+	goodCertificateRequestRsaPrivateKeyBlock, rest := pem.Decode(goodCertificateRequestRsaPrivateKeyPEMData)
 	if len(rest) != 0 {
 		return &rsa.PrivateKey{}, fmt.Errorf(excessPEMDataFormatString, rest)
 	}
 
-	if goodRSAPrivateKeyBlock.Type != "RSA PRIVATE KEY" {
-		return &rsa.PrivateKey{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "RSA Private Key", goodRSAPrivateKeyBlock.Type)
+	if goodCertificateRequestRsaPrivateKeyBlock.Type != "RSA PRIVATE KEY" {
+		return &rsa.PrivateKey{}, fmt.Errorf(wrongPEMBlockTypeFormatString, "RSA Private Key", goodCertificateRequestRsaPrivateKeyBlock.Type)
 	}
 
-	goodRSAPrivateKey, err := x509.ParsePKCS1PrivateKey(goodRSAPrivateKeyBlock.Bytes)
+	goodCertificateRequestRsaPrivateKey, err := x509.ParsePKCS1PrivateKey(goodCertificateRequestRsaPrivateKeyBlock.Bytes)
 	if err != nil {
 		return &rsa.PrivateKey{}, err
 	}
 
-	return goodRSAPrivateKey, nil
+	return goodCertificateRequestRsaPrivateKey, nil
 }
 
-func setupGoodRSAPrivateKeyPEMData() []byte {
+func setupGoodCertificateRequestRsaPrivateKeyPEMData() []byte {
 	return []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIJKAIBAAKCAgEAp17EU0yKFdjqoec7zSc0AWDmT6cZpys8C74HqKeOArJPvswE
 b4OVyKZj20hFNj2N6TRry0x+pw+eP2XziEc0jdIqb33K6SbZKyezmKNYF+0TlzN9
@@ -339,10 +535,13 @@ func TestCreateCAValid(t *testing.T) {
 	type args struct {
 		opts *certificates.CertOptions
 	}
-	goodCaCertificate, err := setupGoodCertificate()
+	goodCaCertificate, err := setupGoodCaCertificate()
 	if err != nil {
 		t.Errorf("Error setting up certificate: %v", err)
 	}
+
+	goodCaCertificate.KeyUsage = x509.KeyUsageDigitalSignature |
+									x509.KeyUsageCertSign
 
 	goodCaCertificate.ExtKeyUsage = []x509.ExtKeyUsage{
 		x509.ExtKeyUsageClientAuth,
@@ -362,12 +561,12 @@ func TestCreateCAValid(t *testing.T) {
 
 	goodCertOptions := certificates.CertOptions{
 		Bits:       4096,
-		CommonName: "Ansible Automation Controller Nodes Mesh ROOT CA",
+		CommonName: "Ansible Automation Controller Nodes Mesh Certificate Authority",
 		NotAfter:   goodCaTimeAfter,
 		NotBefore:  goodCaTimeBefore,
 	}
 
-	goodCaPrivateKey, err := setupGoodRSAPrivateKey()
+	goodCaPrivateKey, err := setupGoodCaRsaPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,11 +595,14 @@ func TestCreateCAValid(t *testing.T) {
 
 			mockRsa := mock_certificates.NewMockRsaer(ctrl)
 
-			mockRsa.EXPECT().GenerateKey(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
-					return goodCaPrivateKey, nil
-				},
-			)
+			mockRsa.
+				EXPECT().
+				GenerateKey(gomock.Any(), gomock.Any()).
+				DoAndReturn(
+					func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
+						return goodCaPrivateKey, nil
+				}	,
+				)
 
 			got, _ := certificates.CreateCA(tt.args.opts, mockRsa)
 			if !reflect.DeepEqual(got.PrivateKey, tt.want.PrivateKey) {
@@ -664,7 +866,7 @@ func TestCreateCertReqValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	goodRSAPrivateKey, err := setupGoodRSAPrivateKey()
+	goodRSAPrivateKey, err := setupGoodCertificateRequestRsaPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1120,8 +1322,8 @@ func TestLoadFromPEMFile(t *testing.T) {
 		t.Errorf(errorSettingUpTypeFormatString, "certificate request", err)
 	}
 
-	rsaPrivateKeyTestFilename := "rsa_private_key_test_filename"
-	goodRSAPrivateKey, err := setupGoodRSAPrivateKey()
+	certificateRequestRsaPrivateKeyTestFilename := "rsa_private_key_test_filename"
+	goodCertificateRequestRsaPrivateKey, err := setupGoodCertificateRequestRsaPrivateKey()
 	if err != nil {
 		t.Errorf(errorSettingUpTypeFormatString, "rsa private key", err)
 	}
@@ -1189,17 +1391,17 @@ func TestLoadFromPEMFile(t *testing.T) {
 		{
 			name: "RSA Private Key",
 			args: args{
-				filename: rsaPrivateKeyTestFilename,
+				filename: certificateRequestRsaPrivateKeyTestFilename,
 			},
 			wantOserReadfileCalls: func() {
 				o.
 					EXPECT().
 					ReadFile(gomock.Any()).
-					Return(interface{}(setupGoodRSAPrivateKeyPEMData()), nil).
+					Return(interface{}(setupGoodCertificateRequestRsaPrivateKeyPEMData()), nil).
 					Times(1)
 			},
 			want: []interface{}{
-				goodRSAPrivateKey,
+				goodCertificateRequestRsaPrivateKey,
 			},
 			wantErr: false,
 		},
@@ -1670,7 +1872,7 @@ func TestSaveToPEMFile(t *testing.T) {
 	}
 
 	certificateTestFilename := "certificate_test_filename"
-	goodCaCertificate, err := setupGoodCertificate()
+	goodCaCertificate, err := setupGoodCaCertificate()
 	if err != nil {
 		t.Errorf("Error setting up certificate: %v", err)
 	}
@@ -1690,7 +1892,7 @@ func TestSaveToPEMFile(t *testing.T) {
 	}
 
 	rsaPrivateKeyTestFilename := "rsa_private_key_test_filename"
-	goodCaPrivateKey, err := setupGoodRSAPrivateKey()
+	goodCaPrivateKey, err := setupGoodCertificateRequestRsaPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1880,7 +2082,7 @@ func TestSignCertReq(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	goodCaPrivateKey, err := setupGoodRSAPrivateKey()
+	goodCaPrivateKey, err := setupGoodCaRsaPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1937,11 +2139,14 @@ func TestSignCertReq(t *testing.T) {
 
 			mockRsa := mock_certificates.NewMockRsaer(ctrl)
 
-			mockRsa.EXPECT().GenerateKey(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
-					return goodCaPrivateKey, nil
-				},
-			)
+			mockRsa.
+				EXPECT().
+				GenerateKey(gomock.Any(), gomock.Any()).
+				DoAndReturn(
+					func(random io.Reader, bits int) (*rsa.PrivateKey, error) {
+						return goodCaPrivateKey, nil
+					},
+				)
 
 			CA, err := setupGoodCA(tt.args.caOpts, mockRsa)
 			if err != nil {

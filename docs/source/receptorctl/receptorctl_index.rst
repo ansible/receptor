@@ -19,3 +19,4 @@ The Receptor client, ``receptorctl``, provides a command line interface for inte
    receptorctl_work_list
    receptorctl_work_release
    receptorctl_work_results
+   receptorctl_work_submit

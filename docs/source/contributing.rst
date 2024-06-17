@@ -33,6 +33,8 @@ An initial checklist for your change to increase the likelihood of acceptance:
 Release process
 ===============
 
+Before starting the release process verify that `make test` and `go test tests/goroutines/simple_config.go` tests pass.
+
 Maintainers have the ability to run the `Stage Release`_ workflow. Running this workflow will:
 
 - Build and push the container image to ghcr.io. This serves as a staging environment where the image can be tested.

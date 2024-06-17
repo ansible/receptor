@@ -5,7 +5,7 @@ work submit
 .. contents::
    :local:
 
-``receptorctl work submit`` submits a new unit of work.
+``receptorctl work submit`` requests a Receptor node to run a unit of work.
 
 Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <<WorkType>> [<<Command Parameters>>]``
 
@@ -27,13 +27,13 @@ Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <
 
 ``Command Parameters`` are parameters passed to the work command.
 
-``-a``, ``--param TEXT`` adds additional Receptor parameter in key=value format.
-``-f``, ``--follow`` causes Receptorctl to remain attached to the job and print its results.
-``-l``, ``--payload-literal TEXT`` uses the ``TEXT`` as the literal unit of work data.
+``-a``, ``--param <<KEY>>=<<VALUE>>`` adds a Receptor parameter in key=value format.
+``-f``, ``--follow`` keeps Receptorctl to remain attached to the job and displays the job results.
+``-l``, ``--payload-literal <<TEXT>>`` uses the value of ``<<TEXT>>`` as the literal unit of work data.
 ``-n``, ``--no-payload`` sends an empty payload.
-``--node <<Node ID>>`` is the Receptor node to run the work on. It defaults to the local node.
-``-p``, ``--payload TEXT`` specifies the file containing unit of work data. Use - for stdin.
+``--node <<Node ID>>`` is the Receptor node on which the work runs. The default is the local node.
+``-p``, ``--payload <<TEXT>>`` specifies the file that contains data for the unit of work. Specify ``-`` for standard input (stdin).
 ``--rm`` releases the work unit after completion.
-``--signwork`` digitally signs remote work submissions to stdout.
-``--tls-client TEXT`` specifies the TLS client used when submitting work to a remote node.
-``--ttl TEXT`` specifies the time to live until remote work must start, e.g. 1h20m30s or 30m10s.
+``--signwork`` digitally signs remote work submissions to standard output (stdout).
+``--tls-client <<TEXT>>`` specifies the TLS client used when submitting work to a remote node.
+``--ttl <<TEXT>>`` specifies the time to live (TTL) for remote work requests in ``##h##m##s`` format; for example ``1h20m30s`` or ``30m10s``.

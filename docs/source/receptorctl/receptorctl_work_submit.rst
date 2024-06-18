@@ -36,4 +36,4 @@ Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <
 ``--rm`` releases the work unit after completion.
 ``--signwork`` digitally signs remote work submissions to standard output (stdout).
 ``--tls-client <<TEXT>>`` specifies the TLS client that submits work to a remote node.
-``--ttl <<TEXT>>`` specifies the time to live (TTL) for remote work requests in ``##h##m##s`` format; for example ``1h20m30s`` or ``30m10s``.
+``--ttl <<TEXT>>`` specifies the time to live (TTL) for remote work requests in ``##h##m##s`` format; for example ``1h20m30s`` or ``30m10s``. Use the ``receptorctl work list`` command to display units of work on Receptor nodes and determine appropriate TTL values.

@@ -7,7 +7,7 @@ work submit
 
 ``receptorctl work submit`` requests a Receptor node to run a unit of work.
 
-Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <<WorkType>> [<<Command Parameters>>]``
+Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <<WorkType>> [<<Runtime Parameters>>]``
 
 ``socket_path`` is the control socket address for the Receptor connection.
    The default is ``unix:`` for a Unix socket.
@@ -25,7 +25,7 @@ Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <
 
 ``WorkType`` specifies an execution request type for the work unit.  Use the ``receptorctl status`` command to find available work types for Receptor nodes.
 
-``Command Parameters`` are parameters passed by Receptor to the work command.
+``Runtime Parameters`` are parameters passed by Receptor to the work command.
 
 ^^^^^^^^^^^^^^^^^^^
 Work submit options

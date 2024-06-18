@@ -23,7 +23,7 @@ Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <
 ``ps -fp $(pidof receptor)``
 ``lsof -p <pid>``
 
-``WorkType`` is the execution request type for the work unit.
+``WorkType`` specifies an execution request type for the work unit.  Use the ``receptorctl status`` command to find available work types for Receptor nodes.
 
 ``Command Parameters`` are parameters passed to the work command.
 

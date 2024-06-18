@@ -25,7 +25,13 @@ Command syntax: ``receptorctl --socket=<socket_path> work submit [<<Options>>] <
 
 ``WorkType`` specifies an execution request type for the work unit.  Use the ``receptorctl status`` command to find available work types for Receptor nodes.
 
-``Command Parameters`` are parameters passed to the work command.
+``Command Parameters`` are parameters passed by Receptor to the work command.
+
+^^^^^^^^^^^^^^^^^^^
+Work submit options
+^^^^^^^^^^^^^^^^^^^
+
+You can use the following options with the ``work submit`` command:
 
 ``-a``, ``--param <<KEY>>=<<VALUE>>`` adds a Receptor parameter in key=value format.
 ``-f``, ``--follow`` keeps Receptorctl to remain attached to the job and displays the job results.

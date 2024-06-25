@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"reflect"
 
 	receptorVersion "github.com/ansible/receptor/internal/version"
 	"github.com/spf13/cobra"
@@ -15,6 +16,7 @@ import (
 var (
 	cfgFile string
 	version bool
+	latest  bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -28,18 +30,24 @@ var rootCmd = &cobra.Command{
 			fmt.Println(receptorVersion.Version)
 			os.Exit(0)
 		}
-		config, err := ParseConfig(cfgFile)
+		receptorConfig, certifcatesConfig, err := ParseConfigs(cfgFile)
 		if err != nil {
 			fmt.Printf("unable to decode into struct, %v", err)
 			os.Exit(1)
 		}
-		version := viper.GetInt("version")
-		switch version {
-		case 2:
-			RunConfigV2(*config)
-		default:
-			RunConfigV1()
-		}
+		// version := viper.GetInt("version")
+		RunConfigV2(reflect.ValueOf(*certifcatesConfig))
+		RunConfigV2(reflect.ValueOf(*receptorConfig))
+
+		// switch version {
+		// case 2:
+		// 	fmt.Println("Running V2")
+		// 	RunConfigV2(reflect.ValueOf(*certifcatesConfig))
+		// 	RunConfigV2(reflect.ValueOf(*receptorConfig))
+		// default:
+		// 	fmt.Println("Running V1")
+		// 	RunConfigV1()
+		// }
 	},
 }
 
@@ -55,6 +63,7 @@ func init() {
 
 	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.receptor.yaml)")
 	rootCmd.Flags().BoolVar(&version, "version", false, "Show the Receptor version")
+	rootCmd.Flags().BoolVar(&latest, "latest", false, "Use the latest config and cli")
 }
 
 var FindMe = true

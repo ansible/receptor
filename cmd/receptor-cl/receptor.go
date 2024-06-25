@@ -13,7 +13,20 @@ import (
 )
 
 func main() {
-	cmd.Execute()
+	var latest bool
+	for _, arg := range os.Args {
+		if arg == "--latest" {
+			latest = true
+		}
+	}
+
+	if !latest {
+		fmt.Println("Running older cli/config")
+		cmd.RunConfigV1()
+	} else {
+		fmt.Println("Running latest cli/config")
+		cmd.Execute()
+	}
 
 	if netceptor.MainInstance.BackendCount() == 0 {
 		netceptor.MainInstance.Logger.Warning("Nothing to do - no backends are running.\n")

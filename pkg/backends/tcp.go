@@ -334,6 +334,7 @@ func (cfg TCPDialerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg TCPDialerCfg) Run() error {
+	// FIX ME!
 	if cfg.Cost == 0 {
 		cfg.Cost = 1.0
 	}

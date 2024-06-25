@@ -85,7 +85,7 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 }
 
 // tcpProxyInboundCfg is the cmdline configuration object for a TCP inbound proxy.
-type tcpProxyInboundCfg struct {
+type TCPProxyInboundCfg struct {
 	Port          int    `required:"true" description:"Local TCP port to bind to"`
 	BindAddr      string `description:"Address to bind TCP listener to" default:"0.0.0.0"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
@@ -95,7 +95,7 @@ type tcpProxyInboundCfg struct {
 }
 
 // Run runs the action.
-func (cfg tcpProxyInboundCfg) Run() error {
+func (cfg TCPProxyInboundCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running TCP inbound proxy service %v\n", cfg)
 	tlsClientCfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLSClient, cfg.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
@@ -111,7 +111,7 @@ func (cfg tcpProxyInboundCfg) Run() error {
 }
 
 // tcpProxyOutboundCfg is the cmdline configuration object for a TCP outbound proxy.
-type tcpProxyOutboundCfg struct {
+type TCPProxyOutboundCfg struct {
 	Service   string `required:"true" description:"Receptor service name to bind to"`
 	Address   string `required:"true" description:"Address for outbound TCP connection"`
 	TLSServer string `description:"Name of TLS server config for the Receptor service"`
@@ -119,7 +119,7 @@ type tcpProxyOutboundCfg struct {
 }
 
 // Run runs the action.
-func (cfg tcpProxyOutboundCfg) Run() error {
+func (cfg TCPProxyOutboundCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running TCP inbound proxy service %s\n", cfg)
 	TLSServerConfig, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLSServer)
 	if err != nil {
@@ -143,7 +143,7 @@ func init() {
 		return
 	}
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
-		"tcp-server", "Listen for TCP and forward via Receptor", tcpProxyInboundCfg{}, cmdline.Section(servicesSection))
+		"tcp-server", "Listen for TCP and forward via Receptor", TCPProxyInboundCfg{}, cmdline.Section(servicesSection))
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
-		"tcp-client", "Listen on a Receptor service and forward via TCP", tcpProxyOutboundCfg{}, cmdline.Section(servicesSection))
+		"tcp-client", "Listen on a Receptor service and forward via TCP", TCPProxyOutboundCfg{}, cmdline.Section(servicesSection))
 }

@@ -222,6 +222,7 @@ class ReceptorControl:
         commandJson = json.dumps(commandMap)
         command = f"{commandJson}\n"
         self.writestr(command)
+        print("command", command)
         text = self.readstr()
         m = re.compile(
             "Work unit created with ID (.+). Send stdin data and EOF."
@@ -240,6 +241,7 @@ class ReceptorControl:
         else:
             raise RuntimeError("Unknown payload type")
         self._sockfile.flush()
+        print("payload", payload)
         shutdown_write(self._socket)
         text = self.readstr()
         self.close()

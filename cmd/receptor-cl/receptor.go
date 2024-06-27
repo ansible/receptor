@@ -13,19 +13,23 @@ import (
 )
 
 func main() {
-	var latest bool
+	var old bool
+	newArgs := []string{}
 	for _, arg := range os.Args {
-		if arg == "--latest" {
-			latest = true
+		if arg == "--old" {
+			old = true
+			continue
 		}
+		newArgs = append(newArgs, arg)
 	}
 
-	if !latest {
-		fmt.Println("Running older cli/config")
-		cmd.RunConfigV1()
-	} else {
-		fmt.Println("Running latest cli/config")
+	os.Args = newArgs
+
+	if !old {
 		cmd.Execute()
+	} else {
+		fmt.Println("Running old cli/config")
+		cmd.RunConfigV1()
 	}
 
 	if netceptor.MainInstance.BackendCount() == 0 {

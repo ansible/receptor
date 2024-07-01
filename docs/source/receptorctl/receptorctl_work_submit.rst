@@ -32,14 +32,13 @@ Work submit options
 ^^^^^^^^^^^^^^^^^^^
 
 You can use the following options with the ``work submit`` command:
-
-``-a``, ``--param <<KEY>>=<<VALUE>>`` adds a Receptor parameter in key=value format.
-``-f``, ``--follow`` keeps Receptorctl to remain attached to the job and displays the job results.
-``-l``, ``--payload-literal <<TEXT>>`` uses the value of ``<<TEXT>>`` as the literal unit of work data.
-``-n``, ``--no-payload`` sends an empty payload.
-``--node <<Node ID>>`` is the Receptor node on which the work runs. The default is the local node.
-``-p``, ``--payload <<TEXT>>`` specifies the file that contains data for the unit of work. Specify ``-`` for standard input (stdin).
-``--rm`` releases the work unit after completion.
-``--signwork`` digitally signs remote work submissions to standard output (stdout).
-``--tls-client <<TEXT>>`` specifies the TLS client that submits work to a remote node.
-``--ttl <<TEXT>>`` specifies the time to live (TTL) for remote work requests in ``##h##m##s`` format; for example ``1h20m30s`` or ``30m10s``. Use the ``receptorctl work list`` command to display units of work on Receptor nodes and determine appropriate TTL values.
+ - ``-a``, ``--param <<KEY>>=<<VALUE>>`` adds a Receptor parameter in key=value format.
+ - ``-f``, ``--follow`` keeps Receptorctl to remain attached to the job and displays the job results.
+ - ``-l``, ``--payload-literal <<TEXT>>`` uses the value of ``<<TEXT>>`` as the literal unit of work data.
+ - ``-n``, ``--no-payload`` sends an empty payload.
+ - ``--node <<Node ID>>`` is the Receptor node on which the work runs. The default is the local node.
+ - ``-p``, ``--payload <<TEXT>>`` specifies the file that contains data for the unit of work. Specify ``-`` for standard input (stdin).
+ - ``--rm`` releases the work unit after completion.
+ - ``--signwork`` digitally signs remote work submissions to standard output (stdout).
+ - ``--tls-client <<TEXT>>`` specifies the TLS client that submits work to a remote node.
+ - ``--ttl <<TEXT>>`` specifies the time to live (TTL) for remote work requests in ``##h##m##s`` format; for example ``1h20m30s`` or ``30m10s``. Use the ``receptorctl work list`` command to display units of work on Receptor nodes and determine appropriate TTL values.

@@ -20,3 +20,8 @@ The Receptor client, ``receptorctl``, provides a command line interface for inte
    receptorctl_work_release
    receptorctl_work_results
    receptorctl_work_submit
+
+.. attention:
+   Receptor has commands that are intended to provide internal functionality. These commands are not supported by ``receptorctl``:
+   - ``work force-release``.
+   - ``work status``.

@@ -4,7 +4,7 @@ OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/nul
 ifneq ($(OFFICIAL_VERSION),)
 	VERSION := $(OFFICIAL_VERSION)
 else ifneq ($(shell git tag --list),)
-	VERSION := $(shell git describe --tags | cut -d - -f -1)+$(shell git rev-parse --short HEAD)
+	VERSION := $(shell git describe --tags | cut -d - -f -1)+git$(shell git rev-parse --short HEAD)
 else ifeq ($(VERSION),)
 	VERSION := $(error No tags found in git repository)
 # else VERSION was passed as a command-line argument to make

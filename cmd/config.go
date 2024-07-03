@@ -30,22 +30,23 @@ type Runer interface {
 }
 
 type ReceptorConfig struct {
-	Node              types.NodeCfg
-	Trace             logger.TraceCfg
-	LocalOnly         backends.NullBackendCfg          `mapstructure:"local-only"`
-	LogLevel          logger.LoglevelCfg               `mapstructure:"log-level"`
-	ControlServices   []controlsvc.CmdlineConfigUnix   `mapstructure:"control-services"`
-	TCPPeers          []backends.TCPDialerCfg          `mapstructure:"tcp-peers"`
-	UDPPeers          []backends.UDPDialerCfg          `mapstructure:"udp-peers"`
-	WSPeers           []backends.WebsocketDialerCfg    `mapstructure:"ws-peers"`
-	TCPListeners      []backends.TCPListenerCfg        `mapstructure:"tcp-listeners"`
-	UDPListeners      []backends.UDPListenerCfg        `mapstructure:"udp-listeners"`
-	WSListeners       []backends.WebsocketListenerCfg  `mapstructure:"ws-listeners"`
-	TLSClients        []netceptor.TLSClientConfig      `mapstructure:"tls-clients"`
-	TLSServer         []netceptor.TLSServerConfig      `mapstructure:"tls-servers"`
-	WorkCommands      []workceptor.CommandWorkerCfg    `mapstructure:"work-commands"`
-	WorkKubernetes    []workceptor.KubeWorkerCfg       `mapstructure:"work-kubernetes"`
-	WorkPython        []workceptor.WorkPythonCfg       `mapstructure:"work-python"`
+	// Used pointer structs to apply defaults to config
+	Node            *types.NodeCfg
+	Trace           logger.TraceCfg
+	LocalOnly       backends.NullBackendCfg          `mapstructure:"local-only"`
+	LogLevel        *logger.LoglevelCfg              `mapstructure:"log-level"`
+	ControlServices []*controlsvc.CmdlineConfigUnix  `mapstructure:"control-services"`
+	TCPPeers        []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
+	UDPPeers        []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
+	WSPeers         []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
+	TCPListeners    []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
+	UDPListeners    []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
+	WSListeners     []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
+	TLSClients      []netceptor.TLSClientConfig      `mapstructure:"tls-clients"`
+	TLSServer       []netceptor.TLSServerConfig      `mapstructure:"tls-servers"`
+	WorkCommands    []workceptor.CommandWorkerCfg    `mapstructure:"work-commands"`
+	WorkKubernetes  []*workceptor.KubeWorkerCfg      `mapstructure:"work-kubernetes"`
+	// WorkPython        []workceptor.WorkPythonCfg       `mapstructure:"work-python"`
 	WorkSigning       workceptor.SigningKeyPrivateCfg  `mapstructure:"work-signing"`
 	WorkVerification  workceptor.VerifyingKeyPublicCfg `mapstructure:"work-verification"`
 	IpRouters         []services.IpRouterCfg           `mapstructure:"ip-routers"`
@@ -100,7 +101,6 @@ func isConfigEmpty(v reflect.Value) bool {
 }
 
 func RunConfigV2(v reflect.Value) {
-	// v := reflect.ValueOf(config)
 	phases := []string{"Init", "Prepare", "Run"}
 
 	for _, phase := range phases {

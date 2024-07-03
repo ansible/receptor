@@ -8,7 +8,9 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-type NullBackendCfg struct{}
+type NullBackendCfg struct {
+	Local bool
+}
 
 // make the nullBackendCfg object be usable as a do-nothing Backend.
 func (cfg NullBackendCfg) Start(_ context.Context, _ *sync.WaitGroup) (chan netceptor.BackendSession, error) {

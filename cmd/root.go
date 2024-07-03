@@ -35,19 +35,17 @@ var rootCmd = &cobra.Command{
 			fmt.Printf("unable to decode into struct, %v", err)
 			os.Exit(1)
 		}
-		// version := viper.GetInt("version")
+
+		isEmptyReceptorConfig := isConfigEmpty(reflect.ValueOf(*receptorConfig))
+
 		RunConfigV2(reflect.ValueOf(*certifcatesConfig))
+		if isEmptyReceptorConfig {
+			os.Exit(0)
+		}
+
+		SetConfigDefaults(receptorConfig)
 		RunConfigV2(reflect.ValueOf(*receptorConfig))
 
-		// switch version {
-		// case 2:
-		// 	fmt.Println("Running V2")
-		// 	RunConfigV2(reflect.ValueOf(*certifcatesConfig))
-		// 	RunConfigV2(reflect.ValueOf(*receptorConfig))
-		// default:
-		// 	fmt.Println("Running V1")
-		// 	RunConfigV1()
-		// }
 	},
 }
 

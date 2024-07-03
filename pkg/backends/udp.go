@@ -333,12 +333,6 @@ func (cfg UDPListenerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg UDPListenerCfg) Run() error {
-	if cfg.BindAddr == "" {
-		cfg.BindAddr = "0.0.0.0"
-	}
-	if cfg.Cost == 0 {
-		cfg.Cost = 0
-	}
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	b, err := NewUDPListener(address, netceptor.MainInstance.Logger)
 	if err != nil {
@@ -378,9 +372,6 @@ func (cfg UDPDialerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg UDPDialerCfg) Run() error {
-	if cfg.Cost == 0 {
-		cfg.Cost = 0
-	}
 	netceptor.MainInstance.Logger.Debug("Running UDP peer connection %s\n", cfg.Address)
 	b, err := NewUDPDialer(cfg.Address, cfg.Redial, netceptor.MainInstance.Logger)
 	if err != nil {

@@ -408,15 +408,6 @@ func (cfg WebsocketListenerCfg) Prepare() error {
 
 // Run runs the action.
 func (cfg WebsocketListenerCfg) Run() error {
-	if cfg.BindAddr == "" {
-		cfg.BindAddr = "0.0.0.0"
-	}
-	if cfg.Cost == 0 {
-		cfg.Cost = 0
-	}
-	if cfg.Path == "" {
-		cfg.Path = "/"
-	}
 	address := fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.Port)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {

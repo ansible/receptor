@@ -256,20 +256,6 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
-	// version := viper.GetInt("version")
-	// if version > 1 {
-	// 	cmdRunner := commandRunnerCfg{
-	// 		Command: cw.command,
-	// 		Params:  cw.Status().ExtraData.(*CommandExtraData).Params,
-	// 		UnitDir: cw.UnitDir(),
-	// 	}
-	// 	err := cmdRunner.Run()
-	// 	if err != nil {
-	// 		fmt.Println("New code")
-	// 		fmt.Println(err)
-	// 	}
-	// 	return err
-	// }
 	level := cw.GetWorkceptor().nc.GetLogger().GetLogLevel()
 	levelName, _ := cw.GetWorkceptor().nc.GetLogger().LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
@@ -283,7 +269,7 @@ func (cw *commandUnit) Start() error {
 		receptorBin = "receptor"
 	}
 
-	cmd := exec.Command(receptorBin, "--old", "--node", "id=worker",
+	cmd := exec.Command(receptorBin, "--legacy", "--node", "id=worker",
 		"--log-level", levelName,
 		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),

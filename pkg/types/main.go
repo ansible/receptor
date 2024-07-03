@@ -23,10 +23,6 @@ type NodeCfg struct {
 }
 
 func (cfg NodeCfg) Init() error {
-	if cfg.DataDir == "" {
-		cfg.DataDir = "/tmp/receptor"
-	}
-
 	var err error
 	if cfg.ID == "" {
 		host, err := os.Hostname()

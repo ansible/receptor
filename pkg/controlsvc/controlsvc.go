@@ -501,13 +501,6 @@ type CmdlineConfigUnix struct {
 
 // Run runs the action.
 func (cfg CmdlineConfigUnix) Run() error {
-	if cfg.Permissions == 0 {
-		cfg.Permissions = 0600
-	}
-	if cfg.Service == "" {
-		cfg.Service = "control"
-	}
-
 	if cfg.TLS != "" && cfg.TCPListen != "" && cfg.TCPTLS == "" {
 		netceptor.MainInstance.Logger.Warning("Control service %s has TLS configured on the Receptor listener but not the TCP listener.", cfg.Service)
 	}

@@ -1,0 +1,64 @@
+---
+name: Receptorctl nox sessions
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        description: The Python version to use.
+        required: true
+      session:
+        type: string
+        description: The nox session to run.
+        required: true
+      download-receptor:
+        type: boolean
+        description: Whether to perform go binary download.
+        required: false
+        default: false
+      go-version:
+        type: string
+        description: The Go version to use.
+        required: false
+env:
+  FORCE_COLOR: 1
+  NOXSESSION: ${{ inputs.session }}
+
+jobs:
+  nox:
+    runs-on: ubuntu-latest
+
+    name: >-  # can't use `env` in this context:
+      Run `receptorctl` ${{ inputs.session }} session
+
+    steps:
+      - name: Download the `receptor` binary
+        if: fromJSON(inputs.download-receptor)
+        uses: actions/download-artifact@v4
+        with:
+          name: receptor-${{ inputs.go-version }}
+          path: /usr/local/bin/
+
+      - name: Set executable bit on the `receptor` binary
+        if: fromJSON(inputs.download-receptor)
+        run: sudo chmod a+x /usr/local/bin/receptor
+
+      - name: Set up nox
+        uses: wntrblm/nox@2024.04.15
+        with:
+          python-versions: ${{ inputs.python-version }}
+
+      - name: Check out the source code from Git
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+          sparse-checkout: receptorctl
+
+      - name: Provision nox environment for ${{ env.NOXSESSION }}
+        run: nox --install-only
+        working-directory: ./receptorctl
+
+      - name: Run `receptorctl` nox ${{ env.NOXSESSION }} session
+        run: nox --no-install
+        working-directory: ./receptorctl

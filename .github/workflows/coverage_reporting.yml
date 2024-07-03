@@ -6,9 +6,12 @@ on:  # yamllint disable-line rule:truthy
   push:
     branches: [devel]
 
+env:
+  DESIRED_GO_VERSION: '1.20'
+
 jobs:
-  testing:
-    name: coverage
+  go_test_coverage:
+    name: go test coverage
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,16 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.20"
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version: ${{ env.DESIRED_GO_VERSION }}
 
       - name: build and install receptor
         run: |
@@ -53,7 +47,6 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: true
-          flags: go
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

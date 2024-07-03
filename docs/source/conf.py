@@ -17,9 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'receptor'
-copyright = 'Red Hat Ansible'
-author = 'Red Hat Ansible'
+project = "receptor"
+copyright = "Red Hat Ansible"
+author = "Red Hat Ansible"
 
 # The full version, including alpha/beta/rc tags
 # release = '0.0.0'
@@ -31,29 +31,29 @@ author = 'Red Hat Ansible'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autosectionlabel',
-    'pbr.sphinxext',
+    "sphinx.ext.autosectionlabel",
+    "pbr.sphinxext",
 ]
 
 autosectionlabel_prefix_document = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['Thumbs.db', '.DS_Store']
+exclude_patterns = ["Thumbs.db", ".DS_Store"]
 
-pygments_style = 'ansible'
-language = 'en'
-master_doc = 'index'
-source_suffix = '.rst'
+pygments_style = "ansible"
+language = "en"
+master_doc = "index"
+source_suffix = ".rst"
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_ansible_theme'
+html_theme = "sphinx_ansible_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -66,7 +66,7 @@ sidebar_collapse = False
 # -- Options for HTML output -------------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'receptorrdoc'
+htmlhelp_basename = "receptorrdoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -89,8 +89,7 @@ latex_elements = {
 }
 
 latex_documents = [
-    (master_doc, 'receptor.tex', 'receptor Documentation',
-     'Red Hat Ansible', 'manual'),
+    (master_doc, "receptor.tex", "receptor Documentation", "Red Hat Ansible", "manual"),
 ]
 
 # -- Options for manual page output ---------------------------------------
@@ -108,7 +107,36 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'receptor', 'receptor Documentation',
-     author, 'receptor', 'Overlay network to establish a persistent mesh.',
-     'Miscellaneous'),
+    (
+        master_doc,
+        "receptor",
+        "receptor Documentation",
+        author,
+        "receptor",
+        "Overlay network to establish a persistent mesh.",
+        "Miscellaneous",
+    ),
 ]
+
+# -- Options for QtHelp output  -------------------------------------------
+
+
+# -- Options for linkcheck builder  ---------------------------------------
+
+linkcheck_report_timeouts_as_broken = False
+linkcheck_timeout = 30
+
+# -- Options for xml builder  ---------------------------------------------
+
+xml_pretty = True
+
+# -- Options for C domain  ------------------------------------------------
+
+
+# -- Options for C++ domain  ----------------------------------------------
+
+
+# -- Options for Python domain  -------------------------------------------
+
+
+# -- Options for Javascript domain  ---------------------------------------

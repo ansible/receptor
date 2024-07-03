@@ -1,13 +1,31 @@
+---
 version: 2
 updates:
-  - package-ecosystem: gomod
-    directory: /
+  - package-ecosystem: "gomod"
+    directory: "/"
     schedule:
-      interval: daily
-  - package-ecosystem: github-actions
-    directory: /
+      interval: "daily"
+    labels:
+      - "dependencies"
+      - "go"
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: daily
+      interval: "daily"
+    labels:
+      - "dependencies"
+      - "github-actions"
+  - package-ecosystem: "pip"
+    directory: "/receptor-python-worker"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    schedule:
+      interval: "daily"
+    labels:
+      - "dependencies"
+      - "pip"
   - package-ecosystem: "pip"
     directory: "/receptorctl"
     groups:
@@ -15,7 +33,7 @@ updates:
         patterns:
           - "*"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     labels:
-      - "pip"
       - "dependencies"
+      - "pip"

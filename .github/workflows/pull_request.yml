@@ -4,6 +4,11 @@ name: CI
 on:  # yamllint disable-line rule:truthy
   pull_request:  # yamllint disable-line rule:empty-values
 
+env:
+  DESIRED_GO_VERSION: '1.20'
+  DESIRED_GOLANGCI_LINT_VERSION: 'v1.56'
+  DESIRED_PYTHON_VERSION: '3.11'
+
 jobs:
   lint-receptor:
     name: lint-receptor
@@ -13,28 +18,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-go@v5
         with:
-          cache: false
-          go-version: '1.20'
+          go-version: ${{ env.DESIRED_GO_VERSION }}
+
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.56
-  lint-receptorctl:
-    name: lint-receptorctl
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+          version: ${{ env.DESIRED_GOLANGCI_LINT_VERSION }}
 
-      - name: Setup nox
-        uses: wntrblm/nox@2024.04.15
-
-      - name: Run receptorctl linters
-        run: make receptorctl-lint
   receptor:
     name: receptor (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
@@ -87,42 +80,54 @@ jobs:
         if: ${{ failure() }}
         run: find /tmp/receptor-testing -name controlsock -delete
 
-      - name: Artifact receptor data
+      - name: Artifact receptor data for ${{ matrix.go-version }}
         uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
-          name: test-logs
+          name: test-logs-${{ matrix.go-version }}
           path: /tmp/receptor-testing
 
-      - name: Archive receptor binary
+      - name: Archive receptor binary for ${{ matrix.go-version }}
         uses: actions/upload-artifact@v4
         with:
-          name: receptor
+          name: receptor-${{ matrix.go-version }}
           path: /usr/local/bin/receptor
+
   receptorctl:
-    name: receptorctl
+    name: Run receptorctl tests${{ '' }}  # Nest jobs under the same sidebar category
     needs: receptor
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          # NOTE: The highest and the lowest versions come
+          # NOTE: first as their statuses are most likely to
+          # NOTE: signal problems early:
+          - 3.11
+          - 3.8
+          - >-
+            3.10
+          - 3.9
+    uses: ./.github/workflows/reusable-nox.yml
+    with:
+      python-version: ${{ matrix.python-version }}
+      session: tests-${{ matrix.python-version }}
+      download-receptor: true
+      go-version: '1.20'
 
-      - name: Download receptor
-        uses: actions/download-artifact@v4
-        with:
-          name: receptor
-          path: /usr/local/bin/
+  lint-receptorctl:
+    name: Lint receptorctl${{ '' }}  # Nest jobs under the same sidebar category
+    strategy:
+      fail-fast: false
+      matrix:
+        session:
+          - check_style
+          - check_format
+    uses: ./.github/workflows/reusable-nox.yml
+    with:
+      python-version: '3.11'
+      session: ${{ matrix.session }}
 
-      - name: Fix permissions on receptor binary
-        run: sudo chmod a+x /usr/local/bin/receptor
-
-      - name: Setup nox
-        uses: wntrblm/nox@2024.04.15
-
-      - name: Run receptorctl tests
-        run: make receptorctl-test
   container:
     name: container
     runs-on: ubuntu-latest
@@ -135,7 +140,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.DESIRED_PYTHON_VERSION }}
 
       - name: Install python dependencies
         run: pip install build
@@ -172,3 +177,49 @@ jobs:
             echo "Output did not contain expected value"
             exit 1
           fi
+
+  receptorctl-test-coverage:
+    name: Receptorctl test coverage
+    needs: receptor
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        session:
+          - coverage
+    steps:
+      - name: Download the `receptor` binary
+        uses: actions/download-artifact@v4
+        with:
+          name: receptor-${{ env.DESIRED_GO_VERSION }}
+          path: /usr/local/bin/
+
+      - name: Set executable bit on the `receptor` binary
+        run: sudo chmod a+x /usr/local/bin/receptor
+
+      - name: Set up nox
+        uses: wntrblm/nox@2024.04.15
+        with:
+          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Check out the source code from Git
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+
+      - name: Provision nox environment for ${{ matrix.session }}
+        run: nox --install-only --session ${{ matrix.session }}
+        working-directory: ./receptorctl
+
+      - name: Run `receptorctl` nox ${{ matrix.session }} session
+        run: nox --no-install --session ${{ matrix.session }}
+        working-directory: ./receptorctl
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: receptorctl
+          files: receptorctl_coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

@@ -1,6 +1,6 @@
 ---
 name: Promote Release
-on:
+on:  # yamllint disable-line rule:truthy
   release:
     types: [published]
 
@@ -31,7 +31,11 @@ jobs:
         run: echo pypi_repo=testpypi >> $GITHUB_ENV
         if: ${{ github.repository_owner != 'ansible' }}
 
+      - name: Set receptor pypi version
+        run: echo RECEPTORCTL_PYPI_VERSION=$(curl --silent https://pypi.org/pypi/receptorctl/json | jq --raw-output '"v" + .info.version') >> $GITHUB_ENV
+
       - name: Build receptorctl and upload to pypi
+        if: ${{ env.RECEPTORCTL_PYPI_VERSION != env.TAG }}
         run: |
           make receptorctl_wheel receptorctl_sdist VERSION=$TAG
           twine upload \

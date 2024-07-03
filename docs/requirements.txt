@@ -1,3 +1,6 @@
+doc8
 pbr
-sphinx
+rstcheck >= 6
 six
+sphinx
+sphinx_ansible_theme

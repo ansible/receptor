@@ -1,10 +1,13 @@
-# If the current commit has been tagged, use that as the version.
-# Otherwise include short commit hash.
+# If the current git commit has been tagged, use <tag> as the version. (e.g. v1.4.5)
+# Otherwise the version is <tag>+git<short commit hash> (e.g. 1.4.5+f031d2)
 OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
-ifeq ($(OFFICIAL_VERSION),)
-VERSION := $(shell git describe --tags | cut -d - -f -1)+$(shell git rev-parse --short HEAD)
-else
-VERSION := $(OFFICIAL_VERSION)
+ifneq ($(OFFICIAL_VERSION),)
+	VERSION := $(OFFICIAL_VERSION)
+else ifneq ($(shell git tag --list),)
+	VERSION := $(shell git describe --tags | cut -d - -f -1)+git$(shell git rev-parse --short HEAD)
+else ifeq ($(VERSION),)
+	VERSION := $(error No tags found in git repository)
+# else VERSION was passed as a command-line argument to make
 endif
 
 

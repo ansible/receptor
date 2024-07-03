@@ -33,7 +33,7 @@ Work submit options
 
 You can use the following options with the ``work submit`` command:
 
-.. list-table:: Options
+.. list-table::
     :header-rows: 1
     :widths: auto
 
@@ -48,7 +48,7 @@ You can use the following options with the ``work submit`` command:
     * - ``-n``, ``--no-payload``
       - Sends an empty payload.
     * - ``--node <<Node ID>>``
-      - Is the Receptor node on which the work runs. The default is the local node.
+      - Specifies the Receptor node on which the work runs. The default is the local node.
     * - ``-p``, ``--payload <<TEXT>>``
       - Specifies the file that contains data for the unit of work. Specify ``-`` for standard input (stdin).
     * - ``--rm``

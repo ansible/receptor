@@ -36,4 +36,4 @@ ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
 EXPOSE 7323
 
 ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
-CMD ["/usr/bin/receptor", "-c", "/etc/receptor/receptor.conf"]
+CMD ["/usr/bin/receptor", "--legacy", "-c", "/etc/receptor/receptor.conf"]

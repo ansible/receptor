@@ -18,6 +18,7 @@ func main() {
 	for _, arg := range os.Args {
 		if arg == "--legacy" {
 			legacy = true
+
 			continue
 		}
 		newArgs = append(newArgs, arg)

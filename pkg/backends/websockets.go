@@ -1,6 +1,3 @@
-//go:build !no_websocket_backend && !no_backends
-// +build !no_websocket_backend,!no_backends
-
 package backends
 
 import (

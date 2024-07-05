@@ -119,10 +119,6 @@ build-all:
 		example/*.go && \
 	$(GO) build \
 		-o receptor \
-		--tags no_backends,no_services,no_tls_config \
-		./cmd/receptor-cl && \
-	$(GO) build \
-		-o receptor \
 		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
 		./cmd/receptor-cl
 

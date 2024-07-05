@@ -1,6 +1,3 @@
-//go:build !no_udp_backend && !no_backends
-// +build !no_udp_backend,!no_backends
-
 package backends
 
 import (

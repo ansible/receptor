@@ -1,6 +1,3 @@
-//go:build !no_tcp_backend && !no_backends
-// +build !no_tcp_backend,!no_backends
-
 package backends
 
 import (

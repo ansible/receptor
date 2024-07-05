@@ -63,7 +63,7 @@ func SetWSPeerDefaults(config *ReceptorConfig) {
 func SetCmdlineUnixDefaults(config *ReceptorConfig) {
 	for _, service := range config.ControlServices {
 		if service.Permissions == 0 {
-			service.Permissions = 0600
+			service.Permissions = 0o600
 		}
 
 		if service.Service == "" {

@@ -31,31 +31,30 @@ type Runer interface {
 
 type ReceptorConfig struct {
 	// Used pointer structs to apply defaults to config
-	Node            *types.NodeCfg
-	Trace           logger.TraceCfg
-	LocalOnly       backends.NullBackendCfg          `mapstructure:"local-only"`
-	LogLevel        *logger.LoglevelCfg              `mapstructure:"log-level"`
-	ControlServices []*controlsvc.CmdlineConfigUnix  `mapstructure:"control-services"`
-	TCPPeers        []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
-	UDPPeers        []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
-	WSPeers         []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
-	TCPListeners    []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
-	UDPListeners    []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
-	WSListeners     []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
-	TLSClients      []netceptor.TLSClientConfig      `mapstructure:"tls-clients"`
-	TLSServer       []netceptor.TLSServerConfig      `mapstructure:"tls-servers"`
-	WorkCommands    []workceptor.CommandWorkerCfg    `mapstructure:"work-commands"`
-	WorkKubernetes  []*workceptor.KubeWorkerCfg      `mapstructure:"work-kubernetes"`
-	// WorkPython        []workceptor.WorkPythonCfg       `mapstructure:"work-python"`
+	Node              *types.NodeCfg
+	Trace             logger.TraceCfg
+	LocalOnly         backends.NullBackendCfg          `mapstructure:"local-only"`
+	LogLevel          *logger.LoglevelCfg              `mapstructure:"log-level"`
+	ControlServices   []*controlsvc.CmdlineConfigUnix  `mapstructure:"control-services"`
+	TCPPeers          []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
+	UDPPeers          []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
+	WSPeers           []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
+	TCPListeners      []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
+	UDPListeners      []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
+	WSListeners       []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
+	TLSClients        []netceptor.TLSClientConfig      `mapstructure:"tls-clients"`
+	TLSServer         []netceptor.TLSServerConfig      `mapstructure:"tls-servers"`
+	WorkCommands      []workceptor.CommandWorkerCfg    `mapstructure:"work-commands"`
+	WorkKubernetes    []*workceptor.KubeWorkerCfg      `mapstructure:"work-kubernetes"`
 	WorkSigning       workceptor.SigningKeyPrivateCfg  `mapstructure:"work-signing"`
 	WorkVerification  workceptor.VerifyingKeyPublicCfg `mapstructure:"work-verification"`
-	IpRouters         []services.IpRouterCfg           `mapstructure:"ip-routers"`
-	TCPClients        []services.TCPProxyOutboundCfg   `mapstructure:"tcp-clients"`
-	TCPServers        []services.TCPProxyInboundCfg    `mapstructure:"tcp-servers"`
-	UDPClients        []services.TCPProxyInboundCfg    `mapstructure:"udp-clients"`
-	UDPServers        []services.TCPProxyInboundCfg    `mapstructure:"udp-servers"`
-	UnixSocketClients []services.UnixProxyOutboundCfg  `mapstructure:"unix-socket-clients"`
-	UnixSocketServers []services.UnixProxyInboundCfg   `mapstructure:"unix-socket-servers"`
+	IPRouters         []services.IPRouterCfg
+	TCPClients        []services.TCPProxyOutboundCfg  `mapstructure:"tcp-clients"`
+	TCPServers        []services.TCPProxyInboundCfg   `mapstructure:"tcp-servers"`
+	UDPClients        []services.TCPProxyInboundCfg   `mapstructure:"udp-clients"`
+	UDPServers        []services.TCPProxyInboundCfg   `mapstructure:"udp-servers"`
+	UnixSocketClients []services.UnixProxyOutboundCfg `mapstructure:"unix-socket-clients"`
+	UnixSocketServers []services.UnixProxyInboundCfg  `mapstructure:"unix-socket-servers"`
 }
 
 type CertificatesConfig struct {
@@ -78,14 +77,13 @@ func ParseConfigs(configFile string) (*ReceptorConfig, *CertificatesConfig, erro
 	err := viper.Unmarshal(&receptorConfig)
 	if err != nil {
 		return nil, nil, err
-
 	}
 
 	err = viper.Unmarshal(&certifcatesConfig)
 	if err != nil {
 		return nil, nil, err
-
 	}
+
 	return &receptorConfig, &certifcatesConfig, nil
 }
 
@@ -97,6 +95,7 @@ func isConfigEmpty(v reflect.Value) bool {
 		}
 		isEmpty = false
 	}
+
 	return isEmpty
 }
 
@@ -117,12 +116,11 @@ func RunConfigV2(v reflect.Value) {
 			default:
 				RunPhases(phase, v.Field(i))
 			}
-
 		}
 	}
 }
 
-// RunPhases runs the appropriate function (Init, Prepare, Run) on a command
+// RunPhases runs the appropriate function (Init, Prepare, Run) on a command.
 func RunPhases(phase string, v reflect.Value) {
 	cmd := v.Interface()
 	var err error
@@ -134,6 +132,7 @@ func RunPhases(phase string, v reflect.Value) {
 			if err != nil {
 				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
 			}
+		default:
 		}
 	}
 	if phase == "Prepare" {
@@ -143,6 +142,7 @@ func RunPhases(phase string, v reflect.Value) {
 			if err != nil {
 				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
 			}
+		default:
 		}
 	}
 	if phase == "Run" {
@@ -152,12 +152,12 @@ func RunPhases(phase string, v reflect.Value) {
 			if err != nil {
 				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
 			}
+		default:
 		}
 	}
 }
 
 func RunConfigV1() {
-
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Specifies the node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Runs a self-contained node with no backend", backends.NullBackendCfg{}, cmdline.Singleton)

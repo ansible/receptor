@@ -1,6 +1,3 @@
-//go:build !no_tls_config
-// +build !no_tls_config
-
 package netceptor
 
 import (

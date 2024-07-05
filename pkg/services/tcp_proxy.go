@@ -1,6 +1,3 @@
-//go:build !no_proxies && !no_services
-// +build !no_proxies,!no_services
-
 package services
 
 import (

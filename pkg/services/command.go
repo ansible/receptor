@@ -1,5 +1,5 @@
-//go:build !windows && !no_command_service && !windows && !no_services
-// +build !windows,!no_command_service,!windows,!no_services
+//go:build !windows
+// +build !windows
 
 package services
 

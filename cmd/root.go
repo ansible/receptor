@@ -72,12 +72,13 @@ func initConfig() {
 
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".receptor")
+		viper.SetConfigName("receptor")
 	}
 
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err == nil {
+	err := viper.ReadInConfig()
+	if err == nil {
 		fmt.Fprintln(os.Stdout, "Using config file:", viper.ConfigFileUsed())
 	}
 }

@@ -68,8 +68,8 @@ func PrintPhaseErrorMessage(configName string, phase string, err error) {
 }
 
 func ParseConfigs(configFile string) (*ReceptorConfig, *CertificatesConfig, error) {
-	if configFile == "" {
-		fmt.Fprintln(os.Stderr, "Could not locate config file (default is $HOME/.receptor.yaml)")
+	if configFile == "" && viper.ConfigFileUsed() == "" {
+		fmt.Fprintln(os.Stderr, "Could not locate config file (default is $HOME/receptor.yaml)")
 		os.Exit(1)
 	}
 	var receptorConfig ReceptorConfig

@@ -41,6 +41,10 @@ func SetUDPPeerDefaults(config *ReceptorConfig) {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
 		}
+
+		if !peer.Redial {
+			peer.Redial = true
+		}
 	}
 }
 
@@ -49,6 +53,10 @@ func SetTCPPeerDefaults(config *ReceptorConfig) {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
 		}
+
+		if !peer.Redial {
+			peer.Redial = true
+		}
 	}
 }
 
@@ -56,6 +64,10 @@ func SetWSPeerDefaults(config *ReceptorConfig) {
 	for _, peer := range config.WSPeers {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
+		}
+
+		if !peer.Redial {
+			peer.Redial = true
 		}
 	}
 }

@@ -335,6 +335,7 @@ def receptor_mesh_access_control(
 @pytest.fixture(scope="function")
 def receptor_control_args(receptor_mesh):
     args = {
+        "--legacy": None,
         "--socket": f"{receptor_mesh.get_mesh_tmp_dir()}/{receptor_mesh.socket_file_name}",
         "--config": None,
         "--tls": None,

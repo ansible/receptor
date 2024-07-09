@@ -266,7 +266,7 @@ def start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path):
         )
         receptor_nodes.nodes.append(
             subprocess.Popen(
-                [receptor_bin_path, "-c", config_file],
+                [receptor_bin_path, "--legacy", "-c", config_file],
                 stdout=receptor_nodes.log_files[i],
                 stderr=receptor_nodes.log_files[i],
             )

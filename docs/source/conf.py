@@ -3,9 +3,7 @@
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
 # -- Path setup --------------------------------------------------------------
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -13,8 +11,6 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-
-
 # -- Project information -----------------------------------------------------
 
 project = "receptor"
@@ -74,15 +70,12 @@ latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     #
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     #
     # 'preamble': '',
-
     # Latex figure (float) alignment
     #
     # 'figure_align': 'htbp',
@@ -97,8 +90,13 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'receptor', 'receptor Documentation',
-     [author], 1)
+    (master_doc, "receptor", "Receptor Documentation", [author], 1),
+    ("getting_started_guide/index", "receptor_getting_started_guide", "Receptor Getting Started Guide", [author], 1),
+    ("porting_guide/index", "receptor_porting_guide", "Receptor Porting Guide", [author], 1),
+    ("receptorctl/index", "receptorctl", "receptor client", [author], 1),
+    ("roadmap/index", "receptor_roadmap", "Receptor Roadmap", [author], 1),
+    ("upgrade/index", "receptor_upgrade", "Receptor Upgrade", [author], 1),
+    ("user_guide/index", "receptor_user_guide", "Receptor User Guide", [author], 1),
 ]
 
 # -- Options for Texinfo output -------------------------------------------

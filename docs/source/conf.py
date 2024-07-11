@@ -32,7 +32,7 @@ author = "Red Hat Ansible"
 # ones.
 extensions = [
     "sphinx.ext.autosectionlabel",
-    "pbr.sphinxext",
+    # "pbr.sphinxext"
 ]
 
 autosectionlabel_prefix_document = True

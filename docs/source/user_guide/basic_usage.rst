@@ -5,25 +5,6 @@ Using Receptor
 
    :local:
 
-Configuring Receptor with the CLI
------------------------------------
-
-Run the following command in a terminal to start a node called `foo`,
-
-.. code-block:: bash
-
-    receptor --node id=foo --local-only --log-level Debug
-
-The log shows the receptor node started successfully
-
-``INFO 2021/07/22 22:40:36 Initialization complete``
-
-Supported log levels, in increasing verbosity, are ``Error``, ``Warning``, ``Info`` and ``Debug``.  The default level is ``Info``.
-
-Note: stop the receptor process with ``ctrl-c``
-
-.. _configuring_receptor_with_a_config_file:
-
 Configuring Receptor with a config file
 ----------------------------------------
 
@@ -32,13 +13,15 @@ Receptor can be configured on the command-line, exemplified above, or via a yaml
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - local-only
+    local-only:
+      local: true
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
 Start receptor using the config file
 

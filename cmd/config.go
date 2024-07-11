@@ -55,7 +55,6 @@ type ReceptorConfig struct {
 	UDPServers        []services.TCPProxyInboundCfg   `mapstructure:"udp-servers"`
 	UnixSocketClients []services.UnixProxyOutboundCfg `mapstructure:"unix-socket-clients"`
 	UnixSocketServers []services.UnixProxyInboundCfg  `mapstructure:"unix-socket-servers"`
-	// CommandServices   []services.CommandSvcCfg        `mapstructure:"command-services"`
 }
 
 type CertificatesConfig struct {

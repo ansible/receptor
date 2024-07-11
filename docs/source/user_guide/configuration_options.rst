@@ -2,14 +2,6 @@
 Receptor Configuration Options
 ==============================
 
-.. ---------------------
-.. Receptor yaml config
-.. ---------------------
-
-.. Command line arguments use the following syntax: ``receptor [--<action> [<param>=<value> ...] ...]``
-
-.. The possible options for ``<action>`` are listed below.  Parameters for actions are listed in their own section.
-
 ----------------
 Persistent Flags
 ----------------
@@ -131,17 +123,6 @@ Node
 Configure resources used by other commands
 ------------------------------------------
 
-.. .. list-table:: Configure resources used by other commands
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Action
-..       - Description
-..     * - ``--tls-client``
-..       - Define a TLS client configuration
-..     * - ``--tls-server``
-..       - Define a TLS server configuration
-
 ^^^^^^^^^^^
 TLS Clients
 ^^^^^^^^^^^
@@ -249,25 +230,6 @@ TLS Servers
 ----------------------------------------------------------------------
 Options to configure back-ends, which connect Receptor nodes together
 ----------------------------------------------------------------------
-
-.. .. list-table:: Control Service
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Action
-..       - Description
-..     * - ``--tcp-listener``
-..       - Run a backend listener on a TCP port
-..     * - ``--tcp-peer``
-..       - Make an outbound backend connection to a TCP peer
-..     * - ``--udp-listener``
-..       - Run a backend listener on a UDP port
-..     * - ``--udp-peer``
-..       - Make an outbound backend connection to a UDP peer
-..     * - ``--ws-listener``
-..       - Run an http server that accepts websocket connections
-..     * - ``--ws-peer``
-..       - Connect outbound to a websocket peer
 
 ^^^^^^^^^^^^^
 TCP listeners
@@ -508,59 +470,6 @@ Websocket Peers
 -------------------------------------------------------
 Configure services that run on top of the Receptor mesh
 -------------------------------------------------------
-
-.. .. list-table:: Configure services that run on top of the Receptor mesh
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Action
-..       - Description
-..     * - ``--command-service``
-..       - Run an interactive command via a Receptor service
-..     * - ``--ip-router``
-..       - Run an IP router using a tun interface
-..     * - ``--tcp-client``
-..       - Listen on a Receptor service and forward via TCP
-..     * - ``--tcp-server``
-..       - Listen for TCP and forward via Receptor
-..     * - ``--udp-client``
-..       - Listen on a Receptor service and forward via UDP
-..     * - ``--udp-server``
-..       - Listen for UDP and forward via Receptor
-..     * - ``--unix-socket-client``
-..       - Listen via Receptor and forward to a Unix socket
-..     * - ``--unix-socket-server``
-..       - Listen on a Unix socket and forward via Receptor
-
-.. ^^^^^^^^^^^^^^^^
-.. Command Services
-.. ^^^^^^^^^^^^^^^^
-
-.. .. list-table:: Command Service (List item)
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Parameter
-..       - Description
-..       - Default value
-..       - Type
-..     * - ``command``
-..       - Command to execute on a connection (required)
-..       - No default value.
-..       - string
-..     * - ``service``
-..       - Receptor service name to bind to (required)
-..       - No default value.
-..       - string
-..     * - ``tls``
-..       - Name of TLS server config
-..       - No default value.
-..       - string
-.. .. code-block:: yaml
-
-..     command-servies:
-..       - command: cat
-..         service: foo
 
 ^^^^^^^^^^
 IP Routers
@@ -814,23 +723,6 @@ Unix Socket Servers
 Configure workers that process units of work
 --------------------------------------------
 
-.. .. list-table:: Configure workers that process units of work
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Action
-..       - Description
-..     * - ``--work-command``
-..       - Run a worker using an external command
-..     * - ``--work-kubernetes``
-..       - Run a worker using Kubernetes
-..     * - ``--work-python``
-..       - Run a worker using a Python plugin
-..     * - ``--work-signing``
-..       - Private key to sign work submissions
-..     * - ``--work-verification``
-..       - Public key to verify work submissions
-
 ^^^^^^^^^^^^^
 Work Commands
 ^^^^^^^^^^^^^
@@ -949,42 +841,6 @@ Work Kubernetes
     work-kubernetes:
       - worktype: cat
 
-.. ^^^^^^^^^^^
-.. Work Python
-.. ^^^^^^^^^^^
-
-.. .. list-table:: Work Python
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Parameter
-..       - Description
-..       - Default value
-..       - Type
-..     * - ``config``
-..       - Plugin-specific configuration
-..       - No default value.
-..       - JSON
-..     * - ``function``
-..       - Receptor-exported function to call (required)
-..       - No default value.
-..       - string
-..     * - ``plugin``
-..       - Python module name of the worker plugin (required)
-..       - No default value.
-..       - string
-..     * - ``worktype``
-..       - Name for this worker type (required)
-..       - No default value.
-..       - string
-
-.. .. code-block:: yaml
-
-..     tcp-clients:
-..       - address: localhost:2223
-..         service: foo
-
-
 ^^^^^^^^^^^^
 Work Signing
 ^^^^^^^^^^^^
@@ -1039,19 +895,6 @@ Work Verification
 -----------------------------------------------------
 Generate certificates and run a certificate authority
 -----------------------------------------------------
-
-.. .. list-table:: Generate certificates and run a certificate authority
-..     :header-rows: 1
-..     :widths: auto
-
-..     * - Action
-..       - Description
-..     * - ``--cert-init``
-..       - Initialize PKI CA
-..     * - ``--cert-makereq``
-..       - Create certificate request
-..     * - ``--cert-signreq``
-..       - Sign request and produce certificate
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Certificate Authority Initialization

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/ansible/receptor/cmd"
 	_ "github.com/ansible/receptor/internal/version"
@@ -31,6 +32,10 @@ func main() {
 	} else {
 		fmt.Println("Running old cli/config")
 		cmd.RunConfigV1()
+	}
+
+	if slices.Contains(os.Args, "--help") {
+		os.Exit(0)
 	}
 
 	if netceptor.MainInstance.BackendCount() == 0 {

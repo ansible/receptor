@@ -55,12 +55,13 @@ type ReceptorConfig struct {
 	UDPServers        []services.TCPProxyInboundCfg   `mapstructure:"udp-servers"`
 	UnixSocketClients []services.UnixProxyOutboundCfg `mapstructure:"unix-socket-clients"`
 	UnixSocketServers []services.UnixProxyInboundCfg  `mapstructure:"unix-socket-servers"`
+	// CommandServices   []services.CommandSvcCfg        `mapstructure:"command-services"`
 }
 
 type CertificatesConfig struct {
 	InitCA  certificates.InitCAConfig    `mapstructure:"cert-init"`
-	MakeReq []certificates.MakeReqConfig `mapstructure:"cert-makereq"`
-	SignReq []certificates.SignReqConfig `mapstructure:"cert-signreq"`
+	MakeReq []certificates.MakeReqConfig `mapstructure:"cert-makereqs"`
+	SignReq []certificates.SignReqConfig `mapstructure:"cert-signreqs"`
 }
 
 func PrintPhaseErrorMessage(configName string, phase string, err error) {

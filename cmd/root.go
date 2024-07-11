@@ -13,7 +13,6 @@ import (
 var (
 	cfgFile string
 	version bool
-	latest  bool
 )
 
 // rootCmd represents the base command when called without any subcommands.
@@ -37,6 +36,7 @@ var rootCmd = &cobra.Command{
 
 		RunConfigV2(reflect.ValueOf(*certifcatesConfig))
 		if isEmptyReceptorConfig {
+			fmt.Println("empty receptor config, skipping...")
 			os.Exit(0)
 		}
 
@@ -55,9 +55,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.receptor.yaml)")
+	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/receptor.yaml)")
 	rootCmd.Flags().BoolVar(&version, "version", false, "Show the Receptor version")
-	rootCmd.Flags().BoolVar(&latest, "latest", false, "Use the latest config and cli")
 }
 
 var FindMe = true

@@ -8,10 +8,12 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 )
 
-const goodKind string = "connection"
-const goodErrorString string = "unit was already started"
+const (
+	goodKind        string = "connection"
+	goodErrorString string = "unit was already started"
+)
 
-var goodError error = fmt.Errorf(goodErrorString)
+var errUnitWasAlreadyStarted error = fmt.Errorf(goodErrorString)
 
 func TestErrorWithKind_Error(t *testing.T) {
 	type fields struct {
@@ -26,7 +28,7 @@ func TestErrorWithKind_Error(t *testing.T) {
 		{
 			name: "Positive",
 			fields: fields{
-				err:  goodError,
+				err:  errUnitWasAlreadyStarted,
 				kind: goodKind,
 			},
 			want: fmt.Sprintf("%s error: %s", goodKind, goodErrorString),
@@ -66,11 +68,11 @@ func TestWrapErrorWithKind(t *testing.T) {
 		{
 			name: "Positive",
 			args: args{
-				err:  goodError,
+				err:  errUnitWasAlreadyStarted,
 				kind: goodKind,
 			},
 			want: utils.ErrorWithKind{
-				Err:  goodError,
+				Err:  errUnitWasAlreadyStarted,
 				Kind: goodKind,
 			},
 		},
@@ -109,7 +111,7 @@ func TestErrorIsKind(t *testing.T) {
 			name: "Positive",
 			args: args{
 				err: utils.WrapErrorWithKind(
-					goodError,
+					errUnitWasAlreadyStarted,
 					goodKind,
 				),
 				kind: goodKind,

@@ -214,7 +214,7 @@ The control-service on `foo` will receive this command and subsequently call the
 
 Sends an empty message to the address "bar:ping" on the mesh. Recall that nodes are analogous to DNS names, and services are like port numbers.
 
-``ToWrite`` calls ``sendMessageWithHopsToLive``
+``WriteTo`` calls ``sendMessageWithHopsToLive``
 
 **netceptor.go::sendMessageWithHopsToLive**
 

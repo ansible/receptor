@@ -98,8 +98,8 @@ As an example, in tcp.go
 
 .. code-block:: yaml
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
 
 ``RegisterConfigTypeForApp`` tells the cmdline parser that "tcp-peer" is mapped to the ``TCPDialerCfg{}`` structure.
 

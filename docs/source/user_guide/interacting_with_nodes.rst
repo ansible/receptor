@@ -16,17 +16,18 @@ foo.yml
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: debug
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      - port: 2222
 
-    - control-service:
-        service: control
+    control-services:
+      - service: control
         filename: /tmp/foo.sock
 
 bar.yml
@@ -34,17 +35,18 @@ bar.yml
 .. code-block:: yaml
 
     ---
-    - node:
-        id: bar
+    version: 2
+    node:
+      id: bar
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: debug
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
 
-    - control-service:
-        service: control
+    control-services:
+      - service: control
 
 If ``filename`` is set, receptor will create a unix domain socket. Use receptorctl to interact with the running receptor node via this domain socket (using "--socket"). The control service on `bar` does not have a ``filename`` set, but can be connected to using the "connect" command, as shown in the :ref:`connect_to_csv` section.
 
@@ -188,12 +190,12 @@ Any action items related to receptor backend connections can be reloaded, withou
 
 .. code-block:: text
 
-    tcp-peer
-    tcp-listener
-    ws-peer
-    ws-listener
-    udp-peer
-    udp-listener
+    tcp-peers
+    tcp-listeners
+    ws-peers
+    ws-listeners
+    udp-peers
+    udp-listeners
     local-only
 
 Changes can include modifying, adding, or removing these items from the configuration file.

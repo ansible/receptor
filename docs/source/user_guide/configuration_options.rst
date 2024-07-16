@@ -2,23 +2,6 @@
 Receptor Configuration Options
 ==============================
 
-----------------
-Persistent Flags
-----------------
-
-.. list-table:: Persistent Flags
-    :header-rows: 1
-    :widths: auto
-
-    * - Action
-      - Description
-    * - ``--config <filename>``
-      - Loads configuration options from a YAML file.
-    * - ``--version``
-      - Display the Receptor version.
-    * - ``--help``
-      - Show this help
-
 ^^^^^^^^^^^^^^^^
 Control Services
 ^^^^^^^^^^^^^^^^

@@ -5,6 +5,23 @@ Using Receptor
 
    :local:
 
+----------------
+CLI Receptor Usage
+----------------
+
+.. list-table:: Persistent Flags
+    :header-rows: 1
+    :widths: auto
+
+    * - Action
+      - Description
+    * - ``--config <filename>``
+      - Loads configuration options from a YAML file.
+    * - ``--version``
+      - Display the Receptor version.
+    * - ``--help``
+      - Show this help
+
 Configuring Receptor with a config file
 ----------------------------------------
 

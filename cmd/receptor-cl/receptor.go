@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/ansible/receptor/cmd"
 	_ "github.com/ansible/receptor/internal/version"
@@ -34,8 +33,10 @@ func main() {
 		cmd.RunConfigV1()
 	}
 
-	if slices.Contains(os.Args, "--help") {
-		os.Exit(0)
+	for _, arg := range os.Args {
+		if arg == "--help" {
+			os.Exit(0)
+		}
 	}
 
 	if netceptor.MainInstance.BackendCount() == 0 {

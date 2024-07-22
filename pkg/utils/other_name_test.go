@@ -17,7 +17,7 @@ func TestReceptorNames(t *testing.T) {
 	}
 
 	rawValues := []asn1.RawValue{
-		asn1.RawValue{
+		{
 			Tag:   2,
 			Class: 2,
 			Bytes: []byte(`hybrid_node1`),
@@ -46,8 +46,7 @@ func TestReceptorNames(t *testing.T) {
 					},
 				},
 			},
-			want:    []string{
-			},
+			want:    []string{},
 			wantErr: false,
 		},
 		{
@@ -70,6 +69,7 @@ func TestReceptorNames(t *testing.T) {
 			got, err := utils.ReceptorNames(tt.args.extensions)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReceptorNames() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if diff := cmp.Diff(got, tt.want); diff != "" {
@@ -124,6 +124,7 @@ func TestMakeReceptorSAN(t *testing.T) {
 			got, err := utils.MakeReceptorSAN(tt.args.dnsNames, tt.args.ipAddresses, tt.args.nodeIDs)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MakeReceptorSAN() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {

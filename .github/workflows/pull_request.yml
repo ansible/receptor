@@ -105,9 +105,8 @@ jobs:
           # NOTE: signal problems early:
           - 3.12
           - 3.8
-          - >-
-            3.11
-          - 3.10
+          - 3.11
+          - "3.10"
           - 3.9
     uses: ./.github/workflows/reusable-nox.yml
     with:

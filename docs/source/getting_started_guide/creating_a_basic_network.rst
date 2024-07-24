@@ -20,21 +20,21 @@ Receptor configurations
 
 1. Create three configuration files, one for each node.
 
- ``foo.yml``
+``foo.yml``
 
 .. code-block:: yaml
 
   ---
   - node:
-    id: foo
+      id: foo
 
   - control-service:
-    service: control
-    filename: /tmp/foo.sock
+      service: control
+      filename: /tmp/foo.sock
 
   - tcp-peer:
-    address: localhost:2222
-    redial: true
+      address: localhost:2222
+      redial: true
 
   - log-level: debug
 
@@ -46,14 +46,14 @@ Receptor configurations
 
   ---
   - node:
-    id: bar
+      id: bar
 
   - control-service:
-    service: control
-    filename: /tmp/bar.sock
+      service: control
+      filename: /tmp/bar.sock
 
   - tcp-listener:
-    port: 2222
+      port: 2222
 
   - log-level: debug
 
@@ -65,27 +65,27 @@ Receptor configurations
 
   ---
   - node:
-    id: mal
+      id: mal
 
   - control-service:
-    service: control
-    filename: /tmp/mal.sock
+      service: control
+      filename: /tmp/mal.sock
 
   - tcp-peer:
-    address: localhost:2222
-    redial: true
+      address: localhost:2222
+      redial: true
 
   - log-level: debug
 
   - work-command:
-    workType: echo
-    command: bash
-    params: "-c \"while read -r line; do echo $line; sleep 1; done\""
-    allowruntimeparams: true
+      workType: echo
+      command: bash
+      params: "-c \"while read -r line; do echo $line; sleep 1; done\""
+      allowruntimeparams: true
 
   ...
 
-1. Run the services in separate terminals.
+2. Run the services in separate terminals.
 
 .. code-block:: bash
 

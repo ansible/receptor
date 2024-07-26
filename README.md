@@ -1,5 +1,4 @@
-Receptor
-========
+# Receptor
 
 [![codecov](https://codecov.io/gh/ansible/receptor/branch/devel/graph/badge.svg?token=RAW5Bvh3hM)](https://codecov.io/gh/ansible/receptor)
 
@@ -7,7 +6,7 @@ Receptor is an overlay network intended to ease the distribution of work across 
 
 See the readthedocs page for Receptor at:
 
-https://ansible.readthedocs.io/projects/receptor/
+<https://ansible.readthedocs.io/projects/receptor/>
 
 ## Terminology and Concepts
 
@@ -24,7 +23,8 @@ https://ansible.readthedocs.io/projects/receptor/
 ## How to Get It
 
 The easiest way to check out Receptor is to run it as a container.  Images are kept on the Quay registry.  To use this, run:
-```
+
+```bash
 [docker|podman] pull quay.io/ansible/receptor
 [docker|podman] run -d -v /path/to/receptor.conf:/etc/receptor/receptor.conf:Z receptor
 ```
@@ -33,8 +33,8 @@ The easiest way to check out Receptor is to run it as a container.  Images are k
 
 This code can be imported and used from Go programs.  The main libraries are:
 
-* _Netceptor_: https://pkg.go.dev/github.com/ansible/receptor/pkg/netceptor
-* _Workceptor_: https://pkg.go.dev/github.com/ansible/receptor/pkg/workceptor
+* _Netceptor_: <https://pkg.go.dev/github.com/ansible/receptor/pkg/netceptor>
+* _Workceptor_: <https://pkg.go.dev/github.com/ansible/receptor/pkg/workceptor>
 
 See the `example/` directory for examples of using these libraries from Go.
 
@@ -46,7 +46,7 @@ The command line is organized into entities which take parameters, like: `recept
 
 Receptor can also take its configuration from a file in YAML format.  The allowed directives are the same as on the command line, with a top-level list of entities and each entity receiving zero or more parameters as a dict.  The above command in YAML format would look like this:
 
-```
+```bash
 ---
 - entity1:
     param1: value1
@@ -58,4 +58,4 @@ Receptor can also take its configuration from a file in YAML format.  The allowe
 
 ## Python Receptor and the 0.6 versions
 
-As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at https://github.com/project-receptor/python-receptor.
+As of June 25th, this repo is the Go implementation of Receptor. If you are looking for the older Python version of Receptor, including any 0.6.x version, it is now located at <https://github.com/project-receptor/python-receptor>.

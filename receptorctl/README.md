@@ -1,6 +1,8 @@
+# Receptorctl
+
 Receptorctl is a front-end CLI and importable Python library that interacts with Receptor over its control socket interface.
 
-# Setting up nox
+## Setting up nox
 
 This project includes a `nox` configuration to automate tests, checks, and other functions in a reproducible way using isolated environments.
 Before you submit a PR, you should install `nox` and verify your changes.
@@ -21,7 +23,7 @@ You can use unpinned dependencies as follows:
 PINNED=false nox -s lint
 ```
 
-# Checking changes to Receptorctl
+## Checking changes to Receptorctl
 
 Run the following `nox` sessions to check for code style and formatting issues:
 
@@ -49,7 +51,7 @@ Run the following `nox` sessions to check for code style and formatting issues:
   nox -s format
   ```
 
-# Running Receptorctl tests
+## Running Receptorctl tests
 
 Run the following `nox` sessions to test Receptorctl changes:
 
@@ -62,24 +64,24 @@ Run the following `nox` sessions to test Receptorctl changes:
 * Run tests against a specific Python version.
 
   ```bash
-  # For example, this command tests Receptorctl against Python 3.11.
-  nox -s tests-3.11
+  # For example, this command tests Receptorctl against Python 3.12.
+  nox -s tests-3.12
   ```
 
-# Updating dependencies
+## Updating dependencies
 
 Update dependencies in the `requirements` directory as follows:
 
 1. Add any packages or pins to the `*.in` file.
 2. Do one of the following from the `receptorctl` directory:
 
-  - Update all dependencies.
+* Update all dependencies.
 
     ```bash
     nox -s pip-compile
     ```
 
-  - Generate the full dependency tree for a single set of dependencies, for example:
+* Generate the full dependency tree for a single set of dependencies, for example:
 
     ```bash
     nox -s "pip-compile-3.12(tests)"

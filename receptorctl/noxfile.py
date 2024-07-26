@@ -5,9 +5,9 @@ from pathlib import Path
 
 import nox.command
 
-LATEST_PYTHON_VERSION = ["3.11"]
+LATEST_PYTHON_VERSION = ["3.12"]
 
-python_versions = ["3.8", "3.9", "3.10", "3.11"]
+python_versions = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 LINT_FILES: tuple[str, ...] = (*iglob("**/*.py"),)
 PINNED = os.environ.get("PINNED", "true").lower() in {"1", "true"}
@@ -120,7 +120,7 @@ def lint(session: nox.Session):
     session.notify("check_format")
 
 
-@nox.session(name="pip-compile", python=["3.11"])
+@nox.session(name="pip-compile", python=["3.12"])
 @nox.parametrize(["req"], arg_values_list=requirements_files, ids=requirements_files)
 def pip_compile(session: nox.Session, req: str):
     """Generate lock files from input files or upgrade packages in lock files."""

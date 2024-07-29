@@ -20,7 +20,9 @@ var rootCmd = &cobra.Command{
 	Use:   "receptor",
 	Short: "Run a receptor instance.",
 	Long: `
-	Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers. Receptor nodes establish peer-to-peer connections with each other via existing networks. Once connected, the receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.`,
+	Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers.
+	Receptor nodes establish peer-to-peer connections with each other via existing networks.
+	Once connected, the receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if version {
 			fmt.Println(receptorVersion.Version)

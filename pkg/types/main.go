@@ -12,10 +12,10 @@ import (
 )
 
 type NodeCfg struct {
-	ID                               string                       `description:"Node ID. Defaults to local hostname." barevalue:"yes"`
-	DataDir                          string                       `description:"Directory in which to store node data" default:"/tmp/receptor"`
-	FirewallRules                    []netceptor.FirewallRuleData `description:"Firewall Rules (see documentation for syntax)"`
-	MaxIdleConnectionTimeout         string                       `description:"Max duration with no traffic before a backend connection is timed out and refreshed."`
+	ID                               string                       `description:"Node ID. Defaults to the local hostname." barevalue:"yes"`
+	DataDir                          string                       `description:"Directory in which to store node data." default:"/tmp/receptor"`
+	FirewallRules                    []netceptor.FirewallRuleData `description:"Firewall rules, see documentation for syntax."`
+	MaxIdleConnectionTimeout         string                       `description:"Maximum duration with no traffic before a backend connection is timed out and refreshed."`
 	ReceptorKubeSupportReconnect     string
 	ReceptorKubeClientsetQPS         string
 	ReceptorKubeClientsetBurst       string

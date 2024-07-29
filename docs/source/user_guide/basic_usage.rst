@@ -5,9 +5,9 @@ Using Receptor
 
    :local:
 
-----------------
-CLI Receptor Usage
-----------------
+----------------------
+Using the Receptor CLI
+----------------------
 
 .. list-table:: Persistent Flags
     :header-rows: 1
@@ -20,7 +20,7 @@ CLI Receptor Usage
     * - ``--version``
       - Display the Receptor version.
     * - ``--help``
-      - Show this help
+      - Display this help
 
 Configuring Receptor with a config file
 ----------------------------------------

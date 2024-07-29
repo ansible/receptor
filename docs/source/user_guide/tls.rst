@@ -10,7 +10,7 @@ mesh connections.
 Configuring TLS
 ---------------
 
-Add ``tls-servers`` and ``tls-clients`` definitions to Receptor config files.
+Add ``tls-servers`` and ``tls-clients`` definitions to Receptor configuration files.
 
 ``foo.yml``
 
@@ -35,10 +35,10 @@ Add ``tls-servers`` and ``tls-clients`` definitions to Receptor config files.
       - port: 2222
         tls: myserver
 
-Defining ``tls-servers`` takes no effect, but it can be referenced elsewhere in the Receptor config file.
+Defining ``tls-servers`` has no effect, but it can be referenced elsewhere in the Receptor configuration file.
 In the preceding configuration snippet, ``tls`` in the ``tcp-listeners`` is set to use ``myserver``.
 In general, ``tls-servers`` should be referenced anywhere Receptor is expecting an incoming connection, such as ``*-listeners`` backends or on the ``control-services``.
-Similarly, ``tls-clients`` should be referenced anywhere Receptor is expecting to make an outgoing connection, i.e. ``*-peers`` backends or in ``receptorctl`` (the command-line client for Receptor).
+Similarly, ``tls-clients`` should be referenced anywhere Receptor is expecting to make an outgoing connection, such as ``*-peers`` backends or in ``receptorctl`` (the command-line client for Receptor).
 
 ``bar.yml``
 
@@ -85,7 +85,7 @@ Running and configuring Receptor with the ``cert-init``, ``cert-makereqs``, and 
     done
 
 The preceding script will create a CA, and for each node ``foo`` and ``bar``, create a certificate request and sign it with the CA.
-These certificates and keys can then create ``tls-servers`` and ``tls-clients`` definitions in the Receptor config files.
+These certificates and keys can then create ``tls-servers`` and ``tls-clients`` definitions in the Receptor configuration files.
 
 Pinned certificates
 --------------------

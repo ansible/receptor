@@ -330,7 +330,7 @@ UDP Listeners
 
 .. code-block:: yaml
 
-    tcp-listeners:
+    udp-listeners:
       - port: 2223
 
 ^^^^^^^^^
@@ -558,7 +558,7 @@ TCP Servers
 
 .. code-block:: yaml
 
-    tcp-clients:
+    tcp-servers:
       - port: 2223
         remotenode: foo
         remoteservice: foo

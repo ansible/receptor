@@ -7,7 +7,10 @@ Connecting nodes
    :local:
 
 
-Connect nodes via receptor backends. TCP, UDP, and websockets are currently supported. For example, ``tcp-peers`` can be used to connect to another node's ``tcp-listeners``, and ``ws-peers`` can be used to connect to another node's ``ws-listeners``.
+Connect nodes through Receptor backends. 
+TCP, UDP, and websockets are currently supported.
+For example, you can connect one Receptor node to another using the ``tcp-peers`` and ``tcp-listeners`` configuration options.
+Similarly you can connect Receptor nodes using the ``ws-peers`` and ``ws-listeners`` configuration options.
 
 .. image:: mesh.png
    :alt: Connected nodes as netceptor peers
@@ -111,7 +114,8 @@ in foo.yml
 
 This means packets sent to `fish` have a cost of 2.0, whereas packets sent to `bar` have a cost of 1.6. If `haz` joined the mesh, it would get a cost of 1.0 since it's not in the nodecost map.
 
-The costs on the two ends of the connection must match. For example, the ``tcp-peers`` on `fish` must have a cost of 2.0, otherwise the connection will be refused.
+The costs on both ends of the connection must match.
+For example, the ``tcp-peers`` configuration on ``fish`` must have a cost of ``2.0``, otherwise the connection will be refused.
 
 in fish.yml
 

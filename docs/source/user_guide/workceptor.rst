@@ -133,7 +133,6 @@ in `bar.yml`
 
 .. code-block:: yaml
 
-    # under work-commands, the second list item
       - workType: echopayload
         command: bash
         params: "-c \"while read -r line; do echo ${line^^}; sleep 5; done\""
@@ -274,7 +273,6 @@ in `bar.yml`
     work-verification:
       publickey: /full/path/signworkpublic.pem
 
-    # under work-commands, the second list item
       - workType: echopayload
         command: bash
         params: "-c \"while read -r line; do echo ${line^^}; sleep 5; done\""

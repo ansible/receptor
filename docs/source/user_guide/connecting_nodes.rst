@@ -7,7 +7,7 @@ Connecting nodes
    :local:
 
 
-Connect nodes through Receptor backends. 
+Connect nodes through Receptor backends.
 TCP, UDP, and websockets are currently supported.
 For example, you can connect one Receptor node to another using the ``tcp-peers`` and ``tcp-listeners`` configuration options.
 Similarly you can connect Receptor nodes using the ``ws-peers`` and ``ws-listeners`` configuration options.

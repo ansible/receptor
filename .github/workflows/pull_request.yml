@@ -152,14 +152,15 @@ jobs:
         run: |
           cat << EOF > test.cfg
           ---
-          - local-only:
+          local-only:
+            local: true
 
-          - control-service:
-              service: control
+          control-services:
+            - service: control
               filename: /tmp/receptor.sock
 
-          - work-command:
-              worktype: cat
+          work-commands:
+            - worktype: cat
               command: cat
           EOF
 

@@ -1,7 +1,7 @@
 //go:build !no_workceptor
 // +build !no_workceptor
 
-// nolint:typecheck
+//nolint:typecheck
 package workceptor
 
 import (
@@ -75,7 +75,8 @@ func (cfg workPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 func (cfg workPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, false)
 
-	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release."))
+	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release"))
+
 	return errWithDeprecation
 }
 

@@ -141,8 +141,9 @@ jobs:
 
       - name: Write out basic config
         run: |
-          cat << EOF > test.cfg
+          cat << EOF > test.yaml
           ---
+          version: 2
           local-only:
             local: true
 
@@ -157,7 +158,7 @@ jobs:
 
       - name: Run receptor (and wait a few seconds for it to boot)
         run: |
-          podman run --name receptor -d -v $PWD/test.cfg:/etc/receptor/receptor.conf:Z localhost/receptor
+          podman run --name receptor -d -v $PWD/test.yaml:/etc/receptor/receptor.yaml:Z localhost/receptor
           sleep 3
           podman logs receptor
 

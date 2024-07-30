@@ -5,7 +5,6 @@ Using Receptor
 
    :local:
 
-----------------------
 Using the Receptor CLI
 ----------------------
 
@@ -21,6 +20,8 @@ Using the Receptor CLI
       - Display the Receptor version.
     * - ``--help``
       - Display this help
+
+.. _configuring_receptor_with_a_config_file:
 
 Configuring Receptor with a config file
 ----------------------------------------

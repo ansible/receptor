@@ -19,7 +19,7 @@ LABEL version="${VERSION}"
 
 COPY receptorctl-${VERSION}-py3-none-any.whl /tmp
 COPY receptor_python_worker-${VERSION}-py3-none-any.whl /tmp
-COPY receptor.conf /etc/receptor/receptor.conf
+COPY receptor.yaml /etc/receptor/receptor.yaml
 
 RUN dnf -y update && \
     dnf -y install python3.12-pip && \
@@ -36,4 +36,4 @@ ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
 EXPOSE 7323
 
 ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
-CMD ["/usr/bin/receptor", "--config", "/etc/receptor/receptor.conf"]
+CMD ["/usr/bin/receptor", "--config", "/etc/receptor/receptor.yaml"]

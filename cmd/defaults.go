@@ -1,5 +1,7 @@
 package cmd
 
+import "github.com/ansible/receptor/pkg/types"
+
 func SetTCPListenerDefaults(config *ReceptorConfig) {
 	for _, listener := range config.TCPListeners {
 		if listener.Cost == 0 {
@@ -85,12 +87,18 @@ func SetCmdlineUnixDefaults(config *ReceptorConfig) {
 }
 
 func SetLogLevelDefaults(config *ReceptorConfig) {
+	if config.LogLevel == nil {
+		return
+	}
 	if config.LogLevel.Level == "" {
 		config.LogLevel.Level = "error"
 	}
 }
 
 func SetNodeDefaults(config *ReceptorConfig) {
+	if config.Node == nil {
+		config.Node = &types.NodeCfg{}
+	}
 	if config.Node.DataDir == "" {
 		config.Node.DataDir = "/tmp/receptor"
 	}

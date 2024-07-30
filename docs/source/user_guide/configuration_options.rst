@@ -721,7 +721,7 @@ Work Kubernetes
 Work Python
 ^^^^^^^^^^^
 
-.. list-table:: Work Python
+.. list-table:: Work Python [DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release
     :header-rows: 1
     :widths: auto
 

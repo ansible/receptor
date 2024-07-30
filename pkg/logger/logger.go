@@ -47,6 +47,7 @@ func GetLogLevelByName(logName string) (int, error) {
 	return 0, err
 }
 
+// This doesn't seem to be used anywhere.
 // GetLogLevel returns current log level.
 func GetLogLevel() int {
 	return logLevel

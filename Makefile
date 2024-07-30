@@ -96,7 +96,7 @@ kubectl:
 lint:
 	@golint cmd/... pkg/... example/...
 
-receptorctl-lint: receptorctl/.VERSION
+receptorctl-lint: receptor receptorctl/.VERSION
 	@cd receptorctl && nox -s lint
 
 format:

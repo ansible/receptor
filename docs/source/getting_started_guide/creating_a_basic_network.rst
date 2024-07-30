@@ -20,7 +20,7 @@ Receptor configurations
 
 1. Create three configuration files, one for each node.
 
- ``foo.yml``
+``foo.yml``
 
 .. code-block:: yaml
 
@@ -82,14 +82,14 @@ Receptor configurations
     level: debug
 
   - work-command:
-    workType: echo
-    command: bash
-    params: "-c \"while read -r line; do echo $line; sleep 1; done\""
-    allowruntimeparams: true
+      workType: echo
+      command: bash
+      params: "-c \"while read -r line; do echo $line; sleep 1; done\""
+      allowruntimeparams: true
 
   ...
 
-1. Run the services in separate terminals.
+2. Run the services in separate terminals.
 
 .. code-block:: bash
 

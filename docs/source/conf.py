@@ -3,9 +3,7 @@
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
 # -- Path setup --------------------------------------------------------------
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -13,8 +11,6 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-
-
 # -- Project information -----------------------------------------------------
 
 project = "receptor"
@@ -74,15 +70,12 @@ latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     #
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     #
     # 'preamble': '',
-
     # Latex figure (float) alignment
     #
     # 'figure_align': 'htbp',
@@ -97,8 +90,37 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'receptor', 'receptor Documentation',
-     [author], 1)
+    ("receptorctl/receptorctl_index", "receptorctl", "receptor client", [author], 1),
+    (
+        "receptorctl/receptorctl_connect",
+        "receptorctl-connect",
+        "Establishes a connection between local client and a Receptor node.",
+        [author],
+        1,
+    ),
+    ("receptorctl/receptorctl_ping", "receptorctl-ping", "Tests the network reachability of Receptor nodes.", [author], 1),
+    ("receptorctl/receptorctl_reload", "receptorctl-reload", "Reloads the Receptor configuration for the connected node.", [author], 1),
+    ("receptorctl/receptorctl_status", "receptorctl-status", "Displays the status of the Receptor network.", [author], 1),
+    (
+        "receptorctl/receptorctl_traceroute",
+        "receptorctl-traceroute",
+        "Displays the network route that packets follow to Receptor nodes.",
+        [author],
+        1,
+    ),
+    (
+        "receptorctl/receptorctl_version",
+        "receptorctl-version",
+        "Displays version information for receptorctl and\
+        the Receptor node to which it is connected.",
+        [author],
+        1,
+    ),
+    ("receptorctl/receptorctl_work_cancel", "receptorctl-work-cancel", "Terminates one or more units of work.", [author], 1),
+    ("receptorctl/receptorctl_work_list", "receptorctl-work-list", "Displays known units of work.", [author], 1),
+    ("receptorctl/receptorctl_work_release", "receptorctl-work-release", "Deletes one or more units of work.", [author], 1),
+    ("receptorctl/receptorctl_work_results", "receptorctl-work-results", "Gets results for units of work.", [author], 1),
+    ("receptorctl/receptorctl_work_submit", "receptorctl-work-submit", "Requests a Receptor node to run a unit of work.", [author], 1),
 ]
 
 # -- Options for Texinfo output -------------------------------------------

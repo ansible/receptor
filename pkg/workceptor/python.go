@@ -1,7 +1,6 @@
 //go:build !no_workceptor
 // +build !no_workceptor
 
-//nolint:typecheck
 package workceptor
 
 import (

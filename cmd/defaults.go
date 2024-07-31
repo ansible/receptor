@@ -39,7 +39,7 @@ func SetWSListenerDefaults(config *ReceptorConfig) {
 }
 
 func SetUDPPeerDefaults(config *ReceptorConfig) {
-	for _, peer := range config.TCPPeers {
+	for _, peer := range config.UDPPeers {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
 		}

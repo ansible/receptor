@@ -6,13 +6,13 @@ Creating a basic 3-node network
 ###############################
 
 In this section, we will create a three-node network.
-The three nodes are: foo, bar, and mal.
+The three nodes are: foo, bar, and baz.
 
-`foo -> bar <- mal`
+`foo -> bar <- baz`
 
-foo and mal are directly connected to bar with TCP connections.
+foo and baz are directly connected to bar with TCP connections.
 
-foo can reach mal by sending network packets through bar.
+foo can reach baz by sending network packets through bar.
 
 ***********************
 Receptor configurations
@@ -25,18 +25,19 @@ Receptor configurations
 .. code-block:: yaml
 
   ---
-  - node:
-      id: foo
+  version: 2
+  node:
+    id: foo
 
-  - control-service:
-      service: control
+  control-services:
+    - service: control
       filename: /tmp/foo.sock
 
-  - tcp-peer:
-      address: localhost:2222
-      redial: true
+  tcp-peers:
+    - address: localhost:2222
 
-  - log-level: debug
+  log-level:
+    level: debug
 
   ...
 
@@ -45,37 +46,40 @@ Receptor configurations
 .. code-block:: yaml
 
   ---
-  - node:
-      id: bar
+  version: 2
+  node:
+    id: bar
 
-  - control-service:
-      service: control
+  control-services:
+    - service: control
       filename: /tmp/bar.sock
 
-  - tcp-listener:
-      port: 2222
+  tcp-listeners:
+    - port: 2222
 
-  - log-level: debug
+  log-level:
+    level: debug
 
   ...
 
-``mal.yml``
+``baz.yml``
 
 .. code-block:: yaml
 
   ---
-  - node:
-      id: mal
+  version: 2
+  node:
+    id: baz
 
-  - control-service:
-      service: control
-      filename: /tmp/mal.sock
+  control-services:
+    - service: control
+      filename: /tmp/baz.sock
 
-  - tcp-peer:
-      address: localhost:2222
-      redial: true
+  tcp-peers:
+    - address: localhost:2222
 
-  - log-level: debug
+  log-level:
+    level: debug
 
   - work-command:
       workType: echo
@@ -97,7 +101,7 @@ Receptor configurations
 
 .. code-block:: bash
 
-    ./receptor --config mal.yml
+    ./receptor --config baz.yml
 
 .. seealso::
 

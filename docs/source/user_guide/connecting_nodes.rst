@@ -7,7 +7,10 @@ Connecting nodes
    :local:
 
 
-Connect nodes via receptor backends. TCP, UDP, and websockets are currently supported. For example, ``tcp-peer`` can be used to connect to another node's ``tcp-listener``, and ``ws-peer`` can be used to connect to another node's ``ws-listener``.
+Connect nodes through Receptor backends.
+TCP, UDP, and websockets are currently supported.
+For example, you can connect one Receptor node to another using the ``tcp-peers`` and ``tcp-listeners`` configuration options.
+Similarly you can connect Receptor nodes using the ``ws-peers`` and ``ws-listeners`` configuration options.
 
 .. image:: mesh.png
    :alt: Connected nodes as netceptor peers
@@ -17,42 +20,45 @@ foo.yml
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      - port: 2222
 
 bar.yml
 
 .. code-block:: yaml
 
     ---
-    - node:
-        id: bar
+    version: 2
+    node:
+      id: bar
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
 
 fish.yml
 
 .. code-block:: yaml
 
     ---
-    - node:
-        id: fish
+    version: 2
+    node:
+      id: fish
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
 
 If we start the backends for each of these configurations, this will form a three-node mesh. Notice `bar` and `fish` are not directly connected to each other. However, the mesh allows traffic from `bar` to pass through `foo` to reach `fish`, as if `bar` and `fish` were directly connected.
 
@@ -99,21 +105,22 @@ in foo.yml
 
 .. code-block:: yaml
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      - port: 2222
         cost: 1.0
         nodecost:
-            bar: 1.6
-            fish: 2.0
+          bar: 1.6
+          fish: 2.0
 
 This means packets sent to `fish` have a cost of 2.0, whereas packets sent to `bar` have a cost of 1.6. If `haz` joined the mesh, it would get a cost of 1.0 since it's not in the nodecost map.
 
-The costs on the two ends of the connection must match. For example, the ``tcp-peer`` on `fish` must have a cost of 2.0, otherwise the connection will be refused.
+The costs on both ends of the connection must match.
+For example, the ``tcp-peers`` configuration on ``fish`` must have a cost of ``2.0``, otherwise the connection will be refused.
 
 in fish.yml
 
 .. code-block:: yaml
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
         cost: 2.0

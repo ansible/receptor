@@ -10,65 +10,67 @@ mesh connections.
 Configuring TLS
 ---------------
 
-Add ``tls-server`` and ``tls-client`` definitions to Receptor config files.
+Add ``tls-servers`` and ``tls-clients`` definitions to Receptor configuration files.
 
 ``foo.yml``
 
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tls-server:
-        name: myserver
+    tls-servers:
+      - name: myserver
         cert: /full/path/foo.crt
         key: /full/path/foo.key
         requireclientcert: true
         clientcas: /full/path/ca.crt
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      - port: 2222
         tls: myserver
 
-Defining ``tls-server`` takes no effect, but it can be referenced elsewhere in the Receptor config file.
-In the preceding configuration snippet, ``tls`` in the ``tcp-listener`` is set to use ``myserver``.
-In general, ``tls-server`` should be referenced anywhere Receptor is expecting an incoming connection, such as ``*-listener`` backends or on the ``control-service``.
-Similarly, ``tls-client`` should be referenced anywhere Receptor is expecting to make an outgoing connection, i.e. ``*-peer`` backends or in ``receptorctl`` (the command-line client for Receptor).
+Defining ``tls-servers`` has no effect, but it can be referenced elsewhere in the Receptor configuration file.
+In the preceding configuration snippet, ``tls`` in the ``tcp-listeners`` is set to use ``myserver``.
+In general, ``tls-servers`` should be referenced anywhere Receptor is expecting an incoming connection, such as ``*-listeners`` backends or on the ``control-services``.
+Similarly, ``tls-clients`` should be referenced anywhere Receptor is expecting to make an outgoing connection, such as ``*-peers`` backends or in ``receptorctl`` (the command-line client for Receptor).
 
 ``bar.yml``
 
 .. code-block:: yaml
 
     ---
-    - node:
-        id: bar
+    version: 2
+    node:
+      id: bar
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tls-client:
-        name: myclient
+    tls-clients:
+      - name: myclient
         rootcas: /full/path/ca.crt
         insecureskipverify: false
         cert: /full/path/bar.crt
         key: /full/path/bar.key
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
         tls: myclient
 
 
-``myclient`` is referenced in ``tcp-peer``. Once started, `foo` and `bar` will authenticate each other, and the connection will be fully encrypted.
+``myclient`` is referenced in ``tcp-peers``. Once started, `foo` and `bar` will authenticate each other, and the connection will be fully encrypted.
 
 Generating certs
 -----------------
 
 Receptor supports X.509 compliant certificates and provides a built-in tool to generate valid certificates.
-Running Receptor with the ``cert-init``, ``cert-makereq``, and ``cert-signreq`` actions creates certificate authorities, make requests, and sign requests.
+Running and configuring Receptor with the ``cert-init``, ``cert-makereqs``, and ``cert-signreqs`` properties creates certificate authorities, make requests, and sign requests.
 
 ``makecerts.sh``
 
@@ -83,7 +85,7 @@ Running Receptor with the ``cert-init``, ``cert-makereq``, and ``cert-signreq`` 
     done
 
 The preceding script will create a CA, and for each node ``foo`` and ``bar``, create a certificate request and sign it with the CA.
-These certificates and keys can then create ``tls-server`` and ``tls-client`` definitions in the Receptor config files.
+These certificates and keys can then create ``tls-servers`` and ``tls-clients`` definitions in the Receptor configuration files.
 
 Pinned certificates
 --------------------
@@ -95,11 +97,12 @@ pinning for this purpose.  Here is an example of a pinned certificate configurat
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - tls-server:
-        name: myserver
+    tls-servers:
+      - name: myserver
         cert: /full/path/foo.crt
         key: /full/path/foo.key
         requireclientcert: true
@@ -107,8 +110,8 @@ pinning for this purpose.  Here is an example of a pinned certificate configurat
         pinnedclientcert:
           - E6:9B:98:A7:A5:DB:17:D6:E4:2C:DE:76:45:42:A8:79:A3:0A:C5:6D:10:42:7A:6A:C4:54:57:83:F1:0F:E2:95
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      - port: 2222
         tls: myserver
 
 Certificate pinning is an added requirement, and does not eliminate the need to meet other stated requirements.  In the above example, the client certificate must both be signed by a CA in the `ca.crt` bundle, and also have the listed fingerprint.  Multiple fingerprints may be specified, in which case a certificate matching any one of them will be accepted.
@@ -144,22 +147,23 @@ The default behavior for this option is `false` which means that the certificate
 .. code-block:: yaml
 
     ---
-    - node:
-        id: bar
+    version: 2
+    node:
+      id: bar
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tls-client:
-        name: myclient
+    tls-clients:
+      - name: myclient
         rootcas: /full/path/ca.crt
         insecureskipverify: false
         cert: /full/path/bar.crt
         key: /full/path/bar.key
         skipreceptornamescheck: true
 
-    - tls-server:
-        name: myserver
+    tls-servers:
+      - name: myserver
         cert: /full/path/foo.crt
         key: /full/path/foo.key
         requireclientcert: true
@@ -168,6 +172,6 @@ The default behavior for this option is `false` which means that the certificate
           - E6:9B:98:A7:A5:DB:17:D6:E4:2C:DE:76:45:42:A8:79:A3:0A:C5:6D:10:42:7A:6A:C4:54:57:83:F1:0F:E2:95
         skipreceptornamescheck: true
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
         tls: myclient

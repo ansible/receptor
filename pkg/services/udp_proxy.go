@@ -1,6 +1,3 @@
-//go:build !no_proxies && !no_services
-// +build !no_proxies,!no_services
-
 package services
 
 import (
@@ -11,6 +8,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service.
@@ -174,7 +172,7 @@ func runUDPToNetceptorOutbound(uc *net.UDPConn, pc netceptor.PacketConner, addr 
 }
 
 // udpProxyInboundCfg is the cmdline configuration object for a UDP inbound proxy.
-type udpProxyInboundCfg struct {
+type UDPProxyInboundCfg struct {
 	Port          int    `required:"true" description:"Local UDP port to bind to"`
 	BindAddr      string `description:"Address to bind UDP listener to" default:"0.0.0.0"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
@@ -182,28 +180,32 @@ type udpProxyInboundCfg struct {
 }
 
 // Run runs the action.
-func (cfg udpProxyInboundCfg) Run() error {
+func (cfg UDPProxyInboundCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running UDP inbound proxy service %v\n", cfg)
 
 	return UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService)
 }
 
 // udpProxyOutboundCfg is the cmdline configuration object for a UDP outbound proxy.
-type udpProxyOutboundCfg struct {
+type UDPProxyOutboundCfg struct {
 	Service string `required:"true" description:"Receptor service name to bind to"`
 	Address string `required:"true" description:"Address for outbound UDP connection"`
 }
 
 // Run runs the action.
-func (cfg udpProxyOutboundCfg) Run() error {
+func (cfg UDPProxyOutboundCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running UDP outbound proxy service %s\n", cfg)
 
 	return UDPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, cfg.Address)
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
-		"udp-server", "Listen for UDP and forward via Receptor", udpProxyInboundCfg{}, cmdline.Section(servicesSection))
+		"udp-server", "Listen for UDP and forward via Receptor", UDPProxyInboundCfg{}, cmdline.Section(servicesSection))
 	cmdline.RegisterConfigTypeForApp("receptor-proxies",
-		"udp-client", "Listen on a Receptor service and forward via UDP", udpProxyOutboundCfg{}, cmdline.Section(servicesSection))
+		"udp-client", "Listen on a Receptor service and forward via UDP", UDPProxyOutboundCfg{}, cmdline.Section(servicesSection))
 }

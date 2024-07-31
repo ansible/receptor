@@ -11,21 +11,22 @@ foo.yml
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      port: 2222
 
-    - control-service:
-        service: control
+    control-services:
+      - service: control
         filename: /tmp/foo.sock
 
-    - work-kubernetes:
-        worktype: kubeit
+    work-kubernetes:
+      - worktype: kubeit
         authmethod: kubeconfig
         allowruntimeauth: true
         allowruntimepod: true
@@ -34,7 +35,7 @@ foo.yml
 kubeitpod.yml
 
 .. note::
-   You may need to set ``tcp-listener``, ``tcp-peer``, or ``local-only`` before you can start the control service. See https://github.com/ansible/receptor/issues/518
+   You might need to set ``tcp-listeners``, ``tcp-peers``, or ``local-only`` before you can start the control service. See https://github.com/ansible/receptor/issues/518
 
 .. code-block:: yaml
 

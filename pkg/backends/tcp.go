@@ -1,6 +1,3 @@
-//go:build !no_tcp_backend && !no_backends
-// +build !no_tcp_backend,!no_backends
-
 package backends
 
 import (
@@ -17,6 +14,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // TCPDialer implements Backend for outbound TCP.
@@ -367,6 +365,10 @@ func (cfg TCPListenerCfg) Reload() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",

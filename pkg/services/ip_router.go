@@ -1,5 +1,5 @@
-//go:build linux && !no_ip_router && linux && !no_services
-// +build linux,!no_ip_router,linux,!no_services
+//go:build linux
+// +build linux
 
 package services
 
@@ -16,6 +16,7 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 	"github.com/songgao/water"
+	"github.com/spf13/viper"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -359,16 +360,8 @@ func (ipr *IPRouterService) run() error {
 	return nil
 }
 
-// ipRouterCfg is the cmdline configuration object for an IP router.
-type ipRouterCfg struct {
-	NetworkName string `required:"true" description:"Name of this network and service."`
-	Interface   string `description:"Name of the local tun interface"`
-	LocalNet    string `required:"true" description:"Local /30 CIDR address"`
-	Routes      string `description:"Comma separated list of CIDR subnets to advertise"`
-}
-
 // Run runs the action.
-func (cfg ipRouterCfg) Run() error {
+func (cfg IPRouterCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running tun router service %s\n", cfg)
 	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)
 	if err != nil {
@@ -379,6 +372,10 @@ func (cfg ipRouterCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-ip-router",
-		"ip-router", "Run an IP router using a tun interface", ipRouterCfg{}, cmdline.Section(servicesSection))
+		"ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, cmdline.Section(servicesSection))
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // Oser is the function calls interfaces for mocking os.
@@ -36,7 +37,7 @@ func InitCA(opts *CertOptions, certOut, keyOut string, osWrapper Oser) error {
 	return err
 }
 
-type initCA struct {
+type InitCAConfig struct {
 	CommonName string `description:"Common name to assign to the certificate" required:"Yes"`
 	Bits       int    `description:"Bit length of the encryption keys of the certificate" required:"Yes"`
 	NotBefore  string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
@@ -45,7 +46,7 @@ type initCA struct {
 	OutKey     string `description:"File to save the CA private key to" required:"Yes"`
 }
 
-func (ica initCA) Run() (err error) {
+func (ica InitCAConfig) Run() (err error) {
 	opts := &CertOptions{
 		CommonName: ica.CommonName,
 		Bits:       ica.Bits,
@@ -113,7 +114,7 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string, osWrapper Oser) er
 	return nil
 }
 
-type makeReq struct {
+type MakeReqConfig struct {
 	CommonName string   `description:"Common name to assign to the certificate" required:"Yes"`
 	Bits       int      `description:"Bit length of the encryption keys of the certificate"`
 	DNSName    []string `description:"DNS names to add to the certificate"`
@@ -124,7 +125,7 @@ type makeReq struct {
 	OutKey     string   `description:"File to save the private key to (new key will be generated)"`
 }
 
-func (mr makeReq) Prepare() error {
+func (mr MakeReqConfig) Prepare() error {
 	if mr.InKey == "" && mr.OutKey == "" {
 		return fmt.Errorf("must provide either InKey or OutKey")
 	}
@@ -141,7 +142,7 @@ func (mr makeReq) Prepare() error {
 	return nil
 }
 
-func (mr makeReq) Run() error {
+func (mr MakeReqConfig) Run() error {
 	opts := &CertOptions{
 		CommonName: mr.CommonName,
 		Bits:       mr.Bits,
@@ -227,7 +228,7 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 	return SaveToPEMFile(certOut, []interface{}{cert}, &OsWrapper{})
 }
 
-type signReq struct {
+type SignReqConfig struct {
 	Req       string `description:"Certificate Request PEM filename" required:"Yes"`
 	CACert    string `description:"CA certificate PEM filename" required:"Yes"`
 	CAKey     string `description:"CA private key PEM filename" required:"Yes"`
@@ -237,7 +238,7 @@ type signReq struct {
 	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
 }
 
-func (sr signReq) Run() error {
+func (sr SignReqConfig) Run() error {
 	opts := &CertOptions{}
 	if sr.NotBefore != "" {
 		t, err := time.Parse(time.RFC3339, sr.NotBefore)
@@ -258,10 +259,14 @@ func (sr signReq) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
-		"cert-init", "Initialize PKI CA", initCA{}, cmdline.Exclusive, cmdline.Section(certSection))
+		"cert-init", "Initialize PKI CA", InitCAConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
-		"cert-makereq", "Create certificate request", makeReq{}, cmdline.Exclusive, cmdline.Section(certSection))
+		"cert-makereq", "Create certificate request", MakeReqConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
-		"cert-signreq", "Sign request and produce certificate", signReq{}, cmdline.Exclusive, cmdline.Section(certSection))
+		"cert-signreq", "Sign request and produce certificate", SignReqConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 }

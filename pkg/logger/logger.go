@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -262,11 +263,11 @@ func (rl *ReceptorLogger) LogLevelToName(logLevel int) (string, error) {
 	return "", err
 }
 
-type loglevelCfg struct {
+type LoglevelCfg struct {
 	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
 }
 
-func (cfg loglevelCfg) Init() error {
+func (cfg LoglevelCfg) Init() error {
 	var err error
 	val, err := GetLogLevelByName(cfg.Level)
 	if err != nil {
@@ -277,20 +278,24 @@ func (cfg loglevelCfg) Init() error {
 	return nil
 }
 
-type traceCfg struct{}
+type TraceCfg struct{}
 
-func (cfg traceCfg) Prepare() error {
+func (cfg TraceCfg) Prepare() error {
 	return nil
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	logLevel = InfoLevel
 	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"log-level", "Specifies the verbosity level for command output", loglevelCfg{}, cmdline.Singleton)
+		"log-level", "Specifies the verbosity level for command output", LoglevelCfg{}, cmdline.Singleton)
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+		"trace", "Enables packet tracing output", TraceCfg{}, cmdline.Singleton)
 }

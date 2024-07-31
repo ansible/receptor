@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // pythonUnit implements the WorkUnit interface.
@@ -44,7 +45,7 @@ func (pw *pythonUnit) Start() error {
 // **************************************************************************
 
 // workPythonCfg is the cmdline configuration object for a Python worker plugin.
-type workPythonCfg struct {
+type WorkPythonCfg struct {
 	WorkType string                 `required:"true" description:"Name for this worker type"`
 	Plugin   string                 `required:"true" description:"Python module name of the worker plugin"`
 	Function string                 `required:"true" description:"Receptor-exported function to call"`
@@ -52,7 +53,7 @@ type workPythonCfg struct {
 }
 
 // NewWorker is a factory to produce worker instances.
-func (cfg workPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg WorkPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
 			BaseWorkUnitForWorkUnit: &BaseWorkUnit{
@@ -71,7 +72,7 @@ func (cfg workPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 }
 
 // Run runs the action.
-func (cfg workPythonCfg) Run() error {
+func (cfg WorkPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, false)
 
 	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release"))
@@ -80,6 +81,10 @@ func (cfg workPythonCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-python", "Run a worker using a Python plugin\n[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release.", workPythonCfg{}, cmdline.Section(workersSection))
+		"work-python", "Run a worker using a Python plugin\n[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release.", WorkPythonCfg{}, cmdline.Section(workersSection))
 }

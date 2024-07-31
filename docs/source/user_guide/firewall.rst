@@ -15,7 +15,6 @@ Firewall rules are added under the ``node`` entry in a Receptor configuration fi
 .. code-block:: yaml
 
     # Accepts everything
-    ---
     node:
       firewallrules:
         - action: "accept"
@@ -23,7 +22,6 @@ Firewall rules are added under the ``node`` entry in a Receptor configuration fi
 .. code-block:: yaml
 
     # Drops traffic from `foo` to `bar`'s control service
-    ---
     node:
       firewallrules:
         - action: "drop"
@@ -34,7 +32,6 @@ Firewall rules are added under the ``node`` entry in a Receptor configuration fi
 .. code-block:: yaml
 
     # Rejects traffic originating from nodes like abcb, adfb, etc
-    ---
     node:
       firewallrules:
         - action: "reject"
@@ -43,7 +40,6 @@ Firewall rules are added under the ``node`` entry in a Receptor configuration fi
 .. code-block:: yaml
 
     # Rejects traffic destined for nodes like abcb, AdfB, etc
-    ---
     node:
       firewallrules:
         - action: "reject"

@@ -56,6 +56,7 @@ linters-settings:
         allow:
           - "$gostd"
           - "github.com/ansible/receptor/internal/version"
+          - "github.com/ansible/receptor/cmd"
           - "github.com/ansible/receptor/pkg"
           - "github.com/creack/pty"
           - "github.com/fsnotify/fsnotify"
@@ -70,6 +71,8 @@ linters-settings:
           - "github.com/rogpeppe/go-internal/lockedfile"
           - "github.com/songgao/water"
           - "github.com/vishvananda/netlink"
+          - "github.com/spf13/viper"
+          - "github.com/spf13/cobra"
           - "k8s.io/api/core"
           - "k8s.io/apimachinery/pkg"
           - "k8s.io/client-go"

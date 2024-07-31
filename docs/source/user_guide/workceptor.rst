@@ -6,28 +6,29 @@ Workceptor
 
 Workceptor is a component of receptor that handles units of work.
 
-``work-command`` defines a type of work that can run on the node.
+``work-commands`` defines a type of work that can run on the node.
 
 foo.yml
 
 .. code-block:: yaml
 
     ---
-    - node:
-        id: foo
+    version: 2
+    node:
+      id: foo
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tcp-listener:
-        port: 2222
+    tcp-listeners:
+      - port: 2222
 
-    - control-service:
-        service: control
+    control-services:
+      - service: control
         filename: /tmp/foo.sock
 
-    - work-command:
-        workType: echoint
+    work-commands:
+      - workType: echoint
         command: bash
         params:  "-c \"for i in {1..5}; do echo $i; sleep 1; done\""
 
@@ -36,25 +37,24 @@ bar.yml
 .. code-block:: yaml
 
     ---
-    - node:
-        id: bar
+    version: 2
+    node:
+      id: bar
 
-    - log-level:
-        level: Debug
+    log-level:
+      level: Debug
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peer:
+      address: localhost:2222
 
-    - control-service:
-        service: control
+    control-services:
+      - service: control
 
-    - work-command:
-        worktype: echoint
+    work-commands:
+      - worktype: echoint
         command: bash
         params:  "-c \"for i in {1..10}; do echo $i; sleep 1; done\""
-
-    - work-command:
-        workType: echopayload
+      - workType: echopayload
         command: bash
         params: "-c \"while read -r line; do echo ${line^^}; sleep 3; done\""
 
@@ -72,7 +72,7 @@ Configuring work commands
 Local work
 -----------
 
-Start the work by connecting to the ``control-service`` and issuing a "work submit" command
+Start the work by connecting to the ``control-services`` and issuing a "work submit" command
 
 .. code-block:: bash
 
@@ -133,8 +133,7 @@ in `bar.yml`
 
 .. code-block:: yaml
 
-    - work-command:
-        workType: echopayload
+      - workType: echopayload
         command: bash
         params: "-c \"while read -r line; do echo ${line^^}; sleep 5; done\""
 
@@ -161,8 +160,8 @@ Work commands can be configured to allow parameters to be passed to commands whe
 
 .. code-block:: yaml
 
-  - work-command:
-      workType: listcontents
+  work-commands:
+    - workType: listcontents
       command: ls
       allowruntimeparams: true
 
@@ -271,11 +270,10 @@ in `bar.yml`
 .. code-block:: yaml
 
     # PKIX
-    - work-verification:
-        publickey: /full/path/signworkpublic.pem
+    work-verification:
+      publickey: /full/path/signworkpublic.pem
 
-    - work-command:
-        workType: echopayload
+      - workType: echopayload
         command: bash
         params: "-c \"while read -r line; do echo ${line^^}; sleep 5; done\""
         verifysignature: true
@@ -285,9 +283,9 @@ in `foo.yml`
 .. code-block:: yaml
 
     # PKCS1
-    - work-signing:
-        privatekey: /full/path/signworkprivate.pem
-        tokenexpiration: 30m
+    work-signing:
+      privatekey: /full/path/signworkprivate.pem
+      tokenexpiration: 30m
 
 Tokenexpiration determines how long a the signature is valid for. This expiration directly corresponds to the "expiresAt" field in the generated JSON web token. Valid units include "h" and "m", e.g. 1h30m for one hour and 30 minutes.
 

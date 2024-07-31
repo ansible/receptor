@@ -1,5 +1,5 @@
-//go:build !windows && !no_command_service && !windows && !no_services
-// +build !windows,!no_command_service,!windows,!no_services
+//go:build !windows
+// +build !windows
 
 package services
 
@@ -14,6 +14,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.com/spf13/viper"
 )
 
 func runCommand(qc net.Conn, command string, logger *logger.ReceptorLogger) error {
@@ -59,14 +60,14 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 }
 
 // commandSvcCfg is the cmdline configuration object for a command service.
-type commandSvcCfg struct {
+type CommandSvcCfg struct {
 	Service string `required:"true" description:"Receptor service name to bind to"`
 	Command string `required:"true" description:"Command to execute on a connection"`
 	TLS     string `description:"Name of TLS server config"`
 }
 
 // Run runs the action.
-func (cfg commandSvcCfg) Run() error {
+func (cfg CommandSvcCfg) Run() error {
 	netceptor.MainInstance.Logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
@@ -78,6 +79,10 @@ func (cfg commandSvcCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-command-service",
-		"command-service", "Run an interactive command via a Receptor service", commandSvcCfg{}, cmdline.Section(servicesSection))
+		"command-service", "Run an interactive command via a Receptor service", CommandSvcCfg{}, cmdline.Section(servicesSection))
 }

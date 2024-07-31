@@ -1,0 +1,8 @@
+---
+version: 2
+control-services:
+  - service: control
+    filename: /tmp/receptor.sock
+
+tcp-listeners:
+  - port: 7323

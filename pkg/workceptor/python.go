@@ -5,6 +5,7 @@ package workceptor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 
@@ -21,6 +22,7 @@ type pythonUnit struct {
 
 // Start launches a job with given parameters.
 func (pw *pythonUnit) Start() error {
+	pw.UpdateBasicStatus(WorkStatePending, "[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release.", 0)
 	pw.UpdateBasicStatus(WorkStatePending, "Launching Python runner", 0)
 	config := make(map[string]interface{})
 	for k, v := range pw.config {
@@ -72,10 +74,12 @@ func (cfg workPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 func (cfg workPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, false)
 
-	return err
+	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release"))
+
+	return errWithDeprecation
 }
 
 func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-python", "Run a worker using a Python plugin", workPythonCfg{}, cmdline.Section(workersSection))
+		"work-python", "Run a worker using a Python plugin\n[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release.", workPythonCfg{}, cmdline.Section(workersSection))
 }

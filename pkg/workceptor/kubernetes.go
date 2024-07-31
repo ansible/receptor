@@ -816,6 +816,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 					// this is probably not possible...
 					errMsg := fmt.Sprintf("Error reading stdin: %s", stdin.Error())
 					kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+					kw.GetWorkceptor().nc.GetLogger().Error("Pod status at time of error %s", kw.pod.Status.String())
 					kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
 
 					close(stdinErrChan) // signal STDOUT goroutine to stop

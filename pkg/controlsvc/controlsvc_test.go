@@ -103,6 +103,10 @@ func TestRunControlSvc(t *testing.T) {
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	mockUnix := mock_controlsvc.NewMockUtiler(ctrl)
 	mockNet := mock_controlsvc.NewMockNeter(ctrl)
+	mockTLS := mock_controlsvc.NewMockTlser(ctrl)
+	mockListener := mock_controlsvc.NewMockListener(ctrl)
+
+	logger := logger.NewReceptorLogger("")
 
 	runControlSvcTestCases := []struct {
 		name          string
@@ -158,6 +162,21 @@ func TestRunControlSvc(t *testing.T) {
 				"tcpListen":  "",
 			},
 		},
+		{
+			name:          "tcp listener set",
+			expectedError: "",
+			expectedCalls: func() {
+				mockNet.EXPECT().Listen(gomock.Any(), gomock.Any()).Return(mockListener, nil)
+				mockTLS.EXPECT().NewListener(gomock.Any(), gomock.Any()).Return(mockListener)
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockListener.EXPECT().Accept().Return(nil, errors.New("normal close")).AnyTimes()
+			},
+			listeners: map[string]string{
+				"service":    "",
+				"unixSocket": "",
+				"tcpListen":  "tcp:1",
+			},
+		},
 	}
 
 	for _, testCase := range runControlSvcTestCases {
@@ -166,10 +185,11 @@ func TestRunControlSvc(t *testing.T) {
 			s := controlsvc.New(false, mockNetceptor)
 			s.SetServerUtils(mockUnix)
 			s.SetServerNet(mockNet)
+			s.SetServerTLS(mockTLS)
 
 			err := s.RunControlSvc(context.Background(), testCase.listeners["service"], &tls.Config{}, testCase.listeners["unixSocket"], os.FileMode(0o600), testCase.listeners["tcpListen"], &tls.Config{})
 
-			if err.Error() != testCase.expectedError {
+			if err != nil && err.Error() != testCase.expectedError {
 				t.Errorf("expected error %s, got %v", testCase.expectedError, err)
 			}
 		})

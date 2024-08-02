@@ -221,8 +221,8 @@ func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	nCopied := copy(p, m.Data)
 	fromAddr := Addr{
 		network: pc.s.GetNetworkName(),
-		node:       m.FromNode,
-		service:    m.FromService,
+		node:    m.FromNode,
+		service: m.FromService,
 	}
 
 	return nCopied, fromAddr, nil
@@ -260,8 +260,8 @@ func (pc *PacketConn) LocalService() string {
 func (pc *PacketConn) LocalAddr() net.Addr {
 	return Addr{
 		network: pc.s.GetNetworkName(),
-		node:       pc.s.NodeID(),
-		service:    pc.localService,
+		node:    pc.s.NodeID(),
+		service: pc.localService,
 	}
 }
 

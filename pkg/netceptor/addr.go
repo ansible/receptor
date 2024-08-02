@@ -5,8 +5,8 @@ import "fmt"
 // Addr represents an endpoint address on the Netceptor network.
 type Addr struct {
 	network string
-	node       string
-	service    string
+	node    string
+	service string
 }
 
 // Network returns the network name.

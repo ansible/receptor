@@ -34,7 +34,7 @@ func main() {
 	}
 
 	for _, arg := range os.Args {
-		if arg == "--help" {
+		if arg == "--help" || arg == "-h" {
 			os.Exit(0)
 		}
 	}

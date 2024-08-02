@@ -8,14 +8,6 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-// func setupTests() *netceptor.Netceptor {
-// 	ctx := context.Background()
-// 	defer ctx.Done()
-
-// 	n1 := netceptor.New(ctx, "testNode1")
-// 	return n1
-// }
-
 func TestNetwork(t *testing.T) {
 	networkResult := "netceptor-testNode1"
 	strResult := "testNode2:testService"

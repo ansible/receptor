@@ -390,9 +390,9 @@ func New(ctx context.Context, nodeID string) *Netceptor {
 // NewAddr generates a Receptor network address from a node ID and service name.
 func (s *Netceptor) NewAddr(node string, service string) Addr {
 	return Addr{
-		NetworkStr: s.networkName,
-		Node:       node,
-		Service:    service,
+		network: s.networkName,
+		node:       node,
+		service:    service,
 	}
 }
 

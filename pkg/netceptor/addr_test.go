@@ -15,13 +15,13 @@ func TestNetwork(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_netceptor.NewMockNetcForPing(ctrl)
 
-	mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{
-		NetworkStr: "netceptor-testNode1",
-		Node:       "testNode2",
-		Service:    "testService",
-	})
+	mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{})
 
 	addr := mockNetceptor.NewAddr("testNode2", "testService")
+	addr.SetNetwork(networkResult)
+	addr.SetNode("testNode2")
+	addr.SetService("testService")
+
 	network := addr.Network()
 	str := addr.String()
 

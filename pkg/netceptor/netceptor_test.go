@@ -281,7 +281,7 @@ func TestLotsOfPings(t *testing.T) {
 
 							return
 						}
-						if ncAddr.Node != recipient.nodeID {
+						if ncAddr.node != recipient.nodeID {
 							errorChan <- fmt.Errorf("received response from wrong node")
 
 							return

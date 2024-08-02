@@ -25,8 +25,8 @@ func TestNetwork(t *testing.T) {
 
 	mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{
 		NetworkStr: "netceptor-testNode1",
-		Node: "testNode2",
-		Service: "testService",
+		Node:       "testNode2",
+		Service:    "testService",
 	})
 
 	addr := mockNetceptor.NewAddr("testNode2", "testService")

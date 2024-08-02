@@ -19,7 +19,7 @@ require (
 	github.com/quic-go/quic-go v0.40.1
 	github.com/rogpeppe/go-internal v1.12.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.18.2
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/goleak v1.3.0
@@ -71,10 +71,10 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect

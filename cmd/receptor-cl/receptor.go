@@ -13,11 +13,11 @@ import (
 )
 
 func main() {
-	var legacy bool
+	var latest bool
 	newArgs := []string{}
 	for _, arg := range os.Args {
-		if arg == "--legacy" {
-			legacy = true
+		if arg == "--latest" {
+			latest = true
 
 			continue
 		}
@@ -26,10 +26,10 @@ func main() {
 
 	os.Args = newArgs
 
-	if !legacy {
+	if latest {
+		fmt.Println("Running latest cli/config")
 		cmd.Execute()
 	} else {
-		fmt.Println("Running old cli/config")
 		cmd.RunConfigV1()
 	}
 

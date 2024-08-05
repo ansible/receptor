@@ -141,24 +141,22 @@ jobs:
 
       - name: Write out basic config
         run: |
-          cat << EOF > test.yaml
+          cat << EOF > test.cfg
           ---
-          version: 2
-          local-only:
-            local: true
+          - local-only:
 
-          control-services:
-            - service: control
+          - control-service:
+              service: control
               filename: /tmp/receptor.sock
 
-          work-commands:
-            - worktype: cat
+          - work-command:
+              worktype: cat
               command: cat
           EOF
 
       - name: Run receptor (and wait a few seconds for it to boot)
         run: |
-          podman run --name receptor -d -v $PWD/test.yaml:/etc/receptor/receptor.yaml:Z localhost/receptor
+          podman run --name receptor -d -v $PWD/test.cfg:/etc/receptor/receptor.conf:Z localhost/receptor
           sleep 3
           podman logs receptor
 

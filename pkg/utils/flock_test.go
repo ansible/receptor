@@ -1,11 +1,14 @@
 //go:build !windows
 // +build !windows
 
-package utils
+package utils_test
 
 import (
-	"reflect"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/ansible/receptor/pkg/utils"
 )
 
 func TestTryFLock(t *testing.T) {
@@ -15,35 +18,39 @@ func TestTryFLock(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *FLock
+		want    *utils.FLock
 		wantErr bool
 	}{
 		{
-			name:		"Positive",
-			args:		args{
-				filename:	"",
-						},
-			want:		&FLock{},
-			wantErr:	false,
+			name: "Positive",
+			args: args{
+				filename: filepath.Join(os.TempDir(), "good_flock_listener"),
+			},
+			want:    &utils.FLock{0},
+			wantErr: false,
 		},
 		{
-			name:	"Negative",
-			args:		args{
-				filename:	"",
-						},
-			want:		&FLock{},
-			wantErr:	true,
+			name: "Negative",
+			args: args{
+				filename: "",
+			},
+			want:    &utils.FLock{},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := TryFLock(tt.args.filename)
+			got, err := utils.TryFLock(tt.args.filename)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("TryFLock() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("%s: TryFLock(): error = %v, wantErr %v", tt.name, err, tt.wantErr)
+
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("TryFLock() = %v, want %v", got, tt.want)
+
+			if err == nil {
+				if got.Fd < 0 {
+					t.Errorf("%s: UnixSocketListen(): Invalid got Fd = %+v", tt.name, got)
+				}
 			}
 		})
 	}
@@ -51,7 +58,7 @@ func TestTryFLock(t *testing.T) {
 
 func TestFLock_Unlock(t *testing.T) {
 	type fields struct {
-		fd int
+		Fd int
 	}
 	tests := []struct {
 		name    string
@@ -59,27 +66,27 @@ func TestFLock_Unlock(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:		"Positive",
-			fields:		fields{
-				fd: 	1,
+			name: "Positive",
+			fields: fields{
+				Fd: 1,
 			},
-			wantErr:	false,
+			wantErr: false,
 		},
 		{
-			name:		"Negative",
-			fields:		fields{
-				fd: 	-1,
+			name: "Negative",
+			fields: fields{
+				Fd: -1,
 			},
-			wantErr:	true,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lock := &FLock{
-				fd: tt.fields.fd,
+			lock := &utils.FLock{
+				Fd: tt.fields.Fd,
 			}
 			if err := lock.Unlock(); (err != nil) != tt.wantErr {
-				t.Errorf("FLock.Unlock() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("%s: FLock.Unlock() error = %v, wantErr %v", tt.name, err, tt.wantErr)
 			}
 		})
 	}

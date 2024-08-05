@@ -54,6 +54,7 @@ func TestUnixSocketListen(t *testing.T) {
 			_, got1, err := utils.UnixSocketListen(tt.args.filename, tt.args.permissions)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%s: UnixSocketListen(): error = %+v, wantErr = %+v", tt.name, err, tt.wantErr)
+
 				return
 			}
 

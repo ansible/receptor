@@ -13,7 +13,7 @@ var ErrLocked = fmt.Errorf("fslock is already locked")
 
 // FLock represents a file lock.
 type FLock struct {
-	fd int
+	Fd int
 }
 
 // TryFLock non-blockingly attempts to acquire a lock on the file.
@@ -32,10 +32,10 @@ func TryFLock(filename string) (*FLock, error) {
 		return nil, err
 	}
 
-	return &FLock{fd: fd}, nil
+	return &FLock{Fd: fd}, nil
 }
 
 // Unlock unlocks the file lock.
 func (lock *FLock) Unlock() error {
-	return syscall.Close(lock.fd)
+	return syscall.Close(lock.Fd)
 }

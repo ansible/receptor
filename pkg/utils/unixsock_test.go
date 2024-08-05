@@ -32,7 +32,7 @@ func TestUnixSocketListen(t *testing.T) {
 		{
 			name: "Positive",
 			args: args{
-				filename:    filepath.Join(os.TempDir(), "good_listener"),
+				filename:    filepath.Join(os.TempDir(), "good_unixsock_listener"),
 				permissions: 0x0400,
 			},
 			wantErr: false,
@@ -60,7 +60,7 @@ func TestUnixSocketListen(t *testing.T) {
 
 			if err == nil {
 				if got1.Fd < 0 {
-					t.Errorf("%s: UnixSocketListen(): Invalid got1 fd = %+v", tt.name, got1)
+					t.Errorf("%s: UnixSocketListen(): Invalid got1 Fd = %+v", tt.name, got1)
 				}
 
 				defer got1.Unlock()

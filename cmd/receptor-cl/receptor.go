@@ -13,11 +13,11 @@ import (
 )
 
 func main() {
-	var latest bool
+	var isV2 bool
 	newArgs := []string{}
 	for _, arg := range os.Args {
-		if arg == "--latest" {
-			latest = true
+		if arg == "--config-v2" {
+			isV2 = true
 
 			continue
 		}
@@ -26,8 +26,8 @@ func main() {
 
 	os.Args = newArgs
 
-	if latest {
-		fmt.Println("Running latest cli/config")
+	if isV2 {
+		fmt.Println("Running v2 cli/config")
 		cmd.Execute()
 	} else {
 		cmd.RunConfigV1()

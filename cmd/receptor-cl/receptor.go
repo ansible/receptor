@@ -13,11 +13,11 @@ import (
 )
 
 func main() {
-	var legacy bool
+	var isV2 bool
 	newArgs := []string{}
 	for _, arg := range os.Args {
-		if arg == "--legacy" {
-			legacy = true
+		if arg == "--config-v2" {
+			isV2 = true
 
 			continue
 		}
@@ -26,10 +26,10 @@ func main() {
 
 	os.Args = newArgs
 
-	if !legacy {
+	if isV2 {
+		fmt.Println("Running v2 cli/config")
 		cmd.Execute()
 	} else {
-		fmt.Println("Running old cli/config")
 		cmd.RunConfigV1()
 	}
 

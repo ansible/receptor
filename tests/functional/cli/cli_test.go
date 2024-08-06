@@ -28,7 +28,7 @@ func ConfirmListening(pid int, proto string) (bool, error) {
 
 func TestHelp(t *testing.T) {
 	t.Parallel()
-	cmd := exec.Command("receptor", "--legacy", "--help")
+	cmd := exec.Command("receptor", "--help")
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestListeners(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 			receptorStdOut := bytes.Buffer{}
-			cmd := exec.Command("receptor", "--legacy", "--node", "id=test", listener, "port=0")
+			cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0")
 			cmd.Stdout = &receptorStdOut
 			err := cmd.Start()
 			if err != nil {
@@ -98,7 +98,7 @@ func TestSSLListeners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command("receptor", "--legacy", "--node", "id=test", "--tls-server", "name=server-tls", fmt.Sprintf("cert=%s", crt), fmt.Sprintf("key=%s", key), listener, fmt.Sprintf("port=%d", port), "tls=server-tls")
+			cmd := exec.Command("receptor", "--node", "id=test", "--tls-server", "name=server-tls", fmt.Sprintf("cert=%s", crt), fmt.Sprintf("key=%s", key), listener, fmt.Sprintf("port=%d", port), "tls=server-tls")
 			cmd.Stdout = &receptorStdOut
 			err = cmd.Start()
 			if err != nil {
@@ -143,7 +143,7 @@ func TestNegativeCost(t *testing.T) {
 		t.Run(listener, func(t *testing.T) {
 			t.Parallel()
 			receptorStdOut := bytes.Buffer{}
-			cmd := exec.Command("receptor", "--legacy", "--node", "id=test", listener, "port=0", "cost=-1")
+			cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0", "cost=-1")
 			cmd.Stdout = &receptorStdOut
 			err := cmd.Start()
 			if err != nil {
@@ -185,7 +185,7 @@ func TestCostMap(t *testing.T) {
 				t.Run(costMapCopy, func(t *testing.T) {
 					t.Parallel()
 					receptorStdOut := bytes.Buffer{}
-					cmd := exec.Command("receptor", "--legacy", "--node", "id=test", listener, "port=0", fmt.Sprintf("nodecost=%s", costMapCopy))
+					cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0", fmt.Sprintf("nodecost=%s", costMapCopy))
 					cmd.Stdout = &receptorStdOut
 					err := cmd.Start()
 					if err != nil {
@@ -235,7 +235,7 @@ func TestCosts(t *testing.T) {
 				t.Run(costCopy, func(t *testing.T) {
 					t.Parallel()
 					receptorStdOut := bytes.Buffer{}
-					cmd := exec.Command("receptor", "--legacy", "--node", "id=test", listener, "port=0", fmt.Sprintf("cost=%s", costCopy))
+					cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0", fmt.Sprintf("cost=%s", costCopy))
 					cmd.Stdout = &receptorStdOut
 					err := cmd.Start()
 					if err != nil {

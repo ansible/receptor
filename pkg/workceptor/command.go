@@ -269,7 +269,7 @@ func (cw *commandUnit) Start() error {
 		receptorBin = "receptor"
 	}
 
-	cmd := exec.Command(receptorBin, "--legacy", "--node", "id=worker",
+	cmd := exec.Command(receptorBin, "--node", "id=worker",
 		"--log-level", levelName,
 		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),

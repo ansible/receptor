@@ -11,17 +11,17 @@ Try Sample Commands
 
     receptorctl --socket /tmp/foo.sock status
 
-2. Ping node mal from node foo
+2. Ping node baz from node foo
 
 .. code-block:: bash
 
-    receptorctl --socket /tmp/foo.sock ping mal
+    receptorctl --socket /tmp/foo.sock ping baz
 
-3. Submit work from foo to mal and stream results back to foo
+3. Submit work from foo to baz and stream results back to foo
 
 .. code-block:: bash
 
-    seq 10 | receptorctl --socket /tmp/foo.sock work submit --node mal echo --payload - -f
+    seq 10 | receptorctl --socket /tmp/foo.sock work submit --node baz echo --payload - -f
 
 4. List work units
 

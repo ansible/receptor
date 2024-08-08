@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"crypto/x509"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/utils"
 )
 
 func TestParseReceptorNamesFromCert(t *testing.T) {
@@ -110,7 +111,7 @@ Bdt96MbGrC0=
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := ParseReceptorNamesFromCert(tt.args.cert, tt.args.expectedHostname, tt.args.logger)
+			got, got1, err := utils.ParseReceptorNamesFromCert(tt.args.cert, tt.args.expectedHostname, tt.args.logger)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseReceptorNamesFromCert() error = %v, wantErr %v", err, tt.wantErr)
 

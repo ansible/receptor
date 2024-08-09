@@ -1,3 +1,4 @@
+---
 - node:
     id: node1
 
@@ -23,3 +24,4 @@
     service: ctltls
     tcplisten: 11113
     tcptls: tlsserver
+...

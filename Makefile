@@ -164,7 +164,7 @@ test: receptor
 	PATH="${PWD}:${PATH}" \
 	$(GO) test ./... $(TESTCMD) -count=1 -race -timeout 5m
 
-receptorctl-test: receptorctl/.VERSION
+receptorctl-test: receptorctl/.VERSION receptor
 	@cd receptorctl && nox -s tests
 
 testloop: receptor

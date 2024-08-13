@@ -56,7 +56,8 @@ def receptor_mesh(base_tmp_dir):
             self.socket_file_name = socket_file_name
 
             # HACK this should be a dinamic way to select a node socket
-            self.default_socket_unix = "unix://" + os.path.join(self.get_mesh_tmp_dir(), socket_file_name)
+            self.default_socket_unix = "unix://"
+            +os.path.join(self.get_mesh_tmp_dir(), socket_file_name)
 
         def default_receptor_controller_unix(self):
             return receptorctl.ReceptorControl(self.default_socket_unix)

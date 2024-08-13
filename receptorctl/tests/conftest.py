@@ -1,20 +1,21 @@
-import receptorctl
-
-import pytest
-import subprocess
+import json
 import os
 import shutil
+import subprocess
 import time
-import json
+from tempfile import mkdtemp
+
+import pytest
 import yaml
 from click.testing import CliRunner
 
+import receptorctl
 from .lib import create_certificate
 
 
 @pytest.fixture(scope="session")
 def base_tmp_dir():
-    receptor_tmp_dir = "/tmp/receptor"
+    receptor_tmp_dir = mkdtemp(dir="/tmp", prefix="receptor_")
     base_tmp_dir = "/tmp/receptorctltest"
 
     # Clean up tmp directory and create a new one
@@ -55,9 +56,7 @@ def receptor_mesh(base_tmp_dir):
             self.socket_file_name = socket_file_name
 
             # HACK this should be a dinamic way to select a node socket
-            self.default_socket_unix = "unix://" + os.path.join(
-                self.get_mesh_tmp_dir(), socket_file_name
-            )
+            self.default_socket_unix = "unix://" + os.path.join(self.get_mesh_tmp_dir(), socket_file_name)
 
         def default_receptor_controller_unix(self):
             return receptorctl.ReceptorControl(self.default_socket_unix)
@@ -73,9 +72,7 @@ def receptor_mesh(base_tmp_dir):
                     self.config_files.append(os.path.join(self.config_files_dir, f))
 
         def __create_certificates(self):
-            self.certificate_files = create_certificate(
-                self.get_mesh_tmp_dir(), "node1"
-            )
+            self.certificate_files = create_certificate(self.get_mesh_tmp_dir(), "node1")
 
         def get_mesh_name(self):
             return self.config_files_dir.split("/")[-1]
@@ -93,10 +90,7 @@ def receptor_mesh(base_tmp_dir):
             try:
                 subprocess.check_output(["openssl", "version"])
             except FileNotFoundError:
-                raise Exception(
-                    "openssl binary not found\n"
-                    'Consider run "sudo dnf install openssl"'
-                )
+                raise Exception("openssl binary not found\n" 'Consider run "sudo dnf install openssl"')
 
         def __create_tmp_dir(self):
             mesh_tmp_dir_path = self.get_mesh_tmp_dir()
@@ -149,9 +143,7 @@ def receptor_bin_path():
         subprocess.check_output(["receptor", "--version"])
         return "receptor"
     except subprocess.CalledProcessError:
-        raise Exception(
-            "Receptor binary not found in $PATH or in '../../tests/artifacts-output'"
-        )
+        raise Exception("Receptor binary not found in $PATH or in '../../tests/artifacts-output'")
 
 
 @pytest.fixture(scope="class")
@@ -211,7 +203,7 @@ def receptor_nodes_kill(nodes):
 
 def import_config_from_node(node):
     """Receive a node and return the config file as a dict"""
-    stream = open(node.args[2], "r")
+    stream = open(node.args[2])
     try:
         config_unflatten = yaml.safe_load(stream)
     except yaml.YAMLError as e:
@@ -255,9 +247,7 @@ def default_receptor_controller_unix(receptor_mesh):
 
 def start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path):
     for i, config_file in enumerate(receptor_mesh.config_files):
-        log_file_name = (
-            config_file.split("/")[-1].replace(".yaml", ".log").replace(".yml", ".log")
-        )
+        log_file_name = config_file.split("/")[-1].replace(".yaml", ".log").replace(".yml", ".log")
         receptor_nodes.log_files.append(
             open(
                 os.path.join(receptor_mesh.get_mesh_tmp_dir(), log_file_name),
@@ -285,9 +275,7 @@ def receptor_mesh_mesh1(
     # Start the receptor nodes processes
     start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path)
 
-    receptor_mesh_wait_until_ready(
-        receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix()
-    )
+    receptor_mesh_wait_until_ready(receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix())
 
     yield
 
@@ -323,9 +311,7 @@ def receptor_mesh_access_control(
     # Start the receptor nodes processes
     start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path)
 
-    receptor_mesh_wait_until_ready(
-        receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix()
-    )
+    receptor_mesh_wait_until_ready(receptor_nodes.nodes, receptor_mesh.default_receptor_controller_unix())
 
     yield
 

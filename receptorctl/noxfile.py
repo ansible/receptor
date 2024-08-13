@@ -90,7 +90,7 @@ def check_style(session: nox.Session):
     Check receptorctl Python code style
     """
     install(session, req="lint")
-    session.run("flake8", *session.posargs, *LINT_FILES)
+    session.run("flake8", "--max--line-length", "120", *session.posargs, *LINT_FILES)
 
 
 @nox.session

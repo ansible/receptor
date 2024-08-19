@@ -824,6 +824,33 @@ Work Kubernetes
     work-kubernetes:
       - worktype: cat
 
+
+
+
+^^^^^^^^^^^
+Work Python
+^^^^^^^^^^^
+.. list-table:: Work Python [DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release
+    :header-rows: 1
+    :widths: auto
+
+    * - Parameter
+      - Description
+      - Default value
+    * - ``config=<JSON dict with string keys>``
+      - Plugin-specific configuration
+      - No default value.
+    * - ``function=<string>``
+      - Receptor-exported function to call (required)
+      - No default value.
+    * - ``plugin=<string>``
+      - Python module name of the worker plugin (required)
+      - No default value.
+    * - ``worktype=<string>``
+      - Name for this worker type (required)
+      - No default value.
+
+
 ^^^^^^^^^^^^
 Work Signing
 ^^^^^^^^^^^^

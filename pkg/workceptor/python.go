@@ -23,7 +23,7 @@ type pythonUnit struct {
 
 // Start launches a job with given parameters.
 func (pw *pythonUnit) Start() error {
-	pw.UpdateBasicStatus(WorkStatePending, "[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release.", 0)
+	pw.UpdateBasicStatus(WorkStatePending, "[DEPRECATION WARNING] '--work-python' option is not currently being used. This feature will be removed from receptor in a future release.", 0)
 	pw.UpdateBasicStatus(WorkStatePending, "Launching Python runner", 0)
 	config := make(map[string]interface{})
 	for k, v := range pw.config {
@@ -75,7 +75,7 @@ func (cfg WorkPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 func (cfg WorkPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, false)
 
-	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release"))
+	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] 'work-python' option is not currently being used. This feature will be removed from receptor in a future release"))
 
 	return errWithDeprecation
 }

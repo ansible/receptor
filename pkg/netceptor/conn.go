@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/logging"
+	"github.com/quic-go/quic-go/qlog"
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
@@ -90,6 +92,29 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
+		Tracer:  func(
+			ctx context.Context, 
+			p logging.Perspective, 
+			connID quic.ConnectionID,
+		) *logging.ConnectionTracer {
+			qlogPath := os.Getenv("QLOGDIR")
+			s.Logger.Debug("HERE: %s", qlogPath)
+			if qlogPath != "" {
+				role := "server"
+				if p == logging.PerspectiveClient {
+					role = "client"
+				}
+				filename := fmt.Sprintf("log_%x_%s.qlog", connID, role)
+				f, err := os.Create(qlogPath + filename)
+				if err != nil {
+					s.Logger.Debug("failed to create qlog file at path: %s", qlogPath)
+					return nil
+				}
+				return qlog.NewConnectionTracer(f, p, connID)
+			} else {
+				return nil
+			}
+		},
 		HandshakeIdleTimeout:    15 * time.Second,
 		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
 		Allow0RTT:               true,
@@ -296,6 +321,28 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
+		Tracer:  func(
+			ctx context.Context, 
+			p logging.Perspective, 
+			connID quic.ConnectionID,
+		) *logging.ConnectionTracer {
+			qlogPath := os.Getenv("QLOGDIR")
+			if qlogPath != "" {
+				role := "server"
+				if p == logging.PerspectiveClient {
+					role = "client"
+				}
+				filename := fmt.Sprintf("log_%x_%s.qlog", connID, role)
+				f, err := os.Create(qlogPath + filename)
+				if err != nil {
+					s.Logger.Debug("failed to create qlog file at path: %s", qlogPath)
+					return nil
+				}
+				return qlog.NewConnectionTracer(f, p, connID)
+			} else {
+				return nil
+			}
+		},
 		HandshakeIdleTimeout:    15 * time.Second,
 		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
 		Allow0RTT:               true,

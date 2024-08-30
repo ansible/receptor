@@ -3,7 +3,7 @@ module github.com/ansible/receptor
 go 1.21
 
 require (
-	github.com/creack/pty v1.1.21
+	github.com/creack/pty v1.1.23
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/ghjm/cmdline v0.1.2
@@ -21,7 +21,7 @@ require (
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.4.0
 	golang.org/x/net v0.28.0

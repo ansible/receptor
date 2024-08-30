@@ -92,7 +92,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
-		Tracer:  s.tracer,
+		Tracer:                  s.tracer,
 		HandshakeIdleTimeout:    15 * time.Second,
 		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
 		Allow0RTT:               true,
@@ -137,11 +137,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	return li, nil
 }
 
-func (s *Netceptor) tracer(
-	ctx context.Context, 
-	p logging.Perspective, 
-	connID quic.ConnectionID,
-) *logging.ConnectionTracer {
+func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID quic.ConnectionID) *logging.ConnectionTracer {
 	qlogPath := os.Getenv("QLOGDIR")
 	if qlogPath != "" {
 		role := "server"
@@ -155,7 +151,7 @@ func (s *Netceptor) tracer(
 
 			return nil
 		}
-		
+
 		return qlog.NewConnectionTracer(f, p, connID)
 	} else {
 		return nil
@@ -324,7 +320,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
-		Tracer:  s.tracer,
+		Tracer:                  s.tracer,
 		HandshakeIdleTimeout:    15 * time.Second,
 		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
 		Allow0RTT:               true,

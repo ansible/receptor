@@ -98,7 +98,6 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 			connID quic.ConnectionID,
 		) *logging.ConnectionTracer {
 			qlogPath := os.Getenv("QLOGDIR")
-			s.Logger.Debug("HERE: %s", qlogPath)
 			if qlogPath != "" {
 				role := "server"
 				if p == logging.PerspectiveClient {

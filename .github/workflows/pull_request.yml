@@ -72,14 +72,14 @@ jobs:
         run: find /tmp/receptor-testing -name controlsock -delete
 
       - name: Artifact receptor data for ${{ matrix.go-version }}
-        uses: actions/upload-artifact@v4.3.6
+        uses: actions/upload-artifact@v4.4.0
         if: ${{ failure() }}
         with:
           name: test-logs-${{ matrix.go-version }}
           path: /tmp/receptor-testing
 
       - name: Archive receptor binary for ${{ matrix.go-version }}
-        uses: actions/upload-artifact@v4.3.6
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: receptor-${{ matrix.go-version }}
           path: /usr/local/bin/receptor

@@ -888,6 +888,7 @@ func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
 	t.Parallel()
 	s := New(context.Background(), "node1")
 	p := logging.PerspectiveClient
+	os.Unsetenv("QLOGDIR")
 	trace := s.tracer(s.context, p, quic.ConnectionID{})
 	if trace != nil {
 		t.Fatalf("tracer should return nil when QLOGDIR environment variable is not defined but got %v", trace)

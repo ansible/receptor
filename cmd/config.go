@@ -37,15 +37,8 @@ type ReceptorConfig struct {
 	// Used pointer structs to apply defaults to config
 	Node              *types.NodeCfg
 	Trace             logger.TraceCfg
-	LocalOnly         backends.NullBackendCfg          `mapstructure:"local-only"`
 	LogLevel          *logger.LoglevelCfg              `mapstructure:"log-level"`
 	ControlServices   []*controlsvc.CmdlineConfigUnix  `mapstructure:"control-services"`
-	TCPPeers          []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
-	UDPPeers          []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
-	WSPeers           []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
-	TCPListeners      []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
-	UDPListeners      []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
-	WSListeners       []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
 	TLSClients        []netceptor.TLSClientConfig      `mapstructure:"tls-clients"`
 	TLSServer         []netceptor.TLSServerConfig      `mapstructure:"tls-servers"`
 	WorkCommands      []workceptor.CommandWorkerCfg    `mapstructure:"work-commands"`
@@ -67,7 +60,7 @@ type CertificatesConfig struct {
 	SignReq []certificates.SignReqConfig `mapstructure:"cert-signreqs"`
 }
 
-type ReloadableServices struct {
+type BackendConfig struct {
 	TCPListeners []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
 	UDPListeners []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
 	WSListeners  []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
@@ -81,24 +74,34 @@ func PrintPhaseErrorMessage(configName string, phase string, err error) {
 	fmt.Printf("ERROR: %s for %s on %s phase\n", err, configName, phase)
 }
 
-func ParseConfigs(configFile string) (*ReceptorConfig, *CertificatesConfig, error) {
-	if configFile == "" && viper.ConfigFileUsed() == "" {
-		fmt.Fprintln(os.Stderr, "Could not locate config file (default is $HOME/receptor.yaml)")
-		os.Exit(1)
-	}
+func ParseReceptorConfig(configFile string) (*ReceptorConfig, error) {
 	var receptorConfig ReceptorConfig
-	var certifcatesConfig CertificatesConfig
 	err := viper.Unmarshal(&receptorConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	err = viper.Unmarshal(&certifcatesConfig)
+	return &receptorConfig, nil
+}
+
+func ParseCertificatesConfig(configFile string) (*CertificatesConfig, error) {
+	var certifcatesConfig CertificatesConfig
+	err := viper.Unmarshal(&certifcatesConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return &receptorConfig, &certifcatesConfig, nil
+	return &certifcatesConfig, nil
+}
+
+func ParseBackendConfig(configFile string) (*BackendConfig, error) {
+	var backendConfig BackendConfig
+	err := viper.Unmarshal(&backendConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &backendConfig, nil
 }
 
 func isConfigEmpty(v reflect.Value) bool {

@@ -13,10 +13,12 @@ import (
 )
 
 var (
-	cfgFile        string
-	version        bool
-	receptorConfig *ReceptorConfig
+	cfgFile       string
+	version       bool
+	backendConfig *BackendConfig
 )
+
+var FindMe = true
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
@@ -26,31 +28,7 @@ var rootCmd = &cobra.Command{
 	Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers.
 	Receptor nodes establish peer-to-peer connections with each other via existing networks.
 	Once connected, the receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if version {
-			fmt.Println(receptorVersion.Version)
-			os.Exit(0)
-		}
-		var err error
-		var certifcatesConfig *CertificatesConfig
-
-		receptorConfig, certifcatesConfig, err = ParseConfigs(cfgFile)
-		if err != nil {
-			fmt.Printf("unable to decode into struct, %v", err)
-			os.Exit(1)
-		}
-
-		isEmptyReceptorConfig := isConfigEmpty(reflect.ValueOf(*receptorConfig))
-
-		RunConfigV2(reflect.ValueOf(*certifcatesConfig))
-		if isEmptyReceptorConfig {
-			fmt.Println("empty receptor config, skipping...")
-			os.Exit(0)
-		}
-
-		SetConfigDefaults(receptorConfig)
-		RunConfigV2(reflect.ValueOf(*receptorConfig))
-	},
+	Run: handleRootCommand,
 }
 
 func Execute() {
@@ -66,8 +44,6 @@ func init() {
 	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/receptor.yaml)")
 	rootCmd.Flags().BoolVar(&version, "version", false, "Show the Receptor version")
 }
-
-var FindMe = true
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
@@ -85,9 +61,9 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		fmt.Println("Config file changed:", e.Name)
+		fmt.Printf("Config file changed: %s\n", e.Name)
 
-		var newConfig *ReceptorConfig
+		var newConfig *BackendConfig
 		viper.Unmarshal(&newConfig)
 
 		// used because OnConfigChange runs twice for some reason
@@ -97,9 +73,9 @@ func initConfig() {
 			return
 		}
 
-		SetConfigDefaults(newConfig)
+		SetBackendConfigDefaults(newConfig)
 
-		isEqual := reflect.DeepEqual(*receptorConfig, *newConfig)
+		isEqual := reflect.DeepEqual(*backendConfig, *newConfig)
 		if !isEqual {
 			fmt.Println("reloading backends")
 
@@ -110,16 +86,59 @@ func initConfig() {
 			// if services has two items in a slice and one of them has changed iterate and reload on changed service
 			netceptor.MainInstance.CancelBackends()
 
-			var reloadableServices *ReloadableServices
-			viper.Unmarshal(&reloadableServices)
-			ReloadServices(reflect.ValueOf(*reloadableServices))
-			receptorConfig = newConfig
+			ReloadServices(reflect.ValueOf(*newConfig))
+			backendConfig = newConfig
 		}
 	})
+	// TODO: use env to turn off watch config
 	viper.WatchConfig()
 
 	err := viper.ReadInConfig()
 	if err == nil {
 		fmt.Fprintln(os.Stdout, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func handleRootCommand(cmd *cobra.Command, args []string) {
+	if version {
+		fmt.Println(receptorVersion.Version)
+		os.Exit(0)
+	}
+
+	if cfgFile == "" && viper.ConfigFileUsed() == "" {
+		fmt.Fprintln(os.Stderr, "Could not locate config file (default is $HOME/receptor.yaml)")
+		os.Exit(1)
+	}
+
+	receptorConfig, err := ParseReceptorConfig(cfgFile)
+	if err != nil {
+		fmt.Printf("unable to decode into struct, %v", err)
+		os.Exit(1)
+	}
+
+	certifcatesConfig, err := ParseCertificatesConfig(cfgFile)
+	if err != nil {
+		fmt.Printf("unable to decode into struct, %v", err)
+		os.Exit(1)
+	}
+
+	backendConfig, err = ParseBackendConfig(cfgFile)
+	if err != nil {
+		fmt.Printf("unable to decode into struct, %v", err)
+		os.Exit(1)
+	}
+
+	isEmptyReceptorConfig := isConfigEmpty(reflect.ValueOf(*receptorConfig))
+	isEmptyReloadableServicesConfig := isConfigEmpty(reflect.ValueOf(*backendConfig))
+
+	RunConfigV2(reflect.ValueOf(*certifcatesConfig))
+	if isEmptyReceptorConfig && isEmptyReloadableServicesConfig {
+		fmt.Println("empty receptor config, skipping...")
+		os.Exit(0)
+	}
+
+	SetReceptorConfigDefaults(receptorConfig)
+	SetBackendConfigDefaults(backendConfig)
+	RunConfigV2(reflect.ValueOf(*receptorConfig))
+	RunConfigV2(reflect.ValueOf(*backendConfig))
 }

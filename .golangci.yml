@@ -99,6 +99,8 @@ linters-settings:
           - "k8s.io/client-go/kubernetes"
           - "k8s.io/client-go/rest"
           - "k8s.io/client-go/tools/remotecommand"
+          - "github.com/quic-go/quic-go"
+          - "github.com/quic-go/quic-go/logging"
 
 issues:
   # Dont commit the following line.

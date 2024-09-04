@@ -12,6 +12,8 @@ import (
 
 	"github.com/ansible/receptor/tests/utils"
 	"github.com/prep/socketpair"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/logging"
 )
 
 type logWriter struct {
@@ -867,5 +869,28 @@ func TestTooShortSetMaxConnectionIdleTime(t *testing.T) {
 	err := node.SetMaxConnectionIdleTime("60us")
 	if err == nil {
 		t.Fatal("this should have failed out, as we're passing in an invalid time object that violates the logic in SetMaxConnectionIdleTime")
+	}
+}
+
+func TestTracerReturnsNewConnectionTracer(t *testing.T) {
+	t.Parallel()
+	s := New(context.Background(), "node1")
+	p := logging.PerspectiveClient
+	os.Setenv("QLOGDIR", "/tmp/")
+	trace := s.tracer(s.context, p, quic.ConnectionID{})
+	if trace == nil {
+		t.Fatalf("tracer should return a newConnectionTracer when QLOGDIR environment variable is defined but got %v", trace)
+	}
+	os.Unsetenv("QLOGDIR")
+}
+
+func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
+	t.Parallel()
+	s := New(context.Background(), "node1")
+	p := logging.PerspectiveClient
+	os.Unsetenv("QLOGDIR")
+	trace := s.tracer(s.context, p, quic.ConnectionID{})
+	if trace != nil {
+		t.Fatalf("tracer should return nil when QLOGDIR environment variable is not defined but got %v", trace)
 	}
 }

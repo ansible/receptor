@@ -6,13 +6,16 @@ import (
 	"reflect"
 
 	receptorVersion "github.com/ansible/receptor/internal/version"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	cfgFile string
-	version bool
+	cfgFile        string
+	version        bool
+	receptorConfig *ReceptorConfig
 )
 
 // rootCmd represents the base command when called without any subcommands.
@@ -28,7 +31,10 @@ var rootCmd = &cobra.Command{
 			fmt.Println(receptorVersion.Version)
 			os.Exit(0)
 		}
-		receptorConfig, certifcatesConfig, err := ParseConfigs(cfgFile)
+		var err error
+		var certifcatesConfig *CertificatesConfig
+
+		receptorConfig, certifcatesConfig, err = ParseConfigs(cfgFile)
 		if err != nil {
 			fmt.Printf("unable to decode into struct, %v", err)
 			os.Exit(1)
@@ -77,6 +83,39 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv()
+
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Println("Config file changed:", e.Name)
+
+		var newConfig *ReceptorConfig
+		viper.Unmarshal(&newConfig)
+
+		// used because OnConfigChange runs twice for some reason
+		// allows to skip empty first config
+		isEmpty := isConfigEmpty(reflect.ValueOf(*newConfig))
+		if isEmpty {
+			return
+		}
+
+		SetConfigDefaults(newConfig)
+
+		isEqual := reflect.DeepEqual(*receptorConfig, *newConfig)
+		if !isEqual {
+			fmt.Println("reloading backends")
+
+			// this will do a reload of all reloadable services
+			// TODO: Optimize to only reload services that have config change
+			// NOTE: Make sure to account for two things
+			// if current config had two services then new config has zero cancel those backends
+			// if services has two items in a slice and one of them has changed iterate and reload on changed service
+			netceptor.MainInstance.CancelBackends()
+
+			var reloadableServices *ReloadableServices
+			viper.Unmarshal(&reloadableServices)
+			ReloadServices(reflect.ValueOf(*reloadableServices))
+		}
+	})
+	viper.WatchConfig()
 
 	err := viper.ReadInConfig()
 	if err == nil {

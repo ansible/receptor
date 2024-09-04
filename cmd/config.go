@@ -29,6 +29,10 @@ type Runer interface {
 	Run() error
 }
 
+type Reloader interface {
+	Reload() error
+}
+
 type ReceptorConfig struct {
 	// Used pointer structs to apply defaults to config
 	Node              *types.NodeCfg
@@ -61,6 +65,16 @@ type CertificatesConfig struct {
 	InitCA  certificates.InitCAConfig    `mapstructure:"cert-init"`
 	MakeReq []certificates.MakeReqConfig `mapstructure:"cert-makereqs"`
 	SignReq []certificates.SignReqConfig `mapstructure:"cert-signreqs"`
+}
+
+type ReloadableServices struct {
+	TCPListeners []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
+	UDPListeners []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
+	WSListeners  []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
+	TCPPeers     []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
+	UDPPeers     []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
+	WSPeers      []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
+	LocalOnly    backends.NullBackendCfg          `mapstructure:"local-only"`
 }
 
 func PrintPhaseErrorMessage(configName string, phase string, err error) {
@@ -153,6 +167,31 @@ func RunPhases(phase string, v reflect.Value) {
 				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
 			}
 		default:
+		}
+	}
+}
+
+// ReloadServices iterates through key/values calling reload on applicable services.
+func ReloadServices(v reflect.Value) {
+	for i := 0; i < v.NumField(); i++ {
+		if reflect.Value.IsZero(v.Field(i)) {
+			continue
+		}
+
+		var err error
+		switch v.Field(i).Kind() {
+		case reflect.Slice:
+			for j := 0; j < v.Field(i).Len(); j++ {
+				switch c := v.Interface().(type) {
+				case Reloader:
+					err = c.Reload()
+					if err != nil {
+						PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
+					}
+				}
+			}
+		default:
+			PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
 		}
 	}
 }

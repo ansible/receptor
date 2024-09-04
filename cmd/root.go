@@ -113,6 +113,7 @@ func initConfig() {
 			var reloadableServices *ReloadableServices
 			viper.Unmarshal(&reloadableServices)
 			ReloadServices(reflect.ValueOf(*reloadableServices))
+			receptorConfig = newConfig
 		}
 	})
 	viper.WatchConfig()

@@ -182,12 +182,14 @@ func ReloadServices(v reflect.Value) {
 		switch v.Field(i).Kind() {
 		case reflect.Slice:
 			for j := 0; j < v.Field(i).Len(); j++ {
-				switch c := v.Interface().(type) {
+				serviceItem := v.Field(i).Index(j).Interface()
+				switch c := serviceItem.(type) {
 				case Reloader:
 					err = c.Reload()
 					if err != nil {
 						PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
 					}
+				default:
 				}
 			}
 		default:

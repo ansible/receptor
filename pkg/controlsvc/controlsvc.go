@@ -275,6 +275,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		if len(cmdBytes) == 0 {
 			continue
 		}
+		s.nc.GetLogger().Debug("Control service received command: %s\n", string(cmdBytes))
 		var cmd string
 		var params string
 		var jsonData map[string]interface{}

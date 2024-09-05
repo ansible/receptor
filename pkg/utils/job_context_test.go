@@ -20,8 +20,6 @@ func TestJobContext_Running(t *testing.T) {
 	}
 
 	goodCtx, goodCancel := context.WithCancel(context.Background())
-	goodWg := &sync.WaitGroup{}
-	goodRunningLock := &sync.Mutex{}
 
 	tests := []struct {
 		name   string
@@ -33,9 +31,9 @@ func TestJobContext_Running(t *testing.T) {
 			fields: fields{
 				Ctx:         goodCtx,
 				JcCancel:    goodCancel,
-				Wg:          goodWg,
+				Wg:          &sync.WaitGroup{},
 				JcRunning:   true,
-				RunningLock: goodRunningLock,
+				RunningLock: &sync.Mutex{},
 			},
 			want: true,
 		},
@@ -125,6 +123,7 @@ func TestJobContext_Value(t *testing.T) {
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
+			want:	nil,
 		},
 	}
 	for _, tt := range tests {
@@ -161,14 +160,16 @@ func TestJobContext_Deadline(t *testing.T) {
 		wantOk   bool
 	}{
 		{
-			name: "Positive",
-			fields: fields{
+			name:		"Positive",
+			fields:		fields{
 				Ctx:         goodCtx,
 				JcCancel:    goodCancel,
 				Wg:          &sync.WaitGroup{},
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
+			wantTime:	time.Time{},
+			wantOk:		false,
 		},
 	}
 	for _, tt := range tests {
@@ -208,14 +209,15 @@ func TestJobContext_Err(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Positive",
-			fields: fields{
+			name:		"Positive",
+			fields:		fields{
 				Ctx:         goodCtx,
 				JcCancel:    goodCancel,
 				Wg:          &sync.WaitGroup{},
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
+			wantErr:	false,
 		},
 	}
 	for _, tt := range tests {

@@ -18,8 +18,7 @@ type fields struct {
 	RunningLock *sync.Mutex
 }
 
-func TestJobContext_Running(t *testing.T) {
-
+func TestJobContextRunning(t *testing.T) {
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
 	tests := []struct {
@@ -55,7 +54,7 @@ func TestJobContext_Running(t *testing.T) {
 	}
 }
 
-func TestJobContext_Cancel(t *testing.T) {
+func TestJobContextCancel(t *testing.T) {
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
 	tests := []struct {
@@ -87,7 +86,7 @@ func TestJobContext_Cancel(t *testing.T) {
 	}
 }
 
-func TestJobContext_Value(t *testing.T) {
+func TestJobContextValue(t *testing.T) {
 	type args struct {
 		key interface{}
 	}
@@ -128,7 +127,7 @@ func TestJobContext_Value(t *testing.T) {
 	}
 }
 
-func TestJobContext_Deadline(t *testing.T) {
+func TestJobContextDeadline(t *testing.T) {
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 	goodWg := &sync.WaitGroup{}
 
@@ -171,7 +170,7 @@ func TestJobContext_Deadline(t *testing.T) {
 	}
 }
 
-func TestJobContext_Err(t *testing.T) {
+func TestJobContextErr(t *testing.T) {
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 	goodRunningLock := &sync.Mutex{}
 
@@ -208,7 +207,7 @@ func TestJobContext_Err(t *testing.T) {
 	}
 }
 
-func TestJobContext_Wait(t *testing.T) {
+func TestJobContextWait(t *testing.T) {
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
 	tests := []struct {

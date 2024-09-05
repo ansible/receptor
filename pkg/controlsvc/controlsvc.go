@@ -516,7 +516,7 @@ func (cfg CmdlineConfigUnix) Run() error {
 		}
 	}
 	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
-		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)
+		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)  //nolint:gosec
 	if err != nil {
 		return err
 	}

@@ -7,6 +7,7 @@ import shutil
 import time
 import json
 import yaml
+import urllib.request
 from click.testing import CliRunner
 
 from .lib import create_certificate
@@ -401,3 +402,23 @@ def invoke_as_json(invoke):
         return result, json_output
 
     return f_invoke_as_json
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "github(): this mark skips the tests for the given open GitHub issues",
+    )
+
+
+def pytest_runtest_setup(item):
+    gh_markers = [mark.args[0] for mark in item.iter_markers(name="github")]
+    if gh_markers:
+        issue_url = gh_markers[0]
+        with urllib.request.urlopen(issue_url) as f:
+            try:
+                status = json.loads(f.read())["state"]
+                if status == "open":
+                    pytest.skip("Test skipped because GitHub issue is open")
+            except (json.decoder.JSONDecodeError, IndexError):
+                pass

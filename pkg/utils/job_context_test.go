@@ -95,9 +95,9 @@ func TestJobContextValue(t *testing.T) {
 		want   interface{}
 	}{
 		{
-			name: "Positive",
+			name:   "Positive",
 			fields: setupGoodFields(),
-			want: nil,
+			want:   nil,
 		},
 	}
 	for _, tt := range tests {
@@ -124,8 +124,8 @@ func TestJobContextDeadline(t *testing.T) {
 		wantOk   bool
 	}{
 		{
-			name: "Positive",
-			fields: setupGoodFields(),
+			name:     "Positive",
+			fields:   setupGoodFields(),
 			wantTime: time.Time{},
 			wantOk:   false,
 		},
@@ -157,8 +157,8 @@ func TestJobContextErr(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Positive",
-			fields: setupGoodFields(),
+			name:    "Positive",
+			fields:  setupGoodFields(),
 			wantErr: false,
 		},
 	}
@@ -184,7 +184,7 @@ func TestJobContextWait(t *testing.T) {
 		fields fields
 	}{
 		{
-			name: "Positive",
+			name:   "Positive",
 			fields: setupGoodFields(),
 		},
 	}

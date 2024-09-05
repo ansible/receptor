@@ -92,7 +92,7 @@ func (cfg UnixProxyInboundCfg) Run() error {
 		return err
 	}
 
-	return UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, os.FileMode(cfg.Permissions),
+	return UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, os.FileMode(cfg.Permissions), //nolint:gosec
 		cfg.RemoteNode, cfg.RemoteService, tlscfg)
 }
 

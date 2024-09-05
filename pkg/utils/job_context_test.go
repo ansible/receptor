@@ -20,7 +20,6 @@ type fields struct {
 
 func TestJobContextRunning(t *testing.T) {
 	goodCtx, goodCancel := context.WithCancel(context.Background())
-
 	tests := []struct {
 		name   string
 		fields fields

@@ -47,11 +47,11 @@ func TestNullBackendCfgGetTLS(t *testing.T) {
 		want   *tls.Config
 	}{
 		{
-			name:	"Positive",
-			fields:	fields{
-				Local:	true,
+			name: "Positive",
+			fields: fields{
+				Local: true,
 			},
-			want:	nil,
+			want: nil,
 		},
 	}
 	for _, tt := range tests {

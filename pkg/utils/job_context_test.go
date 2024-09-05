@@ -10,14 +10,15 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 )
 
-func TestJobContext_Running(t *testing.T) {
-	type fields struct {
-		Ctx         context.Context
-		JcCancel    context.CancelFunc
-		Wg          *sync.WaitGroup
-		JcRunning   bool
-		RunningLock *sync.Mutex
-	}
+type fields struct {
+	Ctx         context.Context
+	JcCancel    context.CancelFunc
+	Wg          *sync.WaitGroup
+	JcRunning   bool
+	RunningLock *sync.Mutex
+}
+
+	func TestJobContext_Running(t *testing.T) {
 
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
@@ -55,13 +56,6 @@ func TestJobContext_Running(t *testing.T) {
 }
 
 func TestJobContext_Cancel(t *testing.T) {
-	type fields struct {
-		Ctx         context.Context
-		JcCancel    context.CancelFunc
-		Wg          *sync.WaitGroup
-		JcRunning   bool
-		RunningLock *sync.Mutex
-	}
 
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
@@ -95,13 +89,6 @@ func TestJobContext_Cancel(t *testing.T) {
 }
 
 func TestJobContext_Value(t *testing.T) {
-	type fields struct {
-		Ctx         context.Context
-		JcCancel    context.CancelFunc
-		Wg          *sync.WaitGroup
-		JcRunning   bool
-		RunningLock *sync.Mutex
-	}
 	type args struct {
 		key interface{}
 	}
@@ -143,15 +130,8 @@ func TestJobContext_Value(t *testing.T) {
 }
 
 func TestJobContext_Deadline(t *testing.T) {
-	type fields struct {
-		Ctx         context.Context
-		JcCancel    context.CancelFunc
-		Wg          *sync.WaitGroup
-		JcRunning   bool
-		RunningLock *sync.Mutex
-	}
-
 	goodCtx, goodCancel := context.WithCancel(context.Background())
+	goodWg := &sync.WaitGroup{}
 
 	tests := []struct {
 		name     string
@@ -164,7 +144,7 @@ func TestJobContext_Deadline(t *testing.T) {
 			fields: fields{
 				Ctx:         goodCtx,
 				JcCancel:    goodCancel,
-				Wg:          &sync.WaitGroup{},
+				Wg:          goodWg,
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
@@ -193,15 +173,9 @@ func TestJobContext_Deadline(t *testing.T) {
 }
 
 func TestJobContext_Err(t *testing.T) {
-	type fields struct {
-		Ctx         context.Context
-		JcCancel    context.CancelFunc
-		Wg          *sync.WaitGroup
-		JcRunning   bool
-		RunningLock *sync.Mutex
-	}
 
 	goodCtx, goodCancel := context.WithCancel(context.Background())
+	goodRunningLock := &sync.Mutex{}
 
 	tests := []struct {
 		name    string
@@ -215,7 +189,7 @@ func TestJobContext_Err(t *testing.T) {
 				JcCancel:    goodCancel,
 				Wg:          &sync.WaitGroup{},
 				JcRunning:   true,
-				RunningLock: &sync.Mutex{},
+				RunningLock: goodRunningLock,
 			},
 			wantErr: false,
 		},
@@ -237,14 +211,6 @@ func TestJobContext_Err(t *testing.T) {
 }
 
 func TestJobContext_Wait(t *testing.T) {
-	type fields struct {
-		Ctx         context.Context
-		JcCancel    context.CancelFunc
-		Wg          *sync.WaitGroup
-		JcRunning   bool
-		RunningLock *sync.Mutex
-	}
-
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
 	tests := []struct {

@@ -18,7 +18,7 @@ type fields struct {
 	RunningLock *sync.Mutex
 }
 
-	func TestJobContext_Running(t *testing.T) {
+func TestJobContext_Running(t *testing.T) {
 
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
@@ -56,7 +56,6 @@ type fields struct {
 }
 
 func TestJobContext_Cancel(t *testing.T) {
-
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 
 	tests := []struct {
@@ -173,7 +172,6 @@ func TestJobContext_Deadline(t *testing.T) {
 }
 
 func TestJobContext_Err(t *testing.T) {
-
 	goodCtx, goodCancel := context.WithCancel(context.Background())
 	goodRunningLock := &sync.Mutex{}
 

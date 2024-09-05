@@ -123,7 +123,7 @@ func TestJobContext_Value(t *testing.T) {
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
-			want:	nil,
+			want: nil,
 		},
 	}
 	for _, tt := range tests {
@@ -160,16 +160,16 @@ func TestJobContext_Deadline(t *testing.T) {
 		wantOk   bool
 	}{
 		{
-			name:		"Positive",
-			fields:		fields{
+			name: "Positive",
+			fields: fields{
 				Ctx:         goodCtx,
 				JcCancel:    goodCancel,
 				Wg:          &sync.WaitGroup{},
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
-			wantTime:	time.Time{},
-			wantOk:		false,
+			wantTime: time.Time{},
+			wantOk:   false,
 		},
 	}
 	for _, tt := range tests {
@@ -209,15 +209,15 @@ func TestJobContext_Err(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:		"Positive",
-			fields:		fields{
+			name: "Positive",
+			fields: fields{
 				Ctx:         goodCtx,
 				JcCancel:    goodCancel,
 				Wg:          &sync.WaitGroup{},
 				JcRunning:   true,
 				RunningLock: &sync.Mutex{},
 			},
-			wantErr:	false,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

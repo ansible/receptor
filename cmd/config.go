@@ -189,13 +189,12 @@ func ReloadServices(v reflect.Value) {
 			for j := 0; j < v.Field(i).Len(); j++ {
 				serviceItem := v.Field(i).Index(j).Interface()
 				switch c := serviceItem.(type) {
-				// check to see if the selected type field satifies reload
+				// check to see if the selected type field satisfies reload
 				// call reload on cfg object
 				case Reloader:
 					err = c.Reload()
 					if err != nil {
 						PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
-
 					}
 				// if cfg object does not satisfy, do nothing
 				default:
@@ -208,8 +207,8 @@ func ReloadServices(v reflect.Value) {
 				err = c.Reload()
 				if err != nil {
 					PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
-
 				}
+			default:
 			}
 		}
 	}

@@ -177,6 +177,7 @@ func RunPhases(phase string, v reflect.Value) {
 // ReloadServices iterates through key/values calling reload on applicable services.
 func ReloadServices(v reflect.Value) {
 	for i := 0; i < v.NumField(); i++ {
+		// if the services is not initialised, skip
 		if reflect.Value.IsZero(v.Field(i)) {
 			continue
 		}
@@ -184,19 +185,32 @@ func ReloadServices(v reflect.Value) {
 		var err error
 		switch v.Field(i).Kind() {
 		case reflect.Slice:
+			// iterate over all the type fields
 			for j := 0; j < v.Field(i).Len(); j++ {
 				serviceItem := v.Field(i).Index(j).Interface()
 				switch c := serviceItem.(type) {
+				// check to see if the selected type field satifies reload
+				// call reload on cfg object
 				case Reloader:
 					err = c.Reload()
 					if err != nil {
 						PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
+
 					}
+				// if cfg object does not satisfy, do nothing
 				default:
 				}
 			}
+		// runs for non slice fields
 		default:
-			PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
+			switch c := v.Field(i).Interface().(type) {
+			case Reloader:
+				err = c.Reload()
+				if err != nil {
+					PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
+
+				}
+			}
 		}
 	}
 }

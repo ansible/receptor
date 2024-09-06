@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	receptorVersion "github.com/ansible/receptor/internal/version"
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
@@ -17,8 +18,6 @@ var (
 	version       bool
 	backendConfig *BackendConfig
 )
-
-var FindMe = true
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
@@ -47,6 +46,7 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	l := logger.NewReceptorLogger("")
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -61,7 +61,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		fmt.Printf("Config file changed: %s\n", e.Name)
+		l.Info("Config file changed: %s\n", e.Name)
 
 		var newConfig *BackendConfig
 		viper.Unmarshal(&newConfig)
@@ -77,7 +77,7 @@ func initConfig() {
 
 		isEqual := reflect.DeepEqual(*backendConfig, *newConfig)
 		if !isEqual {
-			fmt.Println("reloading backends")
+			// fmt.Println("reloading backends")
 
 			// this will do a reload of all reloadable services
 			// TODO: Optimize to only reload services that have config change
@@ -85,10 +85,15 @@ func initConfig() {
 			// if current config had two services then new config has zero cancel those backends
 			// if services has two items in a slice and one of them has changed iterate and reload on changed service
 			netceptor.MainInstance.CancelBackends()
+			l.Info("Reloading backends")
 
 			ReloadServices(reflect.ValueOf(*newConfig))
 			backendConfig = newConfig
+
+			return
 		}
+
+		l.Info("No reloadable backends were found.")
 	})
 	// TODO: use env to turn off watch config
 	viper.WatchConfig()

@@ -9,6 +9,10 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/workceptor"
+
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type NodeCfg struct {
@@ -38,6 +42,9 @@ func (cfg NodeCfg) Init() error {
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(":2112", nil)
 
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
 

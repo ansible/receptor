@@ -13,7 +13,7 @@ const (
 	goodErrorString string = "unit was already started"
 )
 
-var errUnitWasAlreadyStarted error = fmt.Errorf(goodErrorString)
+var errUnitWasAlreadyStarted error = fmt.Errorf(goodErrorString) //nolint:staticcheck
 
 func TestErrorWithKind_Error(t *testing.T) {
 	type fields struct {

@@ -54,7 +54,7 @@ func setupReader(t *testing.T) (*gomock.Controller, *workceptor.STDinReader) {
 
 	wc, err := workceptor.NewStdinReader(mockfilesystemer, "")
 	if err != nil {
-		t.Errorf(stdinError)
+		t.Errorf(stdinError) //nolint:staticcheck
 	}
 
 	return ctrl, wc

@@ -43,7 +43,7 @@ func SendPing(ctx context.Context, s NetcForPing, target string, hopsToLive byte
 	go func() {
 		for msg := range unrCh {
 			errorChan <- errorResult{
-				err:      fmt.Errorf(msg.Problem),
+				err:      fmt.Errorf(msg.Problem), //nolint:govet
 				fromNode: msg.ReceivedFromNode,
 			}
 		}

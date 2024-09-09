@@ -2,7 +2,7 @@ package cmd
 
 import "github.com/ansible/receptor/pkg/types"
 
-func SetTCPListenerDefaults(config *ReceptorConfig) {
+func SetTCPListenerDefaults(config *BackendConfig) {
 	for _, listener := range config.TCPListeners {
 		if listener.Cost == 0 {
 			listener.Cost = 1.0
@@ -13,7 +13,7 @@ func SetTCPListenerDefaults(config *ReceptorConfig) {
 	}
 }
 
-func SetUDPListenerDefaults(config *ReceptorConfig) {
+func SetUDPListenerDefaults(config *BackendConfig) {
 	for _, listener := range config.UDPListeners {
 		if listener.Cost == 0 {
 			listener.Cost = 1.0
@@ -24,7 +24,7 @@ func SetUDPListenerDefaults(config *ReceptorConfig) {
 	}
 }
 
-func SetWSListenerDefaults(config *ReceptorConfig) {
+func SetWSListenerDefaults(config *BackendConfig) {
 	for _, listener := range config.WSListeners {
 		if listener.Cost == 0 {
 			listener.Cost = 1.0
@@ -38,7 +38,7 @@ func SetWSListenerDefaults(config *ReceptorConfig) {
 	}
 }
 
-func SetUDPPeerDefaults(config *ReceptorConfig) {
+func SetUDPPeerDefaults(config *BackendConfig) {
 	for _, peer := range config.UDPPeers {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
@@ -50,7 +50,7 @@ func SetUDPPeerDefaults(config *ReceptorConfig) {
 	}
 }
 
-func SetTCPPeerDefaults(config *ReceptorConfig) {
+func SetTCPPeerDefaults(config *BackendConfig) {
 	for _, peer := range config.TCPPeers {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
@@ -62,7 +62,7 @@ func SetTCPPeerDefaults(config *ReceptorConfig) {
 	}
 }
 
-func SetWSPeerDefaults(config *ReceptorConfig) {
+func SetWSPeerDefaults(config *BackendConfig) {
 	for _, peer := range config.WSPeers {
 		if peer.Cost == 0 {
 			peer.Cost = 1.0
@@ -116,15 +116,18 @@ func SetKubeWorkerDefaults(config *ReceptorConfig) {
 	}
 }
 
-func SetConfigDefaults(config *ReceptorConfig) {
+func SetReceptorConfigDefaults(config *ReceptorConfig) {
+	SetCmdlineUnixDefaults(config)
+	SetLogLevelDefaults(config)
+	SetNodeDefaults(config)
+	SetKubeWorkerDefaults(config)
+}
+
+func SetBackendConfigDefaults(config *BackendConfig) {
 	SetTCPListenerDefaults(config)
 	SetUDPListenerDefaults(config)
 	SetWSListenerDefaults(config)
 	SetTCPPeerDefaults(config)
 	SetUDPPeerDefaults(config)
 	SetWSPeerDefaults(config)
-	SetCmdlineUnixDefaults(config)
-	SetLogLevelDefaults(config)
-	SetNodeDefaults(config)
-	SetKubeWorkerDefaults(config)
 }

@@ -5,11 +5,7 @@ import (
 	"os"
 
 	"github.com/ansible/receptor/cmd"
-	_ "github.com/ansible/receptor/internal/version"
-	_ "github.com/ansible/receptor/pkg/backends"
-	_ "github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/netceptor"
-	_ "github.com/ansible/receptor/pkg/services"
 )
 
 func main() {

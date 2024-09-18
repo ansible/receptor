@@ -4,6 +4,7 @@
 package controlsvc
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -122,8 +123,35 @@ func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) err
 	if err := s.WriteMessage(message); err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, s.conn); err != nil {
-		return err
+	isPayloadDebug := os.Getenv("RECEPTOR_PAYLOAD_DEBUG")
+	if isPayloadDebug != "" {
+		var data string
+		reader := bufio.NewReader(s.conn)
+
+		for {
+			var connectType string
+			if s.conn.LocalAddr().Network() == "unix" {
+				connectType = "unix socket"
+			} else {
+				connectType = "network connection"
+			}
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				if err.Error() != "EOF" {
+					MainInstance.nc.GetLogger().Error("Error reading from %v: %v \n", connectType, err)
+				}
+				break
+			}
+			data += response
+			MainInstance.nc.GetLogger().Debug("Response from %v: %v", connectType, response)
+		}
+		if _, err := out.Write([]byte(data)); err != nil {
+			return err
+		}
+	} else {
+		if _, err := io.Copy(out, s.conn); err != nil {
+			return err
+		}
 	}
 
 	return nil

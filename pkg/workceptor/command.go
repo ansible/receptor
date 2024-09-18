@@ -4,9 +4,11 @@
 package workceptor
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -112,7 +114,31 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	cmd.Stdin = stdin
+	isPayloadDebug := os.Getenv("RECEPTOR_PAYLOAD_DEBUG")
+	if isPayloadDebug != "" {
+		var data string
+		splitUnitDir := strings.Split(unitdir, "/")
+		workUnitID := splitUnitDir[len(splitUnitDir) - 1]
+		reader := bufio.NewReader(stdin)
+		stdinStream, err := cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+		for {
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				if err.Error() != "EOF" {
+					MainInstance.nc.GetLogger().Error("Error reading work unit %v stdin: %v\n", workUnitID, err)
+				}
+				break
+			}
+			data += response
+			MainInstance.nc.GetLogger().Debug("Work unit %v stdin: %v", workUnitID, response)
+		}
+		io.WriteString(stdinStream, data)
+	} else {
+		cmd.Stdin = stdin
+	}
 	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
 	if err != nil {
 		return err

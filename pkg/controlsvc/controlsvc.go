@@ -140,8 +140,8 @@ func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) err
 				if err.Error() != "EOF" {
 					MainInstance.nc.GetLogger().Error("Error reading from %v: %v \n", connectType, err)
 				}
+
 				break
-				
 			}
 			data += response
 			MainInstance.nc.GetLogger().Debug("Response from %v: %v", connectType, response)

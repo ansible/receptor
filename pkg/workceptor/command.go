@@ -130,8 +130,8 @@ func commandRunner(command string, params string, unitdir string) error {
 				if err.Error() != "EOF" {
 					MainInstance.nc.GetLogger().Error("Error reading work unit %v stdin: %v\n", workUnitID, err)
 				}
+
 				break
-				
 			}
 			data += response
 			MainInstance.nc.GetLogger().Debug("Work unit %v stdin: %v", workUnitID, response)

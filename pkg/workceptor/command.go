@@ -118,7 +118,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	if isPayloadDebug != "" {
 		var data string
 		splitUnitDir := strings.Split(unitdir, "/")
-		workUnitID := splitUnitDir[len(splitUnitDir) - 1]
+		workUnitID := splitUnitDir[len(splitUnitDir)-1]
 		reader := bufio.NewReader(stdin)
 		stdinStream, err := cmd.StdinPipe()
 		if err != nil {

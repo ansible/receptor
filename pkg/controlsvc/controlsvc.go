@@ -145,6 +145,7 @@ func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) err
 		if _, err := out.Write([]byte(data)); err != nil {
 			return err
 		}
+
 		fallthrough
 	case payloadDebug > 0:
 		var connectType string

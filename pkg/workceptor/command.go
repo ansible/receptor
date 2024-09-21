@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -114,11 +115,12 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	isPayloadDebug := os.Getenv("RECEPTOR_PAYLOAD_DEBUG")
-	if isPayloadDebug != "" {
+	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
+	splitUnitDir := strings.Split(unitdir, "/")
+	workUnitID := splitUnitDir[len(splitUnitDir)-1]
+	switch payloadDebug {
+	case 3:
 		var data string
-		splitUnitDir := strings.Split(unitdir, "/")
-		workUnitID := splitUnitDir[len(splitUnitDir)-1]
 		reader := bufio.NewReader(stdin)
 		stdinStream, err := cmd.StdinPipe()
 		if err != nil {
@@ -137,7 +139,10 @@ func commandRunner(command string, params string, unitdir string) error {
 			MainInstance.nc.GetLogger().Debug("Work unit %v stdin: %v", workUnitID, response)
 		}
 		io.WriteString(stdinStream, data)
-	} else {
+	case 2:
+		MainInstance.nc.GetLogger().Debug("Work unit %v received command\n", workUnitID)
+		cmd.Stdin = stdin
+	default:
 		cmd.Stdin = stdin
 	}
 	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)

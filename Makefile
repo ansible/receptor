@@ -147,7 +147,7 @@ ifeq (,$(shell which go-junit-report 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(GO-JUNIT-REPORT)) ;\
-	GOBIN=$(dir $(GO-JUNIT-REPORT)) $(GO) install github.com/jstemmer/go-junit-report/v2@latest;\
+	GOBIN=$(dir $(GO-JUNIT-REPORT)) go install github.com/jstemmer/go-junit-report/v2@latest;\
 	}
 else
 GO-JUNIT-REPORT = $(shell which go-junit-report)

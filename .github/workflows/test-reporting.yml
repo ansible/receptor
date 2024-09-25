@@ -1,0 +1,65 @@
+---
+name: Generate junit test report
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:  # yamllint disable-line rule:empty-values
+  push:
+    branches: [devel]
+
+env:
+  DESIRED_GO_VERSION: '1.20'
+
+jobs:
+  go_test_coverage:
+    name: go test coverage
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.DESIRED_GO_VERSION }}
+
+      - name: build and install receptor
+        run: |
+          make build-all
+          sudo cp ./receptor /usr/local/bin/receptor
+
+      - name: Download kind binary
+        run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind
+
+      - name: Create k8s cluster
+        run: ./kind create cluster
+
+      - name: Interact with the cluster
+        run: kubectl get nodes
+
+      - name: Run receptor tests with coverage
+        run: make coverage -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml
+
+      - name: get k8s logs
+        if: ${{ failure() }}
+        run: .github/workflows/artifact-k8s-logs.sh
+
+      - name: remove sockets before archiving logs
+        if: ${{ failure() }}
+        run: find /tmp/receptor-testing -name controlsock -delete
+
+      - name: Artifact receptor data
+        uses: actions/upload-artifact@v4.4.0
+        if: ${{ failure() }}
+        with:
+          name: test-logs
+          path: /tmp/receptor-testing
+
+      - name: Archive receptor binary
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: receptor
+          path: /usr/local/bin/receptor

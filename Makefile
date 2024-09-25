@@ -140,6 +140,20 @@ build-package:
 	cd dist/ && \
 	$(CHECKSUM_PROGRAM) $(DIST).tar.gz >> checksums.txt
 
+GO-JUNIT-REPORT = $(shell pwd)/go-junit-report
+go-junit-report: ## Download go-junit-report locally if necessary.
+ifeq (,$(wildcard $(GO-JUNIT-REPORT)))
+ifeq (,$(shell which go-junit-report 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(GO-JUNIT-REPORT)) ;\
+	GOBIN=$(dir $(GO-JUNIT-REPORT)) $(GO) install github.com/jstemmer/go-junit-report/v2@latest;\
+	}
+else
+GO-JUNIT-REPORT = $(shell which go-junit-report)
+endif
+endif
+
 RUNTEST ?=
 ifeq ($(RUNTEST),)
 TESTCMD =
@@ -227,4 +241,4 @@ tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest go-junit-report

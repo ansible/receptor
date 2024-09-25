@@ -148,6 +148,31 @@ func (rl *ReceptorLogger) Debug(format string, v ...interface{}) {
 	rl.Log(DebugLevel, format, v...)
 }
 
+// Debug payload data.
+func (rl *ReceptorLogger) DebugPayload(payloadDebug int, payload string, workUnitID string, connectionType string) {
+	switch payloadDebug {
+	case 3:
+		if workUnitID != "" {
+			rl.Debug("Work unit %v stdin: %v", workUnitID, payload)
+		} else {
+			rl.Debug("Response reading from conn: %v", payload)
+		}
+
+		fallthrough
+	case 2:
+		if payloadDebug == 2 && workUnitID != "" {
+			rl.Debug("Work unit %v received command\n", workUnitID)
+		}
+
+		fallthrough
+	case 1:
+		if connectionType != "" {
+			rl.Debug("Reading from %v", connectionType)
+		}
+	default:
+	}
+}
+
 // SanitizedDebug contains extra information helpful to developers.
 func (rl *ReceptorLogger) SanitizedDebug(format string, v ...interface{}) {
 	rl.SanitizedLog(DebugLevel, format, v...)

@@ -116,16 +116,20 @@ func commandRunner(command string, params string, unitdir string) error {
 		return err
 	}
 	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
-	splitUnitDir := strings.Split(unitdir, "/")
-	workUnitID := splitUnitDir[len(splitUnitDir)-1]
-	switch payloadDebug {
-	case 3:
-		var data string
-		reader := bufio.NewReader(stdin)
+
+	if payloadDebug != 0 {
+		splitUnitDir := strings.Split(unitdir, "/")
+		workUnitID := splitUnitDir[len(splitUnitDir)-1]
 		stdinStream, err := cmd.StdinPipe()
 		if err != nil {
 			return err
 		}
+		var payload string
+		reader := bufio.NewReader(stdin)
+		if err != nil {
+			return err
+		}
+
 		for {
 			response, err := reader.ReadString('\n')
 			if err != nil {
@@ -135,14 +139,12 @@ func commandRunner(command string, params string, unitdir string) error {
 
 				break
 			}
-			data += response
-			MainInstance.nc.GetLogger().Debug("Work unit %v stdin: %v", workUnitID, response)
+			payload += response
 		}
-		io.WriteString(stdinStream, data)
-	case 2:
-		MainInstance.nc.GetLogger().Debug("Work unit %v received command\n", workUnitID)
-		cmd.Stdin = stdin
-	default:
+
+		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "")
+		io.WriteString(stdinStream, payload)
+	} else {
 		cmd.Stdin = stdin
 	}
 	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)

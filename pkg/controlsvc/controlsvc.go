@@ -125,9 +125,15 @@ func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) err
 		return err
 	}
 	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
-	switch {
-	case payloadDebug > 2:
-		var data string
+
+	if payloadDebug != 0 {
+		var connectionType string
+		var payload string
+		if s.conn.LocalAddr().Network() == "unix" {
+			connectionType = "unix socket"
+		} else {
+			connectionType = "network connection"
+		}
 		reader := bufio.NewReader(s.conn)
 
 		for {
@@ -139,23 +145,14 @@ func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) err
 
 				break
 			}
-			data += response
-			MainInstance.nc.GetLogger().Debug("Response reading from conn: %v", response)
-		}
-		if _, err := out.Write([]byte(data)); err != nil {
-			return err
+			payload += response
 		}
 
-		fallthrough
-	case payloadDebug > 0:
-		var connectType string
-		if s.conn.LocalAddr().Network() == "unix" {
-			connectType = "unix socket"
-		} else {
-			connectType = "network connection"
+		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, "", connectionType)
+		if _, err := out.Write([]byte(payload)); err != nil {
+			return err
 		}
-		MainInstance.nc.GetLogger().Debug("Reading from %v", connectType)
-	default:
+	} else {
 		if _, err := io.Copy(out, s.conn); err != nil {
 			return err
 		}

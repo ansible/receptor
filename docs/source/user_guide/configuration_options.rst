@@ -64,10 +64,10 @@ Log level
 
 Add payload debuging using `RECEPTOR_PAYLOAD_DEBUG=int` envorment variable and using log level debug.
 `RECEPTOR_PAYLOAD_DEBUG` options:
-- 0: No payload debug log
-- 1: Log connection type
-- 2: Log connection type and work unit id
-- 3: Log connection type, work unit id and payload
+* 0: No payload debug log
+* 1: Log connection type
+* 2: Log connection type and work unit id
+* 3: Log connection type, work unit id and payload
 
 **Warning: Payload Debugging May Expose Sensitive Data**
 

@@ -44,7 +44,6 @@ jobs:
         run: go install github.com/jstemmer/go-junit-report/v2@latest
 
       - name: Run receptor tests
-        run: PATH="${PWD}:${PATH}" go test -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml
         run: go test -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml
 
       - name: get k8s logs

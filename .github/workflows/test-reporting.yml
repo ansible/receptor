@@ -46,7 +46,6 @@ jobs:
       - name: Run receptor tests
         run: go test -v 2>&1 ./... | go-junit-report > report.xml
 
-
       - name: get k8s logs
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh

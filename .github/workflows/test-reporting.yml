@@ -43,8 +43,7 @@ jobs:
       - name: Install go junit reporting
         run: make go-junit-report
 
-      - name: Run receptor tests with coverage
-        run: make coverage -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml
+      - name: Run receptor tests
         run: PATH="${PWD}:${PATH}" go test -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml
 
       - name: get k8s logs

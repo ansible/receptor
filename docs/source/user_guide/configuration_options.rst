@@ -62,6 +62,9 @@ Log level
       - Error
       - string
 
+Add payload debuging using `RECEPTOR_PAYLOAD_DEBUG=int` envorment variable and using log level debug.
+`RECEPTOR_PAYLOAD_DEBUG` options [0,1,2,3]
+
 .. code-block:: yaml
 
   log-level:

@@ -46,6 +46,20 @@ jobs:
       - name: Run receptor tests
         run: go test -v 2>&1 ./... | go-junit-report > report.xml
 
+      - name: Upload test results to dashboard
+        if: >-
+          !cancelled()
+          && github.event_name == 'push'
+          && github.repository == 'ansible/receptor'
+          && github.ref_name == github.event.repository.default_branch
+        run: >-
+          curl -v --user "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}" 
+          --form "xunit_xml=@report.xml" 
+          --form "component_name=receptor" 
+          --form "git_commit_sha=${{ github.sha }}" 
+          --form "git_repository_url=https://github.com/${{ github.repository }}" 
+          "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+
       - name: get k8s logs
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh

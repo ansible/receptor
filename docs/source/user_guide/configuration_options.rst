@@ -63,19 +63,21 @@ Log level
       - string
 
 Add payload debuging using `RECEPTOR_PAYLOAD_DEBUG=int` envorment variable and using log level debug.
-... list-table: `RECEPTOR_PAYLOAD_DEBUG` options:
+
+.. list-table:: RECEPTOR_PAYLOAD_DEBUG options
     :header-rows: 1
     :widths: auto
-  * - Debug level
-    - Description
-  * - 0
-    - No payload debug log
-  * - 1
-    - Log connection type
-  * - 2
-    - Log connection type and work unit id
-  * - 3
-    - Log connection type, work unit id and payload
+
+    * - Debug level
+      - Description
+    * - 0
+      - No payload debug log
+    * - 1
+      - Log connection type
+    * - 2
+      - Log connection type and work unit id
+    * - 3
+      - Log connection type, work unit id and payload
 
 **Warning: Payload Debugging May Expose Sensitive Data**
 

@@ -90,14 +90,16 @@ func TestDebugPayload(t *testing.T) {
 		payload        string
 		workUnitID     string
 		connectionType string
-		expectedLogs   []string
+		expectedLog    string
 	}{
-		{name: "debugPayload no log", debugPayload: 0, payload: "", workUnitID: "", connectionType: "", expectedLogs: []string{}},
-		{name: "debugPayload log level 1", debugPayload: 1, payload: "", workUnitID: "", connectionType: connectionType, expectedLogs: []string{fmt.Sprintf("Reading from %v", connectionType)}},
-		{name: "debugPayload log level 2 with workUnitID", debugPayload: 2, payload: "", workUnitID: workUnitID, connectionType: connectionType, expectedLogs: []string{fmt.Sprintf("Reading from %v", connectionType), fmt.Sprintf("Work unit %v received command", workUnitID)}},
-		{name: "debugPayload log level 2 without workUnitID", debugPayload: 2, payload: "", workUnitID: "", connectionType: connectionType, expectedLogs: []string{fmt.Sprintf("Reading from %v", connectionType)}},
-		{name: "debugPayload log level 3 with workUnitID", debugPayload: 3, payload: payload, workUnitID: workUnitID, connectionType: connectionType, expectedLogs: []string{fmt.Sprintf("Reading from %v", connectionType), fmt.Sprintf("Work unit %v stdin: %v", workUnitID, payload)}},
-		{name: "debugPayload log level 3 without workUnitID", debugPayload: 3, payload: payload, workUnitID: "", connectionType: connectionType, expectedLogs: []string{fmt.Sprintf("Reading from %v", connectionType), fmt.Sprintf("Response reading from conn: %v", payload)}},
+		{name: "debugPayload no log", debugPayload: 0, payload: "", workUnitID: "", connectionType: "", expectedLog: ""},
+		{name: "debugPayload log level 1", debugPayload: 1, payload: "", workUnitID: "", connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v", connectionType)},
+		{name: "debugPayload log level 2 with workUnitID", debugPayload: 2, payload: "", workUnitID: workUnitID, connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v with work unit %v", connectionType, workUnitID)},
+		{name: "debugPayload log level 2 without workUnitID", debugPayload: 2, payload: "", workUnitID: "", connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v", connectionType)},
+		{name: "debugPayload log level 3 with workUnitID", debugPayload: 3, payload: payload, workUnitID: workUnitID, connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v with work unit %v with a payload of: %v", connectionType, workUnitID, payload)},
+		{name: "debugPayload log level 3 without workUnitID", debugPayload: 3, payload: payload, workUnitID: "", connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v, work unit not created yet with a payload of: %v", connectionType, payload)},
+		{name: "debugPayload log level 3 without workUnitID and payload is new line", debugPayload: 3, payload: "\n", workUnitID: "", connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v, work unit not created yet with a payload of: %v", connectionType, "\n")},
+		{name: "debugPayload log level 3 without workUnitID or payload", debugPayload: 3, payload: "", workUnitID: "", connectionType: connectionType, expectedLog: fmt.Sprintf("PACKET TRACING ENABLED: Reading from %v, work unit not created yet with a payload of: %v", connectionType, "")},
 	}
 
 	for _, testCase := range debugPayloadTestCases {
@@ -109,10 +111,8 @@ func TestDebugPayload(t *testing.T) {
 			if err != nil {
 				t.Error("error reading test-output file")
 			}
-			for _, expectedlog := range testCase.expectedLogs {
-				if !bytes.Contains(testOutput, []byte(expectedlog)) {
-					t.Errorf("failed to log correctly, expected: %v got %v", expectedlog, string(testOutput))
-				}
+			if !bytes.Contains(testOutput, []byte(testCase.expectedLog)) {
+				t.Errorf("failed to log correctly, expected: %v got %v", testCase.expectedLog, string(testOutput))
 			}
 			if err := os.Truncate(logFilePath, 0); err != nil {
 				t.Errorf("failed to truncate: %v", err)

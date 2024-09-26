@@ -150,27 +150,29 @@ func (rl *ReceptorLogger) Debug(format string, v ...interface{}) {
 
 // Debug payload data.
 func (rl *ReceptorLogger) DebugPayload(payloadDebug int, payload string, workUnitID string, connectionType string) {
+	var payloadMessage string
+	var workunitIDMessage string
+	var connectionTypeMessage string
 	switch payloadDebug {
 	case 3:
-		if workUnitID != "" {
-			rl.Debug("Work unit %v stdin: %v", workUnitID, payload)
-		} else {
-			rl.Debug("Response reading from conn: %v", payload)
-		}
+		payloadMessage = fmt.Sprintf(" with a payload of: %s", payload)
 
 		fallthrough
 	case 2:
-		if payloadDebug == 2 && workUnitID != "" {
-			rl.Debug("Work unit %v received command\n", workUnitID)
+		if workUnitID != "" {
+			workunitIDMessage = fmt.Sprintf(" with work unit %s", workUnitID)
+		} else {
+			workunitIDMessage = ", work unit not created yet"
 		}
 
 		fallthrough
 	case 1:
 		if connectionType != "" {
-			rl.Debug("Reading from %v", connectionType)
+			connectionTypeMessage = fmt.Sprintf("Reading from %s", connectionType)
 		}
 	default:
 	}
+	rl.Debug(fmt.Sprintf("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage))
 }
 
 // SanitizedDebug contains extra information helpful to developers.

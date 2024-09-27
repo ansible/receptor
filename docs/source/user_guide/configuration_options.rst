@@ -62,16 +62,16 @@ Log level
       - Error
       - string
 
-Add payload debuging using `RECEPTOR_PAYLOAD_DEBUG=int` envorment variable and using log level debug.
+Add payload tracing using `RECEPTOR_PAYLOAD_TRACE_LEVEL=int` envorment variable and using log level debug.
 
-.. list-table:: RECEPTOR_PAYLOAD_DEBUG options
+.. list-table:: RECEPTOR_PAYLOAD_TRACE_LEVEL options
     :header-rows: 1
     :widths: auto
 
-    * - Debug level
+    * - Tracing level
       - Description
     * - 0
-      - No payload debug log
+      - No payload tracing log
     * - 1
       - Log connection type
     * - 2
@@ -79,9 +79,9 @@ Add payload debuging using `RECEPTOR_PAYLOAD_DEBUG=int` envorment variable and u
     * - 3
       - Log connection type, work unit id and payload
 
-**Warning: Payload Debugging May Expose Sensitive Data**
+**Warning: Payload Tracing May Expose Sensitive Data**
 
-Please be aware that using payload debugging can potentially reveal sensitive information. This includes, but is not limited to, personal data, authentication tokens, and system configurations. Ensure that you only use debugging tools in a secure environment and avoid sharing debug output with unauthorized users. Always follow your organization's data protection policies when handling sensitive information. Proceed with caution!
+Please be aware that using payload tracing can potentially reveal sensitive information. This includes, but is not limited to, personal data, authentication tokens, and system configurations. Ensure that you only use tracing tools in a secure environment and avoid sharing trace output with unauthorized users. Always follow your organization's data protection policies when handling sensitive information. Proceed with caution!
 
 .. code-block:: yaml
 

@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -111,6 +113,7 @@ func (sw *STDoutWriter) SetWriter(writer FileWriteCloser) {
 // STDinReader reads from a stdin file and provides a Done function.
 type STDinReader struct {
 	reader   FileReadCloser
+	workUnit string
 	lasterr  error
 	doneChan chan struct{}
 	doneOnce sync.Once
@@ -120,6 +123,8 @@ var errFileSizeZero = errors.New("file is empty")
 
 // NewStdinReader allocates a new stdinReader, which reads from a stdin file and provides a Done function.
 func NewStdinReader(fs FileSystemer, unitdir string) (*STDinReader, error) {
+	splitUnitDir := strings.Split(unitdir, "/")
+	workUnitID := splitUnitDir[len(splitUnitDir)-1]
 	stdinpath := path.Join(unitdir, "stdin")
 	stat, err := fs.Stat(stdinpath)
 	if err != nil {
@@ -135,6 +140,7 @@ func NewStdinReader(fs FileSystemer, unitdir string) (*STDinReader, error) {
 
 	return &STDinReader{
 		reader:   reader,
+		workUnit: workUnitID,
 		lasterr:  nil,
 		doneChan: make(chan struct{}),
 		doneOnce: sync.Once{},
@@ -143,6 +149,23 @@ func NewStdinReader(fs FileSystemer, unitdir string) (*STDinReader, error) {
 
 // Read reads data from the stdout file, implementing io.Reader.
 func (sr *STDinReader) Read(p []byte) (n int, err error) {
+	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
+
+	if payloadDebug != 0 {
+		isNotEmpty := func() bool {
+			for _, v := range p {
+				if v != 0 {
+					return true
+				}
+			}
+
+			return false
+		}()
+		if isNotEmpty {
+			payload := string(p)
+			MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, sr.workUnit, "kube api")
+		}
+	}
 	n, err = sr.reader.Read(p)
 	if err != nil {
 		sr.lasterr = err

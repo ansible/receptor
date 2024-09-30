@@ -93,3 +93,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/quic-go/quic-go v0.40.1 => github.com/AaronH88/quic-go v0.0.0-20240925173611-8b838692e0f5 //nolint:gomoddirectives

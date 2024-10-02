@@ -356,7 +356,6 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	}
 	s.AddNameHash(nodeID)
 	s.context, s.cancelFunc = context.WithCancel(ctx)
-	defer s.cancelFunc()
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)

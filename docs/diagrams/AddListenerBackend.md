@@ -1,4 +1,5 @@
 ```mermaid
+%%{init: { 'theme':'dark', 'sequence': {'useMaxWidth':false}, 'fontSize': 14 } }%%
 sequenceDiagram
     participant Application
     participant Netceptor

@@ -1582,7 +1582,13 @@ func (s *Netceptor) handleUnreachable(md *MessageData) error {
 		UnreachableMessage: unrMsg,
 		ReceivedFromNode:   md.FromNode,
 	}
-	s.Logger.Warning("Received unreachable message from %s", md.FromNode)
+	s.Logger.Warning("Received unreachable message from %s (service %s) to %s (service %s): ttl %v, data %s",
+		md.FromNode,
+		md.FromService,
+		md.ToNode,
+		md.ToService,
+		md.HopsToLive,
+		unrMsg.Problem)
 
 	return s.unreachableBroker.Publish(unrData)
 }

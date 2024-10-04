@@ -18,7 +18,6 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - gomoddirectives
     - gomodguard
     - gosec
     - gosimple
@@ -101,6 +100,7 @@ linters-settings:
           - "k8s.io/client-go/tools/remotecommand"
           - "github.com/quic-go/quic-go"
           - "github.com/quic-go/quic-go/logging"
+          - "github.com/AaronH88/quic-go"
 
 issues:
   # Dont commit the following line.

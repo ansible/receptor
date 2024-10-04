@@ -421,6 +421,7 @@ func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 		if err != nil {
 			kw.GetWorkceptor().nc.GetLogger().Error("Error checking pod status for %s/%s: %s", podNamespace, podName, err)
 			*stdoutErr = err
+
 			return
 		}
 		if podIsTerminated {
@@ -434,6 +435,7 @@ func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					err,
 				)
 			}
+
 			break
 		}
 	}
@@ -651,9 +653,11 @@ func (kw *KubeUnit) retrieveRemainingLogs(stdout io.Writer, sinceTime *time.Time
 		// Handle case where no logs are available
 		if apierrors.IsNotFound(err) {
 			kw.GetWorkceptor().nc.GetLogger().Info("No additional logs to retrieve for pod %s/%s", podNamespace, podName)
+
 			return nil
 		}
 		kw.GetWorkceptor().nc.GetLogger().Error("Error retrieving remaining logs for pod %s/%s: %s", podNamespace, podName, err)
+
 		return err
 	}
 	defer logStream.Close()
@@ -677,16 +681,19 @@ func (kw *KubeUnit) retrieveRemainingLogs(stdout io.Writer, sinceTime *time.Time
 		if len(split) != 2 {
 			continue // Skip malformed lines
 		}
-		//timeStamp := ParseTime(split[0])
-		msg := split[1]
 
-		// Write the log message to stdout
-		_, err = stdout.Write([]byte(msg))
-		if err != nil {
-			kw.GetWorkceptor().nc.GetLogger().Error("Error writing remaining logs for pod %s/%s: %s", podNamespace, podName, err)
-			return err
+		timeStamp := ParseTime(split[0])
+		if timeStamp.After(*sinceTime) {
+			msg := split[1]
+
+			// Write the log message to stdout
+			_, err = stdout.Write([]byte(msg))
+			if err != nil {
+				kw.GetWorkceptor().nc.GetLogger().Error("Error writing remaining logs for pod %s/%s: %s", podNamespace, podName, err)
+				return err
+			}
+			logsRetrieved = true
 		}
-		logsRetrieved = true
 	}
 
 	if !logsRetrieved {

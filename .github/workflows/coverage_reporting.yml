@@ -60,14 +60,14 @@ jobs:
         run: find /tmp/receptor-testing -name controlsock -delete
 
       - name: Artifact receptor data
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.4.2
         if: ${{ failure() }}
         with:
           name: test-logs
           path: /tmp/receptor-testing
 
       - name: Archive receptor binary
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.4.2
         with:
           name: receptor
           path: /usr/local/bin/receptor

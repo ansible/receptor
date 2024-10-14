@@ -1071,4 +1071,3 @@ Sign Request and Produce Certificate
     tcp-clients:
       - address: localhost:2223
         service: foo
-

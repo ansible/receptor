@@ -1025,7 +1025,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 			if err != nil {
 				logger.Error("RVF failed to parse: %s", err)
 
-				return fmt.Errorf("failed to parse certificate from server: " + err.Error())
+				return fmt.Errorf("failed to parse certificate from server: " + err.Error()) //nolint:govet
 			}
 			certs[i] = cert
 		}
@@ -1383,7 +1383,7 @@ func (s *Netceptor) printRoutingTable() {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
 		_, _ = fmt.Fprintf(sb, "\n")
-		s.Logger.Log(logLevel, sb.String())
+		s.Logger.Log(logLevel, sb.String()) //nolint:govet
 	}
 	s.Logger.Log(logLevel, "Routing Table:\n")
 	for node := range s.routingTable {
@@ -1582,7 +1582,13 @@ func (s *Netceptor) handleUnreachable(md *MessageData) error {
 		UnreachableMessage: unrMsg,
 		ReceivedFromNode:   md.FromNode,
 	}
-	s.Logger.Warning("Received unreachable message from %s", md.FromNode)
+	s.Logger.Warning("Received unreachable message from %s (service %s) to %s (service %s): ttl %v, data %s",
+		md.FromNode,
+		md.FromService,
+		md.ToNode,
+		md.ToService,
+		md.HopsToLive,
+		unrMsg.Problem)
 
 	return s.unreachableBroker.Publish(unrData)
 }
@@ -1656,7 +1662,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		if !ok || pc.context.Err() != nil {
 			s.listenerLock.RUnlock()
 			if md.FromNode == s.nodeID {
-				return fmt.Errorf(ProblemServiceUnknown)
+				return fmt.Errorf(ProblemServiceUnknown) //nolint:staticcheck
 			}
 			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
 				FromNode:    md.FromNode,

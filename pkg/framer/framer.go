@@ -32,7 +32,7 @@ func New() Framer {
 // SendData takes a data buffer and returns a framed buffer.
 func (f *framer) SendData(data []byte) []byte {
 	buf := make([]byte, len(data)+2)
-	binary.LittleEndian.PutUint16(buf[0:2], uint16(len(data)))
+	binary.LittleEndian.PutUint16(buf[0:2], uint16(len(data))) //nolint:gosec
 	copy(buf[2:], data)
 
 	return buf

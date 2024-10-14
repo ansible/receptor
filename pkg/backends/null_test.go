@@ -2,12 +2,42 @@ package backends_test
 
 import (
 	"context"
+	"crypto/tls"
 	"reflect"
 	"sync"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/backends"
 )
+
+func TestNullBackendCfgGetAddr(t *testing.T) {
+	type fields struct {
+		Local bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{
+			name: "Positive",
+			fields: fields{
+				Local: true,
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &backends.NullBackendCfg{
+				Local: tt.fields.Local,
+			}
+			if got := cfg.GetAddr(); got != tt.want {
+				t.Errorf("NullBackendCfg.GetAddr() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestNullBackendCfg_Start(t *testing.T) {
 	type fields struct {
@@ -39,6 +69,7 @@ func TestNullBackendCfg_Start(t *testing.T) {
 			wantErr:  false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := backends.NullBackendCfg{
@@ -54,10 +85,39 @@ func TestNullBackendCfg_Start(t *testing.T) {
 
 			if reflect.ValueOf(got).Kind() == tt.wantKind {
 				if reflect.ValueOf(got).Type().Elem().String() != tt.wantType {
-				 	t.Errorf("%s: NullBackendCfg.Start() gotType = %+v, wantType = %+v", tt.name, reflect.ValueOf(got).Type().Elem(), tt.wantType)
+					t.Errorf("%s: NullBackendCfg.Start() gotType = %+v, wantType = %+v", tt.name, reflect.ValueOf(got).Type().Elem(), tt.wantType)
 				}
 			} else {
 				t.Errorf("%s: NullBackendCfg.Start() gotKind = %+v, wantKind = %+v", tt.name, reflect.ValueOf(got).Kind(), tt.wantKind)
+			}
+		})
+	}
+}
+
+func TestNullBackendCfgGetTLS(t *testing.T) {
+	type fields struct {
+		Local bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *tls.Config
+	}{
+		{
+			name: "Positive",
+			fields: fields{
+				Local: true,
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &backends.NullBackendCfg{
+				Local: tt.fields.Local,
+			}
+			if got := cfg.GetTLS(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NullBackendCfg.GetTLS() = %v, want %v", got, tt.want)
 			}
 		})
 	}

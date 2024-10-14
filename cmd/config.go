@@ -29,19 +29,16 @@ type Runer interface {
 	Run() error
 }
 
+type Reloader interface {
+	Reload() error
+}
+
 type ReceptorConfig struct {
 	// Used pointer structs to apply defaults to config
 	Node              *types.NodeCfg
 	Trace             logger.TraceCfg
-	LocalOnly         backends.NullBackendCfg          `mapstructure:"local-only"`
 	LogLevel          *logger.LoglevelCfg              `mapstructure:"log-level"`
 	ControlServices   []*controlsvc.CmdlineConfigUnix  `mapstructure:"control-services"`
-	TCPPeers          []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
-	UDPPeers          []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
-	WSPeers           []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
-	TCPListeners      []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
-	UDPListeners      []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
-	WSListeners       []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
 	TLSClients        []netceptor.TLSClientConfig      `mapstructure:"tls-clients"`
 	TLSServer         []netceptor.TLSServerConfig      `mapstructure:"tls-servers"`
 	WorkCommands      []workceptor.CommandWorkerCfg    `mapstructure:"work-commands"`
@@ -63,28 +60,48 @@ type CertificatesConfig struct {
 	SignReq []certificates.SignReqConfig `mapstructure:"cert-signreqs"`
 }
 
+type BackendConfig struct {
+	TCPListeners []*backends.TCPListenerCfg       `mapstructure:"tcp-listeners"`
+	UDPListeners []*backends.UDPListenerCfg       `mapstructure:"udp-listeners"`
+	WSListeners  []*backends.WebsocketListenerCfg `mapstructure:"ws-listeners"`
+	TCPPeers     []*backends.TCPDialerCfg         `mapstructure:"tcp-peers"`
+	UDPPeers     []*backends.UDPDialerCfg         `mapstructure:"udp-peers"`
+	WSPeers      []*backends.WebsocketDialerCfg   `mapstructure:"ws-peers"`
+	LocalOnly    backends.NullBackendCfg          `mapstructure:"local-only"`
+}
+
 func PrintPhaseErrorMessage(configName string, phase string, err error) {
 	fmt.Printf("ERROR: %s for %s on %s phase\n", err, configName, phase)
 }
 
-func ParseConfigs(configFile string) (*ReceptorConfig, *CertificatesConfig, error) {
-	if configFile == "" && viper.ConfigFileUsed() == "" {
-		fmt.Fprintln(os.Stderr, "Could not locate config file (default is $HOME/receptor.yaml)")
-		os.Exit(1)
-	}
+func ParseReceptorConfig(configFile string) (*ReceptorConfig, error) {
 	var receptorConfig ReceptorConfig
-	var certifcatesConfig CertificatesConfig
 	err := viper.Unmarshal(&receptorConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	err = viper.Unmarshal(&certifcatesConfig)
+	return &receptorConfig, nil
+}
+
+func ParseCertificatesConfig(configFile string) (*CertificatesConfig, error) {
+	var certifcatesConfig CertificatesConfig
+	err := viper.Unmarshal(&certifcatesConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return &receptorConfig, &certifcatesConfig, nil
+	return &certifcatesConfig, nil
+}
+
+func ParseBackendConfig(configFile string) (*BackendConfig, error) {
+	var backendConfig BackendConfig
+	err := viper.Unmarshal(&backendConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &backendConfig, nil
 }
 
 func isConfigEmpty(v reflect.Value) bool {
@@ -153,6 +170,46 @@ func RunPhases(phase string, v reflect.Value) {
 				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
 			}
 		default:
+		}
+	}
+}
+
+// ReloadServices iterates through key/values calling reload on applicable services.
+func ReloadServices(v reflect.Value) {
+	for i := 0; i < v.NumField(); i++ {
+		// if the services is not initialised, skip
+		if reflect.Value.IsZero(v.Field(i)) {
+			continue
+		}
+
+		var err error
+		switch v.Field(i).Kind() {
+		case reflect.Slice:
+			// iterate over all the type fields
+			for j := 0; j < v.Field(i).Len(); j++ {
+				serviceItem := v.Field(i).Index(j).Interface()
+				switch c := serviceItem.(type) {
+				// check to see if the selected type field satisfies reload
+				// call reload on cfg object
+				case Reloader:
+					err = c.Reload()
+					if err != nil {
+						PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
+					}
+				// if cfg object does not satisfy, do nothing
+				default:
+				}
+			}
+		// runs for non slice fields
+		default:
+			switch c := v.Field(i).Interface().(type) {
+			case Reloader:
+				err = c.Reload()
+				if err != nil {
+					PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
+				}
+			default:
+			}
 		}
 	}
 }

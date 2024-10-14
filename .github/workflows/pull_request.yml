@@ -6,7 +6,7 @@ on:  # yamllint disable-line rule:truthy
 
 env:
   DESIRED_GO_VERSION: '1.20'
-  DESIRED_GOLANGCI_LINT_VERSION: 'v1.56'
+  DESIRED_GOLANGCI_LINT_VERSION: 'v1.60'
   DESIRED_PYTHON_VERSION: '3.12'
 
 jobs:
@@ -72,14 +72,14 @@ jobs:
         run: find /tmp/receptor-testing -name controlsock -delete
 
       - name: Artifact receptor data for ${{ matrix.go-version }}
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.4.3
         if: ${{ failure() }}
         with:
           name: test-logs-${{ matrix.go-version }}
           path: /tmp/receptor-testing
 
       - name: Archive receptor binary for ${{ matrix.go-version }}
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: receptor-${{ matrix.go-version }}
           path: /usr/local/bin/receptor
@@ -189,7 +189,7 @@ jobs:
         run: sudo chmod a+x /usr/local/bin/receptor
 
       - name: Set up nox
-        uses: wntrblm/nox@2024.04.15
+        uses: wntrblm/nox@2024.10.09
         with:
           python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
 

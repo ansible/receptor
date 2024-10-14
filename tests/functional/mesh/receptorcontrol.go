@@ -161,7 +161,7 @@ func (r *ReceptorControl) ReadAndParseJSON() (map[string]interface{}, error) {
 	}
 
 	if str := string(data); strings.HasPrefix(str, "ERROR") {
-		return nil, fmt.Errorf(str)
+		return nil, fmt.Errorf(str) //nolint:govet,staticcheck
 	}
 	jsonData := make(map[string]interface{})
 	err = json.Unmarshal(data, &jsonData)
@@ -213,7 +213,7 @@ func (r *ReceptorControl) getWorkSubmitResponse() (string, error) {
 	msg, err := r.ReadStr() // flush getWorkSubmitResponse
 
 	if !strings.Contains(msg, "Send stdin data and EOF.") {
-		return "", fmt.Errorf(msg)
+		return "", fmt.Errorf(msg) //nolint:govet,staticcheck
 	}
 
 	if err != nil {

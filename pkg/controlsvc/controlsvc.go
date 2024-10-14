@@ -4,6 +4,7 @@
 package controlsvc
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -122,8 +124,38 @@ func (s *SockControl) ReadFromConn(message string, out io.Writer, io Copier) err
 	if err := s.WriteMessage(message); err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, s.conn); err != nil {
-		return err
+	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
+
+	if payloadDebug != 0 {
+		var connectionType string
+		var payload string
+		if s.conn.LocalAddr().Network() == "unix" {
+			connectionType = "unix socket"
+		} else {
+			connectionType = "network connection"
+		}
+		reader := bufio.NewReader(s.conn)
+
+		for {
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				if err.Error() != "EOF" {
+					MainInstance.nc.GetLogger().Error("Error reading from conn: %v \n", err)
+				}
+
+				break
+			}
+			payload += response
+		}
+
+		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, "", connectionType)
+		if _, err := out.Write([]byte(payload)); err != nil {
+			return err
+		}
+	} else {
+		if _, err := io.Copy(out, s.conn); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -516,7 +548,7 @@ func (cfg CmdlineConfigUnix) Run() error {
 		}
 	}
 	err = MainInstance.RunControlSvc(context.Background(), cfg.Service, tlscfg, cfg.Filename,
-		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls)
+		os.FileMode(cfg.Permissions), cfg.TCPListen, tcptls) //nolint:gosec
 	if err != nil {
 		return err
 	}

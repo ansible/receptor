@@ -4,13 +4,16 @@
 package workceptor
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -112,7 +115,38 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	cmd.Stdin = stdin
+	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
+
+	if payloadDebug != 0 {
+		splitUnitDir := strings.Split(unitdir, "/")
+		workUnitID := splitUnitDir[len(splitUnitDir)-1]
+		stdinStream, err := cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+		var payload string
+		reader := bufio.NewReader(stdin)
+		if err != nil {
+			return err
+		}
+
+		for {
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				if err.Error() != "EOF" {
+					MainInstance.nc.GetLogger().Error("Error reading work unit %v stdin: %v\n", workUnitID, err)
+				}
+
+				break
+			}
+			payload += response
+		}
+
+		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "")
+		io.WriteString(stdinStream, payload)
+	} else {
+		cmd.Stdin = stdin
+	}
 	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
 	if err != nil {
 		return err
@@ -436,7 +470,7 @@ func filenameExists(filename string) error {
 func (cfg SigningKeyPrivateCfg) Prepare() error {
 	duration, err := cfg.PrepareSigningKeyPrivateCfg()
 	if err != nil {
-		return fmt.Errorf(err.Error())
+		return fmt.Errorf(err.Error()) //nolint:govet,staticcheck
 	}
 
 	MainInstance.SigningExpiration = *duration

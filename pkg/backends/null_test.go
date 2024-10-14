@@ -80,6 +80,7 @@ func TestNullBackendCfg_Start(t *testing.T) {
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%s: NullBackendCfg.Start() error = %+v, wantErr %+v", tt.name, err, tt.wantErr)
+
 				return
 			}
 

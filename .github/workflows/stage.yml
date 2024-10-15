@@ -24,6 +24,9 @@ on:  # yamllint disable-line rule:truthy
         description: 'Email of the person who will create a tag / draft release.'
         required: true
         default: ''
+env:
+  DESIRED_PYTHON_VERSION: '3.12'
+
 jobs:
   stage:
     runs-on: ubuntu-latest
@@ -54,6 +57,8 @@ jobs:
 
       - name: Install python
         uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.DESIRED_PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |

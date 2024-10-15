@@ -81,6 +81,7 @@ func TestNewTCPListener(t *testing.T) {
 			got, err := NewTCPListener(tt.args.address, tt.args.tls, tt.args.logger)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewTCPListener() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {

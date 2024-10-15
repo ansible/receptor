@@ -1,4 +1,4 @@
-FROM quay.io/centos/centos:stream9 as builder
+FROM quay.io/centos/centos:stream9 AS builder
 ARG VERSION
 
 RUN dnf -y update && \

@@ -1,7 +1,7 @@
 FROM quay.io/centos/centos:stream9 AS builder
 ARG VERSION
 
-RUN sed -i 's@^metalink=.*appstream.*@baseurl=https://mirror.stream.centos.org/9-stream/AppStream/aarch64/os@g' /etc/yum.repos.d/*.repo
+RUN sed -i "s@^metalink=.*appstream.*@baseurl=https://mirror.stream.centos.org/9-stream/AppStream/$(uname -m)/os@g" /etc/yum.repos.d/*.repo
 RUN dnf -y update && \
     dnf install -y golang make python3.12 python3.12-pip git
 RUN pip3.12 install wheel
@@ -27,8 +27,7 @@ RUN dnf -y update && \
     dnf clean all && \
     pip3.12 install --no-cache-dir wheel && \
     pip3.12 install --no-cache-dir dumb-init && \
-    pip3.12 install --no-cache-dir /tmp/*.whl && \
-    rm /tmp/*.whl
+    if [[ -f /tmp/*.whl ]]; then pip3.12 install --no-cache-dir /tmp/*.whl; rm /usr/share/python3-wheels/*.whl; fi
 
 COPY --from=builder /source/receptor /usr/bin/receptor
 

@@ -27,17 +27,17 @@ func TestdialerSession(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:		"Positive",
-			args:		args{
-				ctx:			nil,
-				wg:				nil,
-				redial:			true,
-				redialDelay:	1 * time.Second,
-				logger:			nil,
-				df:				nil,
+			name: "Positive",
+			args: args{
+				ctx:         nil,
+				wg:          nil,
+				redial:      true,
+				redialDelay: 1 * time.Second,
+				logger:      nil,
+				df:          nil,
 			},
-			want:		nil,
-			wantErr:	false,
+			want:    nil,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

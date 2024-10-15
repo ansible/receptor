@@ -1,6 +1,7 @@
 FROM quay.io/centos/centos:stream9 AS builder
 ARG VERSION
 
+RUN sed -i 's@^metalink=.*appstream.*@baseurl=https://mirror.stream.centos.org/9-stream/AppStream/aarch64/os@g' /etc/yum.repos.d/*.repo
 RUN dnf -y update && \
     dnf install -y golang make python3.12 python3.12-pip git
 RUN pip3.12 install wheel

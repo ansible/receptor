@@ -142,7 +142,7 @@ func commandRunner(command string, params string, unitdir string) error {
 			payload += response
 		}
 
-		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "")
+		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "stdin")
 		io.WriteString(stdinStream, payload)
 	} else {
 		cmd.Stdin = stdin

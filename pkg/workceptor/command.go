@@ -126,9 +126,6 @@ func commandRunner(command string, params string, unitdir string) error {
 		}
 		var payload string
 		reader := bufio.NewReader(stdin)
-		if err != nil {
-			return err
-		}
 
 		for {
 			response, err := reader.ReadString('\n')
@@ -144,6 +141,7 @@ func commandRunner(command string, params string, unitdir string) error {
 
 		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "")
 		io.WriteString(stdinStream, payload)
+		stdinStream.Close()
 	} else {
 		cmd.Stdin = stdin
 	}

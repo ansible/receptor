@@ -26,7 +26,7 @@ func TestNewUDPListener(t *testing.T) {
 		{
 			name: "Positive",
 			args: args{
-				address: "127.0.0.1:9998",
+				address: "127.0.0.1:9997",
 				logger:  logger.NewReceptorLogger("UDPtest"),
 			},
 			wantErr: false,

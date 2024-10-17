@@ -3,7 +3,6 @@ package backends
 import (
 	"context"
 	"net"
-	"reflect"
 	"sync"
 	"testing"
 

@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
+FROM registry.access.redhat.com/ubi9/ubi:9.4 AS builder
 ARG VERSION
 
 RUN dnf -y update && \
@@ -9,7 +9,7 @@ ADD source.tar.gz /source
 WORKDIR /source
 RUN make VERSION=${VERSION}
 
-FROM registry.access.redhat.com/ubi9/ubi:latest
+FROM registry.access.redhat.com/ubi9/ubi:9.4
 ARG VERSION
 
 LABEL license="ASL2"

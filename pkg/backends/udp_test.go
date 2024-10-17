@@ -58,9 +58,9 @@ func TestNewUDPListener(t *testing.T) {
 
 func TestUDPListenerStart(t *testing.T) {
 	type fields struct {
-		laddr    *net.UDPAddr
-		conn     *net.UDPConn
-		sessChan chan *UDPListenerSession
+		laddr           *net.UDPAddr
+		conn            *net.UDPConn
+		sessChan        chan *UDPListenerSession
 		sessionRegistry map[string]*UDPListenerSession
 		logger          *logger.ReceptorLogger
 	}

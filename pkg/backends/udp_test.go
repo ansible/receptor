@@ -165,3 +165,40 @@ func TestUDPDialerStart(t *testing.T) {
 		})
 	}
 }
+
+func TestNewUDPDialer(t *testing.T) {
+	type args struct {
+		address string
+		redial  bool
+		logger  *logger.ReceptorLogger
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *UDPDialer
+		wantErr bool
+	}{
+		{
+			name: "Positive",
+			args: args{
+				address: "127.0.0.1:9995",
+				redial:  true,
+				logger:  logger.NewReceptorLogger("UDPtest"),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewUDPDialer(tt.args.address, tt.args.redial, tt.args.logger)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewUDPDialer() error = %+v, wantErr %+v", err, tt.wantErr)
+
+				return
+			}
+			if got == nil {
+				t.Errorf("NewUDPDialer() returned nil")
+			}
+		})
+	}
+}

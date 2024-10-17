@@ -41,6 +41,7 @@ component_management:
       paths:
         - receptorctl/**
 ignore:
+  - "**/mock_*"
   - "**/*_test.go"
   - "receptorctl/tests"
   - "tests"

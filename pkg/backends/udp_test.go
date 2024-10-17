@@ -3,6 +3,7 @@ package backends
 import (
 	"context"
 	"net"
+	"reflect"
 	"sync"
 	"testing"
 
@@ -16,15 +17,6 @@ func TestNewUDPListener(t *testing.T) {
 		logger  *logger.ReceptorLogger
 	}
 
-	goodLogger := logger.NewReceptorLogger("UDPtest")
-	goodUDPListener := &UDPListener{
-		laddr:           &net.UDPAddr{},
-		conn:            &net.UDPConn{},
-		sessChan:        make(chan *UDPListenerSession),
-		sessRegLock:     sync.RWMutex{},
-		sessionRegistry: make(map[string]*UDPListenerSession),
-		logger:          goodLogger,
-	}
 	tests := []struct {
 		name    string
 		args    args
@@ -35,9 +27,8 @@ func TestNewUDPListener(t *testing.T) {
 			name: "Positive",
 			args: args{
 				address: "127.0.0.1:9998",
-				logger:  goodLogger,
+				logger:  logger.NewReceptorLogger("UDPtest"),
 			},
-			want:    goodUDPListener,
 			wantErr: false,
 		},
 	}
@@ -65,7 +56,6 @@ func TestUDPListenerStart(t *testing.T) {
 		logger          *logger.ReceptorLogger
 	}
 
-	goodLogger := logger.NewReceptorLogger("UDPtest")
 	type args struct {
 		ctx context.Context
 		wg  *sync.WaitGroup
@@ -88,7 +78,7 @@ func TestUDPListenerStart(t *testing.T) {
 				conn:            &net.UDPConn{},
 				sessChan:        make(chan *UDPListenerSession),
 				sessionRegistry: make(map[string]*UDPListenerSession),
-				logger:          goodLogger,
+				logger:          logger.NewReceptorLogger("UDPtest"),
 			},
 			args: args{
 				ctx: context.Background(),
@@ -121,6 +111,57 @@ func TestUDPListenerStart(t *testing.T) {
 			}
 			if got == nil {
 				t.Errorf("UDPListener.Start() returned nil")
+			}
+		})
+	}
+}
+
+func TestUDPDialerStart(t *testing.T) {
+	type fields struct {
+		address string
+		redial  bool
+		logger  *logger.ReceptorLogger
+	}
+	type args struct {
+		ctx context.Context
+		wg  *sync.WaitGroup
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    chan netceptor.BackendSession
+		wantErr bool
+	}{
+		{
+			name: "Positive",
+			fields: fields{
+				address: "127.0.0.1:9998",
+				redial:  true,
+				logger:  logger.NewReceptorLogger("UDPtest"),
+			},
+			args: args{
+				ctx: context.Background(),
+				wg:  &sync.WaitGroup{},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &UDPDialer{
+				address: tt.fields.address,
+				redial:  tt.fields.redial,
+				logger:  tt.fields.logger,
+			}
+			got, err := b.Start(tt.args.ctx, tt.args.wg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UDPDialer.Start() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("UDPDialer.Start() = %v, want %v", got, tt.want)
 			}
 		})
 	}

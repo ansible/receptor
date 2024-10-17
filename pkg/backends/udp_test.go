@@ -1,11 +1,13 @@
 package backends
 
 import (
+	"context"
 	"net"
 	"sync"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 func TestNewUDPListener(t *testing.T) {
@@ -49,6 +51,76 @@ func TestNewUDPListener(t *testing.T) {
 			}
 			if got == nil {
 				t.Errorf("NewUDPListener(): want UDP Listener, got nil")
+			}
+		})
+	}
+}
+
+func TestUDPListenerStart(t *testing.T) {
+	type fields struct {
+		laddr    *net.UDPAddr
+		conn     *net.UDPConn
+		sessChan chan *UDPListenerSession
+		sessionRegistry map[string]*UDPListenerSession
+		logger          *logger.ReceptorLogger
+	}
+
+	goodLogger := logger.NewReceptorLogger("UDPtest")
+	type args struct {
+		ctx context.Context
+		wg  *sync.WaitGroup
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    chan netceptor.BackendSession
+		wantErr bool
+	}{
+		{
+			name: "Positive",
+			fields: fields{
+				laddr: &net.UDPAddr{
+					IP:   net.IPv4(127, 0, 0, 1),
+					Port: 9999,
+					Zone: "",
+				},
+				conn:            &net.UDPConn{},
+				sessChan:        make(chan *UDPListenerSession),
+				sessionRegistry: make(map[string]*UDPListenerSession),
+				logger:          goodLogger,
+			},
+			args: args{
+				ctx: context.Background(),
+				wg:  &sync.WaitGroup{},
+			},
+			want:    make(chan netceptor.BackendSession),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc, err := net.ListenUDP("udp", tt.fields.laddr)
+			if err != nil {
+				t.Errorf("ListenUDP error = %+v", err)
+			}
+
+			b := &UDPListener{
+				laddr:           tt.fields.laddr,
+				conn:            uc,
+				sessChan:        tt.fields.sessChan,
+				sessRegLock:     sync.RWMutex{},
+				sessionRegistry: tt.fields.sessionRegistry,
+				logger:          tt.fields.logger,
+			}
+			got, err := b.Start(tt.args.ctx, tt.args.wg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UDPListener.Start() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if got == nil {
+				t.Errorf("UDPListener.Start() returned nil")
 			}
 		})
 	}

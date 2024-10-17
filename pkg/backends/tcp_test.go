@@ -76,15 +76,15 @@ func TestTCPListenerStart(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Positive",
-			fields:  fields{
-				address:	"127.0.0.1:9998",
-				TLS:		nil,
-				li:			nil,
-				innerLi:	nil,
-				logger:		logger.NewReceptorLogger("TCPtest"),
+			name: "Positive",
+			fields: fields{
+				address: "127.0.0.1:9998",
+				TLS:     nil,
+				li:      nil,
+				innerLi: nil,
+				logger:  logger.NewReceptorLogger("TCPtest"),
 			},
-			args:    args{
+			args: args{
 				ctx: context.Background(),
 				wg:  &sync.WaitGroup{},
 			},
@@ -107,7 +107,7 @@ func TestTCPListenerStart(t *testing.T) {
 				return
 			}
 			if got == nil {
-				t.Errorf("TCPListener.Start() returned nil" )
+				t.Errorf("TCPListener.Start() returned nil")
 			}
 		})
 	}

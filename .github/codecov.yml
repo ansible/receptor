@@ -40,3 +40,7 @@ component_management:
       name: Receptorctl
       paths:
         - receptorctl/**
+ignore:
+  - "**/*_test.go"
+  - "receptorctl/tests"
+  - "tests"

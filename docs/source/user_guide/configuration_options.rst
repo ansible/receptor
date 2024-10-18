@@ -92,6 +92,7 @@ Please be aware that using payload tracing can potentially reveal sensitive info
 Qlog
 ^^^^
 
+.. list-table:: Qlog
 * - Variable
   - Description
   - Type

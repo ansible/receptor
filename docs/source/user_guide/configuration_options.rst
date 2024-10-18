@@ -93,6 +93,9 @@ Qlog
 ^^^^
 
 .. list-table:: Qlog
+  :header-rows: 1
+  :widths: auto
+
 * - Variable
   - Description
   - Type

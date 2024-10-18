@@ -33,7 +33,7 @@ func Test_workceptorCommandTypeInitFromString(t *testing.T) {
 			},
 			wantErr: false,
 		},
-				{
+		{
 			name: "Positive force-release",
 			fields: fields{
 				w: nil,
@@ -43,7 +43,7 @@ func Test_workceptorCommandTypeInitFromString(t *testing.T) {
 			},
 			wantErr: false,
 		},
-{
+		{
 			name: "Positive list",
 			fields: fields{
 				w: nil,

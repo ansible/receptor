@@ -96,12 +96,12 @@ Qlog
     :header-rows: 1
     :widths: auto
 
-* - Variable
-  - Description
-  - Type
-* - QLOGDIR
-  - environment variable to the directory path where logs will be stored
-  - string
+    * - Variable
+      - Description
+      - Type
+    * - QLOGDIR
+      - environment variable to the directory path where logs will be stored
+      - string
 
   Qlogs allows greater visibility in the Receptors mesh network. Set the QLOGDIR environment variable to the directory path where logs will be stored. Creating a new directory may help organize qlogs.
   Once logs are created they can be viewed by uploading the logs to 

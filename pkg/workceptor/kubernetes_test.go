@@ -101,6 +101,52 @@ func TestShouldUseReconnect(t *testing.T) {
 	}
 }
 
+func TestGetTimeoutOpenLogstream(t *testing.T) {
+	const envVariable string = "RECEPTOR_OPEN_LOGSTREAM_TIMEOUT"
+
+	kw, err := startNetceptorNodeWithWorkceptor()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		envValue string
+		want     int
+	}{
+		{
+			name:     "No env value set",
+			envValue: "",
+			want:     1,
+		},
+		{
+			name:     "Env value set incorrectly",
+			envValue: "text instead of int",
+			want:     1,
+		},
+		{
+			name:     "Env value set correctly",
+			envValue: "2",
+			want:     2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue != "" {
+				os.Setenv(envVariable, tt.envValue)
+				defer os.Unsetenv(envVariable)
+			} else {
+				os.Unsetenv(envVariable)
+			}
+
+			if got := workceptor.GetTimeoutOpenLogstream(kw); got != tt.want {
+				t.Errorf("GetTimeoutOpenLogstream() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+}
+
 func TestParseTime(t *testing.T) {
 	type args struct {
 		s string

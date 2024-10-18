@@ -229,6 +229,24 @@ func podRunningAndReady() func(event watch.Event) (bool, error) {
 	return inner
 }
 
+func GetTimeoutOpenLogstream(kw *KubeUnit) int {
+	// RECEPTOR_OPEN_LOGSTREAM_TIMEOUT
+	// default: 1
+	openLogStreamTimeout := 1
+	envTimeout := os.Getenv("RECEPTOR_OPEN_LOGSTREAM_TIMEOUT")
+	if envTimeout != "" {
+		var err error
+		openLogStreamTimeout, err = strconv.Atoi(envTimeout)
+		if err != nil {
+			// ignore error, use default
+			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_OPEN_LOGSTREAM_TIMEOUT: %s. Ignoring", envTimeout)
+			openLogStreamTimeout = 1
+		}
+	}
+	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_OPEN_LOGSTREAM_TIMEOUT: %d", openLogStreamTimeout)
+	return openLogStreamTimeout
+}
+
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
 	var logStream io.ReadCloser
 	var err error
@@ -257,7 +275,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 			retries,
 			err,
 		)
-		time.Sleep(time.Second)
+		time.Sleep(time.Duration(GetTimeoutOpenLogstream(kw)) * time.Second)
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Error: %s", podNamespace, podName, err)

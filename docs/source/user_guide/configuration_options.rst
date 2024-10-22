@@ -104,7 +104,15 @@ Qlog
       - string
 
 Qlogs allows greater visibility in the Receptors mesh network. Set the QLOGDIR environment variable to the directory path where logs will be stored. Creating a new directory may help organize qlogs.
-Once logs are created they can be viewed by uploading the logs to 
+Once logs are created they can be viewed using (qvis)[https://github.com/quiclog/qvis]
+
+#### Run qvis locally:
+- Git clone qvis repo
+- `cd visualizations` 
+- `run npm install`
+- `npm run serve`
+- Qvis is now served on port 8080
+- Upload qlogs to qvis and navigate to Sequence
 
 ^^^^
 Node

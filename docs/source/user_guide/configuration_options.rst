@@ -111,9 +111,9 @@ Run qvis locally:
 ----------------
 
 - Git clone qvis repo
-- `cd visualizations` 
-- `run npm install`
-- `npm run serve`
+- ``cd visualizations`` 
+- ``run npm install``
+- ``npm run serve``
 - Qvis is now served on port 8080
 - Upload qlogs to qvis and navigate to Sequence
 

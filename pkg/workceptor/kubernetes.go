@@ -386,8 +386,11 @@ func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 			split := strings.SplitN(line, " ", 2)
 			timeStamp := ParseTime(split[0])
-			if !timeStamp.After(sinceTime) && !successfulWrite {
-				continue
+			if timeStamp != nil {
+				if !timeStamp.After(sinceTime) && !successfulWrite {
+					continue
+				}
+				sinceTime = *timeStamp
 			}
 			msg := split[1]
 
@@ -399,7 +402,6 @@ func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				return
 			}
 			remainingRetries = retries // each time we read successfully, reset this counter
-			sinceTime = *timeStamp
 			successfulWrite = true
 		}
 

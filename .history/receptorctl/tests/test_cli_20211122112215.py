@@ -8,8 +8,8 @@ import json
 
 
 @pytest.mark.usefixtures("receptor_mesh_mesh1")
-class TestCLI:
-    def test_cli_cmd_status(self, invoke_as_json):
+class TestCommands:
+    def test_cmd_status(self, invoke_as_json):
         result, json_output = invoke_as_json(commands.status, [])
         assert result.exit_code == 0
         assert set(

@@ -24,8 +24,8 @@ import (
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnitForWorkUnit
-	topJC                   *utils.JobContext
-	logger                  *logger.ReceptorLogger
+	topJC  *utils.JobContext
+	logger *logger.ReceptorLogger
 }
 
 // RemoteExtraData is the content of the ExtraData JSON field for a remote work unit.

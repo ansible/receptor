@@ -254,7 +254,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 		workUnitID, err := strFromMap(c.params, "workUnitID")
 		if err != nil {
-
+			workUnitID = ""
 		}
 		workParams := make(map[string]string)
 		nonParams := []string{"command", "subcommand", "node", "worktype", "tlsclient", "ttl", "signwork", "signature"}

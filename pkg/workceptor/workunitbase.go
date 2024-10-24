@@ -131,7 +131,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs 
 		if err == nil {
 			bwu.watcher = &RealWatcher{watcher: watcher}
 		} else {
-			bwu.w.nc.GetLogger.Info("fsnotify.NewWatcher returned %s", err)
+			bwu.w.nc.GetLogger().Info("fsnotify.NewWatcher returned %s", err)
 			bwu.watcher = nil
 		}
 	}

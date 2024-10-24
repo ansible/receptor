@@ -87,7 +87,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		if err == nil {
 			return conn, reader
 		}
-		rw.GetWorkceptor().nc.GetLogger().Debug("Connection to %s failed with error: %s",
+		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {

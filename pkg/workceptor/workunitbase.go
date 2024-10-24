@@ -423,6 +423,11 @@ loop:
 					bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
 				}
 			}
+        case err, ok := <-watcher.Errors:
+            if !ok {
+                return
+            }
+            bwu.w.nc.GetLogger()Error("fsnotify Error reading %s: %s", statusFile, err)
 		}
 		complete := IsComplete(bwu.Status().State)
 		if complete {

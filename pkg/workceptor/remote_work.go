@@ -140,7 +140,6 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 			if err != nil {
 				rw.GetWorkceptor().nc.GetLogger().Error("Error running action function: %s", err)
 			}
-
 		} else {
 			failure()
 		}

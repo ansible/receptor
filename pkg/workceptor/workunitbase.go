@@ -223,7 +223,11 @@ func (sfd *StatusFileData) Save(filename string) error {
 	}
 	err = sfd.saveToFile(file)
 	if err != nil {
-		_ = file.Close()
+		serr := file.Close()
+
+		if serr != nil {
+			MainInstance.nc.GetLogger().Error("Error closing %s: %s", filename, serr)
+		}
 
 		return err
 	}
@@ -262,7 +266,10 @@ func (sfd *StatusFileData) Load(filename string) error {
 	}
 	err = sfd.loadFromFile(file)
 	if err != nil {
-		_ = file.Close()
+		lerr := file.Close()
+		if lerr != nil {
+			MainInstance.nc.GetLogger().Error("Error closing %s: %s", filename, lerr)
+		}
 
 		return err
 	}
@@ -389,11 +396,17 @@ func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 		err := bwu.watcher.Add(statusFile)
 		if err == nil {
 			defer func() {
-				_ = bwu.watcher.Close()
+				werr := bwu.watcher.Close()
+				if werr != nil {
+					bwu.w.nc.GetLogger().Error("Error closing %s: %s", statusFile, err)
+				}
 			}()
 			watcherEvents = bwu.watcher.EventChannel()
 		} else {
-			_ = bwu.watcher.Close()
+			werr := bwu.watcher.Close()
+			if werr != nil {
+				bwu.w.nc.GetLogger().Error("Error closing %s: %s", statusFile, err)
+			}
 			bwu.watcher = nil
 		}
 	}

@@ -87,7 +87,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		if err == nil {
 			return conn, reader
 		}
-		rw.GetWorkceptor().nc.GetLogger().Debug("Connection to %s failed with error: %s",
+		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "CRYPTO_ERROR") {
@@ -136,7 +136,10 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 	go func() {
 		conn, reader := rw.getConnection(ctx)
 		if conn != nil {
-			_ = action(ctx, conn, reader)
+			err := action(ctx, conn, reader)
+			if err != nil {
+				rw.GetWorkceptor().nc.GetLogger().Error("Error running action function: %s", err)
+			}
 		} else {
 			failure()
 		}
@@ -297,7 +300,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
 		if err != nil {
 			rw.GetWorkceptor().nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
-			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+			if cerr != nil {
+				rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to remote work unit %s: %s", remoteUnitID, cerr)
+			}
 			conn = nil
 
 			continue
@@ -305,7 +311,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
 			rw.GetWorkceptor().nc.GetLogger().Debug("Read error reading from %s: %s\n", remoteNode, err)
-			_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+			if cerr != nil {
+				rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection from node %s: %s", remoteNode, cerr)
+			}
 			conn = nil
 
 			continue
@@ -404,7 +413,10 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			conn, reader := rw.getConnection(mw)
 			defer func() {
 				if conn != nil {
-					_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+					cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+					if cerr != nil {
+						rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
+					}
 				}
 			}()
 			if conn == nil {
@@ -464,7 +476,10 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					if ok {
 						cr.CancelRead()
 					}
-					_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+					cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+					if cerr != nil {
+						rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
+					}
 
 					return
 				}
@@ -657,9 +672,12 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		return nil
 	}
 	if release && force {
-		_ = rw.connectAndRun(rw.GetWorkceptor().ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+		err := rw.connectAndRun(rw.GetWorkceptor().ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true)
 		})
+		if err != nil {
+			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
+		}
 
 		return rw.BaseWorkUnitForWorkUnit.Release(true)
 	}

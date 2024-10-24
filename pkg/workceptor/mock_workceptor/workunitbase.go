@@ -68,6 +68,20 @@ func (mr *MockWatcherWrapperMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockWatcherWrapper)(nil).Close))
 }
 
+// ErrorChannel mocks base method.
+func (m *MockWatcherWrapper) ErrorChannel() chan error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ErrorChannel")
+	ret0, _ := ret[0].(chan error)
+	return ret0
+}
+
+// ErrorChannel indicates an expected call of ErrorChannel.
+func (mr *MockWatcherWrapperMockRecorder) ErrorChannel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ErrorChannel", reflect.TypeOf((*MockWatcherWrapper)(nil).ErrorChannel))
+}
+
 // EventChannel mocks base method.
 func (m *MockWatcherWrapper) EventChannel() chan fsnotify.Event {
 	m.ctrl.T.Helper()

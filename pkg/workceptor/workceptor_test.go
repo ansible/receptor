@@ -124,7 +124,7 @@ func TestAllocateUnit(t *testing.T) {
 				mockWorkUnit.EXPECT().Save().Return(tc.saveError).Times(1)
 			}
 
-			_, err := w.AllocateUnit(tc.workType, map[string]string{"param": "value"})
+			_, err := w.AllocateUnit(tc.workType, "", map[string]string{"param": "value"})
 			checkError(err, tc.expectedError, t)
 		})
 	}
@@ -195,7 +195,7 @@ func TestRegisterWorker(t *testing.T) {
 			hasError: false,
 			expectedCalls: func() {
 				mockNetceptor.EXPECT().AddWorkCommand(gomock.Any(), gomock.Any())
-				w.AllocateUnit("remote", map[string]string{})
+				w.AllocateUnit("remote", "", map[string]string{})
 			},
 		},
 	}
@@ -350,7 +350,7 @@ func TestAllocateRemoteUnit(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.expectedCalls()
-			_, err := w.AllocateRemoteUnit("", "", tc.tlsClient, tc.ttl, tc.signWork, tc.params)
+			_, err := w.AllocateRemoteUnit("", "", "", tc.tlsClient, tc.ttl, tc.signWork, tc.params)
 
 			if tc.errorMsg != "" && tc.errorMsg != err.Error() && err != nil {
 				t.Errorf("expected: %s, received: %s", tc.errorMsg, err)

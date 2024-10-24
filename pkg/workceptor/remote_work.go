@@ -677,7 +677,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true)
 		})
 		if err != nil {
-			rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
+			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
 		}
 
 		return rw.BaseWorkUnitForWorkUnit.Release(true)

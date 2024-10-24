@@ -153,6 +153,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	for k, v := range red.RemoteParams {
 		workSubmitCmd[k] = v
 	}
+	workSubmitCmd["workUnitID"] = rw.ID()
 	workSubmitCmd["command"] = "work"
 	workSubmitCmd["subcommand"] = "submit"
 	workSubmitCmd["node"] = red.RemoteNode

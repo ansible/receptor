@@ -252,6 +252,10 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if err != nil {
 			signature = ""
 		}
+		workUnitID, err := strFromMap(c.params, "workUnitID")
+		if err != nil {
+
+		}
 		workParams := make(map[string]string)
 		nonParams := []string{"command", "subcommand", "node", "worktype", "tlsclient", "ttl", "signwork", "signature"}
 		inNonParams := func(p string) bool {
@@ -283,9 +287,9 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			if ttl != "" {
 				return nil, fmt.Errorf("ttl option is intended for remote work only")
 			}
-			worker, err = c.w.AllocateUnit(workType, workParams)
+			worker, err = c.w.AllocateUnit(workType, workUnitID, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsClient, ttl, signWork, workParams)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, workUnitID, tlsClient, ttl, signWork, workParams)
 		}
 		if err != nil {
 			return nil, err

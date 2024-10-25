@@ -86,7 +86,6 @@ linters-settings:
           - "github.com/fortytw2/leaktest"
           - "github.com/fsnotify/fsnotify"
           - "github.com/gorilla/websocket"
-          - "github.com/golang/mock/gomock"
           - "github.com/prep/socketpair"
           - "github.com/google/go-cmp/cmp"
           - "k8s.io/api/core/v1"

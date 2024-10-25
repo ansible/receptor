@@ -21,7 +21,7 @@ import (
 	"github.com/ansible/receptor/pkg/backends"
 	"github.com/ansible/receptor/pkg/backends/mock_backends"
 	"github.com/ansible/receptor/pkg/logger"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 const (
@@ -208,11 +208,11 @@ func TestWebsocketDialerGetTLS(t *testing.T) {
 	}
 }
 
-func setUpListener(t *testing.T) (*gomock.Controller, *mock_backends.MockGorillaWebsocketUpgraderForListener, *mock_backends.MockHttpServerForListener) {
+func setUpListener(t *testing.T) (*gomock.Controller, *mock_backends.MockGorillaWebsocketUpgraderForListener, *mock_backends.MockHTTPServerForListener) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockWebsocketUpgrader := mock_backends.NewMockGorillaWebsocketUpgraderForListener(ctrl)
-	mockServer := mock_backends.NewMockHttpServerForListener(ctrl)
+	mockServer := mock_backends.NewMockHTTPServerForListener(ctrl)
 
 	return ctrl, mockWebsocketUpgrader, mockServer
 }

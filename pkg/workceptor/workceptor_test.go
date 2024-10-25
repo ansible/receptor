@@ -11,7 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
 	"github.com/ansible/receptor/tests/utils"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 func testSetup(t *testing.T) (*gomock.Controller, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor) {

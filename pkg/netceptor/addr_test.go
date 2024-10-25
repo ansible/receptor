@@ -5,7 +5,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 func TestNetwork(t *testing.T) {

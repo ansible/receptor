@@ -8,7 +8,7 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 func TestTracerouteInitFromString(t *testing.T) {

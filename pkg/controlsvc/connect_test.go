@@ -8,7 +8,7 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 func CheckExpectedError(expectedError bool, errorMessage string, t *testing.T, err error) {

@@ -164,6 +164,11 @@ func (w *Workceptor) generateUnitID(lock bool, workUnitID string) (string, error
 			ident = randstr.RandomString(8)
 		} else {
 			ident = workUnitID
+			unitdir := path.Join(w.dataDir, ident)
+			_, err := os.Stat(unitdir)
+			if err == nil {
+				return "", fmt.Errorf("workunit ID %s is already in use, cannot use the same workunit ID more than once", ident)
+			}
 		}
 		_, ok := w.activeUnits[ident]
 		if !ok {

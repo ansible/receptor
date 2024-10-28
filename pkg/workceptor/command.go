@@ -432,9 +432,9 @@ func (cfg commandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
 		statusFilename := path.Join(cfg.UnitDir, "status")
-		err = (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
-		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+		err2 := (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
+		if err2 != nil {
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err2)
 		}
 		MainInstance.nc.GetLogger().Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)

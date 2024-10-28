@@ -407,7 +407,7 @@ func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 			defer func() {
 				werr := bwu.watcher.Close()
 				if werr != nil {
-					bwu.w.nc.GetLogger().Error("Error closing %s: %s", statusFile, err)
+					bwu.w.nc.GetLogger().Error("Error in defer closing %s: %s", statusFile, err)
 				}
 			}()
 			watcherEvents = bwu.watcher.EventChannel()
@@ -435,7 +435,7 @@ loop:
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				err = bwu.Load()
 				if err != nil {
-					bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
+					bwu.w.nc.GetLogger().Error("Watcher Events Error reading %s: %s", statusFile, err)
 				}
 			}
 		case <-time.After(time.Second):
@@ -444,7 +444,7 @@ loop:
 				fi = newFi
 				err = bwu.Load()
 				if err != nil {
-					bwu.w.nc.GetLogger().Error("Error reading %s: %s", statusFile, err)
+					bwu.w.nc.GetLogger().Error("Work unit load Error reading %s: %s", statusFile, err)
 				}
 			}
 		case err, ok := <-watcherErrors:

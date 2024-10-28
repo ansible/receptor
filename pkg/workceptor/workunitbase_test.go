@@ -365,6 +365,10 @@ func TestMonitorLocalStatus(t *testing.T) {
 				eventCh := make(chan fsnotify.Event, 1)
 				mockWatcher.EXPECT().EventChannel().Return(eventCh).AnyTimes()
 				go func() { eventCh <- *tc.fsNotifyEvent }()
+
+				errorCh := make(chan error, 1)
+				mockWatcher.EXPECT().ErrorChannel().Return(errorCh).AnyTimes()
+				// go func() { errorCh <- nil }()
 			}
 
 			go bwu.MonitorLocalStatus()

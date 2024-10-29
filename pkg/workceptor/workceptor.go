@@ -337,7 +337,10 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	if !ok {
 		statusFilename := path.Join(unitdir, "status")
 		sfd := &StatusFileData{}
-		_ = sfd.Load(statusFilename)
+		err := sfd.Load(statusFilename)
+		if err != nil {
+			w.nc.GetLogger.Error("Error loading %s: %s", statusFilename, err)
+		}
 		w.workTypesLock.RLock()
 		wt, ok := w.workTypes[sfd.WorkType]
 		w.workTypesLock.RUnlock()

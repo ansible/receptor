@@ -1021,7 +1021,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		conn, err := li.Accept()
 		lcerr := li.Close()
 		if lcerr != nil {
-			errMsg := fmt.Error( "Error closing listener: %+v", lcerr )
+			errMsg := fmt.Sprintf("Error closing listener: %+v", lcerr)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
 			cancel()

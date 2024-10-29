@@ -70,7 +70,10 @@ func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 	if cmd.Process == nil {
 		return
 	}
-	_ = cmd.Process.Signal(os.Interrupt)
+	pserr := cmd.Process.Signal(os.Interrupt)
+	if pserr != nil {
+		MainInstance.nc.GetLogger().Warning("Error processing Interrupt Signal: %+v", pserr)
+	}
 	select {
 	case <-doneChan:
 		return
@@ -79,7 +82,10 @@ func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 	}
 	if cmd.Process != nil {
 		MainInstance.nc.GetLogger().Info("sending SIGKILL to pid %d", cmd.Process.Pid)
-		_ = cmd.Process.Kill()
+		pkerr := cmd.Process.Kill()
+		if pkerr != nil {
+			MainInstance.nc.GetLogger().Warning("Error killing pid %d: %+v", cmd.Process.Pid, pkerr)
+		}
 	}
 }
 

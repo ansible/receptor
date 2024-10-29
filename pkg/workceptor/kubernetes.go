@@ -1019,7 +1019,15 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	connChan := make(chan *net.TCPConn)
 	go func() {
 		conn, err := li.Accept()
-		_ = li.Close()
+		lcerr := li.Close()
+		if lcerr != nil {
+			errMsg := fmt.Error( "Error closing listener: %+v", lcerr )
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			cancel()
+
+			return
+		}
 		if ctx.Err() != nil {
 			return
 		}
@@ -1092,7 +1100,15 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		if ctx.Err() != nil {
 			return
 		}
-		_ = conn.CloseWrite()
+		cwerr := conn.CloseWrite()
+		if cwerr != nil {
+			errMsg := fmt.Sprintf("Error closing writing side: %+v", cwerr)
+			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			cancel()
+
+			return
+		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Error sending stdin to pod: %s", err)
 			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet

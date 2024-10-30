@@ -92,7 +92,10 @@ func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 // cmdWaiter hangs around and waits for the command to be done because apparently you
 // can't safely call exec.Cmd.Exited() unless you already know the command has exited.
 func cmdWaiter(cmd *exec.Cmd, doneChan chan bool) {
-	_ = cmd.Wait()
+	err := cmd.Wait()
+	if err != nil {
+		MainInstance.nc.GetLogger().Error("Error waiting for command: %s", err)
+	}
 	doneChan <- true
 }
 

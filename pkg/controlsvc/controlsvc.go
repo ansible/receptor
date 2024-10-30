@@ -386,7 +386,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 				}
 			}
 		} else {
-			writeMsg := "ERROR: Unknown command\n"
+			writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
 			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 				return
 			}

@@ -151,18 +151,23 @@ BLOCKLIST='/tests/|mock_|example'
 COVERAGE_FILE='coverage.txt'
 
 coverage: build-all
-	PATH="${PWD}:${PATH}" $(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
-	  $(TESTCMD) \
-	  -count=1 \
-	  -cover \
-	  -covermode=atomic \
-	  -coverprofile=$(COVERAGE_FILE) \
-	  -race \
-	  -timeout 5m
+	PATH="${PWD}:${PATH}" \
+		$(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
+		$(TESTCMD) \
+		-count=1 \
+		-cover \
+		-covermode=atomic \
+		-coverprofile=$(COVERAGE_FILE) \
+		-race \
+		-timeout 5m
 
 test: receptor
 	PATH="${PWD}:${PATH}" \
-	$(GO) test ./... $(TESTCMD) -count=1 -race -timeout 5m
+		$(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
+		$(TESTCMD) \
+		-count=1 \
+		-race \
+		-timeout 5m
 
 receptorctl-test: receptorctl/.VERSION receptor
 	@cd receptorctl && nox -s tests

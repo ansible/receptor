@@ -181,7 +181,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
-	submitIDRegex := regexp.MustCompile(`([.\-_a-zA-Z0-9]+)~([a-zA-Z0-9]+){8}`)
+	submitIDRegex := regexp.MustCompile(`([.\-_@a-zA-Z0-9]+)`)
 	match := submitIDRegex.FindSubmatch([]byte(response))
 	if match == nil || len(match) != 3 {
 		return fmt.Errorf("could not parse response: %s", strings.TrimRight(response, "\n"))

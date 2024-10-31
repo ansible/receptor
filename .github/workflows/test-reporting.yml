@@ -44,7 +44,7 @@ jobs:
         run: go install github.com/jstemmer/go-junit-report/v2@latest
 
       - name: Run receptor tests
-        run: go test -v 2>&1 ./... | go-junit-report > report.xml
+        run: go test -v 2>&1 $$($(GO) list ./... | grep -vE '/tests/|mock_|example') | go-junit-report > report.xml
 
       - name: Upload test results to dashboard
         if: >-

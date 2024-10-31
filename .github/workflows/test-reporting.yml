@@ -10,8 +10,8 @@ env:
   DESIRED_GO_VERSION: '1.20'
 
 jobs:
-  go_test_coverage:
-    name: go test coverage
+  generate_junit_test_report:
+    name: Generate junit test report
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -69,14 +69,14 @@ jobs:
         run: find /tmp/receptor-testing -name controlsock -delete
 
       - name: Artifact receptor data
-        uses: actions/upload-artifact@v4.4.3
+        uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         with:
           name: test-logs
           path: /tmp/receptor-testing
 
       - name: Archive receptor binary
-        uses: actions/upload-artifact@v4.4.3
+        uses: actions/upload-artifact@v4
         with:
           name: receptor
           path: /usr/local/bin/receptor

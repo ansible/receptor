@@ -432,7 +432,9 @@ loop:
 		case <-bwu.ctx.Done():
 			break loop
 		case event := <-watcherEvents:
-			if event.Op&fsnotify.Write == fsnotify.Write {
+			if event.Has(fsnotify.Create) {
+				bwu.w.nc.GetLogger().Debug("Watcher Event create of %s", statusFile)
+			} else if event.Op&fsnotify.Write == fsnotify.Write {
 				err = bwu.Load()
 				if err != nil {
 					bwu.w.nc.GetLogger().Error("Watcher Events Error reading %s: %s", statusFile, err)

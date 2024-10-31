@@ -20,7 +20,7 @@ func testSetup(t *testing.T) (*gomock.Controller, *mock_workceptor.MockNetceptor
 
 	ctx := context.Background()
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-	mockNetceptor.EXPECT().NodeID().Return("test")
+	mockNetceptor.EXPECT().NodeID().Return("test").AnyTimes()
 
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)

@@ -48,7 +48,7 @@ func TestAllocateUnit(t *testing.T) {
 		return mockWorkUnit
 	}
 
-	mockNetceptor.EXPECT().NodeID().Return("test")
+	mockNetceptor.EXPECT().NodeID().Return("test").Times(4)
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
 	if err != nil {
 		t.Errorf("Error while creating Workceptor: %v", err)

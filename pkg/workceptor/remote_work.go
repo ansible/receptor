@@ -183,9 +183,6 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	submitIDRegex := regexp.MustCompile(`([.\-_a-zA-Z0-9]+)~([a-zA-Z0-9]+){8}`)
 	match := submitIDRegex.FindSubmatch([]byte(response))
-	for _, m := range match {
-		fmt.Println("HERE: " + string(m))
-	}
 	if match == nil || len(match) != 3 {
 		return fmt.Errorf("could not parse response: %s", strings.TrimRight(response, "\n"))
 	}

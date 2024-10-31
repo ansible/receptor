@@ -11,7 +11,7 @@ env:
 
 jobs:
   generate_junit_test_report:
-    name: Generate junit test report
+    name: go test coverage
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

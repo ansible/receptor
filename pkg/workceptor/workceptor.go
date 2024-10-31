@@ -161,7 +161,9 @@ func (w *Workceptor) generateUnitID(lock bool, workUnitID string) (string, error
 	var ident string
 	for {
 		if workUnitID == "" {
-			ident = randstr.RandomString(8)
+			rstr := randstr.RandomString(8)
+			nid := w.nc.NodeID()
+			ident = fmt.Sprintf("%s~%s", nid, rstr)
 		} else {
 			ident = workUnitID
 			unitdir := path.Join(w.dataDir, ident)

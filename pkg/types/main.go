@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
@@ -34,6 +35,16 @@ func (cfg NodeCfg) Init() error {
 			return fmt.Errorf("no node ID specified and local host name is localhost")
 		}
 		cfg.ID = host
+	} else {
+		submitIDRegex := regexp.MustCompile(`^[.\-_a-zA-Z0-9]*$`)
+		match := submitIDRegex.FindSubmatch([]byte(cfg.ID))
+		for _, m := range match {
+			fmt.Println("HERE: " + string(m))
+			fmt.Println(cfg.ID)
+		}
+		if match == nil {
+			return fmt.Errorf("node id can only contain a-z, A-Z, 0-9 or special characters . - _ but received: %s", cfg.ID)
+		}
 	}
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")

@@ -181,12 +181,12 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
 	}
-	submitIDRegex := regexp.MustCompile(`([.\-_@a-zA-Z0-9]+)`)
+	submitIDRegex := regexp.MustCompile(`with ID ([.\-_@a-zA-Z0-9]+)\.`)
 	match := submitIDRegex.FindSubmatch([]byte(response))
-	if match == nil || len(match) != 3 {
+	if match == nil || len(match) != 2 {
 		return fmt.Errorf("could not parse response: %s", strings.TrimRight(response, "\n"))
 	}
-	red.RemoteUnitID = string(match[0])
+	red.RemoteUnitID = string(match[1])
 	rw.UpdateFullStatus(func(status *StatusFileData) {
 		ed := status.ExtraData.(*RemoteExtraData)
 		ed.RemoteUnitID = red.RemoteUnitID

@@ -312,51 +312,51 @@ func TestAllocateRemoteUnit(t *testing.T) {
 		expectedCalls func()
 	}{
 		{
-			name:      "get client tls config error",
+			name:      	"get client tls config error",
 			workUnitID: "",
-			tlsClient: "something",
-			errorMsg:  "terminated",
+			tlsClient: 	"something",
+			errorMsg:  	"terminated",
 			expectedCalls: func() {
 				mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, errors.New("terminated"))
 			},
 		},
 		{
-			name:      "sending secrets over non tls connection error",
+			name:      	"sending secrets over non tls connection error",
 			workUnitID: "",
-			tlsClient: "",
-			params:    map[string]string{"secret_": "secret"},
-			errorMsg:  "cannot send secrets over a non-TLS connection",
+			tlsClient: 	"",
+			params:    	map[string]string{"secret_": "secret"},
+			errorMsg:  	"cannot send secrets over a non-TLS connection",
 			expectedCalls: func() {
 				// For testing purposes
 			},
 		},
 		{
-			name:      "invalid duration error",
+			name:      	"invalid duration error",
 			workUnitID: "",
-			tlsClient: "",
-			ttl:       "ttl",
-			errorMsg:  "time: invalid duration \"ttl\"",
+			tlsClient: 	"",
+			ttl:       	"ttl",
+			errorMsg:  	"time: invalid duration \"ttl\"",
 			expectedCalls: func() {
 				// For testing purposes
 			},
 		},
 		{
-			name:      "normal case",
+			name:      	"normal case",
 			workUnitID: "",
-			tlsClient: "",
-			ttl:       "1.5h",
-			errorMsg:  "",
-			signWork:  true,
+			tlsClient: 	"",
+			ttl:       	"1.5h",
+			errorMsg:  	"",
+			signWork:  	true,
 			expectedCalls: func() {
 				// For testing purposes
 			},
 		},
 		{
-			name:      "pass workUnitID",
+			name:      	"pass workUnitID",
 			workUnitID: "testID12345678",
-			tlsClient: "",
-			ttl:       "1.5h",
-			errorMsg:  "",
+			tlsClient: 	"",
+			ttl:       	"1.5h",
+			errorMsg:  	"",
 			signWork:  true,
 			expectedCalls: func() {
 				// For testing purposes

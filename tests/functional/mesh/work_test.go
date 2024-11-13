@@ -45,6 +45,10 @@ func TestWorkSubmitWithTLSClient(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
+			err = controllers["node2"].AssertWorkResults(unitID, expectedResults)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
 		})
 	}
 }

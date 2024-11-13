@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -302,6 +303,7 @@ func TestAllocateRemoteUnit(t *testing.T) {
 
 	testCases := []struct {
 		name          string
+		workUnitID    string
 		tlsClient     string
 		ttl           string
 		signWork      bool
@@ -311,6 +313,7 @@ func TestAllocateRemoteUnit(t *testing.T) {
 	}{
 		{
 			name:      "get client tls config error",
+			workUnitID: "",
 			tlsClient: "something",
 			errorMsg:  "terminated",
 			expectedCalls: func() {
@@ -319,6 +322,7 @@ func TestAllocateRemoteUnit(t *testing.T) {
 		},
 		{
 			name:      "sending secrets over non tls connection error",
+			workUnitID: "",
 			tlsClient: "",
 			params:    map[string]string{"secret_": "secret"},
 			errorMsg:  "cannot send secrets over a non-TLS connection",
@@ -328,6 +332,7 @@ func TestAllocateRemoteUnit(t *testing.T) {
 		},
 		{
 			name:      "invalid duration error",
+			workUnitID: "",
 			tlsClient: "",
 			ttl:       "ttl",
 			errorMsg:  "time: invalid duration \"ttl\"",
@@ -337,6 +342,18 @@ func TestAllocateRemoteUnit(t *testing.T) {
 		},
 		{
 			name:      "normal case",
+			workUnitID: "",
+			tlsClient: "",
+			ttl:       "1.5h",
+			errorMsg:  "",
+			signWork:  true,
+			expectedCalls: func() {
+				// For testing purposes
+			},
+		},
+		{
+			name:      "pass workUnitID",
+			workUnitID: "testID12345678",
 			tlsClient: "",
 			ttl:       "1.5h",
 			errorMsg:  "",
@@ -350,14 +367,27 @@ func TestAllocateRemoteUnit(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.expectedCalls()
-			_, err := w.AllocateRemoteUnit("", "", "", tc.tlsClient, tc.ttl, tc.signWork, tc.params)
-
+			wu, err := w.AllocateRemoteUnit("", "", tc.workUnitID, tc.tlsClient, tc.ttl, tc.signWork, tc.params)
 			if tc.errorMsg != "" && tc.errorMsg != err.Error() && err != nil {
 				t.Errorf("expected: %s, received: %s", tc.errorMsg, err)
 			}
-
+			
 			if tc.errorMsg == "" && err != nil {
 				t.Error(err)
+			}
+			if tc.workUnitID != "" {
+				wuID := wu.ID()
+				if tc.workUnitID != wuID {
+					t.Errorf("expected workUnitID to equal %s but got %s", tc.workUnitID, wuID)
+				}
+			}
+		})
+		t.Cleanup(func() {
+			if tc.workUnitID != "" {
+				err := os.RemoveAll(fmt.Sprintf("/tmp/test/%s", tc.workUnitID))
+				if err != nil {
+					t.Errorf("removal of test directory /tmp/test/%s failed", tc.workUnitID)
+				}
 			}
 		})
 	}

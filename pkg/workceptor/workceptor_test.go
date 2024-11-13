@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -382,14 +381,14 @@ func TestAllocateRemoteUnit(t *testing.T) {
 				}
 			}
 		})
-		t.Cleanup(func() {
-			if tc.workUnitID != "" {
-				err := os.RemoveAll(fmt.Sprintf("/tmp/test/%s", tc.workUnitID))
-				if err != nil {
-					t.Errorf("removal of test directory /tmp/test/%s failed", tc.workUnitID)
-				}
-			}
-		})
+		// t.Cleanup(func() {
+		// 	if tc.workUnitID != "" {
+		// 		err := os.RemoveAll(fmt.Sprintf("/tmp/test/%s", tc.workUnitID))
+		// 		if err != nil {
+		// 			t.Errorf("removal of test directory /tmp/test/%s failed", tc.workUnitID)
+		// 		}
+		// 	}
+		// })
 	}
 }
 

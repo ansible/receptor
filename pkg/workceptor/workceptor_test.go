@@ -371,7 +371,7 @@ func TestAllocateRemoteUnit(t *testing.T) {
 			if tc.errorMsg != "" && tc.errorMsg != err.Error() && err != nil {
 				t.Errorf("expected: %s, received: %s", tc.errorMsg, err)
 			}
-			
+
 			if tc.errorMsg == "" && err != nil {
 				t.Error(err)
 			}

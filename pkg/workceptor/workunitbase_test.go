@@ -343,6 +343,21 @@ func TestMonitorLocalStatus(t *testing.T) {
 			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Write},
 			sleepDuration: 500 * time.Millisecond,
 		},
+		{
+			name:          "Handle Remove Event",
+			statObj:       NewInfo("test", 1, 0, time.Now()),
+			addWatcherErr: nil,
+			statErr:       nil,
+			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Remove},
+			sleepDuration: 100 * time.Millisecond,
+		},{
+			name:          "Handle Rename Event",
+			statObj:       NewInfo("test", 1, 0, time.Now()),
+			addWatcherErr: nil,
+			statErr:       nil,
+			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Rename},
+			sleepDuration: 100 * time.Millisecond,
+		},
 	}
 
 	for _, tc := range tests {

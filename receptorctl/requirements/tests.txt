@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --output-file=requirements/tests.txt --strip-extras requirements/tests.in
 #
-coverage==7.6.1
+coverage==7.6.4
     # via
     #   -r requirements/tests.in
     #   pytest-cov
@@ -18,5 +18,5 @@ pytest==8.3.3
     # via
     #   -r requirements/tests.in
     #   pytest-cov
-pytest-cov==5.0.0
+pytest-cov==6.0.0
     # via -r requirements/tests.in

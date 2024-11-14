@@ -1,4 +1,4 @@
-package net_interface
+package netinterface
 
 import (
 	"net"

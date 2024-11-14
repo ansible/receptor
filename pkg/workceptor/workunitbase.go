@@ -439,6 +439,16 @@ loop:
 				if err != nil {
 					bwu.w.nc.GetLogger().Error("Watcher Events Error reading %s: %s", statusFile, err)
 				}
+			} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+				err = bwu.Load()
+				if err != nil {
+					bwu.w.nc.GetLogger().Error("Watcher Events Remove reading %s: %s", statusFile, err)
+				}
+			} else if event.Op&fsnotify.Rename == fsnotify.Rename {
+				err = bwu.Load()
+				if err != nil {
+					bwu.w.nc.GetLogger().Error("Watcher Events Rename reading %s: %s", statusFile, err)
+				}
 			}
 		case <-time.After(time.Second):
 			newFi, err := bwu.fs.Stat(statusFile)

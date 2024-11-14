@@ -350,7 +350,8 @@ func TestMonitorLocalStatus(t *testing.T) {
 			statErr:       nil,
 			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Remove},
 			sleepDuration: 100 * time.Millisecond,
-		},{
+		},
+		{
 			name:          "Handle Rename Event",
 			statObj:       NewInfo("test", 1, 0, time.Now()),
 			addWatcherErr: nil,

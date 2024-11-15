@@ -380,14 +380,6 @@ func TestMonitorLocalStatus(t *testing.T) {
 			randstring := randstr.RandomString(4)
 			logFilePath := fmt.Sprintf("/tmp/monitorLocalStatusLog%s", randstring)
 
-			if tc.fsNotifyEvent != nil {
-				logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-				if err != nil {
-					t.Error("error creating monitorLocalStatusLog file")
-				}
-				l.SetOutput(logFile)
-			}
-
 			mockWatcher := mock_workceptor.NewMockWatcherWrapper(ctrl)
 			mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
 			bwu.Init(w, "test", "", mockFileSystem, mockWatcher)
@@ -400,6 +392,11 @@ func TestMonitorLocalStatus(t *testing.T) {
 			mockWatcher.EXPECT().Close().AnyTimes()
 
 			if tc.fsNotifyEvent != nil {
+				logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+				if err != nil {
+					t.Error("error creating monitorLocalStatusLog file")
+				}
+				l.SetOutput(logFile)
 				eventCh := make(chan fsnotify.Event, 1)
 				mockWatcher.EXPECT().EventChannel().Return(eventCh).AnyTimes()
 				go func() { eventCh <- *tc.fsNotifyEvent }()

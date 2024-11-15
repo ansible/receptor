@@ -420,7 +420,7 @@ func TestMonitorLocalStatus(t *testing.T) {
 					t.Errorf("expected log to be: %s, got %s", tc.logOutput, string(logOutput))
 				}
 			}
-			
+
 			bwu.CancelContext()
 		})
 	}

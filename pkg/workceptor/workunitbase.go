@@ -443,12 +443,12 @@ loop:
 			case event.Op&fsnotify.Remove == fsnotify.Remove:
 				err = bwu.Load()
 				if err != nil {
-					bwu.w.nc.GetLogger().Error("Watcher Events Remove reading %s: %s", statusFile, err)
+					bwu.w.nc.GetLogger().Debug("Watcher Events Remove reading %s: %s", statusFile, err)
 				}
 			case event.Op&fsnotify.Rename == fsnotify.Rename:
 				err = bwu.Load()
 				if err != nil {
-					bwu.w.nc.GetLogger().Error("Watcher Events Rename reading %s: %s", statusFile, err)
+					bwu.w.nc.GetLogger().Debug("Watcher Events Rename reading %s: %s", statusFile, err)
 				}
 			}
 		case <-time.After(time.Second):

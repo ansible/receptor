@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/randstr"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
 	"github.com/fsnotify/fsnotify"
@@ -376,12 +377,16 @@ func TestMonitorLocalStatus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl, bwu, w, _, l := setUp(t)
 			defer ctrl.Finish()
-			logFilePath := "/tmp/monitorLocalStatusLog"
-			logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-			if err != nil {
-				t.Error("error creating monitorLocalStatusLog file")
+			randstring := randstr.RandomString(4)
+			logFilePath := fmt.Sprintf("/tmp/monitorLocalStatusLog%s", randstring)
+
+			if tc.fsNotifyEvent != nil {
+				logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+				if err != nil {
+					t.Error("error creating monitorLocalStatusLog file")
+				}
+				l.SetOutput(logFile)
 			}
-			l.SetOutput(logFile)
 
 			mockWatcher := mock_workceptor.NewMockWatcherWrapper(ctrl)
 			mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
@@ -395,38 +400,27 @@ func TestMonitorLocalStatus(t *testing.T) {
 			mockWatcher.EXPECT().Close().AnyTimes()
 
 			if tc.fsNotifyEvent != nil {
-				logOutput, err := os.ReadFile(logFilePath)
-				if err != nil {
-					t.Error("error reading monitorLocalStatusLog file")
-				}
 				eventCh := make(chan fsnotify.Event, 1)
 				mockWatcher.EXPECT().EventChannel().Return(eventCh).AnyTimes()
 				go func() { eventCh <- *tc.fsNotifyEvent }()
-
+				
 				errorCh := make(chan error, 1)
 				mockWatcher.EXPECT().ErrorChannel().Return(errorCh).AnyTimes()
-				switch {
-				// write event
-				case tc.fsNotifyEvent.Op == 2:
-					if !bytes.Contains(logOutput, []byte(tc.logOutput)) {
-						t.Errorf("failed to log fsnotify event: %s", tc.logOutput)
-					}
-				// remove event
-				case tc.fsNotifyEvent.Op == 4:
-					if !bytes.Contains(logOutput, []byte(tc.logOutput)) {
-						t.Errorf("failed to log fsnotify event: %s", tc.logOutput)
-					}
-				// rename event
-				case tc.fsNotifyEvent.Op == 8:
-					if !bytes.Contains(logOutput, []byte(tc.logOutput)) {
-						t.Errorf("failed to log fsnotify event: %s", tc.logOutput)
-					}
+			}
+			
+			go bwu.MonitorLocalStatus()
+			time.Sleep(tc.sleepDuration)
+			
+			if tc.fsNotifyEvent != nil {
+				logOutput, err := os.ReadFile(logFilePath)
+				if err != nil && len(logOutput) == 0 {
+					t.Errorf("error reading %s file", logFilePath)
+				}
+				if !bytes.Contains(logOutput, []byte(tc.logOutput)) {
+					t.Errorf("expected log to be: %s, got %s", tc.logOutput, string(logOutput))
 				}
 			}
-
-			go bwu.MonitorLocalStatus()
-
-			time.Sleep(tc.sleepDuration)
+			
 			bwu.CancelContext()
 		})
 	}

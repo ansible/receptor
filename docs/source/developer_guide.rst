@@ -11,6 +11,20 @@ Receptor is an open source project that lives at `ansible/receptor repository <h
 
 See the :ref:`contributing:contributing` for more general details.
 
+---------
+Debugging
+---------
+
+^^^^^^^^^^^
+Unix Socket
+^^^^^^^^^^^
+To send commands to unix socket without receptorctl by using socat to send data to the receptor socket directly.
+
+Example:
+.. code-block:: bash
+
+   echo -e '{"command": "work", "subcommand": "submit", "node": "execution", "worktype": "cat", }\n"Hi"' | socat - UNIX-CONNECT:/tmp/control.sock  
+
 -------
 Linters
 -------

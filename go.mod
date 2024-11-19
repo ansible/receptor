@@ -1,6 +1,6 @@
 module github.com/ansible/receptor
 
-go 1.22.0
+go 1.22.9
 
 require (
 	github.com/creack/pty v1.1.23

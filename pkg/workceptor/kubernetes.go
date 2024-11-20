@@ -377,8 +377,17 @@ func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				// At this point we exausted all retries, every retry we either failed to read OR we read but did not get newer msg
 				// If we got a EOF on the last retry we assume that we read everything and we can stop the loop
 				// we ASSUME this is the happy path.
+				// If kube api returned an error there is a missing new line and that line never gets read.
 				if err != io.EOF {
 					*stdoutErr = err
+				} else if line != "" && err == io.EOF {
+					_, err = stdout.Write([]byte(line + "\n"))
+					if err != nil {
+						*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
+						kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
+
+						return
+					}
 				}
 
 				return

@@ -18,7 +18,7 @@ Debugging
 ^^^^^^^^^^^
 Unix Socket
 ^^^^^^^^^^^
-To send commands to unix socket without receptorctl by using socat to send data to the receptor socket directly.
+If you don't want to use receptorctl to control nodes, `socat <https://www.redhat.com/en/blog/getting-started-socat>` can be used to interact with unix sockets directly.
 
 Example:
 

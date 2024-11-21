@@ -11,6 +11,21 @@ Receptor is an open source project that lives at `ansible/receptor repository <h
 
 See the :ref:`contributing:contributing` for more general details.
 
+---------
+Debugging
+---------
+
+^^^^^^^^^^^
+Unix Socket
+^^^^^^^^^^^
+If you don't want to use receptorctl to control nodes, `socat <https://www.redhat.com/en/blog/getting-started-socat>` can be used to interact with unix sockets directly.
+
+Example:
+
+.. code-block:: bash
+
+   echo -e '{"command": "work", "subcommand": "submit", "node": "execution", "worktype": "cat", }\n"Hi"' | socat - UNIX-CONNECT:/tmp/control.sock  
+
 -------
 Linters
 -------

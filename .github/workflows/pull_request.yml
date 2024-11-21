@@ -5,7 +5,7 @@ on:  # yamllint disable-line rule:truthy
   pull_request:  # yamllint disable-line rule:empty-values
 
 env:
-  DESIRED_GO_VERSION: '1.20'
+  DESIRED_GO_VERSION: '1.22'
   DESIRED_GOLANGCI_LINT_VERSION: 'v1.60'
   DESIRED_PYTHON_VERSION: '3.12'
 
@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.20", "1.21"]
+        go-version: ["1.22"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
       python-version: ${{ matrix.python-version }}
       session: tests-${{ matrix.python-version }}
       download-receptor: true
-      go-version: '1.20'
+      go-version: '1.22'
 
   lint-receptorctl:
     name: Lint receptorctl${{ '' }}  # Nest jobs under the same sidebar category

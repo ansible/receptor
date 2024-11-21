@@ -385,14 +385,16 @@ func (kw *KubeUnit) kubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			}
 
 			split := strings.SplitN(line, " ", 2)
-			timeStamp := ParseTime(split[0])
-			if timeStamp != nil {
-				if !timeStamp.After(sinceTime) && !successfulWrite {
+			msg := line
+			timestamp := ParseTime(split[0])
+			if timestamp != nil {
+				kw.GetWorkceptor().nc.GetLogger().Debug("No timestamp received, log line: '%s'", line)
+				if !timestamp.After(sinceTime) && !successfulWrite {
 					continue
 				}
-				sinceTime = *timeStamp
+				sinceTime = *timestamp
+				msg = split[1]
 			}
-			msg := split[1]
 
 			_, err = stdout.Write([]byte(msg))
 			if err != nil {

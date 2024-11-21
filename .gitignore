@@ -25,3 +25,4 @@ receptorctl-test-venv/
 /test-configs
 coverage.txt
 venv
+/vendor

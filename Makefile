@@ -163,7 +163,7 @@ coverage: build-all
 
 test: receptor
 	PATH="${PWD}:${PATH}" \
-		$(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
+		$(GO) test $$($(GO) list ./...) \
 		$(TESTCMD) \
 		-count=1 \
 		-race \

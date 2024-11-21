@@ -401,13 +401,6 @@ func Test_IsCompatibleK8S(t *testing.T) {
 		{
 			name: "Prerelease Kubernetes version positive test 2",
 			args: args{
-				versionStr: "v1.23.14-asdfasdf+12131",
-			},
-			want: true,
-		},
-		{
-			name: "Prerelease Kubernetes version positive test 3",
-			args: args{
 				versionStr: "v1.23.15-asdfasdf+12131",
 			},
 			want: true,

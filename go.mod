@@ -5,7 +5,7 @@ go 1.22.7
 require (
 	github.com/creack/pty v1.1.23
 	github.com/fortytw2/leaktest v1.3.0
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/ghjm/cmdline v0.1.2
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/go-cmp v0.6.0

@@ -27,7 +27,10 @@ func setUpMocks(ctrl *gomock.Controller) (*mock_services.MockNetcForUDPProxy, *m
 func TestUDPProxyServiceInbound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNetceptor, mockNetter, mockUDPConn, mockPacketCon := setUpMocks(ctrl)
+	var mockNetceptor *mock_services.MockNetcForUDPProxy
+	var mockNetter *mock_net_interface.MockNetterUDP
+	var mockUDPConn *mock_net_interface.MockUDPConnInterface
+	var mockPacketCon *mock_netceptor.MockPacketConner
 	type testCase struct {
 		name      string
 		host      string
@@ -54,34 +57,28 @@ func TestUDPProxyServiceInbound(t *testing.T) {
 			},
 		},
 		{
-			name: "Pass Case",
+			name: "Fail UDP Con Read From",
 			calls: func() {
 				mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, nil)
 				mockNetter.EXPECT().ListenUDP(gomock.Any(), gomock.Any()).Return(mockUDPConn, nil)
 				mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{})
-				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(0, netceptor.Addr{}, nil)
-				mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(mockPacketCon, nil).Times(1)
-				mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{})
-				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, netceptor.Addr{}, nil).Times(1)
-				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, nil).AnyTimes()
-				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, nil).AnyTimes()
-				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(0, netceptor.Addr{}, errors.New("Clean Up error"))
-				mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(mockPacketCon, errors.New("Clean Up error"))
-
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, errors.New("Read From error")).AnyTimes()
 			},
 		},
-		// {
-		// 	name: "Fail UDP Con Read From",
-		// 	calls: func() {
-		// 		mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, nil)
-		// 		mockNetter.EXPECT().ListenUDP(gomock.Any(), gomock.Any()).Return(mockUDPConn, nil)
-		// 		mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{})
-		// 		mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, errors.New("Read From error"))
-		// 	},
-		// },
+		{
+			name: "Fail Netceptor listen packet",
+			calls: func() {
+				mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, nil)
+				mockNetter.EXPECT().ListenUDP(gomock.Any(), gomock.Any()).Return(mockUDPConn, nil)
+				mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{})
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(0, netceptor.Addr{}, nil).AnyTimes()
+				mockNetceptor.EXPECT().ListenPacket(gomock.Any()).Return(mockPacketCon, errors.New("Clean Up error")).AnyTimes()
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			mockNetceptor, mockNetter, mockUDPConn, mockPacketCon = setUpMocks(ctrl)
 			tc.calls()
 			err := UDPProxyServiceInbound(mockNetceptor, tc.host, tc.port, tc.node, tc.service, mockNetter)
 			if tc.expectErr {

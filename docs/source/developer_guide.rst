@@ -26,6 +26,19 @@ Example:
 
    echo -e '{"command": "work", "subcommand": "submit", "node": "execution", "worktype": "cat", }\n"Hi"' | socat - UNIX-CONNECT:/tmp/control.sock  
 
+^^^^^^^^^^^^^^
+Delve Debugger
+^^^^^^^^^^^^^^
+Delve debugger is useful for debugging Go in general but especially good at debugging goroutines.
+When running Devle with Receptor we need to pass in a Receptor config file.
+
+Run Delve with Receptor:
+
+.. code-block:: bash
+
+    dlv debug cmd/receptor-cl/receptor.go -- --config --config-v2 test-configs/kube-node.yml
+
+
 -------
 Linters
 -------

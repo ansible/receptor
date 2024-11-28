@@ -1,14 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/ansible/receptor/cmd"
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 func main() {
+	logger := logger.NewReceptorLogger("")
 	var isV2 bool
 	newArgs := []string{}
 	for _, arg := range os.Args {
@@ -23,7 +24,7 @@ func main() {
 	os.Args = newArgs
 
 	if isV2 {
-		fmt.Println("Running v2 cli/config")
+		logger.Info("Running v2 cli/config")
 		cmd.Execute()
 	} else {
 		cmd.RunConfigV1()
@@ -36,12 +37,12 @@ func main() {
 	}
 
 	if netceptor.MainInstance.BackendCount() == 0 {
-		netceptor.MainInstance.Logger.Warning("Nothing to do - no backends are running.\n")
-		fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
+		logger.Warning("Nothing to do - no backends are running.\n")
+		logger.Warning("Run %s --help for command line instructions.\n", os.Args[0])
 		os.Exit(1)
 	}
 
-	netceptor.MainInstance.Logger.Info("Initialization complete\n")
+	logger.Info("Initialization complete\n")
 
 	<-netceptor.MainInstance.NetceptorDone()
 }

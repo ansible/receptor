@@ -86,10 +86,86 @@ func TestUDPProxyServiceInbound(t *testing.T) {
 					t.Errorf("net UDPProxyServiceInbound fail case error")
 				}
 				return
-			}
-			if err != nil {
-				t.Errorf("net UDPProxyServiceInbound error")
+			} else {
+				if err != nil {
+					t.Errorf("net UDPProxyServiceInbound error")
+				}
 			}
 		})
 	}
+}
+
+func TestUDPProxyServiceOutbound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	var mockNetceptor *mock_services.MockNetcForUDPProxy
+	var mockNetter *mock_net_interface.MockNetterUDP
+	var mockPacketCon *mock_netceptor.MockPacketConner
+	logger := logger.NewReceptorLogger("test")
+	type testCase struct {
+		name      string
+		service   string
+		address   string
+		expectErr bool
+		calls     func()
+	}
+
+	tests := []testCase{
+		{
+			name:      "Fail ResolveUDPAddr",
+			expectErr: true,
+			calls: func() {
+				mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, errors.New("RecolveUDPAddr error"))
+			},
+		},
+		{
+			name:      "Fail Listen And Advertive",
+			expectErr: true,
+			calls: func() {
+				mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, nil)
+				mockNetceptor.EXPECT().ListenPacketAndAdvertise(gomock.Any(), gomock.Any()).Return(nil, errors.New("Netceptor Listen Error"))
+			},
+		},
+		{
+			name: "Fail Read From",
+			calls: func() {
+				mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, nil)
+				mockNetceptor.EXPECT().ListenPacketAndAdvertise(gomock.Any(), gomock.Any()).Return(mockPacketCon, nil)
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, errors.New("Read From error"))
+			},
+		},
+		{
+			name: "Fail Dial UDP",
+			calls: func() {
+				mockNetter.EXPECT().ResolveUDPAddr(gomock.Any(), gomock.Any()).Return(nil, nil)
+				mockNetceptor.EXPECT().ListenPacketAndAdvertise(gomock.Any(), gomock.Any()).Return(mockPacketCon, nil)
+				gomock.InOrder(
+					mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, netceptor.Addr{}, nil),
+					mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, errors.New("Read From error")).AnyTimes(),
+				)
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockNetter.EXPECT().DialUDP(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("Dial UDP error"))
+
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockNetceptor, mockNetter, _, mockPacketCon = setUpMocks(ctrl)
+			tc.calls()
+			err := UDPProxyServiceOutbound(mockNetceptor, tc.service, tc.address, mockNetter)
+			if tc.expectErr {
+				if err == nil {
+					t.Errorf("net UDPProxyServiceOutbound fail case error")
+				}
+				return
+			} else {
+				if err != nil {
+					t.Errorf("net UDPProxyServiceOutbound error")
+				}
+			}
+		})
+	}
+
 }

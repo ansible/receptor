@@ -16,34 +16,6 @@ jobs:
       - name: Checkout Receptor
         uses: actions/checkout@v4
 
-      - name: Install python
-        uses: actions/setup-python@v5
-
-      - name: Install dependencies
-        run: |
-          python3 -m pip install twine build
-
-      - name: Set official pypi info
-        run: echo pypi_repo=pypi >> $GITHUB_ENV
-        if: ${{ github.repository_owner == 'ansible' }}
-
-      - name: Set unofficial pypi info
-        run: echo pypi_repo=testpypi >> $GITHUB_ENV
-        if: ${{ github.repository_owner != 'ansible' }}
-
-      - name: Set receptor pypi version
-        run: echo RECEPTORCTL_PYPI_VERSION=$(curl --silent https://pypi.org/pypi/receptorctl/json | jq --raw-output '"v" + .info.version') >> $GITHUB_ENV
-
-      - name: Build receptorctl and upload to pypi
-        if: ${{ env.RECEPTORCTL_PYPI_VERSION != env.TAG }}
-        run: |
-          make receptorctl_wheel receptorctl_sdist VERSION=$TAG
-          twine upload \
-            -r ${{ env.pypi_repo }} \
-            -u ${{ secrets.PYPI_USERNAME }} \
-            -p ${{ secrets.PYPI_PASSWORD }} \
-            receptorctl/dist/*
-
       - name: Log in to GHCR
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -74,6 +46,34 @@ jobs:
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
+
+      - name: Install python
+        uses: actions/setup-python@v5
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install twine build
+
+      - name: Set official pypi info
+        run: echo pypi_repo=pypi >> $GITHUB_ENV
+        if: ${{ github.repository_owner == 'ansible' }}
+
+      - name: Set unofficial pypi info
+        run: echo pypi_repo=testpypi >> $GITHUB_ENV
+        if: ${{ github.repository_owner != 'ansible' }}
+
+      - name: Set receptor pypi version
+        run: echo RECEPTORCTL_PYPI_VERSION=$(curl --silent https://pypi.org/pypi/receptorctl/json | jq --raw-output '"v" + .info.version') >> $GITHUB_ENV
+
+      - name: Build receptorctl and upload to pypi
+        if: ${{ env.RECEPTORCTL_PYPI_VERSION != env.TAG }}
+        run: |
+          make receptorctl_wheel receptorctl_sdist VERSION=$TAG
+          twine upload \
+            -r ${{ env.pypi_repo }} \
+            -u ${{ secrets.PYPI_USERNAME }} \
+            -p ${{ secrets.PYPI_PASSWORD }} \
+            receptorctl/dist/*
 
   publish:
     runs-on: ubuntu-latest

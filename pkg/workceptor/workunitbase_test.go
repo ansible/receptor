@@ -254,7 +254,7 @@ func TestBaseStatus(t *testing.T) {
 func TestBaseRelease(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
 	mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
-	bwu.Init(w, "test", "", mockFileSystem, &workceptor.RealWatcher{})
+	bwu.Init(w, "test12345", "", mockFileSystem, &workceptor.RealWatcher{})
 
 	const removeError = "RemoveAll Error"
 	testCases := []struct {

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -162,7 +163,7 @@ func (w *Workceptor) generateUnitID(lock bool, workUnitID string) (string, error
 	for {
 		if workUnitID == "" {
 			rstr := randstr.RandomString(8)
-			nid := w.nc.NodeID()
+			nid := regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(w.nc.NodeID(), "")
 			ident = fmt.Sprintf("%s%s", nid, rstr)
 		} else {
 			ident = workUnitID

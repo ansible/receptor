@@ -23,8 +23,8 @@ require (
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/net v0.31.0
-	golang.org/x/sys v0.27.0
+	golang.org/x/net v0.32.0
+	golang.org/x/sys v0.28.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
@@ -73,13 +73,13 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.29.0 // indirect
+	golang.org/x/crypto v0.30.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sync v0.9.0 // indirect
-	golang.org/x/term v0.26.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.27.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect

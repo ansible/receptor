@@ -171,7 +171,7 @@ func (ku KubeAPIWrapper) NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter {
 // It is instantiated in the NewkubeWorker function and available throughout the package.
 var KubeAPIWrapperInstance KubeAPIer
 
-var KubeAPIWrapperLock *sync.RWMutex
+var KubeAPIWrapperLock sync.Mutex
 
 // ErrPodCompleted is returned when pod has already completed before we could attach.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
@@ -522,7 +522,9 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	})
 
 	// Wait for the pod to be running
+	KubeAPIWrapperLock.Lock()
 	fieldSelector := KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.pod.Name).String()
+	KubeAPIWrapperLock.Unlock()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
@@ -544,7 +546,9 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	}
 
 	time.Sleep(2 * time.Second)
+	KubeAPIWrapperLock.Lock()
 	ev, err := KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
+	KubeAPIWrapperLock.Unlock()
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}
@@ -1574,11 +1578,11 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		}
 	}
 
-	KubeAPIWrapperLock = &sync.RWMutex{}
 	KubeAPIWrapperLock.Lock()
-	KubeAPIWrapperInstance = KubeAPIWrapper{}
 	if kawi != nil {
 		KubeAPIWrapperInstance = kawi
+	} else {
+		KubeAPIWrapperInstance = KubeAPIWrapper{}	
 	}
 	KubeAPIWrapperLock.Unlock()
 

@@ -144,7 +144,7 @@ func TestParseTime(t *testing.T) {
 	}
 }
 
-func createKubernetesTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, *mock_workceptor.MockKubeAPIer, context.Context) {
+func createKubernetesTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, *mock_workceptor.MockKubeAPIer, *gomock.Controller, context.Context) {
 	ctrl := gomock.NewController(t)
 	ctx := context.Background()
 
@@ -162,7 +162,7 @@ func createKubernetesTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 	kubeConfig := workceptor.KubeWorkerCfg{AuthMethod: "incluster"}
 	ku := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI)
 
-	return ku, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctx
+	return ku, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx
 }
 
 type hasTerm struct {
@@ -194,7 +194,7 @@ func (e *ex) StreamWithContext(_ context.Context, _ remotecommand.StreamOptions)
 }
 
 func TestKubeStart(t *testing.T) {
-	ku, mockbwu, mockNet, w, mockKubeAPI, ctx := createKubernetesTestSetup(t)
+	ku, mockbwu, mockNet, w, mockKubeAPI, _, ctx := createKubernetesTestSetup(t)
 
 	startTestCases := []struct {
 		name          string
@@ -432,27 +432,11 @@ func Test_IsCompatibleK8S(t *testing.T) {
 func TestKubeLoggingWithReconnect(t *testing.T) {
 	var stdinErr error
 	var stdoutErr error
-	ctx := context.Background()
-	ctrl := gomock.NewController(t)
-	mockBaseWorkUnitForWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
-	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
-	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-	mockNetceptor.EXPECT().NodeID().Return("NodeID")
-	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+	ku, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx := createKubernetesTestSetup(t)
 
 	kw := &workceptor.KubeUnit{
-		BaseWorkUnitForWorkUnit: mockBaseWorkUnitForWorkUnit,
+		BaseWorkUnitForWorkUnit: mockBaseWorkUnit,
 	}
-
-	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
-	if err != nil {
-		t.Errorf("Error while creating Workceptor: %v", err)
-	}
-
-	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil)
-	kubeConfig := workceptor.KubeWorkerCfg{AuthMethod: "incluster"}
-	kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI)
-
 	tests := []struct {
 		name          string
 		expectedCalls func()
@@ -460,16 +444,24 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		{
 			name: "Kube error should be read",
 			expectedCalls: func() {
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				config := rest.Config{}
+				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				clientset := kubernetes.Clientset{}
+				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
 				lock := &sync.RWMutex{}
-				mockBaseWorkUnitForWorkUnit.EXPECT().GetStatusLock().Return(lock).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(lock).AnyTimes()
+				mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()
+				mockBaseWorkUnit.EXPECT().UnitDir().Return("TestDir2").AnyTimes()
 				kubeExtraData := workceptor.KubeExtraData{}
 				status := workceptor.StatusFileData{ExtraData: &kubeExtraData}
-				mockBaseWorkUnitForWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&status).AnyTimes()
-				mockBaseWorkUnitForWorkUnit.EXPECT().GetStatusCopy().Return(status).AnyTimes()
-				mockBaseWorkUnitForWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&status).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(status).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				pod := corev1.Pod{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{Name: "Test_Name"}, Spec: corev1.PodSpec{}, Status: corev1.PodStatus{}}
 				mockKubeAPI.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&pod, nil).AnyTimes()
-				mockBaseWorkUnitForWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
 				field := hasTerm{}
 				mockKubeAPI.EXPECT().OneTermEqualSelector(gomock.Any(), gomock.Any()).Return(&field).AnyTimes()
 				ev := watch.Event{Object: &pod}
@@ -487,7 +479,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
-				mockBaseWorkUnitForWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockKubeAPI.EXPECT().SubResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
@@ -499,6 +490,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.expectedCalls()
+			ku.Start()
 			kw.CreatePod(nil)
 			wg := &sync.WaitGroup{}
 			wg.Add(1)

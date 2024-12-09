@@ -2,7 +2,6 @@ package workceptor_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -486,13 +485,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 						return resp, nil
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
-					GroupVersion:         pod.GroupVersionKind().GroupVersion(),
-					VersionedAPIPath:     fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log", pod.Namespace, pod.Name),
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
 				mockBaseWorkUnitForWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockKubeAPI.EXPECT().SubResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+				exec := ex{}
+				mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), gomock.Any(), gomock.Any()).Return(&exec, nil).AnyTimes()
 			},
 		},
 	}

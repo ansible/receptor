@@ -1582,7 +1582,7 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 	if kawi != nil {
 		KubeAPIWrapperInstance = kawi
 	} else {
-		KubeAPIWrapperInstance = KubeAPIWrapper{}	
+		KubeAPIWrapperInstance = KubeAPIWrapper{}
 	}
 	KubeAPIWrapperLock.Unlock()
 

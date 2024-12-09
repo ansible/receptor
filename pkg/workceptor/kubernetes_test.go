@@ -24,10 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func startNetceptorNodeWithWorkceptor() (*workceptor.KubeUnit, error) {
@@ -455,11 +455,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 	kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI)
 
 	tests := []struct {
-		name     string
+		name          string
 		expectedCalls func()
 	}{
 		{
-			name:     "Kube error should be read",
+			name: "Kube error should be read",
 			expectedCalls: func() {
 				lock := &sync.RWMutex{}
 				mockBaseWorkUnitForWorkUnit.EXPECT().GetStatusLock().Return(lock).AnyTimes()
@@ -482,6 +482,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 							StatusCode: http.StatusOK,
 							Body:       io.NopCloser(strings.NewReader("2024-12-09T00:31:18.823849250Z HI\n kube error")),
 						}
+
 						return resp, nil
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),

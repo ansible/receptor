@@ -36,10 +36,10 @@ func (cfg NodeCfg) Init() error {
 		}
 		cfg.ID = host
 	} else {
-		submitIDRegex := regexp.MustCompile(`^[.\-_@a-zA-Z0-9]*$`)
+		submitIDRegex := regexp.MustCompile(`^[.\-_@:a-zA-Z0-9]*$`)
 		match := submitIDRegex.FindSubmatch([]byte(cfg.ID))
 		if match == nil {
-			return fmt.Errorf("node id can only contain a-z, A-Z, 0-9 or special characters . - _ @ but received: %s", cfg.ID)
+			return fmt.Errorf("node id can only contain a-z, A-Z, 0-9 or special characters . - _ @ : but received: %s", cfg.ID)
 		}
 	}
 	if strings.ToLower(cfg.ID) == "localhost" {

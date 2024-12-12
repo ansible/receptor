@@ -130,7 +130,7 @@ Node
       - Default value
       - Type
     * - ``id``
-      - Node ID can only contain a-z, A-Z, 0-9 or special characters . - _ @
+      - Node ID can only contain a-z, A-Z, 0-9 or special characters . - _ @ :
       - local hostname
       - string
     * - ``datadir``

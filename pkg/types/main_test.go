@@ -4,18 +4,18 @@ import "testing"
 
 func TestMainInitNodeID(t *testing.T) {
 	mainInitNodeIDTestCases := []struct {
-		name 				string
-		nodeID 			string
+		name        string
+		nodeID      string
 		expectedErr string
 	}{
 		{
-			name: "successful, no error",
-			nodeID: "t.e-s_t@1:234",
+			name:        "successful, no error",
+			nodeID:      "t.e-s_t@1:234",
 			expectedErr: "",
 		},
 		{
-			name: "failed, charactered not allowed",
-			nodeID: "test!#&123",
+			name:        "failed, charactered not allowed",
+			nodeID:      "test!#&123",
 			expectedErr: "node id can only contain a-z, A-Z, 0-9 or special characters . - _ @ : but received: test!#&123",
 		},
 	}

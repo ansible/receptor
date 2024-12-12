@@ -101,7 +101,6 @@ func TestUnredactedStatus(t *testing.T) {
 	statusLock := &sync.RWMutex{}
 	for _, testCase := range restartTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{

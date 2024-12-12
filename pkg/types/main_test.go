@@ -31,6 +31,9 @@ func TestMainInitNodeID(t *testing.T) {
 			} else if err != nil && err.Error() != testCase.expectedErr {
 				t.Errorf("expected error to be %s, but got: %s", testCase.expectedErr, err.Error())
 			}
+			t.Cleanup(func() {
+				cfg = NodeCfg{}
+			})
 		})
 	}
 }

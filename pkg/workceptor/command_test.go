@@ -89,7 +89,6 @@ func TestCommandSetFromParams(t *testing.T) {
 }
 
 func TestUnredactedStatus(t *testing.T) {
-	t.Parallel()
 	wu, mockBaseWorkUnit, _, _ := createCommandTestSetup(t)
 	restartTestCases := []struct {
 		name string

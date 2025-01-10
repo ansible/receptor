@@ -3,12 +3,46 @@ package main
 import (
 	"os"
 
+	_ "net/http/pprof"
+
 	"github.com/ansible/receptor/cmd"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 func main() {
+	// pyroscope.Start(pyroscope.Config {
+	// 	ApplicationName: "receptor",
+
+	// 	// replace this with the address of pyroscope server
+	// 	ServerAddress: "http://localhost:4040",
+
+	// 	// you can disable logging by setting this to nil
+	// 	Logger: pyroscope.StandardLogger,
+
+	// 	ProfileTypes: [] pyroscope.ProfileType {
+	// 		// these profile types are enabled by default:
+	// 		pyroscope.ProfileCPU,
+	// 			pyroscope.ProfileAllocObjects,
+	// 			pyroscope.ProfileAllocSpace,
+	// 			pyroscope.ProfileInuseObjects,
+	// 			pyroscope.ProfileInuseSpace,
+
+	// 			// these profile types are optional:
+	// 			pyroscope.ProfileGoroutines,
+	// 			pyroscope.ProfileMutexCount,
+	// 			pyroscope.ProfileMutexDuration,
+	// 			pyroscope.ProfileBlockCount,
+	// 			pyroscope.ProfileBlockDuration,
+	// 	},
+	// })
+
+	// pyroscope.TagWrapper(context.Background(), pyroscope.Labels("test", "netceptor_main"), func(c context.Context) {
+	// 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
+	// })
+
+	
+
 	logger := logger.NewReceptorLogger("")
 	var isV2 bool
 	newArgs := []string{}

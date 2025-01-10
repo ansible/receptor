@@ -218,6 +218,7 @@ func RunConfigV1() {
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Specifies the node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Runs a self-contained node with no backend", backends.NullBackendCfg{}, cmdline.Singleton)
+	cl.AddConfigType("pyroscope", "Profile Receptor using Pyroscope", types.ReceptorPyroscopeCfg{}, cmdline.Singleton)
 
 	// Add registered config types from imported modules
 	for _, appName := range []string{

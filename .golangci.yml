@@ -75,6 +75,11 @@ linters-settings:
           - "k8s.io/api/core"
           - "k8s.io/apimachinery/pkg"
           - "k8s.io/client-go"
+          - "github.com/docker/docker/api/types/container"
+          - "github.com/docker/docker/api/types/image"
+          - "github.com/docker/docker/client"
+          - "github.com/docker/go-connections/nat"
+          - "github.com/grafana/pyroscope-go"
       tests:
         files:
           - "$test"

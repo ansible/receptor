@@ -28,6 +28,8 @@ type NodeCfg struct {
 	ReceptorKubeClientsetRateLimiter string
 }
 
+var receptorDataDir string
+
 func (cfg NodeCfg) Init() error {
 	var err error
 	if cfg.ID == "" {
@@ -50,6 +52,8 @@ func (cfg NodeCfg) Init() error {
 	if strings.ToLower(cfg.ID) == "localhost" {
 		return fmt.Errorf("node ID \"localhost\" is reserved")
 	}
+
+	receptorDataDir = cfg.DataDir
 
 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
 
@@ -74,7 +78,7 @@ func (cfg NodeCfg) Init() error {
 		}
 	}
 
-	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
+	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, receptorDataDir)
 	if err != nil {
 		return err
 	}
@@ -121,7 +125,14 @@ func (pyroscopeCfg ReceptorPyroscopeCfg) Init() error {
 	pyroscopeLogger := logrus.New()
 	pyroscopeLogger.SetLevel(logrus.DebugLevel)
 
-	logFile, err := os.OpenFile("/tmp/pyroscope.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o666)
+	if _, err := os.Stat(receptorDataDir); os.IsNotExist(err) {
+		err := os.MkdirAll(receptorDataDir, 0o700)
+		if err != nil {
+			fmt.Printf("error creating directory: %v", err)
+		}
+	}
+
+	logFile, err := os.OpenFile(fmt.Sprintf("%s/pyroscope.log", receptorDataDir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o666)
 	if err != nil {
 		pyroscopeLogger.Fatalf("Error opening log file: %v", err)
 	}

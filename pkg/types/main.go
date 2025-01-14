@@ -11,9 +11,9 @@ import (
 
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/grafana/pyroscope-go"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -94,7 +94,7 @@ func (cfg NodeCfg) Run() error {
 }
 
 type ReceptorPyroscopeCfg struct {
-	ApplicationName   string // e.g backend.purchases
+	ApplicationName   string
 	Tags              map[string]string
 	ServerAddress     string // e.g http://pyroscope.services.internal:4040
 	BasicAuthUser     string // http basic auth user
@@ -118,7 +118,18 @@ func (pyroscopeCfg ReceptorPyroscopeCfg) Init() error {
 	runtime.SetMutexProfileFraction(5)
 	runtime.SetBlockProfileRate(5)
 
-	_, err := pyroscope.Start(pyroscope.Config{
+	pyroscopeLogger := logrus.New()
+	pyroscopeLogger.SetLevel(logrus.DebugLevel)
+
+	logFile, err := os.OpenFile("/tmp/pyroscope.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o666)
+	if err != nil {
+		pyroscopeLogger.Fatalf("Error opening log file: %v", err)
+	}
+	pyroscopeLogger.SetOutput(logFile)
+
+	pyroscopeLogger.SetFormatter(&logrus.JSONFormatter{})
+
+	_, err = pyroscope.Start(pyroscope.Config{
 		ApplicationName:   pyroscopeCfg.ApplicationName,
 		Tags:              pyroscopeCfg.Tags,
 		ServerAddress:     pyroscopeCfg.ServerAddress,
@@ -126,7 +137,7 @@ func (pyroscopeCfg ReceptorPyroscopeCfg) Init() error {
 		BasicAuthPassword: pyroscopeCfg.BasicAuthPassword,
 		TenantID:          pyroscopeCfg.TenantID,
 		UploadRate:        getUploadRate(pyroscopeCfg),
-		Logger:            pyroscope.StandardLogger,
+		Logger:            pyroscopeLogger,
 		ProfileTypes:      getProfileTypes(pyroscopeCfg),
 		DisableGCRuns:     pyroscopeCfg.DisableGCRuns,
 		HTTPHeaders:       pyroscopeCfg.HTTPHeaders,
@@ -135,16 +146,8 @@ func (pyroscopeCfg ReceptorPyroscopeCfg) Init() error {
 	if err != nil {
 		return err
 	} else {
-		hostIP := strings.Split(strings.Split(pyroscopeCfg.ServerAddress, ":")[1], "//")[1]
-		hostPort := strings.Split(pyroscopeCfg.ServerAddress, ":")[2]
-		utils.StartPyroscopeContainer(hostIP, hostPort)
-
 		return nil
 	}
-
-	// pyroscope.TagWrapper(context.Background(), pyroscope.Labels("test", "netceptor_main"), func(c context.Context) {
-	// 	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
-	// })
 }
 
 func getUploadRate(cfg ReceptorPyroscopeCfg) time.Duration {

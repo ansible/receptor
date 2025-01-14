@@ -117,6 +117,74 @@ Run qvis locally:
 - Qvis is now served on port 8080
 - Upload qlogs to qvis and navigate to Sequence
 
+^^^^^^^^^^^^^^^^
+Pyroscope Client
+^^^^^^^^^^^^^^^^
+
+Use pyroscope-client to implement pyroscope push-mode to profile receptor and push to a Pyroscope server.
+
+.. list-table:: Pyroscope client
+    :header-rows: 1
+    :widths: auto
+
+    * - Parameter
+      - Description
+      - Default value
+      - Type
+    * - ``applicationName``
+      - Name of application used in Pyroscope UI
+      - No default value.
+      - string
+    * - ``tags``
+      -  Map of static tags.
+      - No default value.
+      - map of string
+    * - ``serverAddress``
+      - Address of pyroscope server
+      - No default value.
+      - string
+    * - ``basicAuthUser``
+      - Http basic auth user
+      - No default value.
+      - string
+    * - ``basicAuthPassword``
+      - Http basic auth password
+      - No default value.
+      - string
+    * - ``tenantID``
+      - Specify TenantId when using phlare multi-tenancy
+      - No default value.
+      - string
+    * - ``uploadRate``
+      - Upload rate e.g. ``10s``
+      - 15s
+      - string
+    * - ``profileTypes``
+      - Optional profile types- ProfileGoroutines, ProfileMutexCount, ProfileMutexDuration, ProfileBlockCount, ProfileBlockDuration.
+      - Profile types set by default- ProfileCPU, ProfileAllocObjects, ProfileAlloSpace, ProfileInuseObjects, ProfileInuseSpace.
+      - list of sting
+    * - ``disableGCRuns``
+      - This will disable automatic runtime.GC runs between getting the heap profiles
+      - true
+      - bool
+    * - ``HTTPHeaders``
+      - Set the Authorization header manually
+      - No default value.
+      - map of string
+
+
+.. code-block:: yaml
+
+    pyroscope-client:
+      - applicationName: "receptor"
+        serverAddress: "http://localhost:4040"
+        profileTypes: 
+          - ProfileGoroutines
+          - ProfileMutexCount
+          - ProfileMutexDuration
+          - ProfileBlockCount
+          - ProfileBlockDuration
+
 ^^^^
 Node
 ^^^^

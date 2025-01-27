@@ -24,20 +24,18 @@ Receptor configurations
 
 .. code-block:: yaml
 
-  ---
-  version: 2
-  node:
-    id: foo
+  - node:
+      id: foo
 
-  control-services:
-    - service: control
+  - control-service:
+      service: control
       filename: /tmp/foo.sock
 
-  tcp-peers:
-    - address: localhost:2222
+  - tcp-peer:
+      address: localhost:2222
 
-  log-level:
-    level: debug
+  - log-level:
+      level: debug
 
   ...
 
@@ -46,19 +44,18 @@ Receptor configurations
 .. code-block:: yaml
 
   ---
-  version: 2
-  node:
-    id: bar
+  - node:
+      id: bar
 
-  control-services:
-    - service: control
+  - control-service:
+      service: control
       filename: /tmp/bar.sock
 
-  tcp-listeners:
-    - port: 2222
+  - tcp-listener:
+      port: 2222
 
-  log-level:
-    level: debug
+  - log-level:
+      level: debug
 
   ...
 
@@ -67,19 +64,18 @@ Receptor configurations
 .. code-block:: yaml
 
   ---
-  version: 2
-  node:
-    id: baz
+  - node:
+      id: baz
 
-  control-services:
-    - service: control
+  - control-service:
+      service: control
       filename: /tmp/baz.sock
 
-  tcp-peers:
-    - address: localhost:2222
+  - tcp-peer:
+      address: localhost:2222
 
-  log-level:
-    level: debug
+  - log-level:
+      level: debug
 
   - work-command:
       workType: echo

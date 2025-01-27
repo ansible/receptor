@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ansible/receptor/pkg/backends"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 func TestNullBackendCfgGetAddr(t *testing.T) {
@@ -119,6 +120,66 @@ func TestNullBackendCfgGetTLS(t *testing.T) {
 			}
 			if got := cfg.GetTLS(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NullBackendCfg.GetTLS() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNullBackendRun(t *testing.T) {
+	type fields struct {
+		Local bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   error
+	}{
+		{
+			name: "Positive",
+			fields: fields{
+				Local: true,
+			},
+			want: nil,
+		},
+	}
+	netceptor.MainInstance = netceptor.New(context.Background(), "null_backends_test")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &backends.NullBackendCfg{
+				Local: tt.fields.Local,
+			}
+			if got := cfg.Run(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NullBackendCfg.Run() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNullBackendReload(t *testing.T) {
+	type fields struct {
+		Local bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   error
+	}{
+		{
+			name: "Positive",
+			fields: fields{
+				Local: true,
+			},
+			want: nil,
+		},
+	}
+	netceptor.MainInstance = netceptor.New(context.Background(), "null_backends_test_reload")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &backends.NullBackendCfg{
+				Local: tt.fields.Local,
+			}
+			if got := cfg.Reload(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NullBackendCfg.Run() = %v, want %v", got, tt.want)
 			}
 		})
 	}

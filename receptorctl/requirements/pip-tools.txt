@@ -6,12 +6,12 @@
 #
 build==1.2.1
     # via pip-tools
-click==8.1.7
+click==8.1.8
     # via pip-tools
 packaging==24.0
     # via build
 pip-tools==7.4.1
-    # via -r pip-tools.in
+    # via -r requirements/pip-tools.in
 pyproject-hooks==1.1.0
     # via
     #   build

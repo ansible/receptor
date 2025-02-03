@@ -49,6 +49,7 @@ type RealWatcher struct {
 func (rw *RealWatcher) Add(name string) error {
 	rw.mu.Lock()
 	defer rw.mu.Unlock()
+
 	return rw.watcher.Add(name)
 }
 

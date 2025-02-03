@@ -1470,7 +1470,6 @@ func (kw *KubeUnit) UnredactedStatus() *StatusFileData {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
 	}
-	kw.GetStatusLock().RUnlock()
 
 	return status
 }

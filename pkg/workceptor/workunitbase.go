@@ -43,9 +43,12 @@ type WatcherWrapper interface {
 
 type RealWatcher struct {
 	watcher *fsnotify.Watcher
+	mu sync.Mutex
 }
 
 func (rw *RealWatcher) Add(name string) error {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
 	return rw.watcher.Add(name)
 }
 

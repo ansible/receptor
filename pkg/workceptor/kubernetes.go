@@ -89,81 +89,140 @@ type KubeAPIer interface {
 	NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter
 }
 
-type KubeAPIWrapper struct{}
+type KubeAPIWrapper struct{
+	mu *sync.Mutex
+}
 
 func (ku KubeAPIWrapper) NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return apierrors.NewNotFound(qualifiedResource, name)
 }
 
 func (ku KubeAPIWrapper) OneTermEqualSelector(k string, v string) fields.Selector {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return fields.OneTermEqualSelector(k, v)
 }
 
 func (ku KubeAPIWrapper) NewForConfig(c *rest.Config) (*kubernetes.Clientset, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return kubernetes.NewForConfig(c)
 }
 
 func (ku KubeAPIWrapper) GetLogs(clientset *kubernetes.Clientset, namespace string, name string, opts *corev1.PodLogOptions) *rest.Request {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().Pods(namespace).GetLogs(name, opts)
 }
 
 func (ku KubeAPIWrapper) Get(ctx context.Context, clientset *kubernetes.Clientset, namespace string, name string, opts metav1.GetOptions) (*corev1.Pod, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().Pods(namespace).Get(ctx, name, opts)
 }
 
 func (ku KubeAPIWrapper) Create(ctx context.Context, clientset *kubernetes.Clientset, namespace string, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 }
 
 func (ku KubeAPIWrapper) List(ctx context.Context, clientset *kubernetes.Clientset, namespace string, opts metav1.ListOptions) (*corev1.PodList, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().Pods(namespace).List(ctx, opts)
 }
 
 func (ku KubeAPIWrapper) Watch(ctx context.Context, clientset *kubernetes.Clientset, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().Pods(namespace).Watch(ctx, opts)
 }
 
 func (ku KubeAPIWrapper) Delete(ctx context.Context, clientset *kubernetes.Clientset, namespace string, name string, opts metav1.DeleteOptions) error {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().Pods(namespace).Delete(ctx, name, opts)
 }
 
 func (ku KubeAPIWrapper) SubResource(clientset *kubernetes.Clientset, podName string, podNamespace string) *rest.Request {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(podNamespace).SubResource("attach")
 }
 
 func (ku KubeAPIWrapper) InClusterConfig() (*rest.Config, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return rest.InClusterConfig()
 }
 
 func (ku KubeAPIWrapper) NewDefaultClientConfigLoadingRules() *clientcmd.ClientConfigLoadingRules {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientcmd.NewDefaultClientConfigLoadingRules()
 }
 
 func (ku KubeAPIWrapper) BuildConfigFromFlags(masterURL string, kubeconfigPath string) (*rest.Config, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
 }
 
 func (ku KubeAPIWrapper) NewClientConfigFromBytes(configBytes []byte) (clientcmd.ClientConfig, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return clientcmd.NewClientConfigFromBytes(configBytes)
 }
 
 func (ku KubeAPIWrapper) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return remotecommand.NewSPDYExecutor(config, method, url)
 }
 
 func (ku KubeAPIWrapper) StreamWithContext(ctx context.Context, exec remotecommand.Executor, options remotecommand.StreamOptions) error {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return exec.StreamWithContext(ctx, options)
 }
 
 func (ku KubeAPIWrapper) UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition watch2.PreconditionFunc, conditions ...watch2.ConditionFunc) (*watch.Event, error) {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return watch2.UntilWithSync(ctx, lw, objType, precondition, conditions...)
 }
 
 func (ku KubeAPIWrapper) NewFakeNeverRateLimiter() flowcontrol.RateLimiter {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return flowcontrol.NewFakeNeverRateLimiter()
 }
 
 func (ku KubeAPIWrapper) NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter {
+	ku.mu.Lock()
+	defer ku.mu.Unlock()
+	
 	return flowcontrol.NewFakeAlwaysRateLimiter()
 }
 
@@ -542,9 +601,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	})
 
 	// Wait for the pod to be running
-	KubeAPIWrapperLock.Lock()
 	fieldSelector := KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.pod.Name).String()
-	KubeAPIWrapperLock.Unlock()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
@@ -566,9 +623,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	}
 
 	time.Sleep(2 * time.Second)
-	KubeAPIWrapperLock.Lock()
 	ev, err := KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
-	KubeAPIWrapperLock.Unlock()
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}

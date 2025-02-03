@@ -43,7 +43,7 @@ type WatcherWrapper interface {
 
 type RealWatcher struct {
 	watcher *fsnotify.Watcher
-	mu sync.Mutex
+	mu      sync.Mutex
 }
 
 func (rw *RealWatcher) Add(name string) error {

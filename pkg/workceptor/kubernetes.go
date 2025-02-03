@@ -1463,6 +1463,7 @@ func (kw *KubeUnit) Status() *StatusFileData {
 // Status returns a copy of the status currently loaded in memory.
 func (kw *KubeUnit) UnredactedStatus() *StatusFileData {
 	kw.GetStatusLock().RLock()
+	defer kw.GetStatusLock().RUnlock()
 	status := kw.GetStatusWithoutExtraData()
 	ked, ok := kw.GetStatusCopy().ExtraData.(*KubeExtraData)
 	if ok {

@@ -43,13 +43,9 @@ type WatcherWrapper interface {
 
 type RealWatcher struct {
 	watcher *fsnotify.Watcher
-	mu      sync.Mutex
 }
 
 func (rw *RealWatcher) Add(name string) error {
-	rw.mu.Lock()
-	defer rw.mu.Unlock()
-
 	return rw.watcher.Add(name)
 }
 
@@ -87,6 +83,8 @@ func WorkStateToString(workState int) string {
 		return "Unknown: " + strconv.Itoa(workState)
 	}
 }
+
+var watcherLock sync.Mutex
 
 // ErrPending is returned when an operation hasn't succeeded or failed yet.
 var ErrPending = fmt.Errorf("operation pending")
@@ -406,7 +404,9 @@ func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 	watcherErrors = make(chan error)
 
 	if bwu.watcher != nil {
+		watcherLock.Lock()
 		err := bwu.watcher.Add(statusFile)
+		watcherLock.Unlock()
 		if err == nil {
 			defer func() {
 				werr := bwu.watcher.Close()

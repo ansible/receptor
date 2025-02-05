@@ -89,7 +89,7 @@ type KubeAPIer interface {
 	NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter
 }
 
-type KubeAPIWrapper struct {}
+type KubeAPIWrapper struct{}
 
 func (ku KubeAPIWrapper) NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError {
 	return apierrors.NewNotFound(qualifiedResource, name)
@@ -187,8 +187,6 @@ func podRunningAndReady() func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
-			KubeAPIWrapperLock.Lock()
-			defer KubeAPIWrapperLock.Unlock()
 			return false, KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		if t, ok := event.Object.(*corev1.Pod); ok {
@@ -557,15 +555,11 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
 
-			KubeAPIWrapperLock.Lock()
-			defer KubeAPIWrapperLock.Unlock()
 			return KubeAPIWrapperInstance.List(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
 
-			KubeAPIWrapperLock.Lock()
-			defer KubeAPIWrapperLock.Unlock()
 			return KubeAPIWrapperInstance.Watch(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
 		},
 	}

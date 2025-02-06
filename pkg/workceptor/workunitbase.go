@@ -84,8 +84,6 @@ func WorkStateToString(workState int) string {
 	}
 }
 
-var watcherLock sync.Mutex
-
 // ErrPending is returned when an operation hasn't succeeded or failed yet.
 var ErrPending = fmt.Errorf("operation pending")
 
@@ -404,9 +402,9 @@ func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 	watcherErrors = make(chan error)
 
 	if bwu.watcher != nil {
-		watcherLock.Lock()
+		bwu.statusLock.Lock()
 		err := bwu.watcher.Add(statusFile)
-		watcherLock.Unlock()
+		bwu.statusLock.Unlock()
 		if err == nil {
 			defer func() {
 				werr := bwu.watcher.Close()

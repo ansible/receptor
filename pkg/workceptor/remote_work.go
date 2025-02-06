@@ -547,7 +547,6 @@ func (rw *remoteUnit) Status() *StatusFileData {
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 	rw.GetStatusLock().RLock()
-	defer rw.GetStatusLock().RUnlock()
 	status := rw.GetStatusWithoutExtraData()
 	ed, ok := rw.GetStatusCopy().ExtraData.(*RemoteExtraData)
 	if ok {
@@ -558,6 +557,7 @@ func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 		}
 		status.ExtraData = &edCopy
 	}
+	rw.GetStatusLock().RUnlock()
 
 	return status
 }

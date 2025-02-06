@@ -1493,11 +1493,11 @@ func (kw *KubeUnit) UnredactedStatus() *StatusFileData {
 	kw.GetStatusLock().RLock()
 	status := kw.GetStatusWithoutExtraData()
 	ked, ok := kw.GetStatusCopy().ExtraData.(*KubeExtraData)
-	kw.GetStatusLock().RUnlock()
 	if ok {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
 	}
+	kw.GetStatusLock().RUnlock()
 
 	return status
 }

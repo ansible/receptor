@@ -1492,12 +1492,12 @@ func (kw *KubeUnit) Status() *StatusFileData {
 func (kw *KubeUnit) UnredactedStatus() *StatusFileData {
 	kw.GetStatusLock().RLock()
 	status := kw.GetStatusWithoutExtraData()
+	kw.GetStatusLock().RUnlock()
 	ked, ok := kw.GetStatusCopy().ExtraData.(*KubeExtraData)
 	if ok {
 		kedCopy := *ked
 		status.ExtraData = &kedCopy
 	}
-	kw.GetStatusLock().RUnlock()
 
 	return status
 }

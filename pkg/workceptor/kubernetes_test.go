@@ -546,6 +546,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.expectedCalls()
 			ku.Start()
+			time.Sleep(10 * time.Millisecond)
 			kw.CreatePod(nil)
 			wg := &sync.WaitGroup{}
 			wg.Add(1)

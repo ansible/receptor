@@ -389,6 +389,7 @@ func TestMonitorLocalStatus(t *testing.T) {
 				mockFileSystem.EXPECT().Stat(gomock.Any()).Return(tc.statObjLater, nil).AnyTimes()
 			}
 			mockWatcher.EXPECT().Add(gomock.Any()).Return(tc.addWatcherErr)
+			mockWatcher.EXPECT().Remove(gomock.Any()).AnyTimes()
 			mockWatcher.EXPECT().Close().AnyTimes()
 
 			if tc.fsNotifyEvent != nil {

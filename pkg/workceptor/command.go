@@ -121,12 +121,6 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err := stdin.Close()
-		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(unitdir, "stdin"), err)
-		}
-	}()
 	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
 
 	if payloadDebug != 0 {
@@ -214,6 +208,10 @@ loop:
 		if err != nil {
 			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
+	}
+	err = stdin.Close()
+	if err != nil {
+		MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(unitdir, "stdin"), err)
 	}
 	err = stdout.Close()
 	if err != nil {

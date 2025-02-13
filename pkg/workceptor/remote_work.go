@@ -198,6 +198,12 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	if err != nil {
 		return fmt.Errorf("error opening stdin file: %s", err)
 	}
+	defer func() {
+		err := stdin.Close()
+		if err != nil {
+			MainInstance.nc.GetLogger().Error("Error closing 4 %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
+		}
+	}()
 	_, err = io.Copy(conn, stdin)
 	if err != nil {
 		return fmt.Errorf("error sending stdin file: %s", err)
@@ -467,6 +473,12 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 
 				return
 			}
+			defer func() {
+				err := stdout.Close()
+				if err != nil {
+					MainInstance.nc.GetLogger().Error("Error closing 3 %s: %s", rw.StdoutFileName(), err)
+				}
+			}()
 			doneChan := make(chan struct{})
 			go func() {
 				select {

@@ -95,3 +95,17 @@ func (mr *MockWatcherWrapperMockRecorder) EventChannel() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EventChannel", reflect.TypeOf((*MockWatcherWrapper)(nil).EventChannel))
 }
+
+// Remove mocks base method.
+func (m *MockWatcherWrapper) Remove(path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Remove", path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Remove indicates an expected call of Remove.
+func (mr *MockWatcherWrapperMockRecorder) Remove(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockWatcherWrapper)(nil).Remove), path)
+}

@@ -154,7 +154,7 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 		defer func() {
 			err := f.Close()
 			if err != nil {
-				s.GetLogger().Error("Error closing 2 %s: %s", qlogPath + filename, err)
+				s.GetLogger().Error("Error closing %s: %s", qlogPath+filename, err)
 			}
 		}()
 

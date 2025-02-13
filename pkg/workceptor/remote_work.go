@@ -201,7 +201,7 @@ func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader
 	defer func() {
 		err := stdin.Close()
 		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error closing 4 %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
+			MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
 		}
 	}()
 	_, err = io.Copy(conn, stdin)
@@ -476,7 +476,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			defer func() {
 				err := stdout.Close()
 				if err != nil {
-					MainInstance.nc.GetLogger().Error("Error closing 3 %s: %s", rw.StdoutFileName(), err)
+					MainInstance.nc.GetLogger().Error("Error closing %s: %s", rw.StdoutFileName(), err)
 				}
 			}()
 			doneChan := make(chan struct{})

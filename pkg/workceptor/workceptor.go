@@ -58,7 +58,6 @@ type Workceptor struct {
 	workTypes         map[string]*workType
 	activeUnitsLock   *sync.RWMutex
 	activeUnits       map[string]WorkUnit
-	recentlyReleasedUnits       map[string]string
 	SigningKey        string
 	SigningExpiration time.Duration
 	VerifyingKey      string
@@ -86,7 +85,6 @@ func New(ctx context.Context, nc NetceptorForWorkceptor, dataDir string) (*Workc
 		workTypes:         make(map[string]*workType),
 		activeUnitsLock:   &sync.RWMutex{},
 		activeUnits:       make(map[string]WorkUnit),
-		recentlyReleasedUnits:       make(map[string]string),
 		SigningKey:        "",
 		SigningExpiration: 5 * time.Minute,
 		VerifyingKey:      "",

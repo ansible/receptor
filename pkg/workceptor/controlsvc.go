@@ -351,15 +351,6 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if err != nil {
 			return nil, err
 		}
-		if c.w.recentlyReleasedUnits[unitid] != "" {
-			c.w.nc.GetLogger().Debug("status called on recently released work unit")
-			cfr := make(map[string]interface{})
-			cfr["State"] = 3
-			cfr["Detail"] = "status called on recently released work unit"
-			cfr["StateName"] = "Failed"
-
-			return cfr, nil
-		}
 		cfr, err := c.w.unitStatusForCFR(unitid)
 		if err != nil {
 			return nil, err

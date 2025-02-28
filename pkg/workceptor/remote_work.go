@@ -328,7 +328,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
-				if !forRelease {
+				if forRelease || red.LocalReleased {
 					rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
 					rw.UpdateFullStatus(func(status *StatusFileData) {
 						status.State = WorkStateFailed

@@ -531,6 +531,13 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 	defer bwu.w.activeUnitsLock.Unlock()
 	delete(bwu.w.activeUnits, bwu.unitID)
 
+	bwu.w.recentlyReleasedUnits[bwu.unitID] = bwu.unitID
+
+	// go func()  {
+	// 	time.Sleep(time.Second * 10)
+	// 	delete(bwu.w.recentlyReleasedUnits, bwu.unitID) 
+	// }()
+
 	return nil
 }
 

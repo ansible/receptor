@@ -19,6 +19,7 @@ type FileSystemer interface {
 	Stat(name string) (os.FileInfo, error)
 	Open(name string) (*os.File, error)
 	RemoveAll(path string) error
+	RemoveStdFiles(path string) error
 }
 
 // FileSystem represents the real filesystem.
@@ -42,6 +43,22 @@ func (FileSystem) Open(name string) (*os.File, error) {
 // RemoveAll removes path and any children it contains.
 func (FileSystem) RemoveAll(path string) error {
 	return os.RemoveAll(path)
+}
+
+// RemoveStd removes stdin and stdout files from dir path.
+func (FileSystem) RemoveStdFiles(unitDir string) error {
+	var err error
+	err1 := os.Remove(path.Join(unitDir, "stdin"))
+	if err1 != nil {
+		err = err1
+	}
+
+	err2 := os.Remove(path.Join(unitDir, "stdout"))
+	if err2 != nil {
+		err = errors.Join(err, err2)
+	}
+
+	return err
 }
 
 // FileWriteCloser wraps io.WriteCloser.

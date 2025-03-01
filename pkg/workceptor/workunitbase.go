@@ -31,6 +31,7 @@ const (
 	WorkStateSucceeded = 2
 	WorkStateFailed    = 3
 	WorkStateCanceled  = 4
+	WorkStateReleased  = 5
 )
 
 // WatcherWrapper is wrapping the fsnofity Watcher struct and exposing the Event chan within.
@@ -84,6 +85,8 @@ func WorkStateToString(workState int) string {
 		return "Failed"
 	case WorkStateCanceled:
 		return "Canceled"
+	case WorkStateReleased:
+		return "Released"
 	default:
 		return "Unknown: " + strconv.Itoa(workState)
 	}
@@ -505,10 +508,9 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 // Release releases this unit of work, deleting its files.
 func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.statusLock.Lock()
-	defer bwu.statusLock.Unlock()
 	attemptsLeft := 3
 	for {
-		err := bwu.fs.RemoveAll(bwu.UnitDir())
+		err := bwu.fs.RemoveStdFiles(bwu.UnitDir())
 		if force {
 			break
 		} else if err != nil {
@@ -527,9 +529,18 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 
 		break
 	}
-	bwu.w.activeUnitsLock.Lock()
-	defer bwu.w.activeUnitsLock.Unlock()
-	delete(bwu.w.activeUnits, bwu.unitID)
+	bwu.UpdateBasicStatus(5, "released work", 0)
+	bwu.statusLock.Unlock()
+
+	go func()  {
+		time.Sleep(time.Second * 5)
+
+		bwu.fs.RemoveAll(bwu.unitDir)
+
+		bwu.w.activeUnitsLock.Lock()
+		delete(bwu.w.activeUnits, bwu.unitID)
+		bwu.w.activeUnitsLock.Unlock()
+	}()
 
 	return nil
 }

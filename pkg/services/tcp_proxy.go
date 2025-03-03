@@ -3,22 +3,85 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 	"github.com/spf13/viper"
 )
 
+//go:generate mockgen -package mock_services -source=tcp_proxy.go -destination=mock_services/tcp_proxy.go
+
+type NetcForTCPProxy interface {
+	GetLogger() *logger.ReceptorLogger
+	Dial(node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error)
+	ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*netceptor.Listener, error)
+}
+
+// Interface for the net library to generate stubs with mockgen.
+type NetLib interface {
+	Listen(network string, address string) (net.Listener, error)
+	Dial(network string, address string) (net.Conn, error)
+}
+
+type NetTCP struct{}
+
+func (n *NetTCP) Listen(network string, address string) (net.Listener, error) {
+	return net.Listen(network, address)
+}
+
+func (n *NetTCP) Dial(network string, address string) (net.Conn, error) {
+	return net.Dial(network, address)
+}
+
+// Interface for the tls library to generate stubs with mockgen.
+type TLSLib interface {
+	NewListener(inner net.Listener, config *tls.Config) net.Listener
+	Dial(network string, addr string, config *tls.Config) (*tls.Conn, error)
+}
+
+type TLSTCP struct{}
+
+func (n *TLSTCP) NewListener(inner net.Listener, config *tls.Config) net.Listener {
+	return tls.NewListener(inner, config)
+}
+
+func (n *TLSTCP) Dial(network string, addr string, config *tls.Config) (*tls.Conn, error) {
+	return tls.Dial(network, addr, config)
+}
+
+// Interface for the Net Listener to generate stubs with mockgen.
+type NetListenerTCP interface {
+	net.Listener
+}
+
+// Interface for the utils package to generate stubs with mockgen.
+type UtilsLib interface {
+	BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger)
+}
+
+type UtilsTCP struct{}
+
+func (u *UtilsTCP) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
+	utils.BridgeConns(c1, c1Name, c2, c2Name, logger)
+}
+
+// Interface to mock the Connection object returned from Accept.
+type TCPConn interface {
+	net.Conn
+}
+
 // TCPProxyServiceInbound listens on a TCP port and forwards the connection over the Receptor network.
-func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsServer *tls.Config,
-	node string, rservice string, tlsClient *tls.Config,
+func TCPProxyServiceInbound(s NetcForTCPProxy, host string, port int, tlsServer *tls.Config,
+	node string, rservice string, tlsClient *tls.Config, netTCP NetLib, tlsTCP TLSLib, utilsTCP UtilsLib,
 ) error {
-	tli, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	tli, err := netTCP.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if tlsServer != nil {
-		tli = tls.NewListener(tli, tlsServer)
+		tli = tlsTCP.NewListener(tli, tlsServer)
 	}
 	if err != nil {
 		return fmt.Errorf("error listening on TCP: %s", err)
@@ -27,17 +90,17 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 		for {
 			tc, err := tli.Accept()
 			if err != nil {
-				s.Logger.Error("Error accepting TCP connection: %s\n", err)
+				s.GetLogger().Error("error accepting TCP connection: %s\n", err)
 
 				return
 			}
 			qc, err := s.Dial(node, rservice, tlsClient)
 			if err != nil {
-				s.Logger.Error("Error connecting on Receptor network: %s\n", err)
+				s.GetLogger().Error("error connecting on Receptor network: %s\n", err)
 
 				continue
 			}
-			go utils.BridgeConns(tc, "tcp service", qc, "receptor connection", s.Logger)
+			go utilsTCP.BridgeConns(tc, "tcp service", qc, "receptor connection", s.GetLogger())
 		}
 	}()
 
@@ -45,8 +108,8 @@ func TCPProxyServiceInbound(s *netceptor.Netceptor, host string, port int, tlsSe
 }
 
 // TCPProxyServiceOutbound listens on the Receptor network and forwards the connection via TCP.
-func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *tls.Config,
-	address string, tlsClient *tls.Config,
+func TCPProxyServiceOutbound(s NetcForTCPProxy, service string, tlsServer *tls.Config,
+	address string, tlsClient *tls.Config, netTCP NetLib, tlsTCP TLSLib, utilsTCP UtilsLib,
 ) error {
 	qli, err := s.ListenAndAdvertise(service, tlsServer, map[string]string{
 		"type":    "TCP Proxy",
@@ -59,22 +122,22 @@ func TCPProxyServiceOutbound(s *netceptor.Netceptor, service string, tlsServer *
 		for {
 			qc, err := qli.Accept()
 			if err != nil {
-				s.Logger.Error("Error accepting connection on Receptor network: %s\n", err)
+				s.GetLogger().Error("Error accepting connection on Receptor network: %s\n", err)
 
 				return
 			}
 			var tc net.Conn
 			if tlsClient == nil {
-				tc, err = net.Dial("tcp", address)
+				tc, err = netTCP.Dial("tcp", address)
 			} else {
-				tc, err = tls.Dial("tcp", address, tlsClient)
+				tc, err = tlsTCP.Dial("tcp", address, tlsClient)
 			}
 			if err != nil {
-				s.Logger.Error("Error connecting via TCP: %s\n", err)
+				s.GetLogger().Error("Error connecting via TCP: %s\n", err)
 
 				continue
 			}
-			go utils.BridgeConns(qc, "receptor service", tc, "tcp connection", s.Logger)
+			go utilsTCP.BridgeConns(qc, "receptor service", tc, "tcp connection", s.GetLogger())
 		}
 	}()
 
@@ -104,7 +167,7 @@ func (cfg TCPProxyInboundCfg) Run() error {
 	}
 
 	return TCPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, TLSServerConfig,
-		cfg.RemoteNode, cfg.RemoteService, tlsClientCfg)
+		cfg.RemoteNode, cfg.RemoteService, tlsClientCfg, &NetTCP{}, &TLSTCP{}, &UtilsTCP{})
 }
 
 // tcpProxyOutboundCfg is the cmdline configuration object for a TCP outbound proxy.
@@ -131,7 +194,7 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 		return err
 	}
 
-	return TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, TLSServerConfig, cfg.Address, tlsClientCfg)
+	return TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, TLSServerConfig, cfg.Address, tlsClientCfg, &NetTCP{}, &TLSTCP{}, &UtilsTCP{})
 }
 
 func init() {

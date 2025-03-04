@@ -69,7 +69,7 @@ func (rw *RealWatcher) EventChannel() chan fsnotify.Event {
 
 // IsComplete returns true if a given WorkState indicates the job is finished.
 func IsComplete(workState int) bool {
-	return workState == WorkStateSucceeded || workState == WorkStateFailed
+	return workState == WorkStateSucceeded || workState == WorkStateFailed || workState == WorkStateReleased
 }
 
 // WorkStateToString returns a string representation of a WorkState.
@@ -252,9 +252,10 @@ func (sfd *StatusFileData) Save(filename string) error {
 // Save saves status to a file.
 func (bwu *BaseWorkUnit) Save() error {
 	bwu.statusLock.RLock()
-	defer bwu.statusLock.RUnlock()
+	err := bwu.status.Save(bwu.statusFileName)
+	bwu.statusLock.RUnlock()
 
-	return bwu.status.Save(bwu.statusFileName)
+	return err
 }
 
 // loadFromFile loads status from an already open file.
@@ -294,9 +295,10 @@ func (sfd *StatusFileData) Load(filename string) error {
 // Load loads status from a file.
 func (bwu *BaseWorkUnit) Load() error {
 	bwu.statusLock.Lock()
-	defer bwu.statusLock.Unlock()
+	err := bwu.status.Load(bwu.statusFileName)
+	bwu.statusLock.Unlock()
 
-	return bwu.status.Load(bwu.statusFileName)
+	return err
 }
 
 // UpdateFullStatus atomically updates the status metadata file.  Changes should be made in the callback function.
@@ -352,9 +354,9 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 // Errors are logged rather than returned.
 func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	bwu.statusLock.Lock()
-	defer bwu.statusLock.Unlock()
-
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
+	bwu.statusLock.Unlock()
+
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
@@ -380,9 +382,9 @@ func (sfd *StatusFileData) UpdateBasicStatus(filename string, state int, detail 
 // Passing -1 as stdoutSize leaves it unchanged.
 func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize int64) {
 	bwu.statusLock.Lock()
-	defer bwu.statusLock.Unlock()
-
 	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize)
+	bwu.statusLock.Unlock()
+
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
@@ -500,14 +502,14 @@ func (bwu *BaseWorkUnit) Status() *StatusFileData {
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 	bwu.statusLock.RLock()
-	defer bwu.statusLock.RUnlock()
+	status := bwu.getStatus()
+	bwu.statusLock.RUnlock()
 
-	return bwu.getStatus()
+	return status
 }
 
 // Release releases this unit of work, deleting its files.
 func (bwu *BaseWorkUnit) Release(force bool) error {
-	bwu.statusLock.Lock()
 	attemptsLeft := 3
 	for {
 		err := bwu.fs.RemoveStdFiles(bwu.UnitDir())
@@ -529,11 +531,11 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 
 		break
 	}
+
 	bwu.UpdateBasicStatus(5, "released work", 0)
-	bwu.statusLock.Unlock()
 
 	go func()  {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 200)
 
 		bwu.fs.RemoveAll(bwu.unitDir)
 

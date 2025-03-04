@@ -9,6 +9,7 @@ recepcert
 /net
 .container-flag*
 .VERSION
+.python-version
 kubectl
 /receptorctl/.nox
 /receptorctl/.VERSION

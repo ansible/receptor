@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -300,15 +301,40 @@ func (li *Listener) Addr() net.Addr {
 	return li.pc.LocalAddr()
 }
 
+// this interface is for quic stream
+type QuicStreamForConn interface {
+	io.Reader
+	io.Writer
+	io.Closer
+	CancelRead(quic.StreamErrorCode)
+	CancelWrite(quic.StreamErrorCode)
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+	SetDeadline(t time.Time) error
+}
+
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
 	pc       PacketConner
 	qc       quic.Connection
-	qs       quic.Stream
+	qs       QuicStreamForConn
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
+}
+
+func NewConn(s *Netceptor, pc PacketConner, qc quic.Connection, qs QuicStreamForConn, doneChan chan struct{}, doneOnce *sync.Once, ctx context.Context) *Conn {
+	conn := &Conn{
+		s:        s,
+		pc:       pc,
+		qc:       qc,
+		qs:       qs,
+		doneChan: doneChan,
+		doneOnce: doneOnce,
+		ctx:      ctx,
+	}
+	return conn
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -416,16 +442,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			return
 		}
 	}()
-	conn := &Conn{
-		s:        s,
-		pc:       pc,
-		qc:       qc,
-		qs:       qs,
-		doneChan: doneChan,
-		doneOnce: &sync.Once{},
-		ctx:      cctx,
-	}
-
+	conn := NewConn(s, pc, qc, qs, doneChan, &sync.Once{}, cctx)
 	return conn, nil
 }
 

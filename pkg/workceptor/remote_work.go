@@ -713,9 +713,9 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 
 		select {
 		case err = <-errChan:
-			return err	
+			return err
 		default:
-			err = nil
+			return nil
 		}
 	}
 	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)

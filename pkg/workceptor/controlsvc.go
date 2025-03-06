@@ -406,8 +406,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 		if IsPending(err) {
 			cfr[pendingMsg] = unitid
-
-			} else {
+		} else {
 			cfr[completeMsg] = unitid
 		}
 

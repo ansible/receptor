@@ -1581,7 +1581,7 @@ func (kw *KubeUnit) Cancel() error {
 func (kw *KubeUnit) Release(force bool, errChan chan<- error) {
 	err := kw.Cancel()
 	if err != nil && !force {
-		errChan<- err
+		errChan <- err
 	}
 
 	kw.BaseWorkUnitForWorkUnit.Release(force, errChan)

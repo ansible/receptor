@@ -396,14 +396,16 @@ func (w *Workceptor) scanForUnits() {
 
 func (w *Workceptor) findUnit(unitID string) (WorkUnit, error) {
 	w.activeUnitsLock.RLock()
-	defer w.activeUnitsLock.RUnlock()
 	unit, ok := w.activeUnits[unitID]
+	w.activeUnitsLock.RUnlock()
 	if ok {
 		return unit, nil
 	}
 	// if not in active units, rescan work unit dir and recheck
 	w.scanForUnit(unitID)
+	w.activeUnitsLock.RLock()
 	unit, ok = w.activeUnits[unitID]
+	w.activeUnitsLock.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("unknown work unit %s", unitID)
 	}
@@ -460,7 +462,15 @@ func (w *Workceptor) ReleaseUnit(unitID string, force bool) error {
 		return err
 	}
 
-	return unit.Release(force)
+	errChan := make(chan error)
+	unit.Release(force, errChan)
+
+	select {
+	case err = <-errChan:
+		return err
+	default:
+		return nil
+	}
 }
 
 // unitStatusForCFR returns status information as a map, suitable for a control function return value.

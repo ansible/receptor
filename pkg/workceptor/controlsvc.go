@@ -391,14 +391,23 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if c.subcommand == "cancel" {
 			err = unit.Cancel()
 		} else {
-			err = unit.Release(c.subcommand == "force-release")
+			unit.UpdateBasicStatus(5, "released work", 0)
+			errChan := make(chan error)
+			unit.Release(c.subcommand == "force-release", errChan)
+
+			select {
+			case err = <-errChan:
+			default:
+				err = nil
+			}
 		}
 		if err != nil && !IsPending(err) {
 			return nil, err
 		}
 		if IsPending(err) {
 			cfr[pendingMsg] = unitid
-		} else {
+
+			} else {
 			cfr[completeMsg] = unitid
 		}
 

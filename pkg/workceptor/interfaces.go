@@ -17,7 +17,7 @@ type WorkUnit interface {
 	Start() error
 	Restart() error
 	Cancel() error
-	Release(force bool) error
+	Release(force bool, errChan chan<- error)
 }
 
 type WorkerConfig interface {

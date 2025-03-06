@@ -586,7 +586,15 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		go func() {
 			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
-				err := rw.BaseWorkUnitForWorkUnit.Release(false)
+				errChan := make(chan error)
+				rw.BaseWorkUnitForWorkUnit.Release(false, errChan)
+
+				select {
+				case err = <-errChan:
+				default:
+					err = nil
+				}
+
 				if err != nil {
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
@@ -678,7 +686,15 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		rw.topJC.Cancel()
 		rw.topJC.Wait()
 		if release {
-			return rw.BaseWorkUnitForWorkUnit.Release(true)
+			errChan := make(chan error)
+			rw.BaseWorkUnitForWorkUnit.Release(true, errChan)
+
+			select {
+			case err := <-errChan:
+				return err
+			default:
+				return nil
+			}
 		}
 		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
 
@@ -692,7 +708,15 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
 		}
 
-		return rw.BaseWorkUnitForWorkUnit.Release(true)
+		errChan := make(chan error)
+		rw.BaseWorkUnitForWorkUnit.Release(true, errChan)
+
+		select {
+		case err = <-errChan:
+			return err	
+		default:
+			err = nil
+		}
 	}
 	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
 
@@ -707,8 +731,11 @@ func (rw *remoteUnit) Cancel() error {
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (rw *remoteUnit) Release(force bool) error {
-	return rw.cancelOrRelease(true, force)
+func (rw *remoteUnit) Release(force bool, errChan chan<- error) {
+	err := rw.cancelOrRelease(true, force)
+	if err != nil {
+		errChan <- err
+	}
 }
 
 func NewRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workType string) WorkUnit {

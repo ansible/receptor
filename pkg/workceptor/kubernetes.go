@@ -1578,13 +1578,13 @@ func (kw *KubeUnit) Cancel() error {
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (kw *KubeUnit) Release(force bool) error {
+func (kw *KubeUnit) Release(force bool, errChan chan<- error) {
 	err := kw.Cancel()
 	if err != nil && !force {
-		return err
+		errChan<- err
 	}
 
-	return kw.BaseWorkUnitForWorkUnit.Release(force)
+	kw.BaseWorkUnitForWorkUnit.Release(force, errChan)
 }
 
 // **************************************************************************

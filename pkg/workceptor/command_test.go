@@ -326,7 +326,7 @@ func TestRelease(t *testing.T) {
 		{
 			name: "released successfully",
 			expectedCalls: func() {
-				mockBaseWorkUnit.EXPECT().Release(gomock.Any())
+				mockBaseWorkUnit.EXPECT().Release(gomock.Any(), gomock.Any())
 			},
 			errorCatch: func(err error, t *testing.T) {
 				if err != nil {
@@ -347,7 +347,16 @@ func TestRelease(t *testing.T) {
 				},
 			})
 			testCase.expectedCalls()
-			err := wu.Release(testCase.force)
+			errChan := make(chan error)
+			wu.Release(testCase.force, errChan)
+
+			var err error
+			select {
+			case err = <-errChan:
+			default:
+				err = nil
+			}
+
 			testCase.errorCatch(err, t)
 		})
 	}

@@ -205,17 +205,15 @@ func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) MonitorLocalStatus() *gomock.
 }
 
 // Release mocks base method.
-func (m *MockBaseWorkUnitForWorkUnit) Release(force bool) error {
+func (m *MockBaseWorkUnitForWorkUnit) Release(force bool, errChan chan<- error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Release", force)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "Release", force, errChan)
 }
 
 // Release indicates an expected call of Release.
-func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) Release(force any) *gomock.Call {
+func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) Release(force, errChan any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).Release), force)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).Release), force, errChan)
 }
 
 // Save mocks base method.

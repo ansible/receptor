@@ -84,6 +84,20 @@ func (mr *MockFileSystemerMockRecorder) RemoveAll(path any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAll", reflect.TypeOf((*MockFileSystemer)(nil).RemoveAll), path)
 }
 
+// RemoveStdFiles mocks base method.
+func (m *MockFileSystemer) RemoveStdFiles(path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveStdFiles", path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveStdFiles indicates an expected call of RemoveStdFiles.
+func (mr *MockFileSystemerMockRecorder) RemoveStdFiles(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveStdFiles", reflect.TypeOf((*MockFileSystemer)(nil).RemoveStdFiles), path)
+}
+
 // Stat mocks base method.
 func (m *MockFileSystemer) Stat(name string) (os.FileInfo, error) {
 	m.ctrl.T.Helper()

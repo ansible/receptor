@@ -313,18 +313,27 @@ type QuicStreamForConn interface {
 	SetDeadline(t time.Time) error
 }
 
+type QuicConnectionForConn interface {
+	OpenStreamSync(context.Context) (quic.Stream, error)
+	CloseWithError(quic.ApplicationErrorCode, string) error
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
+	Context() context.Context
+}
+
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
 	s        *Netceptor
 	pc       PacketConner
-	qc       quic.Connection
+	qc       QuicConnectionForConn
 	qs       QuicStreamForConn
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
 }
 
-func NewConn(s *Netceptor, pc PacketConner, qc quic.Connection, qs QuicStreamForConn, doneChan chan struct{}, doneOnce *sync.Once, ctx context.Context) *Conn {
+// NewConn constructs a new Conn instance, so that the test package can create one with necessary fields
+func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStreamForConn, doneChan chan struct{}, doneOnce *sync.Once, ctx context.Context) *Conn {
 	conn := &Conn{
 		s:        s,
 		pc:       pc,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
+	"github.com/quic-go/quic-go"
 	"go.uber.org/mock/gomock"
 )
 
@@ -69,8 +70,7 @@ func TestRead(t *testing.T) {
 func TestCancelRead(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
-	// TODO: mock that it's Canceled with 499 and not Any()
-	mock_qs.EXPECT().CancelRead(gomock.Any()).Times(1)
+	mock_qs.EXPECT().CancelRead(gomock.Eq(quic.StreamErrorCode(499))).Times(1)
 	conn := makeConn(t, TestConn{qs: mock_qs})
 	conn.CancelRead()
 }
@@ -122,8 +122,7 @@ func TestCloseConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	// quic Connection should be closed
 	mock_qc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
-	// TODO: mock that it's closed with 0 and not Any()
-	mock_qc.EXPECT().CloseWithError(gomock.Any(), gomock.Eq("normal close")).Return(nil).Times(1)
+	mock_qc.EXPECT().CloseWithError(quic.ApplicationErrorCode(0), gomock.Eq("normal close")).Return(nil).Times(1)
 
 	// PacketConner should be cancelled
 	mock_pc := mock_netceptor.NewMockPacketConner(ctrl)

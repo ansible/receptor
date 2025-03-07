@@ -55,6 +55,18 @@ func (mr *MockQuicStreamForConnMockRecorder) CancelRead(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelRead", reflect.TypeOf((*MockQuicStreamForConn)(nil).CancelRead), arg0)
 }
 
+// CancelWrite mocks base method.
+func (m *MockQuicStreamForConn) CancelWrite(arg0 quic.StreamErrorCode) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "CancelWrite", arg0)
+}
+
+// CancelWrite indicates an expected call of CancelWrite.
+func (mr *MockQuicStreamForConnMockRecorder) CancelWrite(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelWrite", reflect.TypeOf((*MockQuicStreamForConn)(nil).CancelWrite), arg0)
+}
+
 // Close mocks base method.
 func (m *MockQuicStreamForConn) Close() error {
 	m.ctrl.T.Helper()
@@ -67,6 +79,20 @@ func (m *MockQuicStreamForConn) Close() error {
 func (mr *MockQuicStreamForConnMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockQuicStreamForConn)(nil).Close))
+}
+
+// Context mocks base method.
+func (m *MockQuicStreamForConn) Context() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Context")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// Context indicates an expected call of Context.
+func (mr *MockQuicStreamForConnMockRecorder) Context() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockQuicStreamForConn)(nil).Context))
 }
 
 // Read mocks base method.
@@ -126,6 +152,20 @@ func (mr *MockQuicStreamForConnMockRecorder) SetWriteDeadline(t any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetWriteDeadline", reflect.TypeOf((*MockQuicStreamForConn)(nil).SetWriteDeadline), t)
 }
 
+// StreamID mocks base method.
+func (m *MockQuicStreamForConn) StreamID() quic.StreamID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StreamID")
+	ret0, _ := ret[0].(quic.StreamID)
+	return ret0
+}
+
+// StreamID indicates an expected call of StreamID.
+func (mr *MockQuicStreamForConnMockRecorder) StreamID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamID", reflect.TypeOf((*MockQuicStreamForConn)(nil).StreamID))
+}
+
 // Write mocks base method.
 func (m *MockQuicStreamForConn) Write(p []byte) (int, error) {
 	m.ctrl.T.Helper()
@@ -165,6 +205,36 @@ func (m *MockQuicConnectionForConn) EXPECT() *MockQuicConnectionForConnMockRecor
 	return m.recorder
 }
 
+// AcceptStream mocks base method.
+func (m *MockQuicConnectionForConn) AcceptStream(arg0 context.Context) (quic.Stream, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcceptStream", arg0)
+	ret0, _ := ret[0].(quic.Stream)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AcceptStream indicates an expected call of AcceptStream.
+func (mr *MockQuicConnectionForConnMockRecorder) AcceptStream(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcceptStream", reflect.TypeOf((*MockQuicConnectionForConn)(nil).AcceptStream), arg0)
+}
+
+// AcceptUniStream mocks base method.
+func (m *MockQuicConnectionForConn) AcceptUniStream(arg0 context.Context) (quic.ReceiveStream, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcceptUniStream", arg0)
+	ret0, _ := ret[0].(quic.ReceiveStream)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AcceptUniStream indicates an expected call of AcceptUniStream.
+func (mr *MockQuicConnectionForConnMockRecorder) AcceptUniStream(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcceptUniStream", reflect.TypeOf((*MockQuicConnectionForConn)(nil).AcceptUniStream), arg0)
+}
+
 // CloseWithError mocks base method.
 func (m *MockQuicConnectionForConn) CloseWithError(arg0 quic.ApplicationErrorCode, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -177,6 +247,20 @@ func (m *MockQuicConnectionForConn) CloseWithError(arg0 quic.ApplicationErrorCod
 func (mr *MockQuicConnectionForConnMockRecorder) CloseWithError(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseWithError", reflect.TypeOf((*MockQuicConnectionForConn)(nil).CloseWithError), arg0, arg1)
+}
+
+// ConnectionState mocks base method.
+func (m *MockQuicConnectionForConn) ConnectionState() quic.ConnectionState {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConnectionState")
+	ret0, _ := ret[0].(quic.ConnectionState)
+	return ret0
+}
+
+// ConnectionState indicates an expected call of ConnectionState.
+func (mr *MockQuicConnectionForConnMockRecorder) ConnectionState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectionState", reflect.TypeOf((*MockQuicConnectionForConn)(nil).ConnectionState))
 }
 
 // Context mocks base method.
@@ -207,6 +291,21 @@ func (mr *MockQuicConnectionForConnMockRecorder) LocalAddr() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LocalAddr", reflect.TypeOf((*MockQuicConnectionForConn)(nil).LocalAddr))
 }
 
+// OpenStream mocks base method.
+func (m *MockQuicConnectionForConn) OpenStream() (quic.Stream, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenStream")
+	ret0, _ := ret[0].(quic.Stream)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenStream indicates an expected call of OpenStream.
+func (mr *MockQuicConnectionForConnMockRecorder) OpenStream() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenStream", reflect.TypeOf((*MockQuicConnectionForConn)(nil).OpenStream))
+}
+
 // OpenStreamSync mocks base method.
 func (m *MockQuicConnectionForConn) OpenStreamSync(arg0 context.Context) (quic.Stream, error) {
 	m.ctrl.T.Helper()
@@ -222,6 +321,51 @@ func (mr *MockQuicConnectionForConnMockRecorder) OpenStreamSync(arg0 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenStreamSync", reflect.TypeOf((*MockQuicConnectionForConn)(nil).OpenStreamSync), arg0)
 }
 
+// OpenUniStream mocks base method.
+func (m *MockQuicConnectionForConn) OpenUniStream() (quic.SendStream, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenUniStream")
+	ret0, _ := ret[0].(quic.SendStream)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenUniStream indicates an expected call of OpenUniStream.
+func (mr *MockQuicConnectionForConnMockRecorder) OpenUniStream() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenUniStream", reflect.TypeOf((*MockQuicConnectionForConn)(nil).OpenUniStream))
+}
+
+// OpenUniStreamSync mocks base method.
+func (m *MockQuicConnectionForConn) OpenUniStreamSync(arg0 context.Context) (quic.SendStream, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenUniStreamSync", arg0)
+	ret0, _ := ret[0].(quic.SendStream)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenUniStreamSync indicates an expected call of OpenUniStreamSync.
+func (mr *MockQuicConnectionForConnMockRecorder) OpenUniStreamSync(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenUniStreamSync", reflect.TypeOf((*MockQuicConnectionForConn)(nil).OpenUniStreamSync), arg0)
+}
+
+// ReceiveDatagram mocks base method.
+func (m *MockQuicConnectionForConn) ReceiveDatagram(arg0 context.Context) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReceiveDatagram", arg0)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReceiveDatagram indicates an expected call of ReceiveDatagram.
+func (mr *MockQuicConnectionForConnMockRecorder) ReceiveDatagram(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReceiveDatagram", reflect.TypeOf((*MockQuicConnectionForConn)(nil).ReceiveDatagram), arg0)
+}
+
 // RemoteAddr mocks base method.
 func (m *MockQuicConnectionForConn) RemoteAddr() net.Addr {
 	m.ctrl.T.Helper()
@@ -234,4 +378,18 @@ func (m *MockQuicConnectionForConn) RemoteAddr() net.Addr {
 func (mr *MockQuicConnectionForConnMockRecorder) RemoteAddr() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoteAddr", reflect.TypeOf((*MockQuicConnectionForConn)(nil).RemoteAddr))
+}
+
+// SendDatagram mocks base method.
+func (m *MockQuicConnectionForConn) SendDatagram(payload []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendDatagram", payload)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendDatagram indicates an expected call of SendDatagram.
+func (mr *MockQuicConnectionForConnMockRecorder) SendDatagram(payload any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendDatagram", reflect.TypeOf((*MockQuicConnectionForConn)(nil).SendDatagram), payload)
 }

@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"math/big"
 	"net"
 	"os"
@@ -302,22 +301,11 @@ func (li *Listener) Addr() net.Addr {
 }
 
 type QuicStreamForConn interface {
-	io.Reader
-	io.Writer
-	io.Closer
-	CancelRead(quic.StreamErrorCode)
-	// CancelWrite(quic.StreamErrorCode) // This isn't actually called here
-	SetReadDeadline(t time.Time) error
-	SetWriteDeadline(t time.Time) error
-	SetDeadline(t time.Time) error
+	quic.Stream
 }
 
 type QuicConnectionForConn interface {
-	OpenStreamSync(context.Context) (quic.Stream, error)
-	CloseWithError(quic.ApplicationErrorCode, string) error
-	LocalAddr() net.Addr
-	RemoteAddr() net.Addr
-	Context() context.Context
+	quic.Connection
 }
 
 // Conn implements the net.Conn interface via the Receptor network.

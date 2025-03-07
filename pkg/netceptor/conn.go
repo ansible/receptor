@@ -307,7 +307,7 @@ type QuicStreamForConn interface {
 	io.Writer
 	io.Closer
 	CancelRead(quic.StreamErrorCode)
-	CancelWrite(quic.StreamErrorCode)
+	// CancelWrite(quic.StreamErrorCode) // This isn't actually called here
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error
 	SetDeadline(t time.Time) error

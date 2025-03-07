@@ -165,37 +165,70 @@ func TestRemoteAddr(t *testing.T) {
 }
 
 func TestSetDeadline(t *testing.T) {
-	want := time.Now().Add(10 * time.Second)
 	ctrl := gomock.NewController(t)
 	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
-	mock_qs.EXPECT().SetDeadline(gomock.Eq(want)).Return(nil)
-	conn := makeConn(t, TestConn{qs: mock_qs})
-	err := conn.SetDeadline(want)
-	if err != nil {
-		t.Fatalf("conn.TestSetDeadline returned error %v", err)
-	}
+	want := time.Now().Add(10 * time.Second)
+	t.Run("Returns no error after successful SetDeadline", func(t *testing.T) {
+		mock_qs.EXPECT().SetDeadline(gomock.Eq(want)).Return(nil)
+		conn := makeConn(t, TestConn{qs: mock_qs})
+		err := conn.SetDeadline(want)
+		if err != nil {
+			t.Fatalf("conn.TestSetDeadline returned error %v", err)
+		}
+	})
+	t.Run("Returns error from unsuccessful SetDeadline", func(t *testing.T) {
+		want_err := errors.New("SetDeadline error")
+		mock_qs.EXPECT().SetDeadline(gomock.Eq(want)).Return(want_err)
+		conn := makeConn(t, TestConn{qs: mock_qs})
+		got_err := conn.SetDeadline(want)
+		if got_err != want_err {
+			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		}
+	})
 }
 
 func TestSetReadDeadline(t *testing.T) {
-	want := time.Now().Add(10 * time.Second)
 	ctrl := gomock.NewController(t)
 	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
-	mock_qs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(nil)
-	conn := makeConn(t, TestConn{qs: mock_qs})
-	err := conn.SetReadDeadline(want)
-	if err != nil {
-		t.Fatalf("conn.SetReadDeadline returned error %v", err)
-	}
+	want := time.Now().Add(10 * time.Second)
+	t.Run("Returns no error after successful SetReadDeadline", func(t *testing.T) {
+		mock_qs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(nil)
+		conn := makeConn(t, TestConn{qs: mock_qs})
+		err := conn.SetReadDeadline(want)
+		if err != nil {
+			t.Fatalf("conn.SetReadDeadline returned error %v", err)
+		}
+	})
+	t.Run("Returns error from unsuccessful SetReadDeadline", func(t *testing.T) {
+		want_err := errors.New("SetReadDeadline error")
+		mock_qs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(want_err)
+		conn := makeConn(t, TestConn{qs: mock_qs})
+		got_err := conn.SetReadDeadline(want)
+		if got_err != want_err {
+			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		}
+	})
 }
 
 func TestSetWriteDeadline(t *testing.T) {
-	want := time.Now().Add(10 * time.Second)
 	ctrl := gomock.NewController(t)
 	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
-	mock_qs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(nil)
-	conn := makeConn(t, TestConn{qs: mock_qs})
-	err := conn.SetWriteDeadline(want)
-	if err != nil {
-		t.Fatalf("conn.SetWriteDeadline returned error %v", err)
-	}
+	want := time.Now().Add(10 * time.Second)
+	t.Run("Returns no error after successful SetWriteDeadline", func(t *testing.T) {
+		mock_qs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(nil)
+		conn := makeConn(t, TestConn{qs: mock_qs})
+		err := conn.SetWriteDeadline(want)
+		if err != nil {
+			t.Fatalf("conn.SetWriteDeadline returned error %v", err)
+		}
+	})
+	t.Run("Returns error from unsuccessful SetWriteDeadline", func(t *testing.T) {
+		want_err := errors.New("SetWriteDeadline error")
+		mock_qs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(want_err)
+		conn := makeConn(t, TestConn{qs: mock_qs})
+		got_err := conn.SetWriteDeadline(want)
+		if got_err != want_err {
+			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		}
+	})
 }

@@ -118,7 +118,6 @@ func TestClose(t *testing.T) {
 }
 
 // These tests operate on the quic Connection
-
 func TestCloseConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	// quic Connection should be closed

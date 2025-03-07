@@ -301,7 +301,6 @@ func (li *Listener) Addr() net.Addr {
 	return li.pc.LocalAddr()
 }
 
-// this interface is for quic stream
 type QuicStreamForConn interface {
 	io.Reader
 	io.Writer
@@ -332,7 +331,7 @@ type Conn struct {
 	ctx      context.Context
 }
 
-// NewConn constructs a new Conn instance, so that the test package can create one with necessary fields
+// NewConn constructs a new Conn instance, so that the test package can create one
 func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStreamForConn, doneChan chan struct{}, doneOnce *sync.Once, ctx context.Context) *Conn {
 	conn := &Conn{
 		s:        s,

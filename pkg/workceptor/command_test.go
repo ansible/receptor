@@ -350,12 +350,7 @@ func TestRelease(t *testing.T) {
 			errChan := make(chan error)
 			wu.Release(testCase.force, errChan)
 
-			var err error
-			select {
-			case err = <-errChan:
-			default:
-				err = nil
-			}
+			err := <-errChan
 
 			testCase.errorCatch(err, t)
 		})

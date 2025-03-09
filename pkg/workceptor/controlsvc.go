@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
 )
@@ -392,14 +393,11 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			err = unit.Cancel()
 		} else {
 			unit.UpdateBasicStatus(5, "released work", 0)
+			time.Sleep(time.Second * 20)
 			errChan := make(chan error)
 			unit.Release(c.subcommand == "force-release", errChan)
 
-			select {
-			case err = <-errChan:
-			default:
-				err = nil
-			}
+			err = <-errChan
 		}
 		if err != nil && !IsPending(err) {
 			return nil, err

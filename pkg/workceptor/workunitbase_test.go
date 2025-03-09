@@ -290,11 +290,7 @@ func TestBaseRelease(t *testing.T) {
 			errChan := make(chan error)
 			bwu.Release(tc.force, errChan)
 
-			select {
-			case err = <-errChan:
-			default:
-				err = nil
-			}
+			err = <-errChan
 
 			if err != nil && err.Error() != tc.err.Error() {
 				t.Errorf("Error returned dosent match, err received %s, expected %s", err, tc.err)

@@ -465,12 +465,8 @@ func (w *Workceptor) ReleaseUnit(unitID string, force bool) error {
 	errChan := make(chan error)
 	unit.Release(force, errChan)
 
-	select {
-	case err = <-errChan:
-		return err
-	default:
-		return nil
-	}
+	err = <-errChan
+	return err
 }
 
 // unitStatusForCFR returns status information as a map, suitable for a control function return value.

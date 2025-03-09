@@ -511,7 +511,6 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 // / Release releases this unit of work, deleting its files.
 func (bwu *BaseWorkUnit) Release(force bool, errChan chan<- error) {
 	go func() {
-		time.Sleep(time.Second * 20)
 		attemptsLeft := 3
 		for {
 			err := bwu.fs.RemoveAll(bwu.UnitDir())

@@ -378,6 +378,7 @@ func (cw *commandUnit) Release(force bool, errChan chan<- error) {
 	err := cw.Cancel()
 	if err != nil && !force {
 		errChan <- err
+		return
 	}
 
 	cw.BaseWorkUnitForWorkUnit.Release(force, errChan)

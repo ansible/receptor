@@ -589,11 +589,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 				errChan := make(chan error)
 				rw.BaseWorkUnitForWorkUnit.Release(false, errChan)
 
-				select {
-				case err = <-errChan:
-				default:
-					err = nil
-				}
+				err = <-errChan
 
 				if err != nil {
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
@@ -689,12 +685,8 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 			errChan := make(chan error)
 			rw.BaseWorkUnitForWorkUnit.Release(true, errChan)
 
-			select {
-			case err := <-errChan:
-				return err
-			default:
-				return nil
-			}
+			err := <-errChan
+			return err
 		}
 		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
 
@@ -711,12 +703,8 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		errChan := make(chan error)
 		rw.BaseWorkUnitForWorkUnit.Release(true, errChan)
 
-		select {
-		case err = <-errChan:
-			return err
-		default:
-			return nil
-		}
+		err = <-errChan
+		return err
 	}
 	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
 

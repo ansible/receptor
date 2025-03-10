@@ -30,20 +30,21 @@ func makeConn(t testing.TB, tc TestConn) *netceptor.Conn {
 		&sync.Once{},           // doneOnce
 		context.TODO(),         // context
 	)
+
 	return conn
 }
 
-// These tests operate on the quic Stream
+// These tests operate on the quic Stream.
 func TestRead(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	var buf = make([]byte, 1)
+	buf := make([]byte, 1)
 	// Create a mock QuicStream
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 	// both success and error
 	t.Run("Returns number of bytes from successful Read", func(t *testing.T) {
 		want := 1
-		mock_qs.EXPECT().Read(gomock.Eq(buf)).Return(want, nil).Times(1)
-		conn := makeConn(t, TestConn{qs: mock_qs})
+		mockQs.EXPECT().Read(gomock.Eq(buf)).Return(want, nil).Times(1)
+		conn := makeConn(t, TestConn{qs: mockQs})
 		got, err := conn.Read(buf)
 		if err != nil {
 			t.Fatalf("Read returned unexpected error %v", err)
@@ -54,35 +55,35 @@ func TestRead(t *testing.T) {
 	})
 
 	t.Run("Returns error from unsuccessful Read", func(t *testing.T) {
-		want_err := errors.New("Read error")
-		mock_qs.EXPECT().Read(gomock.Eq(buf)).Return(0, want_err).Times(1)
-		conn := makeConn(t, TestConn{qs: mock_qs})
-		_, got_err := conn.Read(buf)
-		if got_err == nil {
+		wantErr := errors.New("Read error")
+		mockQs.EXPECT().Read(gomock.Eq(buf)).Return(0, wantErr).Times(1)
+		conn := makeConn(t, TestConn{qs: mockQs})
+		_, gotErr := conn.Read(buf)
+		if gotErr == nil {
 			t.Errorf("Read did not return expected error")
 		}
-		if got_err != want_err {
-			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		if gotErr != wantErr {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
 }
 
 func TestCancelRead(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
-	mock_qs.EXPECT().CancelRead(gomock.Eq(quic.StreamErrorCode(499))).Times(1)
-	conn := makeConn(t, TestConn{qs: mock_qs})
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs.EXPECT().CancelRead(gomock.Eq(quic.StreamErrorCode(499))).Times(1)
+	conn := makeConn(t, TestConn{qs: mockQs})
 	conn.CancelRead()
 }
 
 func TestWrite(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 	bytes := []byte{4, 8, 15, 16, 23, 42}
 	t.Run("Returns number of bytes written in successful Write", func(t *testing.T) {
 		want := 6
-		mock_qs.EXPECT().Write(gomock.Eq(bytes)).Return(want, nil).Times(1)
-		conn := makeConn(t, TestConn{qs: mock_qs})
+		mockQs.EXPECT().Write(gomock.Eq(bytes)).Return(want, nil).Times(1)
+		conn := makeConn(t, TestConn{qs: mockQs})
 		got, err := conn.Write(bytes)
 		if err != nil {
 			t.Fatalf("Write returned unexpected error %v", err)
@@ -92,24 +93,24 @@ func TestWrite(t *testing.T) {
 		}
 	})
 	t.Run("Returns error from unsuccessful Write", func(t *testing.T) {
-		want_err := errors.New("Write error")
-		mock_qs.EXPECT().Write(gomock.Eq(bytes)).Return(0, want_err).Times(1)
-		conn := makeConn(t, TestConn{qs: mock_qs})
-		_, got_err := conn.Write(bytes)
-		if got_err == nil {
+		wantErr := errors.New("Write error")
+		mockQs.EXPECT().Write(gomock.Eq(bytes)).Return(0, wantErr).Times(1)
+		conn := makeConn(t, TestConn{qs: mockQs})
+		_, gotErr := conn.Write(bytes)
+		if gotErr == nil {
 			t.Errorf("Write did not return expected error")
 		}
-		if got_err != want_err {
-			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		if gotErr != wantErr {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
 }
 
 func TestClose(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
-	mock_qs.EXPECT().Close().Return(nil)
-	conn := makeConn(t, TestConn{qs: mock_qs})
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs.EXPECT().Close().Return(nil)
+	conn := makeConn(t, TestConn{qs: mockQs})
 	err := conn.Close() // This calls the doneOnce and closes the doneChan
 	// would be nice to test that the doneChan is closed
 	if err != nil {
@@ -117,22 +118,22 @@ func TestClose(t *testing.T) {
 	}
 }
 
-// These tests operate on the quic Connection
+// These tests operate on the quic Connection.
 func TestCloseConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	// quic Connection should be closed
-	mock_qc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
-	mock_qc.EXPECT().CloseWithError(quic.ApplicationErrorCode(0), gomock.Eq("normal close")).Return(nil).Times(1)
+	mockQc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQc.EXPECT().CloseWithError(quic.ApplicationErrorCode(0), gomock.Eq("normal close")).Return(nil).Times(1)
 
 	// PacketConner should be cancelled
-	mock_pc := mock_netceptor.NewMockPacketConner(ctrl)
-	mock_pc.EXPECT().Cancel().Times(1)
+	mockPc := mock_netceptor.NewMockPacketConner(ctrl)
+	mockPc.EXPECT().Cancel().Times(1)
 
 	// The CloseConnection method logs some information to the netceptor's Logger, so mock them
-	mock_pc.EXPECT().LocalService().Return("test-local-service").Times(1)
-	mock_qc.EXPECT().RemoteAddr().Return(netceptor.Addr{})
+	mockPc.EXPECT().LocalService().Return("test-local-service").Times(1)
+	mockQc.EXPECT().RemoteAddr().Return(netceptor.Addr{})
 
-	conn := makeConn(t, TestConn{pc: mock_pc, qc: mock_qc})
+	conn := makeConn(t, TestConn{pc: mockPc, qc: mockQc})
 	err := conn.CloseConnection()
 	if err != nil {
 		t.Fatalf("conn.CloseConnection returned error %v", err)
@@ -140,11 +141,11 @@ func TestCloseConnection(t *testing.T) {
 }
 
 func TestLocalAddr(t *testing.T) {
-	want := netceptor.Addr{} // Could mock the net interace here rather than an empty Addr{}
+	want := netceptor.Addr{} // Could mock the net interacted here rather than an empty Addr{}
 	ctrl := gomock.NewController(t)
-	mock_qc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
-	mock_qc.EXPECT().LocalAddr().Return(want).Times(1)
-	conn := makeConn(t, TestConn{qc: mock_qc})
+	mockQc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQc.EXPECT().LocalAddr().Return(want).Times(1)
+	conn := makeConn(t, TestConn{qc: mockQc})
 	got := conn.LocalAddr()
 	if got != want {
 		t.Errorf("Wanted %v, got %v", want, got)
@@ -152,11 +153,11 @@ func TestLocalAddr(t *testing.T) {
 }
 
 func TestRemoteAddr(t *testing.T) {
-	want := netceptor.Addr{} // Could mock the net interace here rather than an empty Addr{}
+	want := netceptor.Addr{} // Could mock the net interacted here rather than an empty Addr{}
 	ctrl := gomock.NewController(t)
-	mock_qc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
-	mock_qc.EXPECT().RemoteAddr().Return(want).Times(1)
-	conn := makeConn(t, TestConn{qc: mock_qc})
+	mockQc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQc.EXPECT().RemoteAddr().Return(want).Times(1)
+	conn := makeConn(t, TestConn{qc: mockQc})
 	got := conn.RemoteAddr()
 	if got != want {
 		t.Errorf("Wanted %v, got %v", want, got)
@@ -165,69 +166,69 @@ func TestRemoteAddr(t *testing.T) {
 
 func TestSetDeadline(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 	want := time.Now().Add(10 * time.Second)
 	t.Run("Returns no error after successful SetDeadline", func(t *testing.T) {
-		mock_qs.EXPECT().SetDeadline(gomock.Eq(want)).Return(nil)
-		conn := makeConn(t, TestConn{qs: mock_qs})
+		mockQs.EXPECT().SetDeadline(gomock.Eq(want)).Return(nil)
+		conn := makeConn(t, TestConn{qs: mockQs})
 		err := conn.SetDeadline(want)
 		if err != nil {
 			t.Fatalf("conn.TestSetDeadline returned error %v", err)
 		}
 	})
 	t.Run("Returns error from unsuccessful SetDeadline", func(t *testing.T) {
-		want_err := errors.New("SetDeadline error")
-		mock_qs.EXPECT().SetDeadline(gomock.Eq(want)).Return(want_err)
-		conn := makeConn(t, TestConn{qs: mock_qs})
-		got_err := conn.SetDeadline(want)
-		if got_err != want_err {
-			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		wantErr := errors.New("SetDeadline error")
+		mockQs.EXPECT().SetDeadline(gomock.Eq(want)).Return(wantErr)
+		conn := makeConn(t, TestConn{qs: mockQs})
+		gotErr := conn.SetDeadline(want)
+		if gotErr != wantErr {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
 }
 
 func TestSetReadDeadline(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 	want := time.Now().Add(10 * time.Second)
 	t.Run("Returns no error after successful SetReadDeadline", func(t *testing.T) {
-		mock_qs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(nil)
-		conn := makeConn(t, TestConn{qs: mock_qs})
+		mockQs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(nil)
+		conn := makeConn(t, TestConn{qs: mockQs})
 		err := conn.SetReadDeadline(want)
 		if err != nil {
 			t.Fatalf("conn.SetReadDeadline returned error %v", err)
 		}
 	})
 	t.Run("Returns error from unsuccessful SetReadDeadline", func(t *testing.T) {
-		want_err := errors.New("SetReadDeadline error")
-		mock_qs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(want_err)
-		conn := makeConn(t, TestConn{qs: mock_qs})
-		got_err := conn.SetReadDeadline(want)
-		if got_err != want_err {
-			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		wantErr := errors.New("SetReadDeadline error")
+		mockQs.EXPECT().SetReadDeadline(gomock.Eq(want)).Return(wantErr)
+		conn := makeConn(t, TestConn{qs: mockQs})
+		gotErr := conn.SetReadDeadline(want)
+		if gotErr != wantErr {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
 }
 
 func TestSetWriteDeadline(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mock_qs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 	want := time.Now().Add(10 * time.Second)
 	t.Run("Returns no error after successful SetWriteDeadline", func(t *testing.T) {
-		mock_qs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(nil)
-		conn := makeConn(t, TestConn{qs: mock_qs})
+		mockQs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(nil)
+		conn := makeConn(t, TestConn{qs: mockQs})
 		err := conn.SetWriteDeadline(want)
 		if err != nil {
 			t.Fatalf("conn.SetWriteDeadline returned error %v", err)
 		}
 	})
 	t.Run("Returns error from unsuccessful SetWriteDeadline", func(t *testing.T) {
-		want_err := errors.New("SetWriteDeadline error")
-		mock_qs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(want_err)
-		conn := makeConn(t, TestConn{qs: mock_qs})
-		got_err := conn.SetWriteDeadline(want)
-		if got_err != want_err {
-			t.Errorf("Wanted %v, got %v", want_err, got_err)
+		wantErr := errors.New("SetWriteDeadline error")
+		mockQs.EXPECT().SetWriteDeadline(gomock.Eq(want)).Return(wantErr)
+		conn := makeConn(t, TestConn{qs: mockQs})
+		gotErr := conn.SetWriteDeadline(want)
+		if gotErr != wantErr {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
 }

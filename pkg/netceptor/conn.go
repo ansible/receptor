@@ -319,7 +319,7 @@ type Conn struct {
 	ctx      context.Context
 }
 
-// NewConn constructs a new Conn instance, so that the test package can create one
+// NewConn constructs a new Conn instance, so that the test package can create one.
 func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStreamForConn, doneChan chan struct{}, doneOnce *sync.Once, ctx context.Context) *Conn {
 	conn := &Conn{
 		s:        s,
@@ -330,6 +330,7 @@ func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStr
 		doneOnce: doneOnce,
 		ctx:      ctx,
 	}
+
 	return conn
 }
 
@@ -439,6 +440,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		}
 	}()
 	conn := NewConn(s, pc, qc, qs, doneChan, &sync.Once{}, cctx)
+
 	return conn, nil
 }
 

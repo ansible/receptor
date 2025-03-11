@@ -30,6 +30,14 @@ var MaxIdleTimeoutForQuicConnections = 30 * time.Second
 // Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
 var KeepAliveForQuicConnections = true
 
+type QuicStreamForConn interface {
+	quic.Stream
+}
+
+type QuicConnectionForConn interface {
+	quic.Connection
+}
+
 type acceptResult struct {
 	conn net.Conn
 	err  error
@@ -298,14 +306,6 @@ func (li *Listener) Close() error {
 // Addr returns the local address of this listener.
 func (li *Listener) Addr() net.Addr {
 	return li.pc.LocalAddr()
-}
-
-type QuicStreamForConn interface {
-	quic.Stream
-}
-
-type QuicConnectionForConn interface {
-	quic.Connection
 }
 
 // Conn implements the net.Conn interface via the Receptor network.

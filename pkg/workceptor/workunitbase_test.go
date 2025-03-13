@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -286,15 +287,16 @@ func TestBaseRelease(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.calls()
-			var err error
+			var wg sync.WaitGroup
 			errChan := make(chan error)
-			bwu.Release(tc.force, errChan)
+			bwu.Release(tc.force, &wg, errChan)
 
-			err = <-errChan
+			err := <-errChan
 
 			if err != nil && err.Error() != tc.err.Error() {
 				t.Errorf("Error returned dosent match, err received %s, expected %s", err, tc.err)
 			}
+			close(errChan)
 		})
 	}
 

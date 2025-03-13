@@ -31,7 +31,7 @@ type BaseWorkUnitForWorkUnit interface {
 	LastUpdateError() error
 	Load() error
 	MonitorLocalStatus()
-	Release(force bool, errChan chan<- error)
+	Release(force bool, wg *sync.WaitGroup, errChan chan error)
 	Save() error
 	SetFromParams(_ map[string]string) error
 	Status() *StatusFileData
@@ -374,14 +374,15 @@ func (cw *commandUnit) Cancel() error {
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (cw *commandUnit) Release(force bool, errChan chan<- error) {
+func (cw *commandUnit) Release(force bool, wg *sync.WaitGroup, errChan chan error) {
 	err := cw.Cancel()
 	if err != nil && !force {
 		errChan <- err
+
 		return
 	}
 
-	cw.BaseWorkUnitForWorkUnit.Release(force, errChan)
+	cw.BaseWorkUnitForWorkUnit.Release(force, wg, errChan)
 }
 
 // **************************************************************************

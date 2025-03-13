@@ -11,6 +11,7 @@ package mock_workceptor
 
 import (
 	reflect "reflect"
+	sync "sync"
 
 	workceptor "github.com/ansible/receptor/pkg/workceptor"
 	gomock "go.uber.org/mock/gomock"
@@ -97,15 +98,15 @@ func (mr *MockWorkUnitMockRecorder) Load() *gomock.Call {
 }
 
 // Release mocks base method.
-func (m *MockWorkUnit) Release(force bool, errChan chan<- error) {
+func (m *MockWorkUnit) Release(force bool, wg *sync.WaitGroup, errChan chan error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Release", force, errChan)
+	m.ctrl.Call(m, "Release", force, wg, errChan)
 }
 
 // Release indicates an expected call of Release.
-func (mr *MockWorkUnitMockRecorder) Release(force, errChan any) *gomock.Call {
+func (mr *MockWorkUnitMockRecorder) Release(force, wg, errChan any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockWorkUnit)(nil).Release), force, errChan)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockWorkUnit)(nil).Release), force, wg, errChan)
 }
 
 // Restart mocks base method.

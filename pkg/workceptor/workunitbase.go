@@ -509,8 +509,10 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 }
 
 // / Release releases this unit of work, deleting its files.
-func (bwu *BaseWorkUnit) Release(force bool, errChan chan<- error) {
+func (bwu *BaseWorkUnit) Release(force bool, wg *sync.WaitGroup, errChan chan error) {
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		attemptsLeft := 3
 		for {
 			err := bwu.fs.RemoveAll(bwu.UnitDir())
@@ -528,6 +530,7 @@ func (bwu *BaseWorkUnit) Release(force bool, errChan chan<- error) {
 				bwu.w.nc.GetLogger().Error("Error removing directory for %s. No more retries left.", bwu.unitID)
 
 				errChan <- err
+				return
 			}
 
 			break

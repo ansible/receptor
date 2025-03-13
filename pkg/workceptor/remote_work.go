@@ -14,6 +14,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -586,8 +587,9 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		go func() {
 			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
+				var wg sync.WaitGroup
 				errChan := make(chan error)
-				rw.BaseWorkUnitForWorkUnit.Release(false, errChan)
+				rw.BaseWorkUnitForWorkUnit.Release(false, &wg, errChan)
 
 				err = <-errChan
 
@@ -667,7 +669,7 @@ func (rw *remoteUnit) Restart() error {
 }
 
 // cancelOrRelease is a shared implementation of Cancel() and Release().
-func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
+func (rw *remoteUnit) cancelOrRelease(release bool, force bool, wg *sync.WaitGroup, errChan chan error) error {
 	// Update the status file that the unit is locally cancelled/released
 	var remoteStarted bool
 	rw.UpdateFullStatus(func(status *StatusFileData) {
@@ -682,10 +684,10 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		rw.topJC.Cancel()
 		rw.topJC.Wait()
 		if release {
-			errChan := make(chan error)
-			rw.BaseWorkUnitForWorkUnit.Release(true, errChan)
+			rw.BaseWorkUnitForWorkUnit.Release(true, wg, errChan)
 
 			err := <-errChan
+
 			return err
 		}
 		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
@@ -700,10 +702,11 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
 		}
 
-		errChan := make(chan error)
-		rw.BaseWorkUnitForWorkUnit.Release(true, errChan)
+		var wg sync.WaitGroup
+		rw.BaseWorkUnitForWorkUnit.Release(true, &wg, errChan)
 
 		err = <-errChan
+
 		return err
 	}
 	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
@@ -715,12 +718,12 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 
 // Cancel stops a running job.
 func (rw *remoteUnit) Cancel() error {
-	return rw.cancelOrRelease(false, false)
+	return rw.cancelOrRelease(false, false, nil, nil)
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (rw *remoteUnit) Release(force bool, errChan chan<- error) {
-	err := rw.cancelOrRelease(true, force)
+func (rw *remoteUnit) Release(force bool, wg *sync.WaitGroup, errChan chan error) {
+	err := rw.cancelOrRelease(true, force, wg, errChan)
 	if err != nil {
 		errChan <- err
 	}

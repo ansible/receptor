@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -403,21 +405,28 @@ func TestUnitStatus(t *testing.T) {
 	}
 }
 
-func TestCancelUnit(t *testing.T) {
-	_, _, w := testSetup(t)
-	activeUnitsIDs := w.ListKnownUnitIDs()
-
-	err := w.CancelUnit(activeUnitsIDs[0])
-	if err != nil {
-		t.Error(err)
-	}
-}
 
 func TestReleaseUnit(t *testing.T) {
 	_, _, w := testSetup(t)
 	activeUnitsIDs := w.ListKnownUnitIDs()
 
-	err := w.ReleaseUnit(activeUnitsIDs[0], true)
+	var wg sync.WaitGroup
+	errChan := make(chan error)
+	w.ReleaseUnit(activeUnitsIDs[0], true, &wg, errChan)
+
+	select {
+	case err := <-errChan:
+		t.Error(err)
+	case <- time.After(time.Second * 30):
+
+	}
+}
+
+func TestCancelUnit(t *testing.T) {
+	_, _, w := testSetup(t)
+	activeUnitsIDs := w.ListKnownUnitIDs()
+
+	err := w.CancelUnit(activeUnitsIDs[0])
 	if err != nil {
 		t.Error(err)
 	}

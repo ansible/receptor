@@ -530,6 +530,7 @@ func (bwu *BaseWorkUnit) Release(force bool, wg *sync.WaitGroup, errChan chan er
 				bwu.w.nc.GetLogger().Error("Error removing directory for %s. No more retries left.", bwu.unitID)
 
 				errChan <- err
+
 				return
 			}
 

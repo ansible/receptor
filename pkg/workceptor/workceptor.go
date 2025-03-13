@@ -460,6 +460,7 @@ func (w *Workceptor) ReleaseUnit(unitID string, force bool, wg *sync.WaitGroup, 
 	unit, err := w.findUnit(unitID)
 	if err != nil {
 		errChan <- err
+
 		return
 	}
 

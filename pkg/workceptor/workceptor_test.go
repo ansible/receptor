@@ -418,7 +418,6 @@ func TestReleaseUnit(t *testing.T) {
 	case err := <-errChan:
 		t.Error(err)
 	case <- time.After(time.Second * 30):
-
 	}
 }
 

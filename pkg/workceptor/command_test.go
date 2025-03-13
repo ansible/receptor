@@ -327,12 +327,12 @@ func TestRelease(t *testing.T) {
 					t.Error(err.Error())
 				}
 			},
-			force: true,
+			force:   true,
 			errChan: make(chan error, 1),
-			wg: &sync.WaitGroup{},
+			wg:      &sync.WaitGroup{},
 		},
 		{
-			name:          "cancel error",
+			name: "cancel error",
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().Release(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(force bool, wg *sync.WaitGroup, ch chan error) {
 					ch <- errors.New("Error")
@@ -343,9 +343,9 @@ func TestRelease(t *testing.T) {
 					t.Error(err)
 				}
 			},
-			force: false,
+			force:   false,
 			errChan: make(chan error, 1),
-			wg: &sync.WaitGroup{},
+			wg:      &sync.WaitGroup{},
 		},
 	}
 	for _, testCase := range releaseTestCases {

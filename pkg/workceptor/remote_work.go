@@ -592,7 +592,6 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 				rw.BaseWorkUnitForWorkUnit.Release(false, &wg, errChan)
 
 				err = <-errChan
-
 				if err != nil {
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}

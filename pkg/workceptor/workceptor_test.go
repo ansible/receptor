@@ -405,7 +405,6 @@ func TestUnitStatus(t *testing.T) {
 	}
 }
 
-
 func TestReleaseUnit(t *testing.T) {
 	_, _, w := testSetup(t)
 	activeUnitsIDs := w.ListKnownUnitIDs()
@@ -417,7 +416,7 @@ func TestReleaseUnit(t *testing.T) {
 	select {
 	case err := <-errChan:
 		t.Error(err)
-	case <- time.After(time.Second * 30):
+	case <-time.After(time.Second * 30):
 	}
 }
 

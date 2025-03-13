@@ -28,13 +28,13 @@ type NetLib interface {
 	Dial(network string, address string) (net.Conn, error)
 }
 
-type NetTCP struct{}
+type NetTCPWrapper struct{}
 
-func (n *NetTCP) Listen(network string, address string) (net.Listener, error) {
+func (n *NetTCPWrapper) Listen(network string, address string) (net.Listener, error) {
 	return net.Listen(network, address)
 }
 
-func (n *NetTCP) Dial(network string, address string) (net.Conn, error) {
+func (n *NetTCPWrapper) Dial(network string, address string) (net.Conn, error) {
 	return net.Dial(network, address)
 }
 
@@ -44,13 +44,13 @@ type TLSLib interface {
 	Dial(network string, addr string, config *tls.Config) (*tls.Conn, error)
 }
 
-type TLSTCP struct{}
+type TLSTCPWrapper struct{}
 
-func (n *TLSTCP) NewListener(inner net.Listener, config *tls.Config) net.Listener {
+func (n *TLSTCPWrapper) NewListener(inner net.Listener, config *tls.Config) net.Listener {
 	return tls.NewListener(inner, config)
 }
 
-func (n *TLSTCP) Dial(network string, addr string, config *tls.Config) (*tls.Conn, error) {
+func (n *TLSTCPWrapper) Dial(network string, addr string, config *tls.Config) (*tls.Conn, error) {
 	return tls.Dial(network, addr, config)
 }
 
@@ -64,9 +64,9 @@ type UtilsLib interface {
 	BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger)
 }
 
-type UtilsTCP struct{}
+type UtilsTCPWrapper struct{}
 
-func (u *UtilsTCP) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
+func (u *UtilsTCPWrapper) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
 	utils.BridgeConns(c1, c1Name, c2, c2Name, logger)
 }
 
@@ -167,7 +167,7 @@ func (cfg TCPProxyInboundCfg) Run() error {
 	}
 
 	return TCPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, TLSServerConfig,
-		cfg.RemoteNode, cfg.RemoteService, tlsClientCfg, &NetTCP{}, &TLSTCP{}, &UtilsTCP{})
+		cfg.RemoteNode, cfg.RemoteService, tlsClientCfg, &NetTCPWrapper{}, &TLSTCPWrapper{}, &UtilsTCPWrapper{})
 }
 
 // tcpProxyOutboundCfg is the cmdline configuration object for a TCP outbound proxy.
@@ -194,7 +194,7 @@ func (cfg TCPProxyOutboundCfg) Run() error {
 		return err
 	}
 
-	return TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, TLSServerConfig, cfg.Address, tlsClientCfg, &NetTCP{}, &TLSTCP{}, &UtilsTCP{})
+	return TCPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, TLSServerConfig, cfg.Address, tlsClientCfg, &NetTCPWrapper{}, &TLSTCPWrapper{}, &UtilsTCPWrapper{})
 }
 
 func init() {

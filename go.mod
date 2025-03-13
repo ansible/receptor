@@ -1,6 +1,7 @@
 module github.com/ansible/receptor
 
 go 1.22.7
+toolchain go1.23.7
 
 require (
 	github.com/creack/pty v1.1.24
@@ -24,7 +25,7 @@ require (
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/net v0.35.0
+	golang.org/x/net v0.36.0
 	golang.org/x/sys v0.30.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.31.3
@@ -82,7 +83,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect

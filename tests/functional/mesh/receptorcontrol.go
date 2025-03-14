@@ -512,7 +512,7 @@ func (r *ReceptorControl) AssertWorkResults(unitID string, expectedResults []byt
 		return err
 	}
 	if string(expectedResults) != string(workResults) {
-		return fmt.Errorf("work results did not match expected results")
+		return fmt.Errorf("work results did not match expected results, got: %v, expected: %v", string(workResults), string(expectedResults))
 	}
 
 	return nil

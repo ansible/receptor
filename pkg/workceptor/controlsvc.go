@@ -401,7 +401,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 
 			select {
 			case err = <-errChan:
-			case <- time.After(time.Second * 15):
+			case <-time.After(time.Second * 15):
 			}
 		}
 		if err != nil && !IsPending(err) {

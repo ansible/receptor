@@ -412,9 +412,9 @@ func TestReleaseUnit(t *testing.T) {
 	var wg sync.WaitGroup
 	errChan := make(chan error, 1)
 	w.ReleaseUnit(activeUnitsIDs[0], true, &wg, errChan)
-	
+
 	wg.Wait()
-	
+
 	select {
 	case err := <-errChan:
 		t.Error(err)

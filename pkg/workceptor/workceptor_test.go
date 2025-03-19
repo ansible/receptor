@@ -410,14 +410,17 @@ func TestReleaseUnit(t *testing.T) {
 	activeUnitsIDs := w.ListKnownUnitIDs()
 
 	var wg sync.WaitGroup
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	w.ReleaseUnit(activeUnitsIDs[0], true, &wg, errChan)
-
+	
+	wg.Wait()
+	
 	select {
 	case err := <-errChan:
 		t.Error(err)
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Millisecond * 1):
 	}
+	close(errChan)
 }
 
 func TestCancelUnit(t *testing.T) {

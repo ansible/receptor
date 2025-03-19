@@ -1,7 +1,5 @@
 package workceptor
 
-import "sync"
-
 // WorkUnit represents a local unit of work.
 type WorkUnit interface {
 	ID() string
@@ -19,7 +17,7 @@ type WorkUnit interface {
 	Start() error
 	Restart() error
 	Cancel() error
-	Release(force bool, wg *sync.WaitGroup, errChan chan error)
+	Release(force bool, closeChan chan bool, errChan chan error)
 }
 
 type WorkerConfig interface {

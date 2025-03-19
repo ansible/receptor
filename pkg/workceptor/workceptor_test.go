@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -409,16 +407,14 @@ func TestReleaseUnit(t *testing.T) {
 	_, _, w := testSetup(t)
 	activeUnitsIDs := w.ListKnownUnitIDs()
 
-	var wg sync.WaitGroup
+	doneChan := make(chan bool, 1)
 	errChan := make(chan error, 1)
-	w.ReleaseUnit(activeUnitsIDs[0], true, &wg, errChan)
-
-	wg.Wait()
+	w.ReleaseUnit(activeUnitsIDs[0], true, doneChan, errChan)
 
 	select {
 	case err := <-errChan:
 		t.Error(err)
-	case <-time.After(time.Millisecond * 1):
+	case <-doneChan:
 	}
 	close(errChan)
 }

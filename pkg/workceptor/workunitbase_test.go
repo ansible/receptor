@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -287,9 +286,9 @@ func TestBaseRelease(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.calls()
-			var wg sync.WaitGroup
-			errChan := make(chan error)
-			bwu.Release(tc.force, &wg, errChan)
+			closeChan := make(chan bool, 1)
+			errChan := make(chan error, 1)
+			bwu.Release(tc.force, closeChan, errChan)
 
 			err := <-errChan
 

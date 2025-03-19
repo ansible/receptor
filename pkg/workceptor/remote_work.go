@@ -14,7 +14,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -587,9 +586,9 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		go func() {
 			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
-				var wg sync.WaitGroup
-				errChan := make(chan error)
-				rw.BaseWorkUnitForWorkUnit.Release(false, &wg, errChan)
+				closeChan := make(chan bool, 1)
+				errChan := make(chan error, 1)
+				rw.BaseWorkUnitForWorkUnit.Release(false, closeChan, errChan)
 
 				err = <-errChan
 				if err != nil {
@@ -668,7 +667,7 @@ func (rw *remoteUnit) Restart() error {
 }
 
 // cancelOrRelease is a shared implementation of Cancel() and Release().
-func (rw *remoteUnit) cancelOrRelease(release bool, force bool, wg *sync.WaitGroup, errChan chan error) error {
+func (rw *remoteUnit) cancelOrRelease(release bool, force bool, closeChan chan bool, errChan chan error) error {
 	// Update the status file that the unit is locally cancelled/released
 	var remoteStarted bool
 	rw.UpdateFullStatus(func(status *StatusFileData) {
@@ -683,7 +682,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool, wg *sync.WaitGro
 		rw.topJC.Cancel()
 		rw.topJC.Wait()
 		if release {
-			rw.BaseWorkUnitForWorkUnit.Release(true, wg, errChan)
+			rw.BaseWorkUnitForWorkUnit.Release(true, closeChan, errChan)
 
 			err := <-errChan
 
@@ -701,8 +700,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool, wg *sync.WaitGro
 			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
 		}
 
-		var wg sync.WaitGroup
-		rw.BaseWorkUnitForWorkUnit.Release(true, &wg, errChan)
+		rw.BaseWorkUnitForWorkUnit.Release(true, closeChan, errChan)
 
 		err = <-errChan
 
@@ -721,8 +719,8 @@ func (rw *remoteUnit) Cancel() error {
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (rw *remoteUnit) Release(force bool, wg *sync.WaitGroup, errChan chan error) {
-	err := rw.cancelOrRelease(true, force, wg, errChan)
+func (rw *remoteUnit) Release(force bool, closeChan chan bool, errChan chan error) {
+	err := rw.cancelOrRelease(true, force, closeChan, errChan)
 	if err != nil {
 		errChan <- err
 	}

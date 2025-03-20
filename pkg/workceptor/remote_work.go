@@ -586,13 +586,14 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		go func() {
 			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
-				closeChan := make(chan bool, 1)
+				doneChan := make(chan bool, 1)
 				errChan := make(chan error, 1)
-				rw.BaseWorkUnitForWorkUnit.Release(false, closeChan, errChan)
+				rw.BaseWorkUnitForWorkUnit.Release(false, doneChan, errChan)
 
-				err = <-errChan
-				if err != nil {
+				select {
+				case err = <-errChan:
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
+				case <-doneChan:
 				}
 			}
 			mw.WorkerDone()

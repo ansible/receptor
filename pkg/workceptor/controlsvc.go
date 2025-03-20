@@ -403,6 +403,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			case <-doneChan:
 			}
 			close(errChan)
+			close(doneChan)
 		}
 		if err != nil && !IsPending(err) {
 			return nil, err

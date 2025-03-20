@@ -286,16 +286,21 @@ func TestBaseRelease(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.calls()
-			closeChan := make(chan bool, 1)
+			doneChan := make(chan bool, 1)
 			errChan := make(chan error, 1)
-			bwu.Release(tc.force, closeChan, errChan)
+			bwu.Release(tc.force, doneChan, errChan)
+			var err error
 
-			err := <-errChan
+			select {
+			case err = <-errChan:
+			case <-doneChan:
+			}
 
 			if err != nil && err.Error() != tc.err.Error() {
 				t.Errorf("Error returned dosent match, err received %s, expected %s", err, tc.err)
 			}
 			close(errChan)
+			close(doneChan)
 		})
 	}
 

@@ -417,6 +417,7 @@ func TestReleaseUnit(t *testing.T) {
 	case <-doneChan:
 	}
 	close(errChan)
+	close(doneChan)
 }
 
 func TestCancelUnit(t *testing.T) {

@@ -312,7 +312,7 @@ func TestRelease(t *testing.T) {
 		expectedCalls func()
 		errorCatch    func(error, *testing.T)
 		force         bool
-		doneChan     	chan bool
+		doneChan      chan bool
 		errChan       chan error
 	}{
 		{
@@ -327,9 +327,9 @@ func TestRelease(t *testing.T) {
 					t.Error(err.Error())
 				}
 			},
-			force:   true,
+			force:    true,
 			doneChan: make(chan bool, 1),
-			errChan: make(chan error, 1),
+			errChan:  make(chan error, 1),
 		},
 		{
 			name: "cancel error",
@@ -343,9 +343,9 @@ func TestRelease(t *testing.T) {
 					t.Error(err)
 				}
 			},
-			force:   false,
+			force:    false,
 			doneChan: make(chan bool, 1),
-			errChan: make(chan error, 1),
+			errChan:  make(chan error, 1),
 		},
 	}
 	for _, testCase := range releaseTestCases {
@@ -365,9 +365,9 @@ func TestRelease(t *testing.T) {
 			wu.Release(testCase.force, testCase.doneChan, testCase.errChan)
 			var err error
 
-			select{
+			select {
 			case err = <-testCase.errChan:
-			case <- testCase.doneChan:
+			case <-testCase.doneChan:
 			}
 
 			testCase.errorCatch(err, t)

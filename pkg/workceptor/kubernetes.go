@@ -327,42 +327,41 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	successfulWrite := false
 	remainingRetries := retries // resets on each successful read from pod stdout
 
-	// get pod, with retry
-	for retries := 5; retries > 0; retries-- {
-		KubeAPIWrapperLock.Lock()
-		kw.pod, err = KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
-		KubeAPIWrapperLock.Unlock()
-		if err == nil {
-			break
-		}
-		kw.GetWorkceptor().nc.GetLogger().Warning(
-			"Error getting pod %s/%s. Will retry %d more times. Error: %s",
-			podNamespace,
-			podName,
-			retries,
-			err,
-		)
-		time.Sleep(time.Second)
-	}
-	if err != nil {
-		errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
-		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-
-		// fail to get pod, no need to continue
-		return
-	}
-
-	logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
-	if err != nil {
-		// fail to get log stream, no need to continue
-		return
-	}
-	defer logStream.Close()
-
 	for {
 		if *stdinErr != nil {
 			// fail to send stdin to pod, no need to continue
+			return
+		}
+
+		// get pod, with retry
+		for retries := 5; retries > 0; retries-- {
+			KubeAPIWrapperLock.Lock()
+			kw.pod, err = KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+			KubeAPIWrapperLock.Unlock()
+			if err == nil {
+				break
+			}
+			kw.GetWorkceptor().nc.GetLogger().Warning(
+				"Error getting pod %s/%s. Will retry %d more times. Error: %s",
+				podNamespace,
+				podName,
+				retries,
+				err,
+			)
+			time.Sleep(time.Second)
+		}
+		if err != nil {
+			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
+			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+			// fail to get pod, no need to continue
+			return
+		}
+
+		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
+		if err != nil {
+			// fail to get log stream, no need to continue
 			return
 		}
 
@@ -459,6 +458,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			remainingRetries = retries // each time we read successfully, reset this counter
 			successfulWrite = true
 		}
+		logStream.Close()
 	}
 }
 

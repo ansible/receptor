@@ -181,6 +181,7 @@ func createReceptorPythonWorkerScript() error {
 	if err != nil {
 		return fmt.Errorf("Error making %s executable: %v", absoluteFilename, err)
 	}
+
 	return nil
 }
 

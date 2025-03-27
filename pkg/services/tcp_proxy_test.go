@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"testing"
@@ -192,6 +193,107 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Errorf("TCPProxyServiceOutbound unexpected case error")
+			}
+		})
+	}
+}
+
+func TestTCPProxyInboundCfgRun(t *testing.T) {
+	type testCoverageItem struct {
+		name        string
+		expectError bool
+		configObj   TCPProxyInboundCfg
+	}
+
+	testCases := []testCoverageItem{
+		{
+			name: "Required parameters set no errors raised",
+			configObj: TCPProxyInboundCfg{
+				Port:          8000,
+				RemoteNode:    "",
+				RemoteService: "",
+			},
+		},
+		{
+			name:        "Required parameters set wrong TLS Client Config",
+			expectError: true,
+			configObj: TCPProxyInboundCfg{
+				Port:          8000,
+				RemoteNode:    "",
+				RemoteService: "",
+				TLSClient:     "gibberish",
+			},
+		},
+		{
+			name:        "Required parameters set wrong TLS Server Config",
+			expectError: true,
+			configObj: TCPProxyInboundCfg{
+				Port:          8000,
+				RemoteNode:    "",
+				RemoteService: "",
+				TLSServer:     "gibberish",
+			},
+		},
+	}
+	netceptor.MainInstance = netceptor.New(context.Background(), "test_tcp_proxy_inbound_cfg_run")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.configObj.Run()
+			if !tc.expectError && err != nil {
+				t.Errorf("This test case wasn't expected to return an error")
+			}
+		})
+	}
+}
+
+func TestTCPProxyOutboundCfgRun(t *testing.T) {
+	type testCoverageItem struct {
+		name        string
+		expectError bool
+		configObj   TCPProxyOutboundCfg
+	}
+
+	testCases := []testCoverageItem{
+		{
+			name: "Required parameters set no errors raised",
+			configObj: TCPProxyOutboundCfg{
+				Service: "",
+				Address: "0.0.0.0:8000",
+			},
+		},
+		{
+			name:        "Required parameters set wrong TLS Server Config",
+			expectError: true,
+			configObj: TCPProxyOutboundCfg{
+				Service:   "",
+				Address:   "0.0.0.0:8000",
+				TLSServer: "gibberish",
+			},
+		},
+		{
+			name:        "Required parameters set missing port in Address",
+			expectError: true,
+			configObj: TCPProxyOutboundCfg{
+				Service: "",
+				Address: "0.0.0.0",
+			},
+		},
+		{
+			name:        "Required parameters set wrong TLS Client Config",
+			expectError: true,
+			configObj: TCPProxyOutboundCfg{
+				Service:   "",
+				Address:   "0.0.0.0:8000",
+				TLSClient: "gibberish",
+			},
+		},
+	}
+	netceptor.MainInstance = netceptor.New(context.Background(), "test_tcp_proxy_outbound_cfg_run")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.configObj.Run()
+			if !tc.expectError && err != nil {
+				t.Errorf("This test case wasn't expected to return an error: %s", err)
 			}
 		})
 	}

@@ -379,6 +379,25 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 					return
 				}
+
+				if err == io.EOF {
+					if line != "" {
+						_, err = stdout.Write([]byte(line + "\n"))
+						if err != nil {
+							*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
+							kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
+
+							return
+						}
+					}
+					kw.GetWorkceptor().nc.GetLogger().Info("Detected EOF for pod %s/%s.",
+						podNamespace,
+						podName,
+					)
+
+					return
+				}
+
 				kw.GetWorkceptor().nc.GetLogger().Info(
 					"Detected Error: %s for pod %s/%s. Will retry %d more times.",
 					err,
@@ -439,7 +458,6 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			remainingRetries = retries // each time we read successfully, reset this counter
 			successfulWrite = true
 		}
-
 		logStream.Close()
 	}
 }

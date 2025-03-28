@@ -407,7 +407,6 @@ func TestReleaseUnit(t *testing.T) {
 	_, _, w := testSetup(t)
 	activeUnitsIDs := w.ListKnownUnitIDs()
 	err := w.ReleaseUnit(activeUnitsIDs[0], true)
-
 	if err != nil {
 		t.Error(err)
 	}

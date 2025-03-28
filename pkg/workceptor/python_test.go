@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math"
-
 	"os"
 	"path"
+	"slices"
 	"strings"
-
 	"sync"
 	"testing"
-
-	"slices"
 
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
@@ -74,7 +71,7 @@ func createReceptorPythonWorkerScript() error {
 		return fmt.Errorf("Error writing to %s: %v", filename, err)
 	}
 
-	err = os.Chmod(absoluteFilename, 0755)
+	err = os.Chmod(absoluteFilename, 0o755)
 	if err != nil {
 		return fmt.Errorf("Error making %s executable: %v", absoluteFilename, err)
 	}
@@ -83,7 +80,7 @@ func createReceptorPythonWorkerScript() error {
 }
 
 func TestPythonUnitStartRunsToSuccess(t *testing.T) {
-	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t)
+	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) // nolint:dogsled
 	pw := workceptor.NewPythonUnit(mockBaseWorkUnit, "", "", nil)
 
 	var stdoutSize int64 = 0
@@ -108,7 +105,7 @@ func TestPythonUnitStartRunsToSuccess(t *testing.T) {
 }
 
 func TestPythonUnitStartFailsOnInvalidConfig(t *testing.T) {
-	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t)
+	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) // nolint:dogsled
 
 	var stdoutSize int64 = 0
 	statusLock := &sync.RWMutex{}
@@ -151,7 +148,7 @@ func TestWorkPythonConfigNewWorkerRunsToSuccess(t *testing.T) {
 }
 
 func TestWorkPythonConfigRunRunsToSuccess(t *testing.T) {
-	_, _, mockNetceptorForWorkceptor, _ := createPythonUnitTestSetup(t)
+	_, _, mockNetceptorForWorkceptor, _ := createPythonUnitTestSetup(t) // nolint:dogsled
 	mockNetceptorForWorkceptor.EXPECT().NodeID().AnyTimes()
 	mockNetceptorForWorkceptor.EXPECT().AddWorkCommand("", false)
 

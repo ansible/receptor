@@ -323,17 +323,17 @@ func TestRelease(t *testing.T) {
 					t.Error(err.Error())
 				}
 			},
-			force:    true,
+			force: true,
 		},
 		{
-			name: "cancel error",
+			name:          "cancel error",
 			expectedCalls: func() {},
 			errorCatch: func(err error, t *testing.T) {
 				if err == nil {
 					t.Error(err)
 				}
 			},
-			force:    false,
+			force: false,
 		},
 	}
 	for _, testCase := range releaseTestCases {

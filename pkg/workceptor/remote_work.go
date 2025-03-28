@@ -586,14 +586,9 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 		go func() {
 			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
-				doneChan := make(chan bool, 1)
-				errChan := make(chan error, 1)
-				rw.BaseWorkUnitForWorkUnit.Release(false, doneChan, errChan)
-
-				select {
-				case err = <-errChan:
+				err := rw.BaseWorkUnitForWorkUnit.Release(false)
+				if err != nil {
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
-				case <-doneChan:
 				}
 			}
 			mw.WorkerDone()
@@ -668,7 +663,7 @@ func (rw *remoteUnit) Restart() error {
 }
 
 // cancelOrRelease is a shared implementation of Cancel() and Release().
-func (rw *remoteUnit) cancelOrRelease(release bool, force bool, closeChan chan bool, errChan chan error) error {
+func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	// Update the status file that the unit is locally cancelled/released
 	var remoteStarted bool
 	rw.UpdateFullStatus(func(status *StatusFileData) {
@@ -683,11 +678,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool, closeChan chan b
 		rw.topJC.Cancel()
 		rw.topJC.Wait()
 		if release {
-			rw.BaseWorkUnitForWorkUnit.Release(true, closeChan, errChan)
-
-			err := <-errChan
-
-			return err
+			return rw.BaseWorkUnitForWorkUnit.Release(true)
 		}
 		rw.UpdateBasicStatus(WorkStateFailed, "Locally Cancelled", 0)
 
@@ -701,11 +692,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool, closeChan chan b
 			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
 		}
 
-		rw.BaseWorkUnitForWorkUnit.Release(true, closeChan, errChan)
-
-		err = <-errChan
-
-		return err
+		return rw.BaseWorkUnitForWorkUnit.Release(true)
 	}
 	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
 
@@ -716,15 +703,12 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool, closeChan chan b
 
 // Cancel stops a running job.
 func (rw *remoteUnit) Cancel() error {
-	return rw.cancelOrRelease(false, false, nil, nil)
+	return rw.cancelOrRelease(false, false)
 }
 
 // Release releases resources associated with a job.  Implies Cancel.
-func (rw *remoteUnit) Release(force bool, closeChan chan bool, errChan chan error) {
-	err := rw.cancelOrRelease(true, force, closeChan, errChan)
-	if err != nil {
-		errChan <- err
-	}
+func (rw *remoteUnit) Release(force bool) error {
+	return rw.cancelOrRelease(true, force)
 }
 
 func NewRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workType string) WorkUnit {

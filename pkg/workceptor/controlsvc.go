@@ -394,16 +394,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		} else {
 			unit.UpdateBasicStatus(5, "released work", 0)
 			time.Sleep(time.Second * 3)
-			doneChan := make(chan bool, 1)
-			errChan := make(chan error, 1)
-			unit.Release(c.subcommand == "force-release", doneChan, errChan)
-
-			select {
-			case err = <-errChan:
-			case <-doneChan:
-			}
-			close(errChan)
-			close(doneChan)
+			err = unit.Release(c.subcommand == "force-release")
 		}
 		if err != nil && !IsPending(err) {
 			return nil, err

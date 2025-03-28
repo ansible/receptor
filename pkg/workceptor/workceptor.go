@@ -456,15 +456,13 @@ func (w *Workceptor) CancelUnit(unitID string) error {
 }
 
 // ReleaseUnit releases (deletes) resources from a unit of work, including stdout.  Release implies Cancel.
-func (w *Workceptor) ReleaseUnit(unitID string, force bool, doneChan chan bool, errChan chan error) {
+func (w *Workceptor) ReleaseUnit(unitID string, force bool) error {
 	unit, err := w.findUnit(unitID)
 	if err != nil {
-		errChan <- err
-
-		return
+		return err
 	}
 
-	unit.Release(force, doneChan, errChan)
+	return unit.Release(force)
 }
 
 // unitStatusForCFR returns status information as a map, suitable for a control function return value.

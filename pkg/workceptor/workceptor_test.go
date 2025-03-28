@@ -406,18 +406,11 @@ func TestUnitStatus(t *testing.T) {
 func TestReleaseUnit(t *testing.T) {
 	_, _, w := testSetup(t)
 	activeUnitsIDs := w.ListKnownUnitIDs()
+	err := w.ReleaseUnit(activeUnitsIDs[0], true)
 
-	doneChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-	w.ReleaseUnit(activeUnitsIDs[0], true, doneChan, errChan)
-
-	select {
-	case err := <-errChan:
+	if err != nil {
 		t.Error(err)
-	case <-doneChan:
 	}
-	close(errChan)
-	close(doneChan)
 }
 
 func TestCancelUnit(t *testing.T) {

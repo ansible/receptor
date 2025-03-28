@@ -312,15 +312,11 @@ func TestRelease(t *testing.T) {
 		expectedCalls func()
 		errorCatch    func(error, *testing.T)
 		force         bool
-		doneChan      chan bool
-		errChan       chan error
 	}{
 		{
 			name: "released successfully",
 			expectedCalls: func() {
-				mockBaseWorkUnit.EXPECT().Release(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(force bool, doneChan chan bool, errorChan chan error) {
-					doneChan <- true
-				}).AnyTimes()
+				mockBaseWorkUnit.EXPECT().Release(gomock.Any()).Return(nil).AnyTimes()
 			},
 			errorCatch: func(err error, t *testing.T) {
 				if err != nil {
@@ -328,24 +324,16 @@ func TestRelease(t *testing.T) {
 				}
 			},
 			force:    true,
-			doneChan: make(chan bool, 1),
-			errChan:  make(chan error, 1),
 		},
 		{
 			name: "cancel error",
-			expectedCalls: func() {
-				mockBaseWorkUnit.EXPECT().Release(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(force bool, doneChan chan bool, errorChan chan error) {
-					errorChan <- errors.New("Error")
-				}).AnyTimes()
-			},
+			expectedCalls: func() {},
 			errorCatch: func(err error, t *testing.T) {
 				if err == nil {
 					t.Error(err)
 				}
 			},
 			force:    false,
-			doneChan: make(chan bool, 1),
-			errChan:  make(chan error, 1),
 		},
 	}
 	for _, testCase := range releaseTestCases {
@@ -362,13 +350,7 @@ func TestRelease(t *testing.T) {
 			testCase.expectedCalls()
 			wu.UpdateBasicStatus(5, "released work", 0)
 			time.Sleep(time.Millisecond * 50)
-			wu.Release(testCase.force, testCase.doneChan, testCase.errChan)
-			var err error
-
-			select {
-			case err = <-testCase.errChan:
-			case <-testCase.doneChan:
-			}
+			err := wu.Release(testCase.force)
 
 			testCase.errorCatch(err, t)
 		})

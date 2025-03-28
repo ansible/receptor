@@ -509,36 +509,32 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 }
 
 // / Release releases this unit of work, deleting its files.
-func (bwu *BaseWorkUnit) Release(force bool, doneChan chan bool, errChan chan error) {
-	go func() {
-		attemptsLeft := 3
-		for {
-			err := bwu.fs.RemoveAll(bwu.UnitDir())
-			if force {
-				break
-			} else if err != nil {
-				attemptsLeft--
-
-				if attemptsLeft > 0 {
-					bwu.w.nc.GetLogger().Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
-
-					continue
-				}
-				bwu.w.nc.GetLogger().Error("Error removing directory for %s. No more retries left.", bwu.unitID)
-
-				errChan <- err
-
-				return
-			}
-
+func (bwu *BaseWorkUnit) Release(force bool) error {
+	attemptsLeft := 3
+	for {
+		err := bwu.fs.RemoveAll(bwu.UnitDir())
+		if force {
 			break
-		}
-		bwu.w.activeUnitsLock.Lock()
-		defer bwu.w.activeUnitsLock.Unlock()
-		delete(bwu.w.activeUnits, bwu.unitID)
+		} else if err != nil {
+			attemptsLeft--
 
-		doneChan <- true
-	}()
+			if attemptsLeft > 0 {
+				bwu.w.nc.GetLogger().Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
+
+				continue
+			}
+			bwu.w.nc.GetLogger().Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+
+			return err
+		}
+
+		break
+	}
+	bwu.w.activeUnitsLock.Lock()
+	defer bwu.w.activeUnitsLock.Unlock()
+	delete(bwu.w.activeUnits, bwu.unitID)
+
+	return nil
 }
 
 func (bwu *BaseWorkUnit) CancelContext() {

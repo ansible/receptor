@@ -80,7 +80,7 @@ func createReceptorPythonWorkerScript() error {
 }
 
 func TestPythonUnitStartRunsToSuccess(t *testing.T) {
-	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) // nolint:dogsled
+	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) //nolint:dogsled
 	pw := workceptor.NewPythonUnit(mockBaseWorkUnit, "", "", nil)
 
 	var stdoutSize int64 = 0
@@ -105,7 +105,7 @@ func TestPythonUnitStartRunsToSuccess(t *testing.T) {
 }
 
 func TestPythonUnitStartFailsOnInvalidConfig(t *testing.T) {
-	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) // nolint:dogsled
+	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) //nolint:dogsled
 
 	var stdoutSize int64 = 0
 	statusLock := &sync.RWMutex{}
@@ -148,7 +148,7 @@ func TestWorkPythonConfigNewWorkerRunsToSuccess(t *testing.T) {
 }
 
 func TestWorkPythonConfigRunRunsToSuccess(t *testing.T) {
-	_, _, mockNetceptorForWorkceptor, _ := createPythonUnitTestSetup(t) // nolint:dogsled
+	_, _, mockNetceptorForWorkceptor, _ := createPythonUnitTestSetup(t) //nolint:dogsled
 	mockNetceptorForWorkceptor.EXPECT().NodeID().AnyTimes()
 	mockNetceptorForWorkceptor.EXPECT().AddWorkCommand("", false)
 

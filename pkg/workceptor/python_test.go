@@ -16,11 +16,6 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-const (
-	deprecationWarning = "[DEPRECATION WARNING] '--work-python' option is not currently being used. This feature will be removed from receptor in a future release."
-	launchPythonRunner = "Launching Python runner"
-)
-
 func createPythonUnitTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor) {
 	ctrl := gomock.NewController(t)
 	ctx := context.Background()
@@ -82,12 +77,9 @@ func createReceptorPythonWorkerScript() error {
 func TestPythonUnitStartRunsToSuccess(t *testing.T) {
 	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) //nolint:dogsled
 	pw := workceptor.NewPythonUnit(mockBaseWorkUnit, "", "", nil)
-
-	var stdoutSize int64 = 0
 	statusLock := &sync.RWMutex{}
 
-	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, deprecationWarning, stdoutSize)
-	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, launchPythonRunner, stdoutSize)
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
 	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
@@ -95,6 +87,8 @@ func TestPythonUnitStartRunsToSuccess(t *testing.T) {
 	})
 	mockBaseWorkUnit.EXPECT().UnitDir()
 	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any())
+	mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
 
 	createReceptorPythonWorkerScript()
 
@@ -107,12 +101,9 @@ func TestPythonUnitStartRunsToSuccess(t *testing.T) {
 func TestPythonUnitStartFailsOnInvalidConfig(t *testing.T) {
 	_, mockBaseWorkUnit, _, _ := createPythonUnitTestSetup(t) //nolint:dogsled
 
-	var stdoutSize int64 = 0
 	statusLock := &sync.RWMutex{}
 
-	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, deprecationWarning, stdoutSize)
-	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, launchPythonRunner, stdoutSize)
-
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
 	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{

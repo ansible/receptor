@@ -38,9 +38,9 @@ type QuicConnectionForConn interface {
 	quic.Connection
 }
 
-type acceptResult struct {
-	conn net.Conn
-	err  error
+type AcceptResult struct {
+	Conn net.Conn
+	Err  error
 }
 
 // Listener implements the net.Listener interface via the Receptor network.
@@ -48,8 +48,8 @@ type Listener struct {
 	s          *Netceptor
 	pc         PacketConner
 	ql         *quic.Listener
-	acceptChan chan *acceptResult
-	doneChan   chan struct{}
+	AcceptChan chan *AcceptResult
+	DoneChan   chan struct{}
 	doneOnce   *sync.Once
 }
 
@@ -135,8 +135,8 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		s:          s,
 		pc:         pc,
 		ql:         ql,
-		acceptChan: make(chan *acceptResult),
-		doneChan:   doneChan,
+		AcceptChan: make(chan *AcceptResult),
+		DoneChan:   doneChan,
 		doneOnce:   &sync.Once{},
 	}
 
@@ -187,11 +187,11 @@ func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {
 	select {
 	case <-ctx.Done():
 		return
-	case li.acceptChan <- &acceptResult{
-		conn: conn,
-		err:  err,
+	case li.AcceptChan <- &AcceptResult{
+		Conn: conn,
+		Err:  err,
 	}:
-	case <-li.doneChan:
+	case <-li.DoneChan:
 	}
 }
 
@@ -200,13 +200,13 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-li.doneChan:
+		case <-li.DoneChan:
 			return
 		default:
 		}
 		qc, err := li.ql.Accept(ctx)
 		select {
-		case <-li.doneChan:
+		case <-li.DoneChan:
 			return
 		default:
 		}
@@ -220,7 +220,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			defer cancel()
 			qs, err := qc.AcceptStream(ctx)
 			select {
-			case <-li.doneChan:
+			case <-li.DoneChan:
 				_ = qc.CloseWithError(500, "Listener Closed")
 
 				return
@@ -267,7 +267,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			}
 			go func() {
 				select {
-				case <-li.doneChan:
+				case <-li.DoneChan:
 					_ = conn.Close()
 				case <-cctx.Done():
 					_ = conn.Close()
@@ -283,9 +283,9 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 // Accept accepts a connection via the listener.
 func (li *Listener) Accept() (net.Conn, error) {
 	select {
-	case ar := <-li.acceptChan:
-		return ar.conn, ar.err
-	case <-li.doneChan:
+	case ar := <-li.AcceptChan:
+		return ar.Conn, ar.Err
+	case <-li.DoneChan:
 		return nil, fmt.Errorf("listener closed")
 	}
 }
@@ -293,7 +293,7 @@ func (li *Listener) Accept() (net.Conn, error) {
 // Close closes the listener.
 func (li *Listener) Close() error {
 	li.doneOnce.Do(func() {
-		close(li.doneChan)
+		close(li.DoneChan)
 	})
 	perr := li.pc.Close()
 	if qerr := li.ql.Close(); qerr != nil {

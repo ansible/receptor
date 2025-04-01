@@ -541,6 +541,51 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), gomock.Any(), gomock.Any()).Return(&exec, nil).AnyTimes()
 			},
 		},
+		{
+			name: "Kube error 503",
+			expectedCalls: func() {
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				config := rest.Config{}
+				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				clientset := kubernetes.Clientset{}
+				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+				lock := &sync.RWMutex{}
+				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(lock).AnyTimes()
+				mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()
+				mockBaseWorkUnit.EXPECT().UnitDir().Return("TestDir2").AnyTimes()
+				kubeExtraData := workceptor.KubeExtraData{}
+				status := workceptor.StatusFileData{ExtraData: &kubeExtraData}
+				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&status).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(status).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				pod := corev1.Pod{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{Name: "Test_Name"}, Spec: corev1.PodSpec{}, Status: corev1.PodStatus{}}
+				mockKubeAPI.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&pod, nil).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+				field := hasTerm{}
+				mockKubeAPI.EXPECT().OneTermEqualSelector(gomock.Any(), gomock.Any()).Return(&field).AnyTimes()
+				ev := watch.Event{Object: &pod}
+				mockKubeAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&ev, nil).AnyTimes()
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&pod, nil).AnyTimes()
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						resp := &http.Response{
+							StatusCode: http.StatusServiceUnavailable, // 503
+							Body:       io.NopCloser(strings.NewReader("kube error")),
+						}
+
+						return resp, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockKubeAPI.EXPECT().SubResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+				exec := ex{}
+				mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), gomock.Any(), gomock.Any()).Return(&exec, nil).AnyTimes()
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

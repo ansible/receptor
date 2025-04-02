@@ -213,7 +213,7 @@ func createKubernetesTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 		t.Errorf("Error while creating Workceptor: %v", err)
 	}
 
-	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil)
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil).AnyTimes()
 	kubeConfig := workceptor.KubeWorkerCfg{AuthMethod: "incluster"}
 	ku := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI)
 
@@ -501,10 +501,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				config := rest.Config{}
-				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				clientset := kubernetes.Clientset{}
-				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil).AnyTimes()
 				lock := &sync.RWMutex{}
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(lock).AnyTimes()
 				mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()
@@ -546,10 +546,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			expectedCalls: func() {
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				config := rest.Config{}
-				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				clientset := kubernetes.Clientset{}
-				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil).AnyTimes()
 				lock := &sync.RWMutex{}
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(lock).AnyTimes()
 				mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()

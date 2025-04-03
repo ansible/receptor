@@ -41,20 +41,20 @@ import (
 // KubeUnit implements the WorkUnit interface.
 type KubeUnit struct {
 	BaseWorkUnitForWorkUnit
-	KubeAPIWrapperInstance  KubeAPIer
-	authMethod          	  string
-	streamMethod        	  string
-	baseParams          	  string
-	allowRuntimeAuth    	  bool
-	allowRuntimeCommand 	  bool
-	allowRuntimeParams  	  bool
-	allowRuntimePod     	  bool
-	deletePodOnRestart   	  bool
-	namePrefix          	  string
-	config              	  *rest.Config
-	clientset           	  *kubernetes.Clientset
-	Pod                 	  *corev1.Pod
-	podPendingTimeout   	  time.Duration
+	KubeAPIWrapperInstance KubeAPIer
+	authMethod             string
+	streamMethod           string
+	baseParams             string
+	allowRuntimeAuth       bool
+	allowRuntimeCommand    bool
+	allowRuntimeParams     bool
+	allowRuntimePod        bool
+	deletePodOnRestart     bool
+	namePrefix             string
+	config                 *rest.Config
+	clientset              *kubernetes.Clientset
+	Pod                    *corev1.Pod
+	podPendingTimeout      time.Duration
 }
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker.

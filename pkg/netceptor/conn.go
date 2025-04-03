@@ -572,7 +572,7 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 
 func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
-		InsecureSkipVerify:    true,
+		InsecureSkipVerify:    false,
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
 		ServerName:            host,

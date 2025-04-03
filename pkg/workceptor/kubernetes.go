@@ -41,19 +41,20 @@ import (
 // KubeUnit implements the WorkUnit interface.
 type KubeUnit struct {
 	BaseWorkUnitForWorkUnit
-	authMethod          string
-	streamMethod        string
-	baseParams          string
-	allowRuntimeAuth    bool
-	allowRuntimeCommand bool
-	allowRuntimeParams  bool
-	allowRuntimePod     bool
-	deletePodOnRestart  bool
-	namePrefix          string
-	config              *rest.Config
-	clientset           *kubernetes.Clientset
-	pod                 *corev1.Pod
-	podPendingTimeout   time.Duration
+	KubeAPIWrapperInstance KubeAPIer
+	authMethod             string
+	streamMethod           string
+	baseParams             string
+	allowRuntimeAuth       bool
+	allowRuntimeCommand    bool
+	allowRuntimeParams     bool
+	allowRuntimePod        bool
+	deletePodOnRestart     bool
+	namePrefix             string
+	config                 *rest.Config
+	clientset              *kubernetes.Clientset
+	Pod                    *corev1.Pod
+	podPendingTimeout      time.Duration
 }
 
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker.
@@ -167,12 +168,6 @@ func (ku KubeAPIWrapper) NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter {
 	return flowcontrol.NewFakeAlwaysRateLimiter()
 }
 
-// KubeAPIWrapperInstance is a package level var that wraps all required kubernetes API calls.
-// It is instantiated in the NewkubeWorker function and available throughout the package.
-var KubeAPIWrapperInstance KubeAPIer
-
-var KubeAPIWrapperLock sync.Mutex
-
 // ErrPodCompleted is returned when pod has already completed before we could attach.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
@@ -183,11 +178,11 @@ var ErrPodFailed = fmt.Errorf("pod failed to start")
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
-func podRunningAndReady() func(event watch.Event) (bool, error) {
+func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
-			return false, KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+			return false, kw.KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		if t, ok := event.Object.(*corev1.Pod); ok {
 			switch t.Status.Phase {
@@ -251,8 +246,8 @@ func GetTimeoutOpenLogstream(kw *KubeUnit) int {
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
 	var logStream io.ReadCloser
 	var err error
-	podNamespace := kw.pod.Namespace
-	podName := kw.pod.Name
+	podNamespace := kw.Pod.Namespace
+	podName := kw.Pod.Name
 	podOptions := &corev1.PodLogOptions{
 		Container: "worker",
 		Follow:    true,
@@ -262,9 +257,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 		podOptions.SinceTime = &metav1.Time{Time: sinceTime}
 	}
 
-	KubeAPIWrapperLock.Lock()
-	logReq := KubeAPIWrapperInstance.GetLogs(kw.clientset, podNamespace, podName, podOptions)
-	KubeAPIWrapperLock.Unlock()
+	logReq := kw.KubeAPIWrapperInstance.GetLogs(kw.clientset, podNamespace, podName, podOptions)
 	// get logstream, with retry
 	for retries := 5; retries > 0; retries-- {
 		logStream, err = logReq.Stream(kw.GetContext())
@@ -297,8 +290,8 @@ func (kw *KubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *S
 	// known issues around this, as logstream can terminate due to log rotation
 	// or 4 hr timeout
 	defer streamWait.Done()
-	podNamespace := kw.pod.Namespace
-	podName := kw.pod.Name
+	podNamespace := kw.Pod.Namespace
+	podName := kw.Pod.Name
 	logStream, err := kw.kubeLoggingConnectionHandler(false, time.Time{})
 	if err != nil {
 		return
@@ -320,8 +313,8 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	defer streamWait.Done()
 	var sinceTime time.Time
 	var err error
-	podNamespace := kw.pod.Namespace
-	podName := kw.pod.Name
+	podNamespace := kw.Pod.Namespace
+	podName := kw.Pod.Name
 
 	retries := 5
 	successfulWrite := false
@@ -335,9 +328,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 		// get pod, with retry
 		for retries := 5; retries > 0; retries-- {
-			KubeAPIWrapperLock.Lock()
-			kw.pod, err = KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
-			KubeAPIWrapperLock.Unlock()
+			kw.Pod, err = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 			if err == nil {
 				break
 			}
@@ -544,10 +535,8 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		pod.Spec.Containers[0].Env = evs
 	}
 
-	KubeAPIWrapperLock.Lock()
-	// get pod and store to kw.pod
-	kw.pod, err = KubeAPIWrapperInstance.Create(kw.GetContext(), kw.clientset, ked.KubeNamespace, pod, metav1.CreateOptions{})
-	KubeAPIWrapperLock.Unlock()
+	// get pod and store to kw.Pod
+	kw.Pod, err = kw.KubeAPIWrapperInstance.Create(kw.GetContext(), kw.clientset, ked.KubeNamespace, pod, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -562,23 +551,21 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		status.State = WorkStatePending
 		status.Detail = "Pod created"
 		status.StdoutSize = 0
-		status.ExtraData.(*KubeExtraData).PodName = kw.pod.Name
+		status.ExtraData.(*KubeExtraData).PodName = kw.Pod.Name
 	})
 
-	KubeAPIWrapperLock.Lock()
 	// Wait for the pod to be running
-	fieldSelector := KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.pod.Name).String()
-	KubeAPIWrapperLock.Unlock()
+	fieldSelector := kw.KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.Pod.Name).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
 
-			return KubeAPIWrapperInstance.List(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
+			return kw.KubeAPIWrapperInstance.List(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
 
-			return KubeAPIWrapperInstance.Watch(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
+			return kw.KubeAPIWrapperInstance.Watch(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
 		},
 	}
 
@@ -590,22 +577,20 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	}
 
 	time.Sleep(2 * time.Second)
-	KubeAPIWrapperLock.Lock()
-	ev, err := KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
-	KubeAPIWrapperLock.Unlock()
+	ev, err := kw.KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady(*kw))
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}
 
 	var ok bool
-	kw.pod, ok = ev.Object.(*corev1.Pod)
+	kw.Pod, ok = ev.Object.(*corev1.Pod)
 	if !ok {
 		return fmt.Errorf("watch did not return a pod")
 	}
 
 	if err == ErrPodCompleted {
 		// Hao: shouldn't we also call kw.Cancel() in these cases?
-		for _, cstat := range kw.pod.Status.ContainerStatuses {
+		for _, cstat := range kw.Pod.Status.ContainerStatuses {
 			if cstat.Name == "worker" {
 				if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
 					return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
@@ -631,12 +616,12 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		go kw.kubeLoggingNoReconnect(&streamWait, stdout, &stdoutErr)
 		streamWait.Wait()
 		kw.Cancel()
-		if len(kw.pod.Status.ContainerStatuses) == 1 {
-			if kw.pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				return fmt.Errorf("%s, %s", err.Error(), kw.pod.Status.ContainerStatuses[0].State.Waiting.Reason)
+		if len(kw.Pod.Status.ContainerStatuses) == 1 {
+			if kw.Pod.Status.ContainerStatuses[0].State.Waiting != nil {
+				return fmt.Errorf("%s, %s", err.Error(), kw.Pod.Status.ContainerStatuses[0].State.Waiting.Reason)
 			}
 
-			for _, cstat := range kw.pod.Status.ContainerStatuses {
+			for _, cstat := range kw.Pod.Status.ContainerStatuses {
 				if cstat.Name == "worker" {
 					if cstat.State.Waiting != nil {
 						return fmt.Errorf("%s, %s", err.Error(), cstat.State.Waiting.Reason)
@@ -682,8 +667,8 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 			skipStdin = false
 		}
 
-		podName = kw.pod.Name
-		podNamespace = kw.pod.Namespace
+		podName = kw.Pod.Name
+		podNamespace = kw.Pod.Namespace
 	} else {
 		if podNamespace == "" {
 			errMsg := fmt.Sprintf("Error creating pod: pod namespace is empty for pod %s",
@@ -708,9 +693,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 			default:
 			}
 
-			KubeAPIWrapperLock.Lock()
-			kw.pod, err = KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
-			KubeAPIWrapperLock.Unlock()
+			kw.Pod, err = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 			if err == nil {
 				break
 			}
@@ -735,9 +718,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	// Attach stdin stream to the pod
 	var exec remotecommand.Executor
 	if !skipStdin {
-		KubeAPIWrapperLock.Lock()
-		req := KubeAPIWrapperInstance.SubResource(kw.clientset, podName, podNamespace)
-		KubeAPIWrapperLock.Unlock()
+		req := kw.KubeAPIWrapperInstance.SubResource(kw.clientset, podName, podNamespace)
 
 		req.VersionedParams(
 			&corev1.PodExecOptions{
@@ -750,9 +731,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 			scheme.ParameterCodec,
 		)
 		var err error
-		KubeAPIWrapperLock.Lock()
-		exec, err = KubeAPIWrapperInstance.NewSPDYExecutor(kw.config, "POST", req.URL())
-		KubeAPIWrapperLock.Unlock()
+		exec, err = kw.KubeAPIWrapperInstance.NewSPDYExecutor(kw.config, "POST", req.URL())
 		if err != nil {
 			errMsg := fmt.Sprintf("Error creating SPDY executor: %s", err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
@@ -846,12 +825,10 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 
 			var err error
 			for retries := 5; retries > 0; retries-- {
-				KubeAPIWrapperLock.Lock()
-				err = KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
+				err = kw.KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
 					Stdin: stdin,
 					Tty:   false,
 				})
-				KubeAPIWrapperLock.Unlock()
 				if err != nil {
 					// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
 					kw.GetWorkceptor().nc.GetLogger().Warning(
@@ -886,7 +863,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 					// this is probably not possible...
 					errMsg := fmt.Sprintf("Error reading stdin: %s", stdin.Error())
 					kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
-					kw.GetWorkceptor().nc.GetLogger().Error("Pod status at time of error %s", kw.pod.Status.String())
+					kw.GetWorkceptor().nc.GetLogger().Error("Pod status at time of error %s", kw.Pod.Status.String())
 					kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
 
 					close(stdinErrChan) // signal STDOUT goroutine to stop
@@ -1226,12 +1203,8 @@ func (kw *KubeUnit) connectUsingKubeconfig() error {
 	var err error
 	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	if ked.KubeConfig == "" {
-		KubeAPIWrapperLock.Lock()
-		clr := KubeAPIWrapperInstance.NewDefaultClientConfigLoadingRules()
-		KubeAPIWrapperLock.Unlock()
-		KubeAPIWrapperLock.Lock()
-		kw.config, err = KubeAPIWrapperInstance.BuildConfigFromFlags("", clr.GetDefaultFilename())
-		KubeAPIWrapperLock.Unlock()
+		clr := kw.KubeAPIWrapperInstance.NewDefaultClientConfigLoadingRules()
+		kw.config, err = kw.KubeAPIWrapperInstance.BuildConfigFromFlags("", clr.GetDefaultFilename())
 		if ked.KubeNamespace == "" {
 			c, err := clr.Load()
 			if err != nil {
@@ -1247,9 +1220,7 @@ func (kw *KubeUnit) connectUsingKubeconfig() error {
 			}
 		}
 	} else {
-		KubeAPIWrapperLock.Lock()
-		cfg, err := KubeAPIWrapperInstance.NewClientConfigFromBytes([]byte(ked.KubeConfig))
-		KubeAPIWrapperLock.Unlock()
+		cfg, err := kw.KubeAPIWrapperInstance.NewClientConfigFromBytes([]byte(ked.KubeConfig))
 		if err != nil {
 			return err
 		}
@@ -1276,9 +1247,7 @@ func (kw *KubeUnit) connectUsingKubeconfig() error {
 
 func (kw *KubeUnit) connectUsingIncluster() error {
 	var err error
-	KubeAPIWrapperLock.Lock()
-	kw.config, err = KubeAPIWrapperInstance.InClusterConfig()
-	KubeAPIWrapperLock.Unlock()
+	kw.config, err = kw.KubeAPIWrapperInstance.InClusterConfig()
 	if err != nil {
 		return err
 	}
@@ -1370,22 +1339,16 @@ func (kw *KubeUnit) connectToKube() error {
 	if ok {
 		switch envRateLimiter {
 		case "never":
-			KubeAPIWrapperLock.Lock()
-			kw.config.RateLimiter = KubeAPIWrapperInstance.NewFakeNeverRateLimiter()
-			KubeAPIWrapperLock.Unlock()
+			kw.config.RateLimiter = kw.KubeAPIWrapperInstance.NewFakeNeverRateLimiter()
 		case "always":
-			KubeAPIWrapperLock.Lock()
-			kw.config.RateLimiter = KubeAPIWrapperInstance.NewFakeAlwaysRateLimiter()
-			KubeAPIWrapperLock.Unlock()
+			kw.config.RateLimiter = kw.KubeAPIWrapperInstance.NewFakeAlwaysRateLimiter()
 		default:
 		}
 		kw.GetWorkceptor().nc.GetLogger().Debug("RateLimiter: %s", envRateLimiter)
 	}
 
 	kw.GetWorkceptor().nc.GetLogger().Debug("QPS: %f, Burst: %d", kw.config.QPS, kw.config.Burst)
-	KubeAPIWrapperLock.Lock()
-	kw.clientset, err = KubeAPIWrapperInstance.NewForConfig(kw.config)
-	KubeAPIWrapperLock.Unlock()
+	kw.clientset, err = kw.KubeAPIWrapperInstance.NewForConfig(kw.config)
 	if err != nil {
 		return err
 	}
@@ -1554,9 +1517,7 @@ func (kw *KubeUnit) Restart() error {
 		if err != nil {
 			kw.GetWorkceptor().nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
-			KubeAPIWrapperLock.Lock()
-			err := KubeAPIWrapperInstance.Delete(context.Background(), kw.clientset, ked.KubeNamespace, ked.PodName, metav1.DeleteOptions{})
-			KubeAPIWrapperLock.Unlock()
+			err := kw.KubeAPIWrapperInstance.Delete(context.Background(), kw.clientset, ked.KubeNamespace, ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
 				kw.GetWorkceptor().nc.GetLogger().Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
@@ -1580,12 +1541,10 @@ func (kw *KubeUnit) Start() error {
 func (kw *KubeUnit) Cancel() error {
 	kw.CancelContext()
 	kw.UpdateBasicStatus(WorkStateCanceled, "Canceled", -1)
-	if kw.pod != nil {
-		KubeAPIWrapperLock.Lock()
-		err := KubeAPIWrapperInstance.Delete(context.Background(), kw.clientset, kw.pod.Namespace, kw.pod.Name, metav1.DeleteOptions{})
-		KubeAPIWrapperLock.Unlock()
+	if kw.Pod != nil {
+		err := kw.KubeAPIWrapperInstance.Delete(context.Background(), kw.clientset, kw.Pod.Namespace, kw.Pod.Name, metav1.DeleteOptions{})
 		if err != nil {
-			kw.GetWorkceptor().nc.GetLogger().Error("Error deleting pod %s: %s", kw.pod.Name, err)
+			kw.GetWorkceptor().nc.GetLogger().Error("Error deleting pod %s: %s", kw.Pod.Name, err)
 		}
 	}
 	if kw.GetCancel() != nil {
@@ -1634,6 +1593,7 @@ func (cfg KubeWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, u
 }
 
 func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string, kawi KubeAPIer) WorkUnit {
+	var kubeAPIWrapperInstance KubeAPIer
 	if bwu == nil {
 		bwu = &BaseWorkUnit{
 			status: StatusFileData{
@@ -1648,16 +1608,15 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		}
 	}
 
-	KubeAPIWrapperLock.Lock()
 	if kawi != nil {
-		KubeAPIWrapperInstance = kawi
+		kubeAPIWrapperInstance = kawi
 	} else {
-		KubeAPIWrapperInstance = KubeAPIWrapper{}
+		kubeAPIWrapperInstance = KubeAPIWrapper{}
 	}
-	KubeAPIWrapperLock.Unlock()
 
 	ku := &KubeUnit{
 		BaseWorkUnitForWorkUnit: bwu,
+		KubeAPIWrapperInstance:  kubeAPIWrapperInstance,
 		authMethod:              strings.ToLower(cfg.AuthMethod),
 		streamMethod:            strings.ToLower(cfg.StreamMethod),
 		baseParams:              cfg.Params,

@@ -80,9 +80,12 @@ func TestTCPProxyServiceInbound(t *testing.T) {
 			name:            "Fail to dial to the receptor network after accepting an inbound connection",
 			tlsServerConfig: nil,
 			calls: func() {
-				mockNetLib.EXPECT().Listen(gomock.Any(), gomock.Any()).Return(mockNetListener, nil).Times(1)
-				mockNetListener.EXPECT().Accept().Return(mockTCPConn, nil).AnyTimes()
-				mockNetceptor.EXPECT().Dial(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("failed to connect to Receptor network")).AnyTimes()
+				gomock.InOrder(
+					mockNetLib.EXPECT().Listen(gomock.Any(), gomock.Any()).Return(mockNetListener, nil).Times(1),
+					mockNetListener.EXPECT().Accept().Return(mockTCPConn, nil).AnyTimes(),
+					mockNetceptor.EXPECT().Dial(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("failed to connect to Receptor network")).AnyTimes(),
+					mockNetListener.EXPECT().Accept().Return(nil, errors.New("failed to accept a new connection")).AnyTimes(),
+				)
 			},
 		},
 		{
@@ -135,7 +138,7 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 		expectError          bool
 		expectedErrorMessage string
 		tlsClientConfig      *tls.Config
-		myAcceptResult       netceptor.AcceptResult
+		myAcceptResults      []netceptor.AcceptResult
 		calls                func()
 	}
 	testCases := []testCoverageItem{
@@ -149,10 +152,10 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 		},
 		{
 			name: "Fail to accept input connections",
-			myAcceptResult: netceptor.AcceptResult{
+			myAcceptResults: []netceptor.AcceptResult{{
 				Conn: nil,
 				Err:  errors.New("connection acceptance failed"),
-			},
+			}},
 			calls: func() {
 				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)
 			},
@@ -160,10 +163,10 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 		{
 			name:            "Fail to dial through non-TLS TCP connection",
 			tlsClientConfig: nil,
-			myAcceptResult: netceptor.AcceptResult{
+			myAcceptResults: []netceptor.AcceptResult{{
 				Conn: mockTCPConn,
 				Err:  nil,
-			},
+			}},
 			calls: func() {
 				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)
 				mockNetLib.EXPECT().Dial(gomock.Any(), gomock.Any()).Return(nil, errors.New("non-TLS TCP dial failed")).AnyTimes()
@@ -172,10 +175,10 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 		{
 			name:            "Fail to dial through TLS TCP connection",
 			tlsClientConfig: &tls.Config{},
-			myAcceptResult: netceptor.AcceptResult{
+			myAcceptResults: []netceptor.AcceptResult{{
 				Conn: mockTCPConn,
 				Err:  nil,
-			},
+			}},
 			calls: func() {
 				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)
 				mockTLSLib.EXPECT().Dial(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("TLS TCP dial failed")).AnyTimes()
@@ -184,9 +187,15 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 		{
 			name:            "Complete connection bridge after successful non-TLS connection",
 			tlsClientConfig: &tls.Config{},
-			myAcceptResult: netceptor.AcceptResult{
-				Conn: mockTCPConn,
-				Err:  nil,
+			myAcceptResults: []netceptor.AcceptResult{
+				{
+					Conn: mockTCPConn,
+					Err:  nil,
+				},
+				{
+					Conn: nil,
+					Err:  errors.New("failed to accept a new connection"),
+				},
 			},
 			calls: func() {
 				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)
@@ -201,7 +210,9 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 			mockNetceptor, mockNetLib, mockTLSLib, _, mockUtilsLib, mockTCPConn = setUpTCPMocks(ctrl)
 			tc.calls()
 			go func() {
-				myListener.AcceptChan <- &tc.myAcceptResult
+				for _, message := range tc.myAcceptResults {
+					myListener.AcceptChan <- &message
+				}
 			}()
 			err := TCPProxyServiceOutbound(mockNetceptor, "", &tls.Config{}, "", tc.tlsClientConfig, mockNetLib, mockTLSLib, mockUtilsLib)
 			if tc.expectError {

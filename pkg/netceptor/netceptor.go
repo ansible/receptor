@@ -2009,18 +2009,30 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						connectionCost = remoteNodeCost
 					}
 					s.connLock.Lock()
-					for conn := range s.connections {
-						if remoteNodeID == conn {
-							remoteNodeAccepted = false
+					existingConn, exists := s.connections[remoteNodeID]
+					
+					// define connError initialize to nil
+					var connError error
+					connError = nil
 
-							break
-						}
+					if exists {
+						connError = existingConn.Context.Err()
 					}
-					if !remoteNodeAccepted {
+					if exists && connError != nil {
+						s.connLock.Unlock() // removeConnection will lock before deleting. Not sure I like this though. 
+						s.removeConnection(remoteNodeID)
+						s.connLock.Lock()
+
+						return s.sendAndLogConnectionRejection(remoteNodeID, existingConn, "handshake failed "+connError.Error())
+					}
+						
+					_, exists = s.connections[remoteNodeID]
+					if exists || !remoteNodeAccepted{
 						s.connLock.Unlock()
 
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "valid connection using a node ID we are already connected to")
 					}
+			
 					s.connections[remoteNodeID] = ci
 					s.connLock.Unlock()
 

@@ -8,7 +8,7 @@ import (
 	"github.com/ansible/receptor/tests/utils"
 )
 
-func flatMesh(proto string) *LibMesh {
+func flatMesh(proto string, nodeCount int) *LibMesh {
 	m := NewLibMesh()
 
 	// Controller has no peers, only a listener
@@ -20,7 +20,7 @@ func flatMesh(proto string) *LibMesh {
 
 	i := 1
 	// All nodes peer out to "controller"
-	for i <= 15 {
+	for i <= nodeCount {
 		nodeID := fmt.Sprintf("node%d", i)
 		node := m.NewLibNode(nodeID)
 		node.Connections = []Connection{

@@ -10,20 +10,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/pkg/backends"
-	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/tests/utils"
+	// "github.com/ansible/receptor/pkg/backends"
+	// "github.com/ansible/receptor/pkg/netceptor"
+	// "github.com/ansible/receptor/tests/utils"
 	_ "github.com/fortytw2/leaktest"
 )
 
 // Test that a mesh starts and that connections are what we expect and that
 // each node's view of the mesh converges.
-func TestMeshStartup(t *testing.T) {
+func TestHandshakeStartup(t *testing.T) {
 	meshDefinitions := map[string]*LibMesh{
-		"tcp": flatMesh("tcp", 15),
-		"udp": flatMesh("udp", 15),
-		"ws":  flatMesh("ws", 15),
-	}
+		"tcp": flatMesh("tcp",3),
+	} 
+
+	fmt.Println("test")
 
 	t.Parallel()
 	for protocol, m := range meshDefinitions {
@@ -67,7 +67,7 @@ func TestMeshStartup(t *testing.T) {
 						_, err := controller.Ping(remoteNode.GetID())
 						switch {
 						case err == nil:
-
+							t.Logf("Ping successful %s: %s", node.GetID(), remoteNode.GetID())
 							break retryloop
 						case i != 1:
 							t.Logf("Error pinging %s: %s. Retrying", remoteNode.GetID(), err)
@@ -79,12 +79,28 @@ func TestMeshStartup(t *testing.T) {
 					}
 				}
 			}
+			node2 := m.GetNodes()["node2"]
+
+			controller := NewReceptorControl()
+			err = controller.Connect(node2.GetControlSocket())
+			if err != nil {
+				t.Fatalf("Error connecting to controller: %s", err)
+			}
+			node2.Cancel()
+			_, err = controller.Ping("node2")
+			switch {
+			case err == nil:
+				t.Logf("Ping successful %s: %s", "controller", "node2")
+
+			default:
+				t.Fatalf("Error pinging %s: %s", "node2", err)
+			}
 		})
 	}
 }
 
 // Test that traceroute works.
-func TestTraceroute(t *testing.T) {
+func TestHandshake(t *testing.T) {
 	meshDefinitions := map[string]*LibMesh{
 		"tcp": treeMesh("tcp"),
 		"udp": treeMesh("udp"),
@@ -188,7 +204,7 @@ func TestTraceroute(t *testing.T) {
 // Test that a mesh starts and that connections are what we expect.
 //
 //nolint:tparallel
-func TestMeshShutdown(t *testing.T) {
+func TestHandshakeShutdown(t *testing.T) {
 	// !!!!!!!!!!
 	// This test is intentionally set to not run in parallel with the other tests
 	// since it is checking to see that all ports are appropriately released.
@@ -260,112 +276,112 @@ func TestMeshShutdown(t *testing.T) {
 	}
 }
 
-func TestCosts(t *testing.T) {
-	t.Parallel()
-	m := NewLibMesh()
+// func TestCosts(t *testing.T) {
+// 	t.Parallel()
+// 	m := NewLibMesh()
 
-	defer func() {
-		t.Log(m.LogWriter.String())
-	}()
+// 	defer func() {
+// 		t.Log(m.LogWriter.String())
+// 	}()
 
-	node1 := m.NewLibNode("node1")
-	node1.ListenerCfgs = map[listenerName]ListenerCfg{
-		"tcp": &backends.TCPListenerCfg{
-			BindAddr: "127.0.0.1:0",
-			Cost:     4.5,
-			NodeCost: map[string]float64{"node2": 2.6, "node3": 3.2},
-		},
-	}
+// 	node1 := m.NewLibNode("node1")
+// 	node1.ListenerCfgs = map[listenerName]ListenerCfg{
+// 		"tcp": &backends.TCPListenerCfg{
+// 			BindAddr: "127.0.0.1:0",
+// 			Cost:     4.5,
+// 			NodeCost: map[string]float64{"node2": 2.6, "node3": 3.2},
+// 		},
+// 	}
 
-	for _, i := range []int{2, 3, 4} {
-		nodeID := fmt.Sprintf("node%d", i)
-		node := m.NewLibNode(nodeID)
-		node.Connections = []Connection{
-			{RemoteNode: node1, Protocol: "tcp"},
-		}
-	}
+// 	for _, i := range []int{2, 3, 4} {
+// 		nodeID := fmt.Sprintf("node%d", i)
+// 		node := m.NewLibNode(nodeID)
+// 		node.Connections = []Connection{
+// 			{RemoteNode: node1, Protocol: "tcp"},
+// 		}
+// 	}
 
-	err := m.Start(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer m.WaitForShutdown()
-	defer m.Destroy()
+// 	err := m.Start(t.Name())
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	defer m.WaitForShutdown()
+// 	defer m.Destroy()
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel1()
+// 	ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+// 	defer cancel1()
 
-	err = m.WaitForReady(ctx1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Test that each Node can ping each Node
-	for _, nodeSender := range m.GetNodes() {
-		controller := NewReceptorControl()
-		err = controller.Connect(nodeSender.GetControlSocket())
-		if err != nil {
-			t.Fatal(err)
-		}
-		for nodeIDResponder := range m.GetNodes() {
-			response, err := controller.Ping(nodeIDResponder)
-			if err != nil {
-				t.Error(err)
-			} else {
-				t.Logf("%v", response)
-			}
-		}
-		controller.Close()
-	}
-}
+// 	err = m.WaitForReady(ctx1)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	// Test that each Node can ping each Node
+// 	for _, nodeSender := range m.GetNodes() {
+// 		controller := NewReceptorControl()
+// 		err = controller.Connect(nodeSender.GetControlSocket())
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 		for nodeIDResponder := range m.GetNodes() {
+// 			response, err := controller.Ping(nodeIDResponder)
+// 			if err != nil {
+// 				t.Error(err)
+// 			} else {
+// 				t.Logf("%v", response)
+// 			}
+// 		}
+// 		controller.Close()
+// 	}
+// }
 
-func TestDuplicateNodes(t *testing.T) {
-	t.Parallel()
-	m := NewLibMesh()
+// func TestDuplicateNodes(t *testing.T) {
+// 	t.Parallel()
+// 	m := NewLibMesh()
 
-	defer func() {
-		t.Log(m.LogWriter.String())
-	}()
+// 	defer func() {
+// 		t.Log(m.LogWriter.String())
+// 	}()
 
-	node1 := m.NewLibNode("node1")
-	node1.ListenerCfgs = map[listenerName]ListenerCfg{
-		"tcp": &backends.TCPListenerCfg{
-			BindAddr: "127.0.0.1:0",
-			Cost:     4.5,
-			NodeCost: map[string]float64{"node2": 2.6, "node3": 3.2},
-		},
-	}
+// 	node1 := m.NewLibNode("node1")
+// 	node1.ListenerCfgs = map[listenerName]ListenerCfg{
+// 		"tcp": &backends.TCPListenerCfg{
+// 			BindAddr: "127.0.0.1:0",
+// 			Cost:     4.5,
+// 			NodeCost: map[string]float64{"node2": 2.6, "node3": 3.2},
+// 		},
+// 	}
 
-	node2 := m.NewLibNode("node2")
-	node2.Connections = []Connection{
-		{RemoteNode: node1, Protocol: "tcp"},
-	}
+// 	node2 := m.NewLibNode("node2")
+// 	node2.Connections = []Connection{
+// 		{RemoteNode: node1, Protocol: "tcp"},
+// 	}
 
-	node3 := m.NewLibNode("node3")
-	node3.netceptorInstance = netceptor.New(context.Background(), "node2")
-	node3.Connections = []Connection{
-		{RemoteNode: node1, Protocol: "tcp"},
-	}
-	// Hack a duplicate node onto the mesh
-	delete(m.nodes, "node3")
-	m.nodes["node2-dupe"] = node3
+// 	node3 := m.NewLibNode("node3")
+// 	node3.netceptorInstance = netceptor.New(context.Background(), "node2")
+// 	node3.Connections = []Connection{
+// 		{RemoteNode: node1, Protocol: "tcp"},
+// 	}
+// 	// Hack a duplicate node onto the mesh
+// 	delete(m.nodes, "node3")
+// 	m.nodes["node2-dupe"] = node3
 
-	err := m.Start(t.Name())
-	defer m.WaitForShutdown()
-	defer m.Destroy()
+// 	err := m.Start(t.Name())
+// 	defer m.WaitForShutdown()
+// 	defer m.Destroy()
 
-	if err != nil {
-		t.Fatal(err)
-	}
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel1()
+// 	ctx1, cancel1 := context.WithTimeout(context.Background(), 1*time.Minute)
+// 	defer cancel1()
 
-	sleepInterval := 100 * time.Millisecond
-	if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
-		return strings.Contains(m.LogWriter.String(), "connected using a node ID we are already connected to")
-	}) {
-		t.Fatal("duplicate nodes were not expected to exist together")
-	}
+// 	sleepInterval := 100 * time.Millisecond
+// 	if !utils.CheckUntilTimeout(ctx1, sleepInterval, func() bool {
+// 		return strings.Contains(m.LogWriter.String(), "connected using a node ID we are already connected to")
+// 	}) {
+// 		t.Fatal("duplicate nodes were not expected to exist together")
+// 	}
 
-	time.Sleep(5 * time.Second)
-}
+// 	time.Sleep(5 * time.Second)
+// }

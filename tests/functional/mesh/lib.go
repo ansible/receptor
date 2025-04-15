@@ -417,6 +417,10 @@ func (n *LibNode) EstablishRemoteConnections() error {
 	return nil
 }
 
+func (n *LibNode) Cancel() {
+	n.controlServerCanceller()
+}
+
 // Shutdown stops the node and waits for it to exit.
 func (n *LibNode) Shutdown() {
 	n.Destroy()

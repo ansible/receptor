@@ -2022,7 +2022,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						s.removeConnection(remoteNodeID)
 						s.connLock.Lock()
 
-						return s.sendAndLogConnectionRejection(remoteNodeID, existingConn, "handshake failed "+connError.Error())
+						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "handshake failed: "+connError.Error())
 					}
 						
 					_, exists = s.connections[remoteNodeID]

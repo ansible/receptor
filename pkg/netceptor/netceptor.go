@@ -2003,19 +2003,20 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
 					}
 
+					// Check if there is connection cost for this remoteNodeID
 					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost
 					}
 					s.connLock.Lock()
-					for conn := range s.connections {
-						if remoteNodeID == conn {
-							remoteNodeAccepted = false
 
-							break
-						}
+					// Check if there connInfo for this remoteNodeID
+					_, ok = s.connections[remoteNodeID]
+					if ok {
+						remoteNodeAccepted = false
 					}
+
 					if !remoteNodeAccepted {
 						s.connLock.Unlock()
 

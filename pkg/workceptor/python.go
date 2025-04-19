@@ -78,7 +78,7 @@ func (cfg WorkPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
-	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }

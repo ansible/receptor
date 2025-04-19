@@ -723,7 +723,7 @@ func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workTyp
 		BaseWorkUnitForWorkUnit: bwu,
 		logger:                  w.nc.GetLogger(),
 	}
-	rw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	rw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 	red := &RemoteExtraData{}
 	red.RemoteParams = make(map[string]string)
 	rw.SetStatusExtraData(red)

@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/rogpeppe/go-internal/lockedfile"
 )
 
@@ -32,39 +31,6 @@ const (
 	WorkStateFailed    = 3
 	WorkStateCanceled  = 4
 )
-
-// WatcherWrapper is wrapping the fsnofity Watcher struct and exposing the Event chan within.
-type WatcherWrapper interface {
-	Add(name string) error
-	Remove(path string) error
-	Close() error
-	ErrorChannel() chan error
-	EventChannel() chan fsnotify.Event
-}
-
-type RealWatcher struct {
-	watcher *fsnotify.Watcher
-}
-
-func (rw *RealWatcher) Add(name string) error {
-	return rw.watcher.Add(name)
-}
-
-func (rw *RealWatcher) Remove(path string) error {
-	return rw.watcher.Remove(path)
-}
-
-func (rw *RealWatcher) Close() error {
-	return rw.watcher.Close()
-}
-
-func (rw *RealWatcher) ErrorChannel() chan error {
-	return rw.watcher.Errors
-}
-
-func (rw *RealWatcher) EventChannel() chan fsnotify.Event {
-	return rw.watcher.Events
-}
 
 // IsComplete returns true if a given WorkState indicates the job is finished.
 func IsComplete(workState int) bool {
@@ -111,11 +77,10 @@ type BaseWorkUnit struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	fs                  FileSystemer
-	watcher             WatcherWrapper
 }
 
 // Init initializes the basic work unit data, in memory only.
-func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper) {
+func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs FileSystemer) {
 	bwu.w = w
 	bwu.status.State = WorkStatePending
 	bwu.status.Detail = "Unit Created"
@@ -129,17 +94,6 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs 
 	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 	bwu.fs = fs
-	if watcher != nil {
-		bwu.watcher = watcher
-	} else {
-		watcher, err := fsnotify.NewWatcher()
-		if err == nil {
-			bwu.watcher = &RealWatcher{watcher: watcher}
-		} else {
-			bwu.w.nc.GetLogger().Info("fsnotify.NewWatcher returned %s", err)
-			bwu.watcher = nil
-		}
-	}
 }
 
 // Error logs message with unitID prepended.
@@ -400,34 +354,6 @@ func (bwu *BaseWorkUnit) LastUpdateError() error {
 // MonitorLocalStatus watches a unit dir and keeps the in-memory workUnit up to date with status changes.
 func (bwu *BaseWorkUnit) MonitorLocalStatus() {
 	statusFile := path.Join(bwu.UnitDir(), "status")
-	var watcherEvents chan fsnotify.Event
-	watcherEvents = make(chan fsnotify.Event)
-
-	var watcherErrors chan error
-	watcherErrors = make(chan error)
-
-	if bwu.watcher != nil {
-		bwu.statusLock.Lock()
-		err := bwu.watcher.Add(statusFile)
-		bwu.statusLock.Unlock()
-		if err == nil {
-			defer func() {
-				bwu.watcher.Remove(statusFile)
-				err = bwu.watcher.Close()
-				if err != nil {
-					bwu.w.nc.GetLogger().Error("Error closing watcher: %v", err)
-				}
-			}()
-			watcherEvents = bwu.watcher.EventChannel()
-			watcherErrors = bwu.watcher.ErrorChannel()
-		} else {
-			werr := bwu.watcher.Close()
-			if werr != nil {
-				bwu.w.nc.GetLogger().Error("Error closing %s: %s", statusFile, err)
-			}
-			bwu.watcher = nil
-		}
-	}
 	fi, err := bwu.fs.Stat(statusFile)
 	if err != nil {
 		bwu.w.nc.GetLogger().Error("Error retrieving stat for %s: %s", statusFile, err)
@@ -439,26 +365,6 @@ loop:
 		select {
 		case <-bwu.ctx.Done():
 			break loop
-		case event := <-watcherEvents:
-			switch {
-			case event.Has(fsnotify.Create):
-				bwu.w.nc.GetLogger().Debug("Watcher Event create of %s", statusFile)
-			case event.Op&fsnotify.Write == fsnotify.Write:
-				err = bwu.Load()
-				if err != nil {
-					bwu.w.nc.GetLogger().Error("Watcher Events Error reading %s: %s", statusFile, err)
-				}
-			case event.Op&fsnotify.Remove == fsnotify.Remove:
-				err = bwu.Load()
-				if err != nil {
-					bwu.w.nc.GetLogger().Debug("Watcher Events Remove reading %s: %s", statusFile, err)
-				}
-			case event.Op&fsnotify.Rename == fsnotify.Rename:
-				err = bwu.Load()
-				if err != nil {
-					bwu.w.nc.GetLogger().Debug("Watcher Events Rename reading %s: %s", statusFile, err)
-				}
-			}
 		case <-time.After(time.Second):
 			newFi, err := bwu.fs.Stat(statusFile)
 			if err == nil && (fi == nil || fi.ModTime() != newFi.ModTime()) {
@@ -468,11 +374,6 @@ loop:
 					bwu.w.nc.GetLogger().Error("Work unit load Error reading %s: %s", statusFile, err)
 				}
 			}
-		case err, ok := <-watcherErrors:
-			if !ok {
-				return
-			}
-			bwu.w.nc.GetLogger().Error("fsnotify Error reading %s: %s", statusFile, err)
 		}
 		complete := IsComplete(bwu.Status().State)
 		if complete {
@@ -574,7 +475,7 @@ func (bwu *BaseWorkUnit) GetCancel() context.CancelFunc {
 
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	uu := &unknownUnit{}
-	uu.BaseWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	uu.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return uu
 }

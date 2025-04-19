@@ -158,27 +158,6 @@ func commandRunner(command string, params string, unitdir string) error {
 	cmd.Stdout = stdout
 	cmd.Stderr = stdout
 
-	// var fdLimit syscall.Rlimit
-	// currFds, err := os.ReadDir("/proc/self/fd")
-	// if err != nil {
-	// 	MainInstance.nc.GetLogger().Error("Error reading /proc/self/fd: %s", err)
-	// }
-	// if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &fdLimit); err != nil {
-	// 	MainInstance.nc.GetLogger().Error("error getting rlimit %s", err)
-	// }
-
-	// if len(currFds) >= int(fdLimit.Max) {
-	// 	MainInstance.nc.GetLogger().Info("File descriptor limit exceeded, file descriptors: %v, max limit: %v", len(currFds), fdLimit.Max)
-	// 	for {
-	// 		if len(currFds) < int(fdLimit.Max) {
-	// 			MainInstance.nc.GetLogger().Info("File descriptors are now available, continuing with work unit %v", unitdir)
-	// 			break
-	// 		}
-	// 		MainInstance.nc.GetLogger().Info("Waiting for file descriptors to become available, max limit: %v", fdLimit.Max)
-	// 		time.Sleep(time.Second * 3)
-	// 	}
-	// }
-
 	err = cmd.Start()
 	if err != nil {
 		return err
@@ -297,27 +276,6 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	cw.done = false
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	// var fdLimit syscall.Rlimit
-	// currFds, err := os.ReadDir("/proc/self/fd")
-	// if err != nil {
-	// 	MainInstance.nc.GetLogger().Error("Error reading /proc/self/fd: %s", err)
-	// }
-	// if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &fdLimit); err != nil {
-	// 	MainInstance.nc.GetLogger().Error("error getting rlimit %s", err)
-	// }
-
-	// if len(currFds) >= int(fdLimit.Max) {
-	// 	MainInstance.nc.GetLogger().Info("File descriptor limit exceeded, file descriptors: %v, max limit: %v", len(currFds), fdLimit.Max)
-	// 	for {
-	// 		if len(currFds) < int(fdLimit.Max) {
-	// 			MainInstance.nc.GetLogger().Info("File descriptors are now available, continuing with work unit %v", cw.ID())
-	// 			break
-	// 		}
-	// 		MainInstance.nc.GetLogger().Info("Waiting for file descriptors to become available, max limit: %v", fdLimit.Max)
-	// 		time.Sleep(time.Second * 3)
-	// 	}
-	// }
 
 	if err := cmd.Start(); err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)

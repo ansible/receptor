@@ -1,6 +1,7 @@
 module github.com/ansible/receptor
 
 go 1.22.7
+toolchain go1.24.1
 
 require (
 	github.com/creack/pty v1.1.24
@@ -15,7 +16,7 @@ require (
 	github.com/minio/highwayhash v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
-	github.com/quic-go/quic-go v0.48.2
+	github.com/quic-go/quic-go v0.51.0
 	github.com/rogpeppe/go-internal v1.13.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8

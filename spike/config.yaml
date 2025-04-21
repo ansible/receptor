@@ -1,2 +1,2 @@
-logLevel: info
-featureFlag: false
+logLevel: debug
+featureFlag: true

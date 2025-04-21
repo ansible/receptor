@@ -62,7 +62,9 @@ func handleConfigChange() {
 	mu.Lock()
 	defer mu.Unlock()
 
-	time.Sleep(1 * time.Second) // Give editors time to finish writing
+	// this is a workaround for a viper bug where values are set to ''
+	// before getting changed to the new value. :(
+	time.Sleep(1 * time.Second)
 
 	err := viper.ReadInConfig() // Make sure you read the latest config
 	if err != nil {
@@ -74,8 +76,14 @@ func handleConfigChange() {
 	newLogLevel := viper.GetString("logLevel")
 	newFeatureFlag := viper.GetBool("featureFlag")
 
-	if newLogLevel == "" {
+	if newLogLevel == "" || !viper.IsSet("logLevel") {
 		log.Printf("Log level not set in config")
+
+		return
+	}
+
+	if !viper.IsSet("FeatureFlag") {
+		log.Printf("Feature Flag is not in config")
 
 		return
 	}

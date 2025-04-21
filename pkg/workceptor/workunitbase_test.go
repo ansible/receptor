@@ -107,41 +107,41 @@ func setUp(t *testing.T) (*gomock.Controller, workceptor.BaseWorkUnit, *workcept
 
 func TestInit(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, nil)
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	ctrl.Finish()
 }
 
 func TestErrorLog(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	bwu.Error("test error")
 	ctrl.Finish()
 }
 
 func TestWarningLog(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	bwu.Warning("test warning")
 	ctrl.Finish()
 }
 
 func TestInfoLog(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	bwu.Info("test info")
 	ctrl.Finish()
 }
 
 func TestDebugLog(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	bwu.Error("test debug")
 	ctrl.Finish()
 }
 
 func TestSetFromParams(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	err := bwu.SetFromParams(nil)
 	if err != nil {
 		t.Errorf("SetFromParams should return nil: got %v", err)
@@ -157,7 +157,7 @@ const (
 
 func TestUnitDir(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	expectedUnitDir := path.Join(rootDir, testDir)
 	if unitDir := bwu.UnitDir(); unitDir != expectedUnitDir {
 		t.Errorf("UnitDir returned wrong value: got %s, want %s", unitDir, expectedUnitDir)
@@ -167,7 +167,7 @@ func TestUnitDir(t *testing.T) {
 
 func TestID(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "test", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "test", workceptor.FileSystem{})
 	if id := bwu.ID(); id != "test" {
 		t.Errorf("ID returned wrong value: got %s, want %s", id, "test")
 	}
@@ -176,7 +176,7 @@ func TestID(t *testing.T) {
 
 func TestStatusFileName(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	expectedUnitDir := path.Join(rootDir, testDir)
 	expectedStatusFileName := path.Join(expectedUnitDir, "status")
 	if statusFileName := bwu.StatusFileName(); statusFileName != expectedStatusFileName {
@@ -187,7 +187,7 @@ func TestStatusFileName(t *testing.T) {
 
 func TestStdoutFileName(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	expectedUnitDir := path.Join(rootDir, testDir)
 	expectedStdoutFileName := path.Join(expectedUnitDir, "stdout")
 	if stdoutFileName := bwu.StdoutFileName(); stdoutFileName != expectedStdoutFileName {
@@ -198,7 +198,7 @@ func TestStdoutFileName(t *testing.T) {
 
 func TestBaseSave(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	err := bwu.Save()
 	if !strings.Contains(err.Error(), dirError) {
 		t.Errorf("Base Work Unit Save, no such file or directory expected, instead %s", err.Error())
@@ -208,7 +208,7 @@ func TestBaseSave(t *testing.T) {
 
 func TestBaseLoad(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	err := bwu.Load()
 	if !strings.Contains(err.Error(), dirError) {
 		t.Errorf("TestBaseLoad, no such file or directory expected, instead %s", err.Error())
@@ -218,7 +218,7 @@ func TestBaseLoad(t *testing.T) {
 
 func TestBaseUpdateFullStatus(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	sf := func(sfd *workceptor.StatusFileData) {
 		// Do nothing
 	}
@@ -232,7 +232,7 @@ func TestBaseUpdateFullStatus(t *testing.T) {
 
 func TestBaseUpdateBasicStatus(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	bwu.UpdateBasicStatus(1, "Details", 0)
 	err := bwu.LastUpdateError()
 	if !strings.Contains(err.Error(), dirError) {
@@ -243,7 +243,7 @@ func TestBaseUpdateBasicStatus(t *testing.T) {
 
 func TestBaseStatus(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
-	bwu.Init(w, "test", "", workceptor.FileSystem{}, &workceptor.RealWatcher{})
+	bwu.Init(w, "test", "", workceptor.FileSystem{})
 	status := bwu.Status()
 	if status.State != workceptor.WorkStatePending {
 		t.Errorf("TestBaseStatus, expected work state pending, received %d", status.State)
@@ -254,7 +254,7 @@ func TestBaseStatus(t *testing.T) {
 func TestBaseRelease(t *testing.T) {
 	ctrl, bwu, w, _, _ := setUp(t)
 	mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
-	bwu.Init(w, "test12345", "", mockFileSystem, &workceptor.RealWatcher{})
+	bwu.Init(w, "test12345", "", mockFileSystem)
 
 	const removeError = "RemoveAll Error"
 	testCases := []struct {
@@ -308,15 +308,6 @@ func TestMonitorLocalStatus(t *testing.T) {
 		sleepDuration time.Duration
 	}{
 		{
-			name:          "Handle Write Event",
-			statObj:       NewInfo("test", 1, 0, time.Now()),
-			addWatcherErr: nil,
-			statErr:       nil,
-			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Write},
-			logOutput:     "Watcher Events Error reading",
-			sleepDuration: 100 * time.Millisecond,
-		},
-		{
 			name:          "Error Adding Watcher",
 			statObj:       NewInfo("test", 1, 0, time.Now()),
 			addWatcherErr: fmt.Errorf("error adding watcher"),
@@ -334,43 +325,6 @@ func TestMonitorLocalStatus(t *testing.T) {
 			logOutput:     "",
 			sleepDuration: 100 * time.Millisecond,
 		},
-		{
-			name:          "Handle Context Cancellation",
-			statObj:       NewInfo("test", 1, 0, time.Now()),
-			addWatcherErr: nil,
-			statErr:       nil,
-			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Write},
-			logOutput:     "Watcher Events Error reading",
-			sleepDuration: 100 * time.Millisecond,
-		},
-		{
-			name:          "Handle File Update Without Event",
-			statObj:       NewInfo("test", 1, 0, time.Now()),
-			statObjLater:  NewInfo("test", 1, 0, time.Now().Add(10*time.Second)),
-			addWatcherErr: nil,
-			statErr:       nil,
-			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Write},
-			logOutput:     "Watcher Events Error reading",
-			sleepDuration: 500 * time.Millisecond,
-		},
-		{
-			name:          "Handle Remove Event",
-			statObj:       NewInfo("test", 1, 0, time.Now()),
-			addWatcherErr: nil,
-			statErr:       nil,
-			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Remove},
-			logOutput:     "Watcher Events Remove reading",
-			sleepDuration: 100 * time.Millisecond,
-		},
-		{
-			name:          "Handle Rename Event",
-			statObj:       NewInfo("test", 1, 0, time.Now()),
-			addWatcherErr: nil,
-			statErr:       nil,
-			fsNotifyEvent: &fsnotify.Event{Op: fsnotify.Rename},
-			logOutput:     "Watcher Events Rename reading",
-			sleepDuration: 100 * time.Millisecond,
-		},
 	}
 
 	for _, tc := range tests {
@@ -382,13 +336,12 @@ func TestMonitorLocalStatus(t *testing.T) {
 
 			mockWatcher := mock_workceptor.NewMockWatcherWrapper(ctrl)
 			mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
-			bwu.Init(w, "test", "", mockFileSystem, mockWatcher)
+			bwu.Init(w, "test", "", mockFileSystem)
 
 			mockFileSystem.EXPECT().Stat(gomock.Any()).Return(tc.statObj, tc.statErr).AnyTimes()
 			if tc.statObjLater != nil {
 				mockFileSystem.EXPECT().Stat(gomock.Any()).Return(tc.statObjLater, nil).AnyTimes()
 			}
-			mockWatcher.EXPECT().Add(gomock.Any()).Return(tc.addWatcherErr)
 			mockWatcher.EXPECT().Remove(gomock.Any()).AnyTimes()
 			mockWatcher.EXPECT().Close().AnyTimes()
 

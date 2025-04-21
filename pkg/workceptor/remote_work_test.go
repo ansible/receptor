@@ -24,7 +24,7 @@ func createRemoteWorkTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 		t.Errorf("Error while creating Workceptor: %v", err)
 	}
 
-	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil)
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 	mockBaseWorkUnit.EXPECT().SetStatusExtraData(gomock.Any())
 	workUnit := workceptor.NewRemoteWorker(mockBaseWorkUnit, w, "", "")
 

@@ -153,15 +153,15 @@ func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) ID() *gomock.Call {
 }
 
 // Init mocks base method.
-func (m *MockBaseWorkUnitForWorkUnit) Init(w *workceptor.Workceptor, unitID, workType string, fs workceptor.FileSystemer, watcher workceptor.WatcherWrapper) {
+func (m *MockBaseWorkUnitForWorkUnit) Init(w *workceptor.Workceptor, unitID, workType string, fs workceptor.FileSystemer) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Init", w, unitID, workType, fs, watcher)
+	m.ctrl.Call(m, "Init", w, unitID, workType, fs)
 }
 
 // Init indicates an expected call of Init.
-func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) Init(w, unitID, workType, fs, watcher any) *gomock.Call {
+func (mr *MockBaseWorkUnitForWorkUnitMockRecorder) Init(w, unitID, workType, fs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).Init), w, unitID, workType, fs, watcher)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockBaseWorkUnitForWorkUnit)(nil).Init), w, unitID, workType, fs)
 }
 
 // LastUpdateError mocks base method.

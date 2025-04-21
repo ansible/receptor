@@ -213,7 +213,7 @@ func createKubernetesTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 		t.Errorf("Error while creating Workceptor: %v", err)
 	}
 
-	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil)
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 	kubeConfig := workceptor.KubeWorkerCfg{AuthMethod: "incluster"}
 	ku := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI)
 

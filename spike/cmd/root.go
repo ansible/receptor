@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
@@ -49,13 +48,6 @@ func loadConfig() {
 		log.Fatalf("Error reading config: %v", err)
 	}
 	handleConfigChange()
-
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		fmt.Printf("Config file change detected: %s — waiting briefly...\n", e.Name)
-		handleConfigChange()
-	})
-
-	viper.WatchConfig()
 }
 
 func handleConfigChange() {
@@ -64,7 +56,7 @@ func handleConfigChange() {
 
 	// this is a workaround for a viper bug where values are set to ''
 	// before getting changed to the new value. :(
-	time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 
 	err := viper.ReadInConfig() // Make sure you read the latest config
 	if err != nil {

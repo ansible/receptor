@@ -13,6 +13,7 @@ import (
 	"github.com/ansible/receptor/pkg/services"
 	"github.com/ansible/receptor/pkg/types"
 	"github.com/ansible/receptor/pkg/workceptor"
+	"github.com/fsnotify/fsnotify"
 	"github.com/ghjm/cmdline"
 	"github.com/spf13/viper"
 )
@@ -271,5 +272,40 @@ func RunConfigV1() {
 			fmt.Printf("Error: %s\n", err)
 			os.Exit(1)
 		}
+		newWatcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+			os.Exit(1)
+		}
+		defer newWatcher.Close()
+		fmt.Println("Watching for changes to config file:", configPath)
+		err = newWatcher.Add(configPath)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+			os.Exit(1)
+		}
+		go func() {
+			for {
+				select {
+				case event, ok := <-newWatcher.Events:
+					if !ok {
+						return
+					}
+					if event.Op&fsnotify.Write == fsnotify.Write {
+						fmt.Printf("Config file changed: %s file: %s", event.Name, configPath)
+						err = controlsvc.InitReload(configPath, reloadParseAndRun)
+						if err != nil {
+							fmt.Printf("Error: %s\n", err)
+							os.Exit(1)
+						}
+					}
+				case err, ok := <-newWatcher.Errors:
+					if !ok {
+						return
+					}
+					fmt.Println("Error:", err)
+				}
+			}
+		}()
 	}
 }

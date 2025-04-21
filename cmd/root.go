@@ -61,10 +61,23 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		l.Info("Config file changed: %s\n", e.Name)
+		// does not show up if log level is error. Otherwise shows up.
+		l.Warning("Config file changed: %s\n", e.Name)
 
 		var newConfig *BackendConfig
+
 		viper.Unmarshal(&newConfig)
+
+		newLoglevelName := viper.GetString("log-level.level")
+		newLogLevel, err := logger.GetLogLevelByName(newLoglevelName)
+		existingLogLevel := logger.GetLogLevel()
+		if err != nil {
+			l.Error("Unable to set log level: %s", err)
+		} else if newLogLevel != existingLogLevel {
+			existingLogLevelName, _ := logger.LogLevelToName(existingLogLevel)
+			l.Warning("Changing log level from %s to %s", existingLogLevelName, newLoglevelName)
+			logger.SetGlobalLogLevel(newLogLevel)
+		}
 
 		// used because OnConfigChange runs twice for some reason
 		// allows to skip empty first config

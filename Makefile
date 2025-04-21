@@ -72,7 +72,7 @@ clean:
 	@rm -fv receptor-python-worker/dist/*
 	@rm -rfv receptorctl-test-venv/
 
-ARCH=amd64
+ARCH ?= amd64
 OS=linux
 
 KUBECTL_BINARY=./kubectl

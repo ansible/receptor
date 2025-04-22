@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"log"
 	"path/filepath"
 	"sync"
 	"time"
@@ -14,8 +13,7 @@ import (
 // While this is a general implementation,
 // It's in the logger package because the only known implementation is for changing
 // v1 config changes. Based loosely on viper.WatchConfig
-
-func WatchCustomConfig(path string, parseFunc func(string) error) error {
+func WatchCustomConfig(path string, parseFunc func(string, *ReceptorLogger) error, rl *ReceptorLogger) error {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -29,7 +27,6 @@ func WatchCustomConfig(path string, parseFunc func(string) error) error {
 		return err
 	}
 
-	// watcher only watches directory.
 	err = watcher.Add(dir)
 	if err != nil {
 		return err
@@ -48,7 +45,6 @@ func WatchCustomConfig(path string, parseFunc func(string) error) error {
 					return
 				}
 
-				// filter on filename
 				if filepath.Base(event.Name) != filename {
 					continue
 				}
@@ -56,20 +52,17 @@ func WatchCustomConfig(path string, parseFunc func(string) error) error {
 				if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0 {
 					mu.Lock()
 					now := time.Now()
-					// Debounce: Ignore events that occur too quickly
 					if now.Sub(lastEventTime) < 200*time.Millisecond {
 						mu.Unlock()
-
 						continue
 					}
 					lastEventTime = now
 					mu.Unlock()
 
-					log.Printf("Config change detected: %s", event.Name)
+					rl.Info("Config change detected: %s", event.Name)
 
-					// Run your custom parser
-					if err := parseFunc(absPath); err != nil {
-						log.Printf("Error parsing config: %v", err)
+					if err := parseFunc(absPath, rl); err != nil {
+						rl.Error("Error parsing config: %v", err)
 					}
 				}
 
@@ -77,14 +70,14 @@ func WatchCustomConfig(path string, parseFunc func(string) error) error {
 				if !ok {
 					return
 				}
-				log.Printf("Watcher error: %v", err)
+				rl.Error("Watcher error: %v", err)
 			}
 		}
 	}()
 
-	// Run once initially
-	if err := parseFunc(absPath); err != nil {
-		log.Printf("Initial config parse failed: %v", err)
+	// Initial parse with logger
+	if err := parseFunc(absPath, rl); err != nil {
+		rl.Error("Initial config parse failed: %v", err)
 	}
 
 	return nil

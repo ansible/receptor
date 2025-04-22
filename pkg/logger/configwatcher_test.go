@@ -24,7 +24,7 @@ func TestWatchCustomConfig(t *testing.T) {
 	var allContents []string
 	var mu sync.Mutex
 
-	parser := func(file string) error {
+	parser := func(file string, rl *ReceptorLogger) error {
 		data, err := os.ReadFile(file)
 		if err != nil {
 			return err
@@ -39,7 +39,9 @@ func TestWatchCustomConfig(t *testing.T) {
 		return nil
 	}
 
-	err := WatchCustomConfig(tmpFile, parser)
+	rl := NewReceptorLogger("")
+
+	err := WatchCustomConfig(tmpFile, parser, rl)
 	if err != nil {
 		t.Fatalf("Failed to start watcher: %v", err)
 	}

@@ -35,18 +35,33 @@ func SetGlobalLogLevel(level int) {
 	logLevel = level
 }
 
-func SetLogLevelByName(level string) error {
+func SetLogLevelByName(level string) (err error, msg string) {
 	newLevel, err := GetLogLevelByName(level)
+	msg = "Log level not changed. Staying "
 	if err != nil {
-		return err
+		return err, msg
 	}
 
 	existingLevel := GetLogLevel()
 	if newLevel != existingLevel {
 		SetGlobalLogLevel(newLevel)
+		// write a warning into msg that the log-level has changed
+		existingLevelName, err1 := LogLevelToName(existingLevel)
+		if err1 != nil {
+			return err1, ""
+		}
+		newLevelName, err2 := LogLevelToName(newLevel)
+		if err2 != nil {
+			return err2, msg
+		}
+		msg = fmt.Sprintf("Log level changed from %s to %s", existingLevelName, newLevelName)
+
+		return nil, msg
+	} else {
+		msg = fmt.Sprintf("Log level is already set to %s", level)
 	}
 
-	return nil
+	return nil, msg
 }
 
 // GetLogLevelByName is a helper function for returning level associated with log

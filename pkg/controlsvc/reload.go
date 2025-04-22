@@ -17,8 +17,10 @@ type (
 
 var configPath = ""
 
-var reloadParseAndRun = func(toRun []string) error {
-	return fmt.Errorf("no configuration file was provided, reload function not set")
+var reloadParseAndRun = func(toRun []string, rl *logger.ReceptorLogger) error {
+	err := fmt.Errorf("no configuration file was provided, reload function not set")
+	rl.Error(err.Error())
+	return err
 }
 
 var cfgNotReloadable = make(map[string]bool)
@@ -31,6 +33,7 @@ var reloadableActions = []string{
 	"udp-peer",
 	"udp-listener",
 	"local-only",
+	"log-level",
 }
 
 func isReloadable(cfg string) bool {
@@ -59,11 +62,11 @@ func getActionKeyword(cfg string) string {
 }
 
 // ReloadHandlerV1Config is a function that parses the config file
-func ReloadHandlerV1Config(filename string) error {
-	return parseConfigForReload(filename, true)
+func ReloadHandlerV1Config(filename string, rl *logger.ReceptorLogger) error {
+	return parseConfigForReload(filename, true, rl)
 }
 
-func parseConfigForReload(filename string, checkReload bool) error {
+func parseConfigForReload(filename string, checkReload bool, rl *logger.ReceptorLogger) error {
 	// cfgNotReloadable is a map, each key being the full configuration item
 	// e.g. "work-command: worktype: echosleep command: bash params:..."
 	// Initially all values of map are set to false,
@@ -97,7 +100,7 @@ func parseConfigForReload(filename string, checkReload bool) error {
 		if strings.Contains((cfg), "log-level") {
 			args := strings.Split(cfg, ":")
 			if len(args) > 1 {
-				setLogLevelFromConfig(cfg)
+				setLogLevelFromConfig(cfg, rl)
 			}
 
 		}
@@ -105,6 +108,7 @@ func parseConfigForReload(filename string, checkReload bool) error {
 			if checkReload {
 				if _, ok := cfgNotReloadable[cfg]; !ok {
 					action := getActionKeyword(cfg)
+					rl.Warning("A non-reloadable config action '%s' was added. Must restart receptor for these changes to take effect", action)
 
 					return fmt.Errorf("a non-reloadable config action '%s' was modified or added. Must restart receptor for these changes to take effect", action)
 				}
@@ -118,7 +122,7 @@ func parseConfigForReload(filename string, checkReload bool) error {
 	return nil
 }
 
-func setLogLevelFromConfig(cfg string) {
+func setLogLevelFromConfig(cfg string, rl *logger.ReceptorLogger) {
 	if !strings.Contains(cfg, "log-level") {
 		return
 	}
@@ -128,16 +132,15 @@ func setLogLevelFromConfig(cfg string) {
 		return
 	}
 
-	mainLogger := MainInstance.nc.GetLogger()
-
 	newLoglevelName := strings.TrimSpace(args[1])
-	oldLogLevelName, _ := mainLogger.LogLevelToName(mainLogger.GetLogLevel())
 
-	err := logger.SetLogLevelByName(newLoglevelName)
-	if err == nil {
-		mainLogger.Warning("Changing log level from %s to %s", oldLogLevelName, newLoglevelName)
-	} else {
-		mainLogger.Error("Unable to set log level: %s", err)
+	err, msg := logger.SetLogLevelByName(newLoglevelName)
+	if err != nil {
+		rl.Error("Error setting log level: %s\n", err.Error())
+		return
+	}
+	if msg != "" {
+		rl.Warning(msg)
 	}
 }
 
@@ -162,15 +165,16 @@ func cfgAbsent() error {
 }
 
 // InitReload initializes objects required before reload commands are issued.
-func InitReload(cPath string, fParseAndRun func([]string) error) error {
+// func InitReload(cPath string, fParseAndRun func([]string, rl *logger.ReceptorLogger) err error, rl *logger.ReceptorLogger) error {
+func InitReload(cPath string, fParseAndRun func([]string, *logger.ReceptorLogger) error, rl *logger.ReceptorLogger) error {
 	configPath = cPath
 	reloadParseAndRun = fParseAndRun
 
-	return parseConfigForReload(configPath, false)
+	return parseConfigForReload(configPath, false, rl)
 }
 
-func checkReload() error {
-	return parseConfigForReload(configPath, true)
+func checkReload(rl *logger.ReceptorLogger) error {
+	return parseConfigForReload(configPath, true, rl)
 }
 
 func (t *ReloadCommandType) InitFromString(_ string) (ControlCommand, error) {
@@ -197,16 +201,18 @@ func handleError(err error, errorcode int, logger *logger.ReceptorLogger) (map[s
 func (c *ReloadCommand) ControlFunc(_ context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	// Reload command stops all backends, and re-runs the ParseAndRun() on the
 	// initial config file
-	nc.GetLogger().Debug("Reloading")
+
+	rl := nc.GetLogger()
+	rl.Debug("Reloading")
 
 	// Do a quick check to catch any yaml errors before canceling backends
-	err := reloadParseAndRun([]string{"PreReload"})
+	err := reloadParseAndRun([]string{"PreReload"}, rl)
 	if err != nil {
 		return handleError(err, 4, nc.GetLogger())
 	}
 
 	// check if non-reloadable items have been added or modified
-	err = checkReload()
+	err = checkReload(rl)
 	if err != nil {
 		return handleError(err, 3, nc.GetLogger())
 	}
@@ -219,7 +225,7 @@ func (c *ReloadCommand) ControlFunc(_ context.Context, nc NetceptorForControlCom
 
 	nc.CancelBackends()
 	// reloadParseAndRun is a ParseAndRun closure, set in receptor.go/main()
-	err = reloadParseAndRun([]string{"PreReload", "Reload"})
+	err = reloadParseAndRun([]string{"PreReload", "Reload"}, rl)
 	if err != nil {
 		return handleError(err, 4, nc.GetLogger())
 	}

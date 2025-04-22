@@ -13,7 +13,6 @@ import (
 	"github.com/ansible/receptor/pkg/services"
 	"github.com/ansible/receptor/pkg/types"
 	"github.com/ansible/receptor/pkg/workceptor"
-	"github.com/fsnotify/fsnotify"
 	"github.com/ghjm/cmdline"
 	"github.com/spf13/viper"
 )
@@ -215,7 +214,7 @@ func ReloadServices(v reflect.Value) {
 	}
 }
 
-func RunConfigV1() {
+func RunConfigV1(rl *logger.ReceptorLogger) {
 	cl := cmdline.NewCmdline()
 	cl.AddConfigType("node", "Specifies the node configuration of this instance", types.NodeCfg{}, cmdline.Required, cmdline.Singleton)
 	cl.AddConfigType("local-only", "Runs a self-contained node with no backend", backends.NullBackendCfg{}, cmdline.Singleton)
@@ -264,48 +263,21 @@ func RunConfigV1() {
 	// not set, then the control service reload command will fail
 	if configPath != "" {
 		// create closure with the passed in args to be ran during a reload
-		reloadParseAndRun := func(toRun []string) error {
+		reloadParseAndRun := func(toRun []string, rl *logger.ReceptorLogger) error {
 			return cl.ParseAndRun(osArgs, toRun)
 		}
-		err = controlsvc.InitReload(configPath, reloadParseAndRun)
+		err = controlsvc.InitReload(configPath, reloadParseAndRun, rl)
 		if err != nil {
 			fmt.Printf("Error: %s\n", err)
 			os.Exit(1)
 		}
-		newWatcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			fmt.Printf("Error: %s\n", err)
-			os.Exit(1)
-		}
-		defer newWatcher.Close()
+		rl := netceptor.MainInstance.GetLogger()
+
 		fmt.Println("Watching for changes to config file:", configPath)
-		err = newWatcher.Add(configPath)
+		err = logger.WatchCustomConfig(configPath, controlsvc.ReloadHandlerV1Config, rl)
 		if err != nil {
-			fmt.Printf("Error: %s\n", err)
+			fmt.Printf("Failed to start config watcher: %s\n", err)
 			os.Exit(1)
 		}
-		go func() {
-			for {
-				select {
-				case event, ok := <-newWatcher.Events:
-					if !ok {
-						return
-					}
-					if event.Op&fsnotify.Write == fsnotify.Write {
-						fmt.Printf("Config file changed: %s file: %s", event.Name, configPath)
-						err = controlsvc.InitReload(configPath, reloadParseAndRun)
-						if err != nil {
-							fmt.Printf("Error: %s\n", err)
-							os.Exit(1)
-						}
-					}
-				case err, ok := <-newWatcher.Errors:
-					if !ok {
-						return
-					}
-					fmt.Println("Error:", err)
-				}
-			}
-		}()
 	}
 }

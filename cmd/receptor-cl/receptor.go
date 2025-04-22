@@ -27,7 +27,7 @@ func main() {
 		logger.Info("Running v2 cli/config")
 		cmd.Execute()
 	} else {
-		cmd.RunConfigV1()
+		cmd.RunConfigV1(logger)
 	}
 
 	for _, arg := range os.Args {

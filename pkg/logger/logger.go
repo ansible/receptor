@@ -35,6 +35,20 @@ func SetGlobalLogLevel(level int) {
 	logLevel = level
 }
 
+func SetLogLevelByName(level string) error {
+	newLevel, err := GetLogLevelByName(level)
+	if err != nil {
+		return err
+	}
+
+	existingLevel := GetLogLevel()
+	if newLevel != existingLevel {
+		SetGlobalLogLevel(newLevel)
+	}
+
+	return nil
+}
+
 // GetLogLevelByName is a helper function for returning level associated with log
 // level string.
 func GetLogLevelByName(logName string) (int, error) {

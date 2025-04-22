@@ -58,6 +58,11 @@ func getActionKeyword(cfg string) string {
 	return action
 }
 
+// ReloadHandlerV1Config is a function that parses the config file
+func ReloadHandlerV1Config(filename string) error {
+	return parseConfigForReload(filename, true)
+}
+
 func parseConfigForReload(filename string, checkReload bool) error {
 	// cfgNotReloadable is a map, each key being the full configuration item
 	// e.g. "work-command: worktype: echosleep command: bash params:..."
@@ -88,22 +93,11 @@ func parseConfigForReload(filename string, checkReload bool) error {
 		}
 		cfg := string(cfgBytes)
 		fmt.Println(cfg)
-		l := MainInstance.nc.GetLogger()
 
 		if strings.Contains((cfg), "log-level") {
 			args := strings.Split(cfg, ":")
 			if len(args) > 1 {
-				newLoglevelName := strings.TrimSpace(args[1])
-				newLogLevel, err := logger.GetLogLevelByName(newLoglevelName)
-				existingLogLevel := logger.GetLogLevel()
-
-				if err != nil {
-					l.Error("Unable to set log level: %s", err)
-				} else if newLogLevel != existingLogLevel {
-					existingLogLevelName, _ := logger.LogLevelToName(existingLogLevel)
-					l.Warning("Changing log level from %s to %s", existingLogLevelName, newLoglevelName)
-					logger.SetGlobalLogLevel(newLogLevel)
-				}
+				setLogLevelFromConfig(cfg)
 			}
 
 		}
@@ -122,6 +116,29 @@ func parseConfigForReload(filename string, checkReload bool) error {
 	}
 
 	return nil
+}
+
+func setLogLevelFromConfig(cfg string) {
+	if !strings.Contains(cfg, "log-level") {
+		return
+	}
+
+	args := strings.Split(cfg, ":")
+	if len(args) < 2 {
+		return
+	}
+
+	mainLogger := MainInstance.nc.GetLogger()
+
+	newLoglevelName := strings.TrimSpace(args[1])
+	oldLogLevelName, _ := mainLogger.LogLevelToName(mainLogger.GetLogLevel())
+
+	err := logger.SetLogLevelByName(newLoglevelName)
+	if err == nil {
+		mainLogger.Warning("Changing log level from %s to %s", oldLogLevelName, newLoglevelName)
+	} else {
+		mainLogger.Error("Unable to set log level: %s", err)
+	}
 }
 
 func cfgAbsent() error {

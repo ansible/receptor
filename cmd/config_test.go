@@ -147,10 +147,8 @@ func TestSetReceptorConfigDefaults(t *testing.T) {
 	// Check Node defaults
 	if config.Node == nil {
 		t.Error("Expected Node to be initialized")
-	} else {
-		if config.Node.DataDir != "/tmp/receptor" {
-			t.Errorf("Expected Node DataDir to be '/tmp/receptor', got '%s'", config.Node.DataDir)
-		}
+	} else if config.Node.DataDir != "/tmp/receptor" {
+		t.Errorf("Expected Node DataDir to be '/tmp/receptor', got '%s'", config.Node.DataDir)
 	}
 
 	// Check ControlService defaults
@@ -170,7 +168,7 @@ func TestSetReceptorConfigDefaults(t *testing.T) {
 	}
 }
 
-// mockCommand is a struct that implements the Initer, Preparer, and Runer interfaces for testing
+// mockCommand is a struct that implements the Initer, Preparer, and Runer interfaces for testing.
 type mockCommand struct {
 	initCalled    bool
 	prepareCalled bool
@@ -180,21 +178,24 @@ type mockCommand struct {
 	runError      error
 }
 
-// Init implements the Initer interface
+// Init implements the Initer interface.
 func (m *mockCommand) Init() error {
 	m.initCalled = true
+
 	return m.initError
 }
 
-// Prepare implements the Preparer interface
+// Prepare implements the Preparer interface.
 func (m *mockCommand) Prepare() error {
 	m.prepareCalled = true
+
 	return m.prepareError
 }
 
-// Run implements the Runer interface
+// Run implements the Runer interface.
 func (m *mockCommand) Run() error {
 	m.runCalled = true
+
 	return m.runError
 }
 
@@ -252,7 +253,7 @@ func TestParseCertificatesConfig(t *testing.T) {
 	t.Skip("Skipping TestParseCertificatesConfig as it requires more complex setup")
 }
 
-// testConfig is a struct with a slice of mockCommand for testing RunConfigV2
+// testConfig is a struct with a slice of mockCommand for testing RunConfigV2.
 type testConfig struct {
 	Commands []*mockCommand
 	Empty    string

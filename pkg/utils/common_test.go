@@ -142,8 +142,13 @@ func TestAddressToHostPort(t *testing.T) {
 		{"[1.2.3.4]:5000", Want{"1.2.3.4", "5000", false}},
 		{"::1", Want{"", "", true}},
 		{"[::1]", Want{"", "", true}},
-		{"::1:5000", Want{"", "", true}},
+		{"::1:5000", Want{"::1", "5000", false}},
 		{"[::1]:5000", Want{"::1", "5000", false}},
+		{"[::1]:pIf37CwA", Want{"::1", "pIf37CwA", false}},
+		{"[0:0:0:0:0:0:0:1]:5000", Want{"0:0:0:0:0:0:0:1", "5000", false}},
+		{"0:0:0:0:0:0:0:1:5000", Want{"0:0:0:0:0:0:0:1", "5000", false}},
+		{"[0:0:0:0:0:0:0:1]:pIf37CwA", Want{"0:0:0:0:0:0:0:1", "pIf37CwA", false}},
+		{"0:0:0:0:0:0:0:1:pIf37CwA", Want{"0:0:0:0:0:0:0:1", "pIf37CwA", false}},
 		{"invalid%address", Want{"", "", true}},
 	}
 	for _, tt := range tests {

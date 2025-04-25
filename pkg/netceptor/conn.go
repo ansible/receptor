@@ -78,16 +78,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
 		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
-			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
-				clientTLSCfg := tlscfg.Clone()
-				remoteNode, _, err := utils.AddressToHostPort(hi.Conn.RemoteAddr().String())
-				if err != nil {
-					return nil, err
-				}
-				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
-
-				return clientTLSCfg, nil
-			}
+			tlscfg.GetConfigForClient = s.getConfigForClient(tlscfg)
 		}
 	}
 	pc := &PacketConn{
@@ -146,6 +137,20 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	go li.acceptLoop(ctx)
 
 	return li, nil
+}
+
+func (s *Netceptor) getConfigForClient(tlscfg *tls.Config) func(*tls.ClientHelloInfo) (*tls.Config, error) {
+	return func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+		clientTLSCfg := tlscfg.Clone()
+		remoteAdrr := hi.Conn.RemoteAddr().String()
+		remoteNode, _, err := utils.AddressToHostPort(remoteAdrr)
+		if err != nil {
+			return nil, err
+		}
+		clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
+
+		return clientTLSCfg, nil
+	}
 }
 
 func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID quic.ConnectionID) *logging.ConnectionTracer {

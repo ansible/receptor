@@ -12,10 +12,10 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/logging"
 	"github.com/quic-go/quic-go/qlog"
@@ -80,7 +80,10 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				clientTLSCfg := tlscfg.Clone()
-				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
+				remoteNode, _, err := utils.AddressToHostPort(hi.Conn.RemoteAddr().String())
+				if err != nil {
+					return nil, err
+				}
 				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
 
 				return clientTLSCfg, nil

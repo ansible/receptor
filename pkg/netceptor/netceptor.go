@@ -1119,8 +1119,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
 		}
-		var err error
-		_, err = certs[0].Verify(opts)
+		_, err := certs[0].Verify(opts)
 		if err != nil {
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 

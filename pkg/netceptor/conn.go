@@ -3,19 +3,15 @@ package netceptor
 import (
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
+	netceptor "github.com/ansible/receptor/pkg/netceptor/internal"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/logging"
 	"github.com/quic-go/quic-go/qlog"
@@ -53,6 +49,8 @@ type Listener struct {
 	doneOnce   *sync.Once
 }
 
+const insecureCommonName = "netceptor-insecure-common-name"
+
 // Internal implementation of Listen and ListenAndAdvertise.
 func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
@@ -72,7 +70,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	var connType byte
 	if tlscfg == nil {
 		connType = ConnTypeStream
-		tlscfg = generateServerTLSConfig()
+		tlscfg, _, _ = netceptor.GenerateServerTLSConfig(insecureCommonName)
 	} else {
 		connType = ConnTypeStreamTLS
 		tlscfg = tlscfg.Clone()
@@ -80,7 +78,10 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
 			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 				clientTLSCfg := tlscfg.Clone()
-				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
+				remoteNode, _, err := utils.AddressToHostPort(hi.Conn.RemoteAddr().String())
+				if err != nil {
+					return nil, err
+				}
 				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
 
 				return clientTLSCfg, nil
@@ -361,7 +362,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 
 	if tlscfg == nil {
-		tlscfg = generateClientTLSConfig(s.NodeID())
+		tlscfg = netceptor.GenerateClientTLSConfig(s.NodeID())
 	} else {
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
@@ -519,64 +520,4 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline sets the write deadline.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.qs.SetWriteDeadline(t)
-}
-
-const insecureCommonName = "netceptor-insecure-common-name"
-
-func generateServerTLSConfig() *tls.Config {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic(err)
-	}
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: insecureCommonName,
-		},
-		NotBefore: time.Now().Add(-1 * time.Minute),
-		NotAfter:  time.Now().Add(24 * time.Hour),
-	}
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	if err != nil {
-		panic(err)
-	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-
-	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		panic(err)
-	}
-
-	return &tls.Config{
-		Certificates:             []tls.Certificate{tlsCert},
-		NextProtos:               []string{"netceptor"},
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-	}
-}
-
-func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-	for i := 0; i < len(rawCerts); i++ {
-		cert, err := x509.ParseCertificate(rawCerts[i])
-		if err != nil {
-			continue
-		}
-		if cert.Subject.CommonName == insecureCommonName {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("insecure connection to secure service")
-}
-
-func generateClientTLSConfig(host string) *tls.Config {
-	return &tls.Config{
-		// #nosec G402 -- InsecureSkipVerify is set true in test context only; production usage is config-driven.
-		InsecureSkipVerify:    true,
-		VerifyPeerCertificate: verifyServerCertificate,
-		NextProtos:            []string{"netceptor"},
-		ServerName:            host,
-		MinVersion:            tls.VersionTLS12,
-	}
 }

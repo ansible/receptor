@@ -10,7 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/utils"
+	"github.com/ansible/receptor/pkg/logger"
+	netceptor "github.com/ansible/receptor/pkg/netceptor/internal"
+	"github.com/ansible/receptor/pkg/utils"
+	test_utils "github.com/ansible/receptor/tests/utils"
 	"github.com/prep/socketpair"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/logging"
@@ -376,7 +379,7 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	nodes := make([]*Netceptor, netsize)
 	backends := make([]*ExternalBackend, netsize)
 	routingChans := make([]chan map[string]string, netsize)
-	logWriter := utils.NewTestLogWriter()
+	logWriter := test_utils.NewTestLogWriter()
 	defer func() {
 		t.Log(logWriter.String())
 	}()
@@ -892,5 +895,28 @@ func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
 	trace := s.tracer(s.context, p, quic.ConnectionID{})
 	if trace != nil {
 		t.Fatalf("tracer should return nil when QLOGDIR environment variable is not defined but got %v", trace)
+	}
+}
+
+func TestReceptorVerifyFuncForServer(t *testing.T) {
+	tests := []struct {
+		remoteAddress string
+		nodeID        string
+	}{
+		{"1.2.3.4:5000", "1.2.3.4"},
+		{"[::1]:2000", "::1"},
+		{"[1.2.3.4.5.6.7.8]:9000", "1.2.3.4.5.6.7.8"},
+	}
+	logger := logger.NewReceptorLogger("TCPTest")
+	for _, tt := range tests {
+		serverTLSConfig, rawServerCert, _ := netceptor.GenerateServerTLSConfig(tt.nodeID)
+		remoteNode, _, _ := utils.AddressToHostPort(tt.remoteAddress)
+		receptorVerify := ReceptorVerifyFunc(serverTLSConfig, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, logger)
+		certs := make([][]byte, 1)
+		certs[0] = rawServerCert
+		err := receptorVerify(certs, nil)
+		if err != nil {
+			t.Errorf("%s: %s", tt, err)
+		}
 	}
 }

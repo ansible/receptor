@@ -67,9 +67,9 @@ func TestFLock_Unlock(t *testing.T) {
 
 	var maxInt uintptr
 	if strconv.IntSize == 32 {
-			maxInt = uintptr(1<<31 - 1)
+		maxInt = uintptr(1<<31 - 1)
 	} else {
-			maxInt = uintptr(1<<63 - 1)
+		maxInt = uintptr(1<<63 - 1)
 	}
 
 	fd := f.Fd()

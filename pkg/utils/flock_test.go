@@ -27,7 +27,7 @@ func TestTryFLock(t *testing.T) {
 			args: args{
 				filename: filepath.Join(os.TempDir(), "good_flock_listener"),
 			},
-			want:    &utils.FLock{0},
+			want:    &utils.FLock{Fd: 0},
 			wantErr: false,
 		},
 		{
@@ -63,7 +63,7 @@ func TestFLock_Unlock(t *testing.T) {
 		t.Error(err)
 	}
 	defer os.Remove(f.Name())
-  defer f.Close()
+	defer f.Close()
 
 	var maxInt uintptr
 	if strconv.IntSize == 32 {

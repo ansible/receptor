@@ -57,6 +57,12 @@ func TestTryFLock(t *testing.T) {
 }
 
 func TestFLock_Unlock(t *testing.T) {
+	f, err := os.CreateTemp("", "flock-test")
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.Remove(f.Name())
+    defer f.Close()
 	type fields struct {
 		Fd int
 	}
@@ -68,7 +74,7 @@ func TestFLock_Unlock(t *testing.T) {
 		{
 			name: "Positive",
 			fields: fields{
-				Fd: 1,
+				Fd: int(f.Fd()),
 			},
 			wantErr: false,
 		},

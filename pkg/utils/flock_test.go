@@ -6,6 +6,7 @@ package utils_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/utils"
@@ -62,7 +63,20 @@ func TestFLock_Unlock(t *testing.T) {
 		t.Error(err)
 	}
 	defer os.Remove(f.Name())
-    defer f.Close()
+  defer f.Close()
+
+	var maxInt uintptr
+	if strconv.IntSize == 32 {
+			maxInt = uintptr(1<<31 - 1)
+	} else {
+			maxInt = uintptr(1<<63 - 1)
+	}
+
+	fd := f.Fd()
+	if fd > maxInt {
+		t.Error(err)
+	}
+
 	type fields struct {
 		Fd int
 	}
@@ -74,7 +88,7 @@ func TestFLock_Unlock(t *testing.T) {
 		{
 			name: "Positive",
 			fields: fields{
-				Fd: int(f.Fd()),
+				Fd: int(f.Fd()), // #nosec G115
 			},
 			wantErr: false,
 		},

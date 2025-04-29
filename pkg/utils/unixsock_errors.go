@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
@@ -11,3 +12,11 @@ var (
 	ErrSocketFilePermissionsNotSet = errors.New("error setting socket file permissions")
 	ErrWindowsNotSupported         = errors.New("unix sockets not available on Windows")
 )
+
+func MakeUnixSocketError(err, underlyingErr error) error {
+	return fmt.Errorf("%s: %s", err, underlyingErr)
+}
+
+func MakeWindowsSocketError() error {
+	return ErrWindowsNotSupported
+}

@@ -10,7 +10,7 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 )
 
-// TestBrokerSubscribe tests the Subscribe method of the Broker
+// TestBrokerSubscribe tests the Subscribe method of the Broker.
 func TestBrokerSubscribe(t *testing.T) {
 	type testCase struct {
 		name           string
@@ -55,7 +55,7 @@ func TestBrokerSubscribe(t *testing.T) {
 	}
 }
 
-// TestBrokerUnsubscribe tests the Unsubscribe method of the Broker
+// TestBrokerUnsubscribe tests the Unsubscribe method of the Broker.
 func TestBrokerUnsubscribe(t *testing.T) {
 	type testCase struct {
 		name           string
@@ -96,7 +96,7 @@ func TestBrokerUnsubscribe(t *testing.T) {
 	}
 }
 
-// TestBrokerPublish tests the Publish method of the Broker
+// TestBrokerPublish tests the Publish method of the Broker.
 func TestBrokerPublish(t *testing.T) {
 	type testCase struct {
 		name           string
@@ -155,7 +155,7 @@ func TestBrokerPublish(t *testing.T) {
 	}
 }
 
-// TestBrokerEndToEnd tests the full publish-subscribe workflow
+// TestBrokerEndToEnd tests the full publish-subscribe workflow.
 func TestBrokerEndToEnd(t *testing.T) {
 	type testCase struct {
 		name           string
@@ -232,6 +232,7 @@ func TestBrokerEndToEnd(t *testing.T) {
 							}
 						case <-time.After(500 * time.Millisecond):
 							t.Errorf("Subscriber %d timed out waiting for message %d", idx, j)
+
 							return
 						}
 					}
@@ -257,6 +258,7 @@ func TestBrokerEndToEnd(t *testing.T) {
 			for i, received := range receivedMsgs {
 				if len(received) != tt.numMessages {
 					t.Errorf("Subscriber %d received %d messages, expected %d", i, len(received), tt.numMessages)
+
 					continue
 				}
 
@@ -276,7 +278,7 @@ func TestBrokerEndToEnd(t *testing.T) {
 	}
 }
 
-// TestBrokerContextCancellation tests that the broker properly handles context cancellation
+// TestBrokerContextCancellation tests that the broker properly handles context cancellation.
 func TestBrokerContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	broker := utils.NewBroker(ctx, reflect.TypeOf(""))
@@ -308,7 +310,7 @@ func TestBrokerContextCancellation(t *testing.T) {
 	}
 }
 
-// TestBrokerConcurrency tests the broker under concurrent operations
+// TestBrokerConcurrency tests the broker under concurrent operations.
 func TestBrokerConcurrency(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -72,7 +72,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	var connType byte
 	if tlscfg == nil {
 		connType = ConnTypeStream
-		tlscfg = generateServerTLSConfig()
+		tlscfg = GenerateServerTLSConfig()
 	} else {
 		connType = ConnTypeStreamTLS
 		tlscfg = tlscfg.Clone()
@@ -369,7 +369,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 
 	if tlscfg == nil {
-		tlscfg = generateClientTLSConfig(s.NodeID())
+		tlscfg = GenerateClientTLSConfig(s.NodeID())
 	} else {
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
@@ -531,7 +531,8 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 
 const insecureCommonName = "netceptor-insecure-common-name"
 
-func generateServerTLSConfig() *tls.Config {
+// GenerateServerTLSConfig creates a TLS server configuration with a self-signed certificate.
+func GenerateServerTLSConfig() *tls.Config {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
@@ -564,7 +565,8 @@ func generateServerTLSConfig() *tls.Config {
 	}
 }
 
-func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+// VerifyServerCertificate verifies that the server certificate has the expected common name.
+func VerifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	for i := 0; i < len(rawCerts); i++ {
 		cert, err := x509.ParseCertificate(rawCerts[i])
 		if err != nil {
@@ -578,11 +580,12 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	return fmt.Errorf("insecure connection to secure service")
 }
 
-func generateClientTLSConfig(host string) *tls.Config {
+// GenerateClientTLSConfig creates a TLS client configuration for connecting to a Receptor node.
+func GenerateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		// #nosec G402 -- InsecureSkipVerify is set true in test context only; production usage is config-driven.
 		InsecureSkipVerify:    true,
-		VerifyPeerCertificate: verifyServerCertificate,
+		VerifyPeerCertificate: VerifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
 		ServerName:            host,
 		MinVersion:            tls.VersionTLS12,

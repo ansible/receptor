@@ -45,12 +45,12 @@ type AcceptResult struct {
 
 // Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
-	s          *Netceptor
-	pc         PacketConner
-	ql         *quic.Listener
+	S          *Netceptor
+	PC         PacketConner
+	QL         *quic.Listener
 	AcceptChan chan *AcceptResult
 	DoneChan   chan struct{}
-	doneOnce   *sync.Once
+	DoneOnce   *sync.Once
 }
 
 // Internal implementation of Listen and ListenAndAdvertise.
@@ -126,15 +126,15 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		}
 	}()
 	li := &Listener{
-		s:          s,
-		pc:         pc,
-		ql:         ql,
+		S:          s,
+		PC:         pc,
+		QL:         ql,
 		AcceptChan: make(chan *AcceptResult),
 		DoneChan:   doneChan,
-		doneOnce:   &sync.Once{},
+		DoneOnce:   &sync.Once{},
 	}
 
-	go li.acceptLoop(ctx)
+	go li.AcceptLoop(ctx)
 
 	return li, nil
 }
@@ -191,7 +191,8 @@ func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags 
 	return s.listen(s.context, service, tlscfg, true, tags)
 }
 
-func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {
+// SendResult sends a connection or error to the AcceptChan.
+func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
 	select {
 	case <-ctx.Done():
 		return
@@ -203,7 +204,8 @@ func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {
 	}
 }
 
-func (li *Listener) acceptLoop(ctx context.Context) {
+// AcceptLoop handles accepting connections from the quic.Listener.
+func (li *Listener) AcceptLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -212,14 +214,14 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			return
 		default:
 		}
-		qc, err := li.ql.Accept(ctx)
+		qc, err := li.QL.Accept(ctx)
 		select {
 		case <-li.DoneChan:
 			return
 		default:
 		}
 		if err != nil {
-			li.sendResult(ctx, nil, err)
+			li.SendResult(ctx, nil, err)
 
 			continue
 		}
@@ -240,7 +242,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 				return
 			} else if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("AcceptStream Error: %s", err.Error()))
-				li.sendResult(ctx, nil, err)
+				li.SendResult(ctx, nil, err)
 
 				return
 			}
@@ -248,21 +250,21 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			n, err := qs.Read(buf)
 			if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("Read Error: %s", err.Error()))
-				li.sendResult(ctx, nil, err)
+				li.SendResult(ctx, nil, err)
 
 				return
 			}
 			if n != 1 || buf[0] != 0 {
 				_ = qc.CloseWithError(500, "Read Data Error")
-				li.sendResult(ctx, nil, fmt.Errorf("stream failed to initialize"))
+				li.SendResult(ctx, nil, fmt.Errorf("stream failed to initialize"))
 
 				return
 			}
 			doneChan := make(chan struct{}, 1)
-			cctx, ccancel := context.WithCancel(li.s.context)
+			cctx, ccancel := context.WithCancel(li.S.context)
 			conn := &Conn{
-				s:        li.s,
-				pc:       li.pc,
+				s:        li.S,
+				pc:       li.PC,
 				qc:       qc,
 				qs:       qs,
 				doneChan: doneChan,
@@ -271,7 +273,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			}
 			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
-				go monitorUnreachable(li.pc, doneChan, rAddr, ccancel)
+				go monitorUnreachable(li.PC, doneChan, rAddr, ccancel)
 			}
 			go func() {
 				select {
@@ -283,7 +285,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 					return
 				}
 			}()
-			li.sendResult(ctx, conn, err)
+			li.SendResult(ctx, conn, err)
 		}()
 	}
 }
@@ -300,11 +302,11 @@ func (li *Listener) Accept() (net.Conn, error) {
 
 // Close closes the listener.
 func (li *Listener) Close() error {
-	li.doneOnce.Do(func() {
+	li.DoneOnce.Do(func() {
 		close(li.DoneChan)
 	})
-	perr := li.pc.Close()
-	if qerr := li.ql.Close(); qerr != nil {
+	perr := li.PC.Close()
+	if qerr := li.QL.Close(); qerr != nil {
 		return qerr
 	}
 
@@ -313,7 +315,18 @@ func (li *Listener) Close() error {
 
 // Addr returns the local address of this listener.
 func (li *Listener) Addr() net.Addr {
-	return li.pc.LocalAddr()
+	return li.PC.LocalAddr()
+}
+
+// NewTestListener creates a Listener for testing purposes.
+func NewTestListener(s *Netceptor, pc PacketConner, addr net.Addr, acceptChan chan *AcceptResult, doneChan chan struct{}, doneOnce *sync.Once) *Listener {
+	return &Listener{
+		S:          s,
+		PC:         pc,
+		AcceptChan: acceptChan,
+		DoneChan:   doneChan,
+		DoneOnce:   doneOnce,
+	}
 }
 
 // Conn implements the net.Conn interface via the Receptor network.

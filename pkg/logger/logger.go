@@ -99,6 +99,7 @@ func NewReceptorLogger(prefix string) *ReceptorLogger {
 	}
 }
 
+// NewReceptorLoggerWithSuffix to instantiate a new logger object with a new Suffix
 func NewReceptorLoggerWithSuffix(prefix string, suffix map[string]string) *ReceptorLogger {
 	logger := NewReceptorLogger(prefix)
 	logger.SetSuffix(suffix)
@@ -106,12 +107,17 @@ func NewReceptorLoggerWithSuffix(prefix string, suffix map[string]string) *Recep
 	return logger
 }
 
+// SetSuffix sets the suffix for the logger, overwriting any existing suffix.
 func (rl *ReceptorLogger) SetSuffix(suffix map[string]string) {
 	rl.m.Lock()
 	defer rl.m.Unlock()
 	rl.Suffix = suffix
 }
 
+// UpdateSuffix allows adding suffix key/value pairs to an existing suffix.
+// If the key already exists, the value will be overwritten.
+// If the suffix is nil, it will be initialized.
+// This is useful for adding additional context to log messages when you want to keep the existing suffix key/value pairs.
 func (rl *ReceptorLogger) UpdateSuffix(suffix map[string]string) {
 	rl.m.Lock()
 	defer rl.m.Unlock()

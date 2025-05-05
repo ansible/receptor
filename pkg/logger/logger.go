@@ -88,6 +88,7 @@ type ReceptorLogger struct {
 	log.Logger
 	Prefix string
 	m      sync.Mutex
+	Suffix map[string]string
 }
 
 // NewReceptorLogger to instantiate a new logger object.
@@ -95,6 +96,30 @@ func NewReceptorLogger(prefix string) *ReceptorLogger {
 	return &ReceptorLogger{
 		Logger: *log.New(os.Stdout, prefix, log.LstdFlags),
 		Prefix: prefix,
+	}
+}
+
+func NewReceptorLoggerWithSuffix(prefix string, suffix map[string]string) *ReceptorLogger {
+	logger := NewReceptorLogger(prefix)
+	logger.SetSuffix(suffix)
+
+	return logger
+}
+
+func (rl *ReceptorLogger) SetSuffix(suffix map[string]string) {
+	rl.m.Lock()
+	defer rl.m.Unlock()
+	rl.Suffix = suffix
+}
+
+func (rl *ReceptorLogger) UpdateSuffix(suffix map[string]string) {
+	rl.m.Lock()
+	defer rl.m.Unlock()
+	if rl.Suffix == nil {
+		rl.Suffix = make(map[string]string)
+	}
+	for k, v := range suffix {
+		rl.Suffix[k] = v
 	}
 }
 
@@ -218,8 +243,37 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 
 	if logLevel >= level {
 		rl.Logger.SetPrefix(prefix)
+		format, v = rl.appendSuffix(format, v)
 		rl.Logger.Printf(format, v...)
 	}
+}
+
+func (rl *ReceptorLogger) appendSuffix(format string, v []interface{}) (string, []interface{}) {
+	if rl.Suffix != nil {
+		rl.m.Lock()
+		defer rl.m.Unlock()
+
+		var b strings.Builder
+		b.WriteString("{")
+		first := true
+		for k, val := range rl.Suffix {
+			if !first {
+				b.WriteString(",")
+			}
+			first = false
+			b.WriteString(`"`)
+			b.WriteString(k)
+			b.WriteString(`":"`)
+			b.WriteString(val)
+			b.WriteString(`"`)
+		}
+		b.WriteString("}")
+
+		format = strings.ReplaceAll(format, "\n", "") + " %s"
+		v = append(v, b.String())
+	}
+
+	return format, v
 }
 
 // SanitizedLog adds a prefix and prints a given log message.
@@ -245,7 +299,8 @@ func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{
 	}
 
 	if logLevel >= level {
-		message := fmt.Sprintf(format, v...)
+		message, v := rl.appendSuffix(format, v)
+		message = fmt.Sprintf(message, v...)
 		sanMessage := strings.ReplaceAll(message, "\n", "")
 		rl.Logger.SetPrefix(prefix)
 		rl.Logger.Print(sanMessage)

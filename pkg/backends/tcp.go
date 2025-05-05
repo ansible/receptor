@@ -62,6 +62,10 @@ func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netcept
 				return nil, err
 			}
 
+			if b.logger != nil {
+				b.logger.Debug("TCPDialer connected to TCP %s Address %s\n", b.address, conn.RemoteAddr().String())
+			}
+
 			return newTCPSession(conn, closeChan), nil
 		})
 }

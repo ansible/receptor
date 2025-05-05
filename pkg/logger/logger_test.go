@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -119,4 +120,41 @@ func TestDebugPayload(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetLoggerWithSuffix(t *testing.T) {
+	var logBuffer bytes.Buffer
+
+	logger.SetGlobalLogLevel(4)
+
+	suffix := map[string]string{
+		"node_id":   "controller",
+		"remote_id": "hop",
+	}
+	receptorLogger := logger.NewReceptorLoggerWithSuffix("", suffix)
+	receptorLogger.SetOutput(&logBuffer)
+	expectedLog := `example message 1 {"node_id":"controller","remote_id":"hop"}`
+	receptorLogger.Error("example message 1")
+	testOutput := logBuffer.Bytes()
+
+	if !strings.Contains(logBuffer.String(), expectedLog) {
+		t.Errorf("failed to log correctly, expected: %v got %v", expectedLog, string(testOutput))
+	}
+
+	logBuffer.Reset()
+
+	suffix = map[string]string{
+		"node_id":   "controller",
+		"remote_id": "hop",
+		"cost":      "12",
+	}
+	receptorLogger.UpdateSuffix(suffix)
+	expectedLog = `example message 2 {"node_id":"controller","remote_id":"hop","cost":"12"}` // note fields comes out alphabetically
+	receptorLogger.SanitizedError("example message 2")
+	testOutput = logBuffer.Bytes()
+
+	if !strings.Contains(logBuffer.String(), expectedLog) {
+		t.Errorf("failed to log correctly, expected: %v got %v", expectedLog, string(testOutput))
+	}
+	logBuffer.Reset()
 }

@@ -254,7 +254,7 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 	}
 }
 
-func (rl *ReceptorLogger) appendSuffix(format string, v []interface{}) (string, []interface{}) {
+func (rl *ReceptorLogger) appendSuffix(format string, v []string) (string, []string) {
 	if rl.Suffix != nil {
 		rl.m.Lock()
 		defer rl.m.Unlock()

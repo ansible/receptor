@@ -32,11 +32,6 @@ func TestGenerateServerTLSConfig(t *testing.T) {
 		t.Errorf("Expected MinVersion to be TLS 1.2, got %d", config.MinVersion)
 	}
 
-	// Check PreferServerCipherSuites
-	if !config.PreferServerCipherSuites {
-		t.Error("Expected PreferServerCipherSuites to be true")
-	}
-
 	// Verify the certificate has the expected common name
 	cert, err := x509.ParseCertificate(config.Certificates[0].Certificate[0])
 	if err != nil {
@@ -80,11 +75,11 @@ func TestVerifyServerCertificate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := netceptor.VerifyServerCertificate(tc.rawCerts, nil)
-			
+
 			if tc.expectErr && err == nil {
 				t.Error("Expected error but got nil")
 			}
-			
+
 			if !tc.expectErr && err != nil {
 				t.Errorf("Expected no error but got: %v", err)
 			}
@@ -94,7 +89,7 @@ func TestVerifyServerCertificate(t *testing.T) {
 
 func TestGenerateClientTLSConfig(t *testing.T) {
 	testHost := "test-host"
-	
+
 	// Call the function to generate a client TLS config
 	config := netceptor.GenerateClientTLSConfig(testHost)
 

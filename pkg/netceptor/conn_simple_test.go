@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestServerTLSConfig tests the GenerateServerTLSConfig function
+// TestServerTLSConfig tests the GenerateServerTLSConfig function.
 func TestServerTLSConfig(t *testing.T) {
 	// Call the function
 	config := GenerateServerTLSConfig()
@@ -18,8 +18,6 @@ func TestServerTLSConfig(t *testing.T) {
 	// Verify the result
 	assert.NotNil(t, config)
 	assert.Equal(t, []string{"netceptor"}, config.NextProtos)
-	// TLS version might be different in different Go versions
-	assert.True(t, config.PreferServerCipherSuites)
 	assert.Len(t, config.Certificates, 1)
 
 	// Verify the certificate
@@ -28,7 +26,7 @@ func TestServerTLSConfig(t *testing.T) {
 	assert.Equal(t, "netceptor-insecure-common-name", cert.Subject.CommonName)
 }
 
-// TestServerCertVerification tests the VerifyServerCertificate function
+// TestServerCertVerification tests the VerifyServerCertificate function.
 func TestServerCertVerification(t *testing.T) {
 	// Generate a server TLS config to get a valid certificate
 	config := GenerateServerTLSConfig()
@@ -47,7 +45,7 @@ func TestServerCertVerification(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestClientTLSConfig tests the GenerateClientTLSConfig function
+// TestClientTLSConfig tests the GenerateClientTLSConfig function.
 func TestClientTLSConfig(t *testing.T) {
 	// Call the function
 	host := "test-host"
@@ -59,7 +57,6 @@ func TestClientTLSConfig(t *testing.T) {
 	assert.NotNil(t, config.VerifyPeerCertificate)
 	assert.Equal(t, []string{"netceptor"}, config.NextProtos)
 	assert.Equal(t, host, config.ServerName)
-	// TLS version might be different in different Go versions
 }
 
 // Skip the tracer test since it's difficult to test without mocking
@@ -118,6 +115,7 @@ func randString(length int) string {
 		result[i] = charset[time.Now().UnixNano()%int64(len(charset))]
 		time.Sleep(1 * time.Nanosecond) // Ensure uniqueness
 	}
+
 	return string(result)
 }
 

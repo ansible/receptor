@@ -73,6 +73,7 @@ func (m *mockQuicListener) Close() error {
 		m.closed = true
 		close(m.closeChan)
 	}
+
 	return nil
 }
 
@@ -187,6 +188,7 @@ func TestListenerClose(t *testing.T) {
 			listener.DoneOnce.Do(func() {
 				close(listener.DoneChan)
 			})
+
 			return mockPC.Close()
 		}
 

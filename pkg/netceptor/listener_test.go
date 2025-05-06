@@ -264,7 +264,7 @@ func TestListenerClose(t *testing.T) {
 	})
 }
 
-// TestListenerAddr tests the Addr method of the Listener struct
+// TestListenerAddr tests the Addr method of the Listener struct.
 func TestListenerAddr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -300,7 +300,7 @@ func TestListenerAddr(t *testing.T) {
 	})
 }
 
-// TestListenerSendResult tests the sendResult method of the Listener struct
+// TestListenerSendResult tests the sendResult method of the Listener struct.
 func TestListenerSendResult(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -379,7 +379,7 @@ func TestListenerSendResult(t *testing.T) {
 	})
 }
 
-// TestListenerAcceptLoop tests the AcceptLoop method of the Listener struct
+// TestListenerAcceptLoop tests the AcceptLoop method of the Listener struct.
 func TestListenerAcceptLoop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

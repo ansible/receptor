@@ -62,7 +62,7 @@ func TestClientTLSConfig(t *testing.T) {
 // Skip the tracer test since it's difficult to test without mocking
 // the quic.ConnectionID type
 
-// TestNetceptorListen tests basic functionality of the Listen method
+// TestNetceptorListen tests basic functionality of the Listen method.
 func TestNetceptorListen(t *testing.T) {
 	// Skip this test in CI environments or when network operations are not possible
 	if os.Getenv("CI") != "" {
@@ -91,7 +91,7 @@ func TestNetceptorListen(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestNetceptorListenServiceTooLong tests that Listen returns an error for service names that are too long
+// TestNetceptorListenServiceTooLong tests that Listen returns an error for service names that are too long.
 func TestNetceptorListenServiceTooLong(t *testing.T) {
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())
@@ -107,7 +107,7 @@ func TestNetceptorListenServiceTooLong(t *testing.T) {
 	assert.Contains(t, err.Error(), "service name service-name-too-long too long")
 }
 
-// Helper function to generate a random string
+// Helper function to generate a random string.
 func randString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)

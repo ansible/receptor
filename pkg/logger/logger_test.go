@@ -134,7 +134,7 @@ func TestGetLoggerWithSuffix(t *testing.T) {
 		receptorLogger := logger.NewReceptorLoggerWithSuffix("", suffix)
 		receptorLogger.SetOutput(&logBuffer)
 
-		receptorLogger.Error(testname)
+		receptorLogger.Error("%s", testname)
 		if !strings.Contains(logBuffer.String(), testname) {
 			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
 		}
@@ -154,7 +154,7 @@ func TestGetLoggerWithSuffix(t *testing.T) {
 			"cost": "12",
 		}
 		receptorLogger.UpdateSuffix(updated)
-		receptorLogger.SanitizedError(testname)
+		receptorLogger.SanitizedError("%s", testname)
 
 		if !strings.Contains(logBuffer.String(), testname) {
 			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())

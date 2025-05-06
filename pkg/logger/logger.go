@@ -99,7 +99,7 @@ func NewReceptorLogger(prefix string) *ReceptorLogger {
 	}
 }
 
-// NewReceptorLoggerWithSuffix to instantiate a new logger object with a new Suffix
+// NewReceptorLoggerWithSuffix to instantiate a new logger object with a new Suffix.
 func NewReceptorLoggerWithSuffix(prefix string, suffix map[string]string) *ReceptorLogger {
 	logger := NewReceptorLogger(prefix)
 	logger.SetSuffix(suffix)

@@ -119,7 +119,7 @@ func randString(length int) string {
 	return string(result)
 }
 
-// TestNetceptorListenAndAdvertise tests basic functionality of the ListenAndAdvertise method
+// TestNetceptorListenAndAdvertise tests basic functionality of the ListenAndAdvertise method.
 func TestNetceptorListenAndAdvertise(t *testing.T) {
 	// Skip this test in CI environments or when network operations are not possible
 	if os.Getenv("CI") != "" {
@@ -149,7 +149,7 @@ func TestNetceptorListenAndAdvertise(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestNetceptorDialInvalidService tests that Dial returns an error for invalid services
+// TestNetceptorDialInvalidService tests that Dial returns an error for invalid services.
 func TestNetceptorDialInvalidService(t *testing.T) {
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())
@@ -164,7 +164,7 @@ func TestNetceptorDialInvalidService(t *testing.T) {
 	assert.Nil(t, conn)
 }
 
-// TestNetceptorDialContextCanceled tests that DialContext returns an error when the context is canceled
+// TestNetceptorDialContextCanceled tests that DialContext returns an error when the context is canceled.
 func TestNetceptorDialContextCanceled(t *testing.T) {
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())

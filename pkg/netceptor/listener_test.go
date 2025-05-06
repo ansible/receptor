@@ -14,7 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// Create a simple Addr implementation for testing
+// Create a simple Addr implementation for testing.
 type testAddr struct {
 	network string
 	node    string
@@ -37,7 +37,7 @@ func newTestAddr(node, service string) testAddr {
 	}
 }
 
-// mockQuicListener is a mock implementation of quic.Listener
+// mockQuicListener is a mock implementation of quic.Listener.
 type mockQuicListener struct {
 	acceptChan chan quic.Connection
 	closeChan  chan struct{}
@@ -77,7 +77,7 @@ func (m *mockQuicListener) Close() error {
 	return nil
 }
 
-// Helper function to create a Listener for testing
+// Helper function to create a Listener for testing.
 func createTestListener(t *testing.T, ctrl *gomock.Controller) (*netceptor.Listener, *mock_netceptor.MockPacketConner, *mockQuicListener) {
 	t.Helper()
 
@@ -101,7 +101,7 @@ func createTestListener(t *testing.T, ctrl *gomock.Controller) (*netceptor.Liste
 	return listener, mockPC, mockQL
 }
 
-// TestListenerAccept tests the Accept method of the Listener struct
+// TestListenerAccept tests the Accept method of the Listener struct.
 func TestListenerAccept(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -173,7 +173,7 @@ func TestListenerAccept(t *testing.T) {
 	})
 }
 
-// TestListenerClose tests the Close method of the Listener struct
+// TestListenerClose tests the Close method of the Listener struct.
 func TestListenerClose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

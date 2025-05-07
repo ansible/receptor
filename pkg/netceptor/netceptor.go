@@ -2027,7 +2027,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						connError = existingConn.Context.Err()
 					}
 					if ok && connError != nil {
-						s.Logger.Error("Initial handshake failed: %s", connError)
+						s.Logger.Error("Context for existing connection error: %s", connError)
 					}
 
 					if !remoteNodeAccepted {

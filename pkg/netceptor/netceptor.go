@@ -355,6 +355,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		MinVersion: tls.VersionTLS12,
 	}
 	s.AddNameHash(nodeID)
+	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -1987,6 +1988,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					if remoteNodeID == s.nodeID {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
+					suffix := map[string]string{"remote_id": remoteNodeID}
+					s.GetLogger().UpdateSuffix(suffix)
 					remoteNodeAccepted := true
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
@@ -2002,6 +2005,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
 					}
 
+					// Check if there is connection cost for this remoteNodeID
+					// Check if there is connection cost for this remoteNodeID
 					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
@@ -2009,7 +2014,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					}
 					s.connLock.Lock()
 					existingConn, exists := s.connections[remoteNodeID]
-					
+
 					// define connError initialize to nil
 					var connError error
 					connError = nil
@@ -2018,20 +2023,20 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						connError = existingConn.Context.Err()
 					}
 					if exists && connError != nil {
-						s.connLock.Unlock() // removeConnection will lock before deleting. Not sure I like this though. 
+						s.connLock.Unlock() // removeConnection will lock before deleting. Not sure I like this though.
 						s.removeConnection(remoteNodeID)
 						s.connLock.Lock()
 
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "handshake failed: "+connError.Error())
 					}
-						
+
 					_, exists = s.connections[remoteNodeID]
-					if exists || !remoteNodeAccepted{
+					if exists || !remoteNodeAccepted {
 						s.connLock.Unlock()
 
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "valid connection using a node ID we are already connected to")
 					}
-			
+
 					s.connections[remoteNodeID] = ci
 					s.connLock.Unlock()
 

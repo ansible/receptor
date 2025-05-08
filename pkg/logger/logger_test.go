@@ -3,7 +3,7 @@ package logger_test
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"strings"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -72,14 +72,10 @@ func TestLogLevelToNameWithError(t *testing.T) {
 }
 
 func TestDebugPayload(t *testing.T) {
-	logFilePath := "/tmp/test-output"
+	var logBuffer bytes.Buffer
 	logger.SetGlobalLogLevel(4)
 	receptorLogger := logger.NewReceptorLogger("testDebugPayload")
-	logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		t.Error("error creating test-output file")
-	}
-
+	receptorLogger.SetOutput(&logBuffer)
 	payload := "Testing debugPayload"
 	workUnitID := "1234"
 	connectionType := "unix socket"
@@ -104,19 +100,67 @@ func TestDebugPayload(t *testing.T) {
 
 	for _, testCase := range debugPayloadTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			receptorLogger.SetOutput(logFile)
 			receptorLogger.DebugPayload(testCase.debugPayload, testCase.payload, testCase.workUnitID, testCase.connectionType)
+			testOutput := logBuffer.Bytes()
 
-			testOutput, err := os.ReadFile(logFilePath)
-			if err != nil {
-				t.Error("error reading test-output file")
-			}
-			if !bytes.Contains(testOutput, []byte(testCase.expectedLog)) {
+			if !strings.Contains(string(testOutput), testCase.expectedLog) {
 				t.Errorf("failed to log correctly, expected: %v got %v", testCase.expectedLog, string(testOutput))
 			}
-			if err := os.Truncate(logFilePath, 0); err != nil {
-				t.Errorf("failed to truncate: %v", err)
-			}
+			logBuffer.Reset()
 		})
 	}
+}
+
+func assertSuffixFieldsPresent(t *testing.T, logLine string, expected map[string]string) {
+	t.Helper()
+	for k, v := range expected {
+		needle := `"` + k + `":"` + v + `"`
+		if !strings.Contains(logLine, needle) {
+			t.Errorf("expected key-value pair %s not found in log: %s", needle, logLine)
+		}
+	}
+}
+
+func TestGetLoggerWithSuffix(t *testing.T) {
+	logger.SetGlobalLogLevel(4)
+
+	t.Run("initial suffix", func(t *testing.T) {
+		var logBuffer bytes.Buffer
+		testname := "Initial Suffix Example"
+		suffix := map[string]string{
+			"node_id":   "controller",
+			"remote_id": "hop",
+		}
+		receptorLogger := logger.NewReceptorLoggerWithSuffix("", suffix)
+		receptorLogger.SetOutput(&logBuffer)
+
+		receptorLogger.Error("%s", testname)
+		if !strings.Contains(logBuffer.String(), testname) {
+			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
+		}
+		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
+	})
+	t.Run("updated suffix", func(t *testing.T) {
+		var logBuffer bytes.Buffer
+		testname := "Updated Suffix Example"
+		suffix := map[string]string{
+			"node_id":   "controller",
+			"remote_id": "hop",
+		}
+		receptorLogger := logger.NewReceptorLoggerWithSuffix("", suffix)
+		receptorLogger.SetOutput(&logBuffer)
+
+		updated := map[string]string{
+			"cost": "12",
+		}
+		receptorLogger.UpdateSuffix(updated)
+		receptorLogger.SanitizedError("%s", testname)
+
+		if !strings.Contains(logBuffer.String(), testname) {
+			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
+		}
+
+		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
+		assertSuffixFieldsPresent(t, logBuffer.String(), updated)
+	})
 }

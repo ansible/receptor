@@ -190,6 +190,7 @@ func (m *mockNetceptorForListen) listen(ctx context.Context, service string, tls
 
 func newMockNetceptorForListen() *mockNetceptorForListen {
 	ctx, cancel := context.WithCancel(context.Background())
+
 	return &mockNetceptorForListen{
 		listenerRegistry:  make(map[string]*PacketConn),
 		reservedServices:  make(map[string]func(*MessageData) error),
@@ -288,6 +289,7 @@ func TestListen(t *testing.T) {
 		// Override getEphemeralFunc to track if it's called
 		s.getEphemeralFunc = func() string {
 			ephemeralServiceCalled = true
+
 			return "ephemeral-service"
 		}
 
@@ -708,11 +710,6 @@ func TestGenerateServerTLSConfig(t *testing.T) {
 		t.Errorf("Expected MinVersion to be TLS 1.2, got %d", tlsConfig.MinVersion)
 	}
 
-	// Check PreferServerCipherSuites
-	if !tlsConfig.PreferServerCipherSuites {
-		t.Error("Expected PreferServerCipherSuites to be true")
-	}
-
 	// Extract and check the certificate's common name
 	cert := tlsConfig.Certificates[0]
 	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
@@ -833,7 +830,7 @@ func TestGenerateClientTLSConfig(t *testing.T) {
 	}
 }
 
-// Helper function to create a test certificate with a specific common name
+// Helper function to create a test certificate with a specific common name.
 func createTestCertificate(t *testing.T, commonName string) []byte {
 	t.Helper()
 

@@ -367,7 +367,6 @@ func TestGetConfigForClient(t *testing.T) {
 
 		// Call the function with our ClientHelloInfo
 		resultConfig, err := configFunc(clientHello)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
@@ -416,7 +415,6 @@ func TestGetConfigForClient(t *testing.T) {
 
 		// Call the function with our ClientHelloInfo
 		resultConfig, err := configFunc(clientHello)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
@@ -485,7 +483,6 @@ func TestNetceptorListen(t *testing.T) {
 
 		// Call the Listen method with a service name <= 8 characters
 		listener, err := s.Listen("test1", nil)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
@@ -515,7 +512,6 @@ func TestNetceptorListen(t *testing.T) {
 
 		// Call the Listen method with empty service name
 		listener, err := s.Listen("", nil)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
@@ -573,7 +569,6 @@ func TestNetceptorListenAndAdvertise(t *testing.T) {
 
 		// Call the ListenAndAdvertise method with a service name <= 8 characters
 		listener, err := s.ListenAndAdvertise("test2", nil, tags)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
@@ -608,7 +603,6 @@ func TestNetceptorListenAndAdvertise(t *testing.T) {
 
 		// Call the ListenAndAdvertise method with empty service name
 		listener, err := s.ListenAndAdvertise("", nil, tags)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
@@ -662,7 +656,6 @@ func TestNetceptorListenAndAdvertise(t *testing.T) {
 
 		// Call the ListenAndAdvertise method with nil tags and a service name <= 8 characters
 		listener, err := s.ListenAndAdvertise("test3", nil, nil)
-
 		// Verify results
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)

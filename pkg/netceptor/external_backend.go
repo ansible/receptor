@@ -204,3 +204,7 @@ func (es *ExternalSession) Close() error {
 
 	return err
 }
+
+func (mc *netMessageConn) RemoteAddr() net.Addr {
+	return mc.conn.RemoteAddr()
+}

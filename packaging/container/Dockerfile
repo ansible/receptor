@@ -26,6 +26,7 @@ RUN dnf -y update && \
     dnf clean all && \
     pip3.12 install --no-cache-dir wheel && \
     pip3.12 install --no-cache-dir dumb-init && \
+    pip3.12 install --no-cache-dir ansible-runner && \
     pip3.12 install --no-cache-dir /tmp/*.whl && \
     rm /tmp/*.whl
 

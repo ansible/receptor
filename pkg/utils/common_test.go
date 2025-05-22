@@ -126,3 +126,35 @@ Bdt96MbGrC0=
 		})
 	}
 }
+
+func TestAddressToHostPort(t *testing.T) {
+	type Want struct {
+		host string
+		port string
+		err  bool
+	}
+	tests := []struct {
+		address string
+		want    Want
+	}{
+		{"127.0.0.1", Want{"", "", true}},
+		{"1.2.3.4:5000", Want{"1.2.3.4", "5000", false}},
+		{"[1.2.3.4]:5000", Want{"1.2.3.4", "5000", false}},
+		{"::1", Want{"", "", true}},
+		{"[::1]", Want{"", "", true}},
+		{"::1:5000", Want{"::1", "5000", false}},
+		{"[::1]:5000", Want{"::1", "5000", false}},
+		{"[::1]:pIf37CwA", Want{"::1", "pIf37CwA", false}},
+		{"[0:0:0:0:0:0:0:1]:5000", Want{"0:0:0:0:0:0:0:1", "5000", false}},
+		{"0:0:0:0:0:0:0:1:5000", Want{"0:0:0:0:0:0:0:1", "5000", false}},
+		{"[0:0:0:0:0:0:0:1]:pIf37CwA", Want{"0:0:0:0:0:0:0:1", "pIf37CwA", false}},
+		{"0:0:0:0:0:0:0:1:pIf37CwA", Want{"0:0:0:0:0:0:0:1", "pIf37CwA", false}},
+		{"invalid%address", Want{"", "", true}},
+	}
+	for _, tt := range tests {
+		host, port, err := utils.AddressToHostPort(tt.address)
+		if host != tt.want.host || port != tt.want.port || (err != nil) != tt.want.err {
+			t.Errorf("AddressToHostPort() %s -> host=%s | port=%s | err=%s", tt.address, host, port, err)
+		}
+	}
+}

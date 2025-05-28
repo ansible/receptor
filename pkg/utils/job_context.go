@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -106,4 +107,24 @@ func (mw *JobContext) Running() bool {
 	defer mw.RunningLock.Unlock()
 
 	return mw.JcRunning
+}
+
+// WaitUntilFinished waits until the JobContext is no longer running, or until timeout.
+// It polls the Running() state using a small delay to avoid a tight loop.
+// In order to simulate
+
+func (mw *JobContext) WaitUntilFinished(timeout time.Duration) error {
+	done := make(chan struct{})
+	go func() {
+		for mw.Running() {
+			time.Sleep(1 * time.Millisecond)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("timeout")
+	}
 }

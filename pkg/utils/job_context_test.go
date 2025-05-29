@@ -308,7 +308,7 @@ func startHungJob(jc *utils.JobContext) {
 // In order to simulate a hung job, we do not call mw.Wait() here, as that would block indefinitely.
 // If the job is not finished within the timeout, it returns an error.
 // The thought being that this could be used to record jobs that do not finish in a reasonable time.
-// These jobs may be stuck and could be recorded in a database or log messagen for later investigation.
+// These jobs may be stuck and could be recorded in a database or log messages for later investigation.
 // Out of scope for this unit test ticket so recording here for later work.
 func WaitUntilFinished(mw *utils.JobContext, timeout time.Duration) error {
 	done := make(chan struct{})

@@ -2,6 +2,7 @@ package utils_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -260,7 +261,7 @@ func TestJobContext_NewJob(t *testing.T) {
 		jc.WorkerDone()
 		jc.WorkerDone()
 		jc.Wait()
-		if err := jc.WaitUntilFinished(jobFinishTimeout); err != nil {
+		if err := WaitUntilFinished(jc, jobFinishTimeout); err != nil {
 			t.Fatalf("JobContext did not finish in time: %v", err)
 		}
 
@@ -277,7 +278,7 @@ func TestWaitUntilFinishedTimeout(t *testing.T) {
 
 	timeout := 10 * time.Millisecond
 	start := time.Now()
-	err := jc.WaitUntilFinished(timeout)
+	err := WaitUntilFinished(jc, timeout)
 	elapsed := time.Since(start)
 
 	if err == nil || err.Error() != "timeout" {
@@ -300,4 +301,27 @@ func startHungJob(jc *utils.JobContext) {
 		// Simulate a never-ending job (never calls WorkerDone)
 		select {} // or: <-ctx.Done()
 	}()
+}
+
+// WaitUntilFinished waits until the JobContext is no longer running, or until timeout.
+// It polls the Running() state using a small delay to avoid a tight loop.
+// In order to simulate a hung job, we do not call mw.Wait() here, as that would block indefinitely.
+// If the job is not finished within the timeout, it returns an error.
+// The thought being that this could be used to record jobs that do not finish in a reasonable time.
+// These jobs may be stuck and could be recorded in a database or log messagen for later investigation.
+// Out of scope for this unit test ticket so recording here for later work.
+func WaitUntilFinished(mw *utils.JobContext, timeout time.Duration) error {
+	done := make(chan struct{})
+	go func() {
+		for mw.Running() {
+			time.Sleep(1 * time.Millisecond)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("timeout")
+	}
 }

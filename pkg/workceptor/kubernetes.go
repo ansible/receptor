@@ -902,8 +902,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 		return
 	}
 
-	// only transition from WorkStateRunning to WorkStateSucceeded if WorkStateFailed is set we do not override
-	if kw.GetContext().Err() != context.Canceled && kw.Status().State == WorkStateRunning {
+	if kw.GetContext().Err() == nil {
 		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 	}
 }

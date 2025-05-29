@@ -15,13 +15,7 @@ Before you submit a PR, you should install `nox` and verify your changes.
 You can run `nox` with no arguments to execute all checks and tests.
 Alternatively, you can run only certain tasks as outlined in the following sections.
 
-> By default nox sessions install pinned dependencies from the `requirements` directory.
-
-You can use unpinned dependencies as follows:
-
-```bash
-PINNED=false nox -s lint
-```
+> By default nox sessions install pinned dependencies from `pyproject.toml`.
 
 ## Checking changes to Receptorctl
 

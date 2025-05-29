@@ -1,6 +1,3 @@
 recursive-include receptorctl *.py
-include .VERSION
 exclude .gitignore
 exclude noxfile.py
-exclude build-requirements.txt
-exclude test-requirements.txt

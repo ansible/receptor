@@ -62,6 +62,8 @@ receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
 clean:
 	@rm -fv .container-flag*
 	@rm -fv .VERSION
+	@rm -fv receptorctl/.VERSION
+	@rm -fv receptor-python-worker/.VERSION
 	@rm -rfv dist/
 	@rm -fv $(KUBECTL_BINARY)
 	@rm -fv packaging/container/receptor
@@ -96,7 +98,7 @@ kubectl:
 lint:
 	@golint cmd/... pkg/... example/...
 
-receptorctl-lint: receptor receptorctl/.VERSION
+receptorctl-lint: receptor
 	@cd receptorctl && nox -s lint
 
 format:
@@ -169,7 +171,7 @@ test: receptor
 		-race \
 		-timeout 5m
 
-receptorctl-test: receptorctl/.VERSION receptor
+receptorctl-test: receptor
 	@cd receptorctl && nox -s tests
 
 testloop: receptor
@@ -184,27 +186,21 @@ version:
 	@echo $(VERSION) > .VERSION
 	@echo ".VERSION created for $(VERSION)"
 
-receptorctl/.VERSION:
-	echo $(VERSION) > $@
-
 RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
-$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/.VERSION $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 -m build --wheel
+$(RECEPTORCTL_WHEEL): $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTORCTL=$(VERSION) python3 -m build --wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
 RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION:v%=%).tar.gz
-$(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/.VERSION $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 -m build --sdist
+$(RECEPTORCTL_SDIST): $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTORCTL=$(VERSION) python3 -m build --sdist
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-receptor-python-worker/.VERSION:
-	echo $(VERSION) > $@
-
 RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION:v%=%)-py3-none-any.whl
-$(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/.VERSION $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
-	@cd receptor-python-worker && python3 -m build --wheel
+$(RECEPTOR_PYTHON_WORKER_WHEEL): $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
+	@cd receptor-python-worker && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTOR_PYTHON_WORKER=$(VERSION) python3 -m build --wheel
 
 # Container command can be docker or podman
 CONTAINERCMD ?= podman

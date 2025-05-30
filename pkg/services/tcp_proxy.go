@@ -14,8 +14,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-//go:generate mockgen -package mock_services -source=tcp_proxy.go -destination=mock_services/tcp_proxy.go
-
 type NetcForTCPProxy interface {
 	GetLogger() *logger.ReceptorLogger
 	Dial(node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error)

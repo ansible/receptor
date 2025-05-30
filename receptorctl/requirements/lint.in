@@ -1,4 +1,0 @@
-# This requirements file is used for receptorctl lint and formatting checks
-
-flake8 # <-- used to check Python code style
-black # <-- used to check Python code formatting

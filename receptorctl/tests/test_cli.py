@@ -22,6 +22,4 @@ class TestCLI:
                 "SystemMemoryMiB",
                 "Version",
             ]
-        ) == set(
-            json_output.keys()
-        ), "The command returned unexpected keys from json output"
+        ) == set(json_output.keys()), "The command returned unexpected keys from json output"

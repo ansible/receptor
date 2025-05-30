@@ -32,8 +32,7 @@ RUN set -x \
 WORKDIR /dependencies
 ADD ./go.mod \
     ./go.sum \
-    ../receptorctl/requirements/tests.txt \
-    ../receptorctl/requirements/tests.in ./
+    ../receptorctl/requirements/requirements.txt ./
 RUN set -x \
     # Go
     && go get -u golang.org/x/lint/golint \
@@ -43,8 +42,7 @@ RUN set -x \
     && source /opt/venv/bin/activate \
     && pip${PYTHON_VERSION} install \
         --upgrade \
-        -r tests.in \
-        -c tests.txt
+        -r requirements.txt
 
 ADD ./tests/environments/container-builder/build-artifacts.sh /
 

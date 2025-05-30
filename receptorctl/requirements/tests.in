@@ -1,5 +1,0 @@
-# This requirements file is used for receptorctl tests
-
-pytest==8.3.3 # <-- used to run receptorctl tests
-pytest-cov
-coverage

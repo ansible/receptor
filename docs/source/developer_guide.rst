@@ -24,7 +24,7 @@ Example:
 
 .. code-block:: bash
 
-   echo -e '{"command": "work", "subcommand": "submit", "node": "execution", "worktype": "cat", }\n"Hi"' | socat - UNIX-CONNECT:/tmp/control.sock  
+   echo -e '{"command": "work", "subcommand": "submit", "node": "execution", "worktype": "cat", }\n"Hi"' | socat - UNIX-CONNECT:/tmp/control.sock
 
 -------
 Linters
@@ -59,7 +59,15 @@ Add/Update tests for bug fixes.
 Mocking
 ^^^^^^^
 
-We are using gomock to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by ``mock_``. An example is the package mock_workceptor under pkg/workceptor.
+We are using mockgen to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by ``mock_``. An example is the package mock_workceptor under pkg/workceptor.
+
+We use go generate to generate our mocks. To generate all the mocks in receptor:
+
+.. code-block:: bash
+
+    make generate
+
+To add a mock to go generate you will need to add a line to the `generate.go` file in the root of the repository.
 
 In order to genenerate a mock for a particular file, run:
 
@@ -72,6 +80,17 @@ For example, to create/update mocks for Workceptor, we can run:
 .. code-block:: bash
 
     mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
+
+After validating the mockgen command generates the mocks correctly you can add this command to the `generate.go` file.
+
+To remove a mock you will need to remove the associated line in the `generate.go` file.
+
+Then the following commands to generate a fresh set of mocks:
+
+.. code-block:: bash
+
+    make generate-clean
+    make generate
 
 ^^^^^^^^^^
 Kubernetes

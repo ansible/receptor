@@ -106,6 +106,13 @@ format:
 
 fmt: format
 
+generate:
+	${GO} generate  ./...
+
+generate-clean:
+	@echo "Removing existing mocks"
+	@find . -type d -name 'mock*' -prune -exec rm -rf {} +
+
 pre-commit:
 	@pre-commit run --all-files
 

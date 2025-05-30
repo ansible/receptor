@@ -1,4 +1,3 @@
-//go:generate mockgen -source=command.go -destination=mock_services/command.go
 //go:build !windows
 // +build !windows
 

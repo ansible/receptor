@@ -6,8 +6,8 @@
 //	mockgen -source=pkg/services/interfaces/net_interfaces.go -destination=pkg/services/interfaces/mock_interfaces/net_interfaces.go
 //
 
-// Package mock_net_interface is a generated GoMock package.
-package mock_net_interface
+// Package mock_netinterface is a generated GoMock package.
+package mock_netinterface
 
 import (
 	net "net"
@@ -17,7 +17,7 @@ import (
 	syscall "syscall"
 	time "time"
 
-	net_interface "github.com/ansible/receptor/pkg/services/interfaces"
+	netinterface "github.com/ansible/receptor/pkg/services/interfaces"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -46,10 +46,10 @@ func (m *MockNetterUDP) EXPECT() *MockNetterUDPMockRecorder {
 }
 
 // DialUDP mocks base method.
-func (m *MockNetterUDP) DialUDP(network string, laddr, raddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
+func (m *MockNetterUDP) DialUDP(network string, laddr, raddr *net.UDPAddr) (netinterface.UDPConnInterface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DialUDP", network, laddr, raddr)
-	ret0, _ := ret[0].(net_interface.UDPConnInterface)
+	ret0, _ := ret[0].(netinterface.UDPConnInterface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -61,10 +61,10 @@ func (mr *MockNetterUDPMockRecorder) DialUDP(network, laddr, raddr any) *gomock.
 }
 
 // ListenUDP mocks base method.
-func (m *MockNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
+func (m *MockNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (netinterface.UDPConnInterface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListenUDP", network, laddr)
-	ret0, _ := ret[0].(net_interface.UDPConnInterface)
+	ret0, _ := ret[0].(netinterface.UDPConnInterface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

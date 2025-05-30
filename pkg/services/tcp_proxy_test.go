@@ -360,7 +360,7 @@ func TestNetTCPWrapperDial(t *testing.T) {
 func TestTLSTCPWrapperNewListener(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	_, _, _, mockNetListener, _, _ := setUpTCPMocks(ctrl)
+	mockNetListener := mock_services.NewMockNetListenerTCP(ctrl)
 
 	w := &TLSTCPWrapper{}
 	x := w.NewListener(mockNetListener, &tls.Config{})

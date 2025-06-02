@@ -1627,7 +1627,7 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		deletePodOnRestart:      cfg.DeletePodOnRestart,
 		namePrefix:              fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
-	ku.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	ku.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return ku
 }

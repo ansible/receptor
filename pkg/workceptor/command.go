@@ -27,7 +27,7 @@ import (
 type BaseWorkUnitForWorkUnit interface {
 	CancelContext()
 	ID() string
-	Init(w *Workceptor, unitID string, workType string, fs FileSystemer, watcher WatcherWrapper)
+	Init(w *Workceptor, unitID string, workType string, fs FileSystemer)
 	LastUpdateError() error
 	Load() error
 	MonitorLocalStatus()
@@ -157,6 +157,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stdout
+
 	err = cmd.Start()
 	if err != nil {
 		return err
@@ -275,6 +276,7 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	cw.done = false
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	if err := cmd.Start(); err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)
 
@@ -411,7 +413,7 @@ func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor
 		baseParams:              cfg.Params,
 		allowRuntimeParams:      cfg.AllowRuntimeParams,
 	}
-	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }

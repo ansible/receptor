@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/services/mock_services"
+	"github.com/ansible/receptor/pkg/utils/mock_utils"
 	"go.uber.org/mock/gomock"
 )
 
@@ -383,8 +383,8 @@ func TestUtilsTCPWrapperBridgeConns(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockReadWriteCloser1 := mock_controlsvc.NewMockReadWriteCloser(ctrl)
-	mockReadWriteCloser2 := mock_controlsvc.NewMockReadWriteCloser(ctrl)
+	mockReadWriteCloser1 := mock_utils.NewMockReadWriteCloser(ctrl)
+	mockReadWriteCloser2 := mock_utils.NewMockReadWriteCloser(ctrl)
 
 	mockReadWriteCloser1.EXPECT().Read(gomock.Any()).Return(0, errors.New("EOF")).AnyTimes()
 	mockReadWriteCloser2.EXPECT().Read(gomock.Any()).Return(0, errors.New("EOF")).AnyTimes()

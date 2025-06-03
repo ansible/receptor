@@ -22,3 +22,4 @@ package main
 //go:generate mockgen -source=pkg/workceptor/stdio_utils.go -destination=pkg/workceptor/mock_workceptor/stdio_utils.go
 //go:generate mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
 //go:generate mockgen -source=pkg/workceptor/workunitbase.go -destination=pkg/workceptor/mock_workceptor/workunitbase.go
+//go:generate mockgen -package=mock_utils -destination=pkg/utils/mock_utils/io.go io ReadWriteCloser

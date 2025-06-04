@@ -386,6 +386,27 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						podName,
 					)
 
+					// check container status again
+					pod, err := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+					if err != nil {
+						kw.GetWorkceptor().nc.GetLogger().Error(err.Error())
+						kw.UpdateBasicStatus(WorkStateFailed, err.Error(), stdout.Size())
+					}
+
+					// kw.GetWorkceptor().nc.GetLogger().Debug(pod.Status.String())
+					// wait for container status to terminate
+					for pod.Status.ContainerStatuses[0].State.Terminated == nil {
+						pod, _ = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+					}
+
+					// if the pod's container finished unsuccessfully - add an error
+					if pod.Status.ContainerStatuses[0].State.Terminated != nil && pod.Status.ContainerStatuses[0].State.Terminated.ExitCode != 0 {
+						errmsg := fmt.Sprintf("pod exited unexpectedly reason: %s (%d)",
+							pod.Status.ContainerStatuses[0].State.Terminated.Reason, pod.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+						kw.GetWorkceptor().nc.GetLogger().Error(errmsg)
+						kw.UpdateBasicStatus(WorkStateFailed, errmsg, stdout.Size())
+					}
+
 					return
 				}
 

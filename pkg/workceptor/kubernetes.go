@@ -122,8 +122,7 @@ func (ku KubeAPIWrapper) Create(ctx context.Context, clientset *kubernetes.Clien
 	}
 
 	// Add default system annotations
-	pod.Annotations["receptor.redhat.com/created-by"] = "receptor"
-	pod.Annotations["receptor.redhat.com/creation-timestamp"] = time.Now().UTC().Format(time.RFC3339)
+	pod.Annotations["receptor.redhat.com/created-by"] = "automation-mesh"
 	pod.Annotations["receptor.redhat.com/request_id"] = "xxx-xxxx-xxxx-xxxx" // Placeholder, replace with actual request ID if available
 	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 }
@@ -248,7 +247,7 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 			if cs.State.Terminated != nil {
 				switch cs.State.Terminated.ExitCode {
 				case 0:
-				        break
+					break
 				default:
 					return false, cs.State.Terminated.Reason, nil
 				}
@@ -496,6 +495,8 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						podNamespace,
 						podName,
 					)
+
+					_, _ = kw.capturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) //TODO Do we have a configurable timeout already?
 
 					return
 				}
@@ -1017,21 +1018,10 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
 	} else {
-
-		pod, err = kw.KubeAPIWrapperInstance.WaitForPodCompleted(pod, kw.clientset, time.Duration(10*time.Second))
-		if err != nil {
-			kw.GetWorkceptor().nc.GetLogger().Warning("Pod is still running: %v", err)
-		}
-
-		ok, reason, err := kw.KubeAPIWrapperInstance.GetPodStatus(pod)
-		if err != nil {
-			reason := fmt.Sprintf("Pod diagnostics failed: %v reason %s", err, reason)
-			kw.GetWorkceptor().nc.GetLogger().Warning(reason)
-			kw.UpdateBasicStatus(WorkStateFailed, reason, stdout.Size())
-			return
-		} else if !ok {
-			kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed: %s", reason)
-			kw.UpdateBasicStatus(WorkStateFailed, reason, stdout.Size())
+		ok, _ := kw.capturePodStatus(pod, stdout.Size(), 10*time.Second)
+		if !ok {
+			// If the pod did not succeed, we already updated the status to WorkStateFailed
+			// and we can return early.
 			return
 		}
 	}
@@ -1042,6 +1032,29 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	if kw.GetContext().Err() != context.Canceled && kw.Status().State == WorkStateRunning {
 		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
 	}
+}
+
+func (kw *KubeUnit) capturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout time.Duration) (ok bool, err error) {
+
+	pod, err = kw.KubeAPIWrapperInstance.WaitForPodCompleted(pod, kw.clientset, timeout)
+	if err != nil {
+		kw.GetWorkceptor().nc.GetLogger().Debug("Job complete and pod is still running: %v", err)
+	}
+
+	ok, reason, err := kw.KubeAPIWrapperInstance.GetPodStatus(pod)
+	if err != nil {
+		reason := fmt.Sprintf("Pod diagnostics failed: %v reason %s", err, reason)
+		kw.GetWorkceptor().nc.GetLogger().Warning(reason)
+		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)
+		return false, err
+	} else if !ok {
+		kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed: %s", reason)
+		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)
+		return false, fmt.Errorf("pod did not succeed: %s", reason)
+	}
+	kw.GetWorkceptor().nc.GetLogger().Debug("Pod completed successfully: %s", pod.Status.String())
+	return true, nil
+
 }
 
 func IsCompatibleK8S(kw *KubeUnit, versionStr string) bool {

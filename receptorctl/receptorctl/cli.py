@@ -182,9 +182,7 @@ def status(ctx, printjson):
     ads = status.pop("Advertisements", None)
     if ads:
         print_message()
-        print_message(
-            f"{'Node':<{longest_node}} Service   Type       Last Seen             Tags"
-        )
+        print_message(f"{'Node':<{longest_node}} Service   Type       Last Seen             Tags")
         for ad in ads:
             time = dateutil.parser.parse(ad["Time"])
             if ad["ConnType"] == 0:
@@ -238,9 +236,7 @@ def status(ctx, printjson):
 @click.pass_context
 @click.argument("node")
 @click.option("--count", default=4, help="Number of pings to send", show_default=True)
-@click.option(
-    "--delay", default=1.0, help="Time to wait between pings", show_default=True
-)
+@click.option("--delay", default=1.0, help="Time to wait between pings", show_default=True)
 def ping(ctx, node, count, delay):
     rc = get_rc(ctx)
     ping_error = False
@@ -251,9 +247,7 @@ def ping(ctx, node, count, delay):
         else:
             ping_error = True
             if "From" in results and "TimeStr" in results:
-                print_error(
-                    f"{results['Error']} from {results['From']} in {results['TimeStr']}"
-                )
+                print_error(f"{results['Error']} from {results['From']} in {results['TimeStr']}")
             else:
                 print_error(f"{results['Error']}")
         if i < count - 1:
@@ -299,9 +293,7 @@ def traceroute(ctx, node):
 @click.pass_context
 @click.argument("node")
 @click.argument("service")
-@click.option(
-    "--raw", "-r", default=False, is_flag=True, help="Set terminal to raw mode"
-)
+@click.option("--raw", "-r", default=False, is_flag=True, help="Set terminal to raw mode")
 @click.option(
     "--tls-client",
     "tlsclient",

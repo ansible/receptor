@@ -12,6 +12,7 @@ import (
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/utils/mock_utils"
 	"go.uber.org/mock/gomock"
 )
 
@@ -26,7 +27,7 @@ func printErrorMessage(t *testing.T, err error) {
 func TestConnectionListener(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
-	mockListener := mock_controlsvc.NewMockListener(ctrl)
+	mockListener := mock_utils.NewMockNetListener(ctrl)
 	logger := logger.NewReceptorLogger("")
 
 	connectionListenerTestCases := []struct {
@@ -63,7 +64,7 @@ func TestConnectionListener(t *testing.T) {
 func TestSetupConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
-	mockConn := mock_controlsvc.NewMockConn(ctrl)
+	mockConn := mock_utils.NewMockNetConn(ctrl)
 	logger := logger.NewReceptorLogger("")
 
 	setupConnectionTestCases := []struct {
@@ -104,7 +105,7 @@ func TestRunControlSvc(t *testing.T) {
 	mockUnix := mock_controlsvc.NewMockUtiler(ctrl)
 	mockNet := mock_controlsvc.NewMockNeter(ctrl)
 	mockTLS := mock_controlsvc.NewMockTlser(ctrl)
-	mockListener := mock_controlsvc.NewMockListener(ctrl)
+	mockListener := mock_utils.NewMockNetListener(ctrl)
 
 	logger := logger.NewReceptorLogger("")
 
@@ -199,8 +200,8 @@ func TestRunControlSvc(t *testing.T) {
 func TestSockControlRemoteAddr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
-	mockAddr := mock_controlsvc.NewMockAddr(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
+	mockAddr := mock_utils.NewMockNetAddr(ctrl)
 	sockControl := controlsvc.NewSockControl(mockCon)
 
 	localhost := "127.0.0.1"
@@ -216,7 +217,7 @@ func TestSockControlRemoteAddr(t *testing.T) {
 
 func TestSockControlWriteMessage(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
 	sockControl := controlsvc.NewSockControl(mockCon)
 
 	writeMessageTestCases := []struct {
@@ -269,7 +270,7 @@ func TestSockControlWriteMessage(t *testing.T) {
 
 func TestSockControlBridgeConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
 	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
 	logger := logger.NewReceptorLogger("")
 
@@ -313,7 +314,7 @@ func TestSockControlBridgeConn(t *testing.T) {
 
 func TestSockControlReadFromConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
 	mockCopier := mock_controlsvc.NewMockCopier(ctrl)
 
 	sockControl := controlsvc.NewSockControl(mockCon)
@@ -372,7 +373,7 @@ func TestSockControlReadFromConn(t *testing.T) {
 
 func TestSockControlWriteToConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
 	sockControl := controlsvc.NewSockControl(mockCon)
 
 	bridgeConnTestCases := []struct {
@@ -436,7 +437,7 @@ func TestSockControlWriteToConn(t *testing.T) {
 
 func TestSockControlClose(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
 	sockControl := controlsvc.NewSockControl(mockCon)
 
 	errorMessage := "cannot close connection"
@@ -491,8 +492,8 @@ func TestAddControlFunc(t *testing.T) {
 
 func TestRunControlSession(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCon := mock_controlsvc.NewMockConn(ctrl)
-	mockAddr := mock_controlsvc.NewMockAddr(ctrl)
+	mockCon := mock_utils.NewMockNetConn(ctrl)
+	mockAddr := mock_utils.NewMockNetAddr(ctrl)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	logger := logger.NewReceptorLogger("")
 

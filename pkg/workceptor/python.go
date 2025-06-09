@@ -21,6 +21,18 @@ type pythonUnit struct {
 	config   map[string]interface{}
 }
 
+// NewPythonUnit creates a new pythonUnit using the given parameters.
+func NewPythonUnit(baseWorkUnit BaseWorkUnitForWorkUnit, plugin string, function string, config map[string]any) *pythonUnit {
+	return &pythonUnit{
+		commandUnit: commandUnit{
+			BaseWorkUnitForWorkUnit: baseWorkUnit,
+		},
+		plugin:   plugin,
+		function: function,
+		config:   config,
+	}
+}
+
 // Start launches a job with given parameters.
 func (pw *pythonUnit) Start() error {
 	pw.UpdateBasicStatus(WorkStatePending, "[DEPRECATION WARNING] '--work-python' option is not currently being used. This feature will be removed from receptor in a future release.", 0)
@@ -66,7 +78,7 @@ func (cfg WorkPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
-	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }

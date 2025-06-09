@@ -19,17 +19,17 @@ type NetcForUDPProxy interface {
 	ListenPacketAndAdvertise(service string, tags map[string]string) (netceptor.PacketConner, error)
 }
 
-type Net struct{}
+type NetUDPWrapper struct{}
 
-func (n *Net) ResolveUDPAddr(network string, address string) (*net.UDPAddr, error) {
+func (n *NetUDPWrapper) ResolveUDPAddr(network string, address string) (*net.UDPAddr, error) {
 	return net.ResolveUDPAddr(network, address)
 }
 
-func (n *Net) ListenUDP(network string, laddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
+func (n *NetUDPWrapper) ListenUDP(network string, laddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
 	return net.ListenUDP(network, laddr)
 }
 
-func (n *Net) DialUDP(network string, laddr *net.UDPAddr, raddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
+func (n *NetUDPWrapper) DialUDP(network string, laddr *net.UDPAddr, raddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
 	return net.DialUDP(network, laddr, raddr)
 }
 
@@ -205,7 +205,7 @@ type UDPProxyInboundCfg struct {
 func (cfg UDPProxyInboundCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running UDP inbound proxy service %v\n", cfg)
 
-	return UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService, &Net{})
+	return UDPProxyServiceInbound(netceptor.MainInstance, cfg.BindAddr, cfg.Port, cfg.RemoteNode, cfg.RemoteService, &NetUDPWrapper{})
 }
 
 // udpProxyOutboundCfg is the cmdline configuration object for a UDP outbound proxy.
@@ -218,7 +218,7 @@ type UDPProxyOutboundCfg struct {
 func (cfg UDPProxyOutboundCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running UDP outbound proxy service %s\n", cfg)
 
-	return UDPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, cfg.Address, &Net{})
+	return UDPProxyServiceOutbound(netceptor.MainInstance, cfg.Service, cfg.Address, &NetUDPWrapper{})
 }
 
 func init() {

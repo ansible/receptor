@@ -6,6 +6,7 @@ package utils_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/utils"
@@ -26,7 +27,7 @@ func TestTryFLock(t *testing.T) {
 			args: args{
 				filename: filepath.Join(os.TempDir(), "good_flock_listener"),
 			},
-			want:    &utils.FLock{0},
+			want:    &utils.FLock{Fd: 0},
 			wantErr: false,
 		},
 		{
@@ -57,6 +58,25 @@ func TestTryFLock(t *testing.T) {
 }
 
 func TestFLock_Unlock(t *testing.T) {
+	f, err := os.CreateTemp("", "flock-test")
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	var maxInt uintptr
+	if strconv.IntSize == 32 {
+		maxInt = uintptr(1<<31 - 1)
+	} else {
+		maxInt = uintptr(1<<63 - 1)
+	}
+
+	fd := f.Fd()
+	if fd > maxInt {
+		t.Error(err)
+	}
+
 	type fields struct {
 		Fd int
 	}
@@ -68,7 +88,7 @@ func TestFLock_Unlock(t *testing.T) {
 		{
 			name: "Positive",
 			fields: fields{
-				Fd: 1,
+				Fd: int(f.Fd()), // #nosec G115
 			},
 			wantErr: false,
 		},

@@ -22,7 +22,7 @@ func newCommandWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, w
 		baseParams:         "foo",
 		allowRuntimeParams: true,
 	}
-	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{}, nil)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }

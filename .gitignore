@@ -9,6 +9,7 @@ recepcert
 /net
 .container-flag*
 .VERSION
+.python-version
 kubectl
 /receptorctl/.nox
 /receptorctl/.VERSION
@@ -26,3 +27,6 @@ receptorctl-test-venv/
 coverage.txt
 venv
 /vendor
+pkg/services/.lock
+pkg/workceptor/status
+pkg/workceptor/status.lock

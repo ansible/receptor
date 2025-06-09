@@ -12,10 +12,10 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/logging"
 	"github.com/quic-go/quic-go/qlog"
@@ -30,9 +30,17 @@ var MaxIdleTimeoutForQuicConnections = 30 * time.Second
 // Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
 var KeepAliveForQuicConnections = true
 
-type acceptResult struct {
-	conn net.Conn
-	err  error
+type QuicStreamForConn interface {
+	quic.Stream
+}
+
+type QuicConnectionForConn interface {
+	quic.Connection
+}
+
+type AcceptResult struct {
+	Conn net.Conn
+	Err  error
 }
 
 // Listener implements the net.Listener interface via the Receptor network.
@@ -40,8 +48,8 @@ type Listener struct {
 	s          *Netceptor
 	pc         PacketConner
 	ql         *quic.Listener
-	acceptChan chan *acceptResult
-	doneChan   chan struct{}
+	AcceptChan chan *AcceptResult
+	DoneChan   chan struct{}
 	doneOnce   *sync.Once
 }
 
@@ -70,13 +78,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
 		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
-			tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
-				clientTLSCfg := tlscfg.Clone()
-				remoteNode := strings.Split(hi.Conn.RemoteAddr().String(), ":")[0]
-				clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
-
-				return clientTLSCfg, nil
-			}
+			tlscfg.GetConfigForClient = s.getConfigForClient(tlscfg)
 		}
 	}
 	pc := &PacketConn{
@@ -127,14 +129,28 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		s:          s,
 		pc:         pc,
 		ql:         ql,
-		acceptChan: make(chan *acceptResult),
-		doneChan:   doneChan,
+		AcceptChan: make(chan *AcceptResult),
+		DoneChan:   doneChan,
 		doneOnce:   &sync.Once{},
 	}
 
 	go li.acceptLoop(ctx)
 
 	return li, nil
+}
+
+func (s *Netceptor) getConfigForClient(tlscfg *tls.Config) func(*tls.ClientHelloInfo) (*tls.Config, error) {
+	return func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+		clientTLSCfg := tlscfg.Clone()
+		remoteAdrr := hi.Conn.RemoteAddr().String()
+		remoteNode, _, err := utils.AddressToHostPort(remoteAdrr)
+		if err != nil {
+			return nil, err
+		}
+		clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
+
+		return clientTLSCfg, nil
+	}
 }
 
 func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID quic.ConnectionID) *logging.ConnectionTracer {
@@ -179,11 +195,11 @@ func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {
 	select {
 	case <-ctx.Done():
 		return
-	case li.acceptChan <- &acceptResult{
-		conn: conn,
-		err:  err,
+	case li.AcceptChan <- &AcceptResult{
+		Conn: conn,
+		Err:  err,
 	}:
-	case <-li.doneChan:
+	case <-li.DoneChan:
 	}
 }
 
@@ -192,13 +208,13 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-li.doneChan:
+		case <-li.DoneChan:
 			return
 		default:
 		}
 		qc, err := li.ql.Accept(ctx)
 		select {
-		case <-li.doneChan:
+		case <-li.DoneChan:
 			return
 		default:
 		}
@@ -212,7 +228,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			defer cancel()
 			qs, err := qc.AcceptStream(ctx)
 			select {
-			case <-li.doneChan:
+			case <-li.DoneChan:
 				_ = qc.CloseWithError(500, "Listener Closed")
 
 				return
@@ -259,7 +275,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			}
 			go func() {
 				select {
-				case <-li.doneChan:
+				case <-li.DoneChan:
 					_ = conn.Close()
 				case <-cctx.Done():
 					_ = conn.Close()
@@ -275,9 +291,9 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 // Accept accepts a connection via the listener.
 func (li *Listener) Accept() (net.Conn, error) {
 	select {
-	case ar := <-li.acceptChan:
-		return ar.conn, ar.err
-	case <-li.doneChan:
+	case ar := <-li.AcceptChan:
+		return ar.Conn, ar.Err
+	case <-li.DoneChan:
 		return nil, fmt.Errorf("listener closed")
 	}
 }
@@ -285,7 +301,7 @@ func (li *Listener) Accept() (net.Conn, error) {
 // Close closes the listener.
 func (li *Listener) Close() error {
 	li.doneOnce.Do(func() {
-		close(li.doneChan)
+		close(li.DoneChan)
 	})
 	perr := li.pc.Close()
 	if qerr := li.ql.Close(); qerr != nil {
@@ -304,11 +320,26 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       PacketConner
-	qc       quic.Connection
-	qs       quic.Stream
+	qc       QuicConnectionForConn
+	qs       QuicStreamForConn
 	doneChan chan struct{}
 	doneOnce *sync.Once
 	ctx      context.Context
+}
+
+// NewConn constructs a new Conn instance, so that the test package can create one.
+func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStreamForConn, doneChan chan struct{}, doneOnce *sync.Once, ctx context.Context) *Conn {
+	conn := &Conn{
+		s:        s,
+		pc:       pc,
+		qc:       qc,
+		qs:       qs,
+		doneChan: doneChan,
+		doneOnce: doneOnce,
+		ctx:      ctx,
+	}
+
+	return conn
 }
 
 // Dial returns a stream connection compatible with Go's net.Conn.
@@ -416,15 +447,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			return
 		}
 	}()
-	conn := &Conn{
-		s:        s,
-		pc:       pc,
-		qc:       qc,
-		qs:       qs,
-		doneChan: doneChan,
-		doneOnce: &sync.Once{},
-		ctx:      cctx,
-	}
+	conn := NewConn(s, pc, qc, qs, doneChan, &sync.Once{}, cctx)
 
 	return conn, nil
 }
@@ -557,6 +580,7 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 
 func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
+		// #nosec G402 -- InsecureSkipVerify is set true in test context only; production usage is config-driven.
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},

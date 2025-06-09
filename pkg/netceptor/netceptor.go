@@ -355,6 +355,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		MinVersion: tls.VersionTLS12,
 	}
 	s.AddNameHash(nodeID)
+	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -1119,8 +1120,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
 		}
-		var err error
-		_, err = certs[0].Verify(opts)
+		_, err := certs[0].Verify(opts)
 		if err != nil {
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 
@@ -1988,6 +1988,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					if remoteNodeID == s.nodeID {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
+					suffix := map[string]string{"remote_id": remoteNodeID}
+					s.GetLogger().UpdateSuffix(suffix)
 					remoteNodeAccepted := true
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
@@ -2003,19 +2005,31 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
 					}
 
+					// Check if there is connection cost for this remoteNodeID
+					// Check if there is connection cost for this remoteNodeID
 					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost
 					}
 					s.connLock.Lock()
-					for conn := range s.connections {
-						if remoteNodeID == conn {
-							remoteNodeAccepted = false
 
-							break
-						}
+					// Check if there is already connInfo for this remoteNodeID
+					existingConn, ok := s.connections[remoteNodeID]
+					if ok {
+						remoteNodeAccepted = false
 					}
+					var connError error
+					connError = nil
+
+					// Verify that the existing connection is valid
+					if ok && existingConn != nil {
+						connError = existingConn.Context.Err()
+					}
+					if ok && connError != nil {
+						s.Logger.Error("Context for existing connection error: %s", connError)
+					}
+
 					if !remoteNodeAccepted {
 						s.connLock.Unlock()
 

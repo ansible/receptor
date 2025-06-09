@@ -33,7 +33,7 @@ func SetWSListenerDefaults(config *BackendConfig) {
 			listener.BindAddr = "0.0.0.0"
 		}
 		if listener.Path == "" {
-			listener.BindAddr = "/"
+			listener.Path = "/"
 		}
 	}
 }

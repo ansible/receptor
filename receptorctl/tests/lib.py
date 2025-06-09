@@ -44,12 +44,7 @@ def create_certificate(tmp_dir: str, commonName: str = "localhost"):
             ext.write("subjectAltName=DNS:" + commonName)
             # Receptor NodeID (otherName) to SAN
             ext.write(
-                ",otherName:"
-                + __OIDReceptorName
-                + ";"
-                + __OIDReceptorNameFormat
-                + ":"
-                + commonName
+                ",otherName:" + __OIDReceptorName + ";" + __OIDReceptorNameFormat + ":" + commonName
             )
             ext.close()
         subprocess.check_output(["openssl", "genrsa", "-out", keyPath, "2048"])
@@ -95,9 +90,7 @@ def create_certificate(tmp_dir: str, commonName: str = "localhost"):
 
     # Create a new CA
     caKeyPath, caCrtPath = generate_cert("ca", "ca")
-    clientKeyPath, clientCrtPath = generate_cert_with_ca(
-        "client", caKeyPath, caCrtPath, commonName
-    )
+    clientKeyPath, clientCrtPath = generate_cert_with_ca("client", caKeyPath, caCrtPath, commonName)
     generate_cert_with_ca("server", caKeyPath, caCrtPath, commonName)
 
     return {

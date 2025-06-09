@@ -37,7 +37,7 @@ func createCommandTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor
 	}
 
 	cwc := &workceptor.CommandWorkerCfg{}
-	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}, nil)
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 	workUnit := cwc.NewWorker(mockBaseWorkUnit, w, "", "")
 
 	return workUnit, mockBaseWorkUnit, mockNetceptor, w

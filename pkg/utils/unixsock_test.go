@@ -85,3 +85,39 @@ func TestUnixSocketListen(t *testing.T) {
 		})
 	}
 }
+
+func TestUnixSocketErrors(t *testing.T) {
+	tests := []struct {
+		name             string
+		errorFuncUnix    func(error, error) error
+		errorFuncWindows func() error
+	}{
+		{
+			name:          "MakeUnixSocketError",
+			errorFuncUnix: utils.MakeUnixSocketError,
+		},
+		{
+			name:             "MakeWindowsSocketError",
+			errorFuncWindows: utils.MakeWindowsSocketError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.errorFuncUnix == nil && tt.errorFuncWindows == nil {
+				t.Error("either errorFuncUnix or errorFuncWindows must be set")
+			}
+
+			var err error = nil
+			if tt.errorFuncUnix != nil {
+				err = tt.errorFuncUnix(utils.ErrSocketFileListen, utils.ErrSocketFileListen)
+			} else if tt.errorFuncWindows != nil {
+				err = tt.errorFuncWindows()
+			}
+
+			if err == nil {
+				t.Errorf("%s: Error expected and none received", tt.name)
+			}
+		})
+	}
+}

@@ -5,13 +5,11 @@ import (
 	"crypto/x509"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// TestServerTLSConfig tests the GenerateServerTLSConfig function.
-func TestServerTLSConfig(t *testing.T) {
+func TestGenerateServerTLSConfig(t *testing.T) {
 	// Call the function
 	config := generateServerTLSConfig()
 
@@ -26,27 +24,46 @@ func TestServerTLSConfig(t *testing.T) {
 	assert.Equal(t, "netceptor-insecure-common-name", cert.Subject.CommonName)
 }
 
-// TestServerCertVerification tests the VerifyServerCertificate function.
-func TestServerCertVerification(t *testing.T) {
+func TestVerifyServerCertificate(t *testing.T) {
 	// Generate a server TLS config to get a valid certificate
 	config := generateServerTLSConfig()
 	rawCert := config.Certificates[0].Certificate[0]
 
-	// Test with a valid certificate
-	err := verifyServerCertificate([][]byte{rawCert}, nil)
-	assert.NoError(t, err)
+	tests := []struct {
+		name        string
+		rawCerts    [][]byte
+		expectError bool
+	}{
+		{
+			name:        "Valid certificate",
+			rawCerts:    [][]byte{rawCert},
+			expectError: false,
+		},
+		{
+			name:        "No certificates",
+			rawCerts:    [][]byte{},
+			expectError: true,
+		},
+		{
+			name:        "Invalid certificate data",
+			rawCerts:    [][]byte{{1, 2, 3, 4}},
+			expectError: true,
+		},
+	}
 
-	// Test with no certificates
-	err = verifyServerCertificate([][]byte{}, nil)
-	assert.Error(t, err)
-
-	// Test with invalid certificate data
-	err = verifyServerCertificate([][]byte{{1, 2, 3, 4}}, nil)
-	assert.Error(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := verifyServerCertificate(tt.rawCerts, nil)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
-// TestClientTLSConfig tests the GenerateClientTLSConfig function.
-func TestClientTLSConfig(t *testing.T) {
+func TestGenerateClientTLSConfig(t *testing.T) {
 	// Call the function
 	host := "test-host"
 	config := generateClientTLSConfig(host)
@@ -58,81 +75,82 @@ func TestClientTLSConfig(t *testing.T) {
 	assert.Equal(t, []string{"netceptor"}, config.NextProtos)
 	assert.Equal(t, host, config.ServerName)
 }
-
-// Skip the tracer test since it's difficult to test without mocking
-// the quic.ConnectionID type
-
-// TestNetceptorListen tests basic functionality of the Listen method.
 func TestNetceptorListen(t *testing.T) {
 	// Skip this test in CI environments or when network operations are not possible
 	if os.Getenv("CI") != "" {
 		t.Skip("Skipping test in CI environment")
 	}
 
-	// Create a Netceptor instance
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	s := New(ctx, "test-node")
-
-	// Generate a random service name
-	serviceName := randString(8)
-
-	// Call Listen
-	listener, err := s.Listen(serviceName, nil)
-	if err != nil {
-		t.Fatalf("Failed to listen: %v", err)
+	tests := []struct {
+		name                string
+		serviceName         string
+		expectError         bool
+		expectedErrorSubstr string
+		needsCleanup        bool
+	}{
+		{
+			name:         "Valid service name",
+			serviceName:  "abcd", // 4 characters, within the 8-character limit
+			expectError:  false,
+			needsCleanup: true,
+		},
+		{
+			name:                "Service name too long",
+			serviceName:         "service-name-too-long", // 22 characters, exceeds 8-character limit
+			expectError:         true,
+			expectedErrorSubstr: "service name service-name-too-long too long",
+			needsCleanup:        false,
+		},
+		{
+			name:         "Empty service name gets ephemeral",
+			serviceName:  "", // Empty service name should get an ephemeral service
+			expectError:  false,
+			needsCleanup: true,
+		},
+		{
+			name:         "Maximum length service name",
+			serviceName:  "abcd1234", // 8 characters, maximum allowed length
+			expectError:  false,
+			needsCleanup: true,
+		},
 	}
 
-	// Verify the listener
-	assert.NotNil(t, listener)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a Netceptor instance for each test case
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			s := New(ctx, "test-node")
 
-	// Clean up
-	err = listener.Close()
-	assert.NoError(t, err)
-}
+			// Call Listen
+			listener, err := s.Listen(tt.serviceName, nil)
 
-// TestNetceptorListenServiceTooLong tests that Listen returns an error for service names that are too long.
-func TestNetceptorListenServiceTooLong(t *testing.T) {
-	// Create a Netceptor instance
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	s := New(ctx, "test-node")
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, listener)
+				if tt.expectedErrorSubstr != "" {
+					assert.Contains(t, err.Error(), tt.expectedErrorSubstr)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, listener)
 
-	// Call Listen with a service name that's too long
-	listener, err := s.Listen("service-name-too-long", nil)
-
-	// Verify the result
-	assert.Error(t, err)
-	assert.Nil(t, listener)
-	assert.Contains(t, err.Error(), "service name service-name-too-long too long")
-}
-
-// Helper function to generate a random string.
-func randString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-		time.Sleep(1 * time.Nanosecond) // Ensure uniqueness
+				if tt.needsCleanup && listener != nil {
+					err = listener.Close()
+					assert.NoError(t, err)
+				}
+			}
+		})
 	}
-
-	return string(result)
 }
 
-// TestNetceptorListenAndAdvertise tests basic functionality of the ListenAndAdvertise method.
 func TestNetceptorListenAndAdvertise(t *testing.T) {
-	// Skip this test in CI environments or when network operations are not possible
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping test in CI environment")
-	}
-
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s := New(ctx, "test-node")
 
-	// Generate a random service name
-	serviceName := randString(8)
+	serviceName := "test-svc"
 
 	// Call ListenAndAdvertise
 	tags := map[string]string{"tag1": "value1"}
@@ -149,7 +167,6 @@ func TestNetceptorListenAndAdvertise(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestNetceptorDialInvalidService tests that Dial returns an error for invalid services.
 func TestNetceptorDialInvalidService(t *testing.T) {
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())
@@ -164,7 +181,6 @@ func TestNetceptorDialInvalidService(t *testing.T) {
 	assert.Nil(t, conn)
 }
 
-// TestNetceptorDialContextCanceled tests that DialContext returns an error when the context is canceled.
 func TestNetceptorDialContextCanceled(t *testing.T) {
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())

@@ -276,7 +276,7 @@ func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod) (bool, string, e
 			return true, "container has not terminated", nil
 		}
 		if cs.State.Terminated.ExitCode != 0 {
-			return false, fmt.Sprintf("container %s exited with code %d: %s", cs.name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
+			return false, fmt.Sprintf("container %s exited with code %d: %s", cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
 		}
 	}
 
@@ -319,12 +319,12 @@ func (ku KubeAPIWrapper) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
 	infraOK, reason, err := ku.podInfrastructureSuccess(pod)
 
 	if !infraOK {
-		return false, fmt("pod %s/%s infrastructure %s",pod.namespace, pod.name, reason), err
+		return false, fmt.Sprintf("pod %s/%s infrastructure %s", pod.Namespace, pod.Name, reason), err
 	}
 
 	appOK, reason, err := ku.podApplicationSuccess(pod)
 	if err != nil {
-		return false, fmt.Sprintf("pod: %s/%s application %s",pod.namespace, pod.name, reason), err
+		return false, fmt.Sprintf("pod: %s/%s application %s", pod.Namespace, pod.Name, reason), err
 	}
 	if !appOK {
 		return false, reason, err

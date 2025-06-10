@@ -123,7 +123,6 @@ func (ku KubeAPIWrapper) Create(ctx context.Context, clientset *kubernetes.Clien
 
 	// Add default system annotations
 	pod.Annotations["receptor.redhat.com/created-by"] = "automation-mesh"
-	pod.Annotations["receptor.redhat.com/request_id"] = "xxx-xxxx-xxxx-xxxx" // Placeholder, replace with actual request ID if available
 	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 }
 
@@ -259,7 +258,7 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 		return true, "", nil
 
 	case corev1.PodRunning, corev1.PodPending:
-		return true, fmt.Sprintf("pod ohase: %s", pod.Status.Phase), fmt.Errorf("pod not in terminal state")
+		return true, fmt.Sprintf("pod phase: %s", pod.Status.Phase), fmt.Errorf("pod not in terminal state")
 
 	default:
 		return false, fmt.Sprintf("unknown phase: %s", pod.Status.Phase), fmt.Errorf("invalid pod phase")
@@ -277,7 +276,7 @@ func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod) (bool, string, e
 			return true, "container has not terminated", nil
 		}
 		if cs.State.Terminated.ExitCode != 0 {
-			return false, fmt.Sprintf("container exited with code %d: %s", cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
+			return false, fmt.Sprintf("container %s exited with code %d: %s", cs.name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
 		}
 	}
 
@@ -320,12 +319,12 @@ func (ku KubeAPIWrapper) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
 	infraOK, reason, err := ku.podInfrastructureSuccess(pod)
 
 	if !infraOK {
-		return false, reason, err
+		return false, fmt("pod %s/%s infrastructure %s",pod.namespace, pod.name, reason), err
 	}
 
 	appOK, reason, err := ku.podApplicationSuccess(pod)
 	if err != nil {
-		return false, fmt.Sprintf("app check failed: %s", reason), err
+		return false, fmt.Sprintf("pod: %s/%s application %s",pod.namespace, pod.name, reason), err
 	}
 	if !appOK {
 		return false, reason, err

@@ -288,15 +288,15 @@ func (m *MockUtilsLib) EXPECT() *MockUtilsLibMockRecorder {
 }
 
 // BridgeConns mocks base method.
-func (m *MockUtilsLib) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, arg4 *logger.ReceptorLogger) {
+func (m *MockUtilsLib) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "BridgeConns", c1, c1Name, c2, c2Name, arg4)
+	m.ctrl.Call(m, "BridgeConns", c1, c1Name, c2, c2Name, logger)
 }
 
 // BridgeConns indicates an expected call of BridgeConns.
-func (mr *MockUtilsLibMockRecorder) BridgeConns(c1, c1Name, c2, c2Name, arg4 any) *gomock.Call {
+func (mr *MockUtilsLibMockRecorder) BridgeConns(c1, c1Name, c2, c2Name, logger any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BridgeConns", reflect.TypeOf((*MockUtilsLib)(nil).BridgeConns), c1, c1Name, c2, c2Name, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BridgeConns", reflect.TypeOf((*MockUtilsLib)(nil).BridgeConns), c1, c1Name, c2, c2Name, logger)
 }
 
 // MockTCPConn is a mock of TCPConn interface.

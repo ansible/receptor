@@ -9,6 +9,7 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/services/mock_services"
+	"github.com/ansible/receptor/pkg/utils/mock_utils"
 	"go.uber.org/mock/gomock"
 )
 
@@ -346,4 +347,51 @@ func TestTCPProxyOutboundCfgRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNetTCPWrapperDial(t *testing.T) {
+	w := &NetTCPWrapper{}
+	_, err := w.Dial("", "")
+	if err == nil {
+		t.Error("Expected an error to be returned.")
+	}
+}
+
+func TestTLSTCPWrapperNewListener(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockNetListener := mock_services.NewMockNetListenerTCP(ctrl)
+
+	w := &TLSTCPWrapper{}
+	x := w.NewListener(mockNetListener, &tls.Config{})
+
+	if x == nil {
+		t.Error("Unexpected nil value returned when creating a new listener.")
+	}
+}
+
+func TestTLSTCPWrapperDial(t *testing.T) {
+	w := &TLSTCPWrapper{}
+	_, err := w.Dial("", "", &tls.Config{})
+
+	if err == nil {
+		t.Error("Expected error when dialing with incorrect parameters.")
+	}
+}
+
+func TestUtilsTCPWrapperBridgeConns(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockReadWriteCloser1 := mock_utils.NewMockReadWriteCloser(ctrl)
+	mockReadWriteCloser2 := mock_utils.NewMockReadWriteCloser(ctrl)
+
+	mockReadWriteCloser1.EXPECT().Read(gomock.Any()).Return(0, errors.New("EOF")).AnyTimes()
+	mockReadWriteCloser2.EXPECT().Read(gomock.Any()).Return(0, errors.New("EOF")).AnyTimes()
+	mockReadWriteCloser1.EXPECT().Close().Times(1)
+	mockReadWriteCloser2.EXPECT().Close().Times(1)
+
+	w := &UtilsTCPWrapper{}
+	myLogger := logger.NewReceptorLogger("test")
+	w.BridgeConns(mockReadWriteCloser1, "", mockReadWriteCloser2, "", myLogger)
 }

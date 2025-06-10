@@ -293,17 +293,17 @@ func (m *MockControlFuncOperations) EXPECT() *MockControlFuncOperationsMockRecor
 }
 
 // BridgeConn mocks base method.
-func (m *MockControlFuncOperations) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, arg3 *logger.ReceptorLogger, utils controlsvc.Utiler) error {
+func (m *MockControlFuncOperations) BridgeConn(message string, bc io.ReadWriteCloser, bcName string, logger *logger.ReceptorLogger, utils controlsvc.Utiler) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BridgeConn", message, bc, bcName, arg3, utils)
+	ret := m.ctrl.Call(m, "BridgeConn", message, bc, bcName, logger, utils)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BridgeConn indicates an expected call of BridgeConn.
-func (mr *MockControlFuncOperationsMockRecorder) BridgeConn(message, bc, bcName, arg3, utils any) *gomock.Call {
+func (mr *MockControlFuncOperationsMockRecorder) BridgeConn(message, bc, bcName, logger, utils any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BridgeConn", reflect.TypeOf((*MockControlFuncOperations)(nil).BridgeConn), message, bc, bcName, arg3, utils)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BridgeConn", reflect.TypeOf((*MockControlFuncOperations)(nil).BridgeConn), message, bc, bcName, logger, utils)
 }
 
 // Close mocks base method.
@@ -321,17 +321,17 @@ func (mr *MockControlFuncOperationsMockRecorder) Close() *gomock.Call {
 }
 
 // ReadFromConn mocks base method.
-func (m *MockControlFuncOperations) ReadFromConn(message string, out io.Writer, arg2 controlsvc.Copier) error {
+func (m *MockControlFuncOperations) ReadFromConn(message string, out io.Writer, io controlsvc.Copier) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadFromConn", message, out, arg2)
+	ret := m.ctrl.Call(m, "ReadFromConn", message, out, io)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ReadFromConn indicates an expected call of ReadFromConn.
-func (mr *MockControlFuncOperationsMockRecorder) ReadFromConn(message, out, arg2 any) *gomock.Call {
+func (mr *MockControlFuncOperationsMockRecorder) ReadFromConn(message, out, io any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFromConn", reflect.TypeOf((*MockControlFuncOperations)(nil).ReadFromConn), message, out, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFromConn", reflect.TypeOf((*MockControlFuncOperations)(nil).ReadFromConn), message, out, io)
 }
 
 // RemoteAddr mocks base method.

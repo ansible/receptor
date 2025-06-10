@@ -248,7 +248,7 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 				case 0:
 					break
 				default:
-					return false, cs.State.Terminated.Reason, nil
+					return false, fmt.Sprintf("pod %s container %s %s", pod.Status.Reason, cs.Name, cs.State.Terminated.Reason), nil
 				}
 			}
 		}

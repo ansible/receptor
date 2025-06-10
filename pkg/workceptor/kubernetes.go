@@ -495,7 +495,9 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						podName,
 					)
 
-					_, _ = kw.capturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) //TODO Do we have a configurable timeout already?
+					if false { // deactivate new code TODO write integration tests
+						_, _ = kw.capturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) //TODO Do we have a configurable timeout already?
+					}
 
 					return
 				}
@@ -1016,7 +1018,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	pod, err := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
-	} else {
+	} else if false { // deactivate new code TODO write integration tests
 		ok, _ := kw.capturePodStatus(pod, stdout.Size(), 10*time.Second)
 		if !ok {
 			// If the pod did not succeed, we already updated the status to WorkStateFailed

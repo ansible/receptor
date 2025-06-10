@@ -586,7 +586,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 	}
 }
 
-// TestKubeAPIWrapper tests the KubeAPIWrapper methods
+// TestKubeAPIWrapper tests the KubeAPIWrapper methods.
 func TestKubeAPIWrapper(t *testing.T) {
 	// Create a KubeAPIWrapper instance
 	wrapper := workceptor.KubeAPIWrapper{}
@@ -626,7 +626,7 @@ func TestKubeAPIWrapper(t *testing.T) {
 	})
 }
 
-// TestKubeAPIWrapperExtended tests the remaining KubeAPIWrapper methods
+// TestKubeAPIWrapperExtended tests the remaining KubeAPIWrapper methods.
 func TestKubeAPIWrapperExtended(t *testing.T) {
 	// Create a KubeAPIWrapper instance
 	wrapper := workceptor.KubeAPIWrapper{}
@@ -753,7 +753,6 @@ users:
 
 	// Test NewSPDYExecutor and StreamWithContext
 	t.Run("SPDY Operations", func(t *testing.T) {
-
 		// Verify NewSPDYExecutor method exists with correct signature
 		methodType := reflect.TypeOf(wrapper.NewSPDYExecutor)
 		assert.Equal(t, "func(*rest.Config, string, *url.URL) (remotecommand.Executor, error)", methodType.String())
@@ -773,7 +772,7 @@ users:
 	})
 }
 
-// TestReadFileToString tests the ReadFileToString function
+// TestReadFileToString tests the ReadFileToString function.
 func TestReadFileToString(t *testing.T) {
 	// Create a temporary file for testing
 	content := "test content"
@@ -813,7 +812,7 @@ func TestReadFileToString(t *testing.T) {
 	})
 }
 
-// TestParseTimeExtended tests the ParseTime function with more cases
+// TestParseTimeExtended tests the ParseTime function with more cases.
 func TestParseTimeExtended(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -859,7 +858,7 @@ func TestParseTimeExtended(t *testing.T) {
 	}
 }
 
-// TestIsCompatibleK8SExtended tests the IsCompatibleK8S function with more cases
+// TestIsCompatibleK8SExtended tests the IsCompatibleK8S function with more cases.
 func TestIsCompatibleK8SExtended(t *testing.T) {
 	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
@@ -917,7 +916,7 @@ func TestIsCompatibleK8SExtended(t *testing.T) {
 	}
 }
 
-// TestGetTimeoutOpenLogstreamExtended tests the GetTimeoutOpenLogstream function with more cases
+// TestGetTimeoutOpenLogstreamExtended tests the GetTimeoutOpenLogstream function with more cases.
 func TestGetTimeoutOpenLogstreamExtended(t *testing.T) {
 	const envVariable string = "RECEPTOR_OPEN_LOGSTREAM_TIMEOUT"
 
@@ -974,7 +973,7 @@ func TestGetTimeoutOpenLogstreamExtended(t *testing.T) {
 	}
 }
 
-// TestKubeLoggingWithReconnectSimple tests the KubeLoggingWithReconnect function with a simple success case
+// TestKubeLoggingWithReconnectSimple tests the KubeLoggingWithReconnect function with a simple success case.
 func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 	// We'll test just the success case for now to avoid mock complexity
 	var stdinErr error
@@ -1009,6 +1008,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader("2024-12-09T00:31:18.823849250Z Log line with timestamp\n")),
 			}
+
 			return resp, nil
 		}),
 		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
@@ -1029,7 +1029,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 	assert.NoError(t, stdoutErr)
 }
 
-// TestKubeUnitCancel tests the Cancel method of KubeUnit
+// TestKubeUnitCancel tests the Cancel method of KubeUnit.
 func TestKubeUnitCancel(t *testing.T) {
 	// Create a test setup
 	_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, _ := createKubernetesTestSetup(t)
@@ -1081,7 +1081,7 @@ func TestKubeUnitCancel(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestKubeUnitRelease tests the Release method of KubeUnit
+// TestKubeUnitRelease tests the Release method of KubeUnit.
 func TestKubeUnitRelease(t *testing.T) {
 	// Create a test setup
 	_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, _ := createKubernetesTestSetup(t)
@@ -1136,7 +1136,7 @@ func TestKubeUnitRelease(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestKubeUnitReleaseWithForce tests the Release method of KubeUnit with force=true
+// TestKubeUnitReleaseWithForce tests the Release method of KubeUnit with force=true.
 func TestKubeUnitReleaseWithForce(t *testing.T) {
 	// Create a test setup
 	_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, _ := createKubernetesTestSetup(t)
@@ -1191,7 +1191,7 @@ func TestKubeUnitReleaseWithForce(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestKubeUnitRestart tests the Restart method of KubeUnit
+// TestKubeUnitRestart tests the Restart method of KubeUnit.
 func TestKubeUnitRestart(t *testing.T) {
 	t.Run("Complete state", func(t *testing.T) {
 		// Create a test setup
@@ -1251,5 +1251,4 @@ func TestKubeUnitRestart(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "restart not implemented for streammethod tcp")
 	})
-
 }

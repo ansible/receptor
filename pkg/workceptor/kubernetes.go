@@ -94,7 +94,9 @@ type KubeAPIer interface {
 	WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeout time.Duration) (*corev1.Pod, error)
 }
 
-type KubeAPIWrapper struct{}
+type KubeAPIWrapper struct {
+	KubeAPIer
+}
 
 func (ku KubeAPIWrapper) NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError {
 	return apierrors.NewNotFound(qualifiedResource, name)
@@ -237,9 +239,6 @@ func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 
 // podInfrastructureFailure checks if the pod has failed to start due to infrastructure issues.
 func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string, error) {
-	if pod == nil {
-		return false, "pod is nil", fmt.Errorf("pod is nil")
-	}
 
 	switch pod.Status.Phase {
 	case corev1.PodFailed:
@@ -249,7 +248,7 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 				case 0:
 					break
 				default:
-					return false, fmt.Sprintf("pod %s container %s %s", pod.Status.Reason, cs.Name, cs.State.Terminated.Reason), nil
+					return false, fmt.Sprintf("pod reason %s container %s %s", pod.Status.Reason, cs.Name, cs.State.Terminated.Reason), nil
 				}
 			}
 		}
@@ -267,11 +266,8 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 	}
 }
 
-// PodApplicationSuccess checks if the pod has successfully completed its application logic.
+// podApplicationSuccess checks if the pod has successfully completed its application logic.
 func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod) (bool, string, error) {
-	if pod == nil {
-		return false, "pod is nil", fmt.Errorf("pod is nil")
-	}
 
 	for _, cs := range pod.Status.ContainerStatuses {
 		if cs.State.Terminated == nil {
@@ -317,6 +313,10 @@ func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernet
 
 // GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
 func (ku KubeAPIWrapper) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
+
+	if pod == nil {
+		return false, "pod is nil", fmt.Errorf("pod is nil")
+	}
 
 	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
 

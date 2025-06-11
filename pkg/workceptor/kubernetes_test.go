@@ -562,3 +562,99 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPodStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+	// Create real implementation instance
+	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
+
+	podSuccess := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test-pod",
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+		},
+	}
+
+	// POD with infrastructure failure
+	infraErrorPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "infra-error-pod",
+		},
+		Status: corev1.PodStatus{
+			Phase:  corev1.PodFailed,
+			Reason: "PodMockOOMKilled",
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "main",
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 1,
+							Reason:   "MockOOMKill",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	applicationErrorPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "infra-error-pod",
+		},
+		Status: corev1.PodStatus{
+			Phase:  corev1.PodFailed,
+			Reason: "AppFailure",
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "main",
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 1,
+							Reason:   "ContainerFailure",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("nil pod", func(t *testing.T) {
+		ok, reason, err := realImplementation.GetPodStatus(nil)
+		if ok || reason != "pod is nil" || err == nil {
+			t.Errorf("Failed nil pod case: ok=%v reason=%q err=%v", ok, reason, err)
+		}
+	})
+
+	t.Run("infrastructure failure", func(t *testing.T) {
+
+		ok, reason, err := realImplementation.GetPodStatus(infraErrorPod)
+
+		if ok || reason != "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container main MockOOMKill" || err != nil {
+			t.Errorf("Failed infrastructure case: ok=%v reason=%q err=%v", ok, reason, err)
+		}
+	})
+
+	t.Run("application failure", func(t *testing.T) {
+		ok, reason, err := realImplementation.GetPodStatus(applicationErrorPod)
+		if ok || reason != "pod default/infra-error-pod infrastructure pod reason AppFailure container main ContainerFailure" || err != nil {
+			t.Errorf("Failed application case: ok=%v reason=%q err=%v", ok, reason, err)
+		}
+	})
+
+	t.Run("success case", func(t *testing.T) {
+
+		ok, reason, err := realImplementation.GetPodStatus(podSuccess)
+		if !ok || reason != "" || err != nil {
+			t.Errorf("Failed success case: ok=%v reason=%q err=%v", ok, reason, err)
+		}
+	})
+}

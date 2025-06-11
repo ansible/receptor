@@ -123,6 +123,7 @@ func (ku KubeAPIWrapper) Create(ctx context.Context, clientset *kubernetes.Clien
 
 	// Add default system annotations
 	pod.Annotations["receptor.redhat.com/created-by"] = "automation-mesh"
+
 	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 }
 
@@ -252,6 +253,7 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 				}
 			}
 		}
+
 		return true, "", nil
 
 	case corev1.PodSucceeded:
@@ -1053,8 +1055,8 @@ func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout 
 		return false, fmt.Errorf("pod did not succeed: %s", reason)
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("Pod completed successfully: %s", pod.Status.String())
-	return true, nil
 
+	return true, nil
 }
 
 func IsCompatibleK8S(kw *KubeUnit, versionStr string) bool {

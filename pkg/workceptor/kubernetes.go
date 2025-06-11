@@ -316,18 +316,17 @@ func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernet
 // GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
 func (ku KubeAPIWrapper) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
 
+	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
+
 	infraOK, reason, err := ku.podInfrastructureSuccess(pod)
 
-	if !infraOK {
-		return false, fmt.Sprintf("pod %s/%s infrastructure %s", pod.Namespace, pod.Name, reason), err
+	if !infraOK || err != nil {
+		return infraOK, fmt.Sprintf("%s infrastructure %s", podRef, reason), err
 	}
 
 	appOK, reason, err := ku.podApplicationSuccess(pod)
-	if err != nil {
-		return false, fmt.Sprintf("pod: %s/%s application %s", pod.Namespace, pod.Name, reason), err
-	}
-	if !appOK {
-		return false, reason, err
+	if !appOK || err != nil {
+		return appOK, fmt.Sprintf("%s application %s", podRef, reason), err
 	}
 
 	return true, "", nil
@@ -496,7 +495,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					)
 
 					if false { // deactivate new code TODO write integration tests
-						_, _ = kw.capturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) //TODO Do we have a configurable timeout already?
+						_, _ = kw.CapturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) //TODO Do we have a configurable timeout already?
 					}
 
 					return
@@ -1019,7 +1018,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
 	} else if false { // deactivate new code TODO write integration tests
-		ok, _ := kw.capturePodStatus(pod, stdout.Size(), 10*time.Second)
+		ok, _ := kw.CapturePodStatus(pod, stdout.Size(), 10*time.Second)
 		if !ok {
 			// If the pod did not succeed, we already updated the status to WorkStateFailed
 			// and we can return early.
@@ -1035,7 +1034,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	}
 }
 
-func (kw *KubeUnit) capturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout time.Duration) (ok bool, err error) {
+func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout time.Duration) (ok bool, err error) {
 
 	pod, err = kw.KubeAPIWrapperInstance.WaitForPodCompleted(pod, kw.clientset, timeout)
 	if err != nil {

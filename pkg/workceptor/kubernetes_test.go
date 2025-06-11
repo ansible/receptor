@@ -26,8 +26,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
+    fakeapi "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/remotecommand"
 )
+
 
 func startNetceptorNodeWithWorkceptor() (*workceptor.KubeUnit, error) {
 	kw := &workceptor.KubeUnit{
@@ -562,16 +564,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		})
 	}
 }
-
-func TestGetPodStatus(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
-
-	// Create real implementation instance
-	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
-
+func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod) {
 	podSuccess := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
@@ -582,8 +575,7 @@ func TestGetPodStatus(t *testing.T) {
 		},
 	}
 
-	// POD with infrastructure failure
-	infraErrorPod := &corev1.Pod{
+	podInfraError := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "infra-error-pod",
@@ -605,10 +597,10 @@ func TestGetPodStatus(t *testing.T) {
 		},
 	}
 
-	applicationErrorPod := &corev1.Pod{
+	podAppError := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
-			Name:      "infra-error-pod",
+			Name:      "app-error-pod",
 		},
 		Status: corev1.PodStatus{
 			Phase:  corev1.PodFailed,
@@ -627,34 +619,151 @@ func TestGetPodStatus(t *testing.T) {
 		},
 	}
 
-	t.Run("nil pod", func(t *testing.T) {
-		ok, reason, err := realImplementation.GetPodStatus(nil)
-		if ok || reason != "pod is nil" || err == nil {
-			t.Errorf("Failed nil pod case: ok=%v reason=%q err=%v", ok, reason, err)
-		}
-	})
+	return podSuccess, podInfraError, podAppError
+}
 
-	t.Run("infrastructure failure", func(t *testing.T) {
+func TestGetPodStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-		ok, reason, err := realImplementation.GetPodStatus(infraErrorPod)
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
-		if ok || reason != "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container main MockOOMKill" || err != nil {
-			t.Errorf("Failed infrastructure case: ok=%v reason=%q err=%v", ok, reason, err)
-		}
-	})
+	// Create real implementation instance
+	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
 
-	t.Run("application failure", func(t *testing.T) {
-		ok, reason, err := realImplementation.GetPodStatus(applicationErrorPod)
-		if ok || reason != "pod default/infra-error-pod infrastructure pod reason AppFailure container main ContainerFailure" || err != nil {
-			t.Errorf("Failed application case: ok=%v reason=%q err=%v", ok, reason, err)
-		}
-	})
+	podSuccess, infraErrorPod, applicationErrorPod := createTestPods()
 
-	t.Run("success case", func(t *testing.T) {
+	tests := []struct {
+		name       string
+		pod        *corev1.Pod
+		wantOk     bool
+		wantReason string
+		wantErr    bool
+	}{
+		{
+			name:       "nil pod",
+			pod:        nil,
+			wantOk:     false,
+			wantReason: "pod is nil",
+			wantErr:    true,
+		},
+		{
+			name:       "infrastructure failure",
+			pod:        infraErrorPod,
+			wantOk:     false,
+			wantReason: "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container main MockOOMKill",
+			wantErr:    false,
+		},
+		{
+			name:       "application failure",
+			pod:        applicationErrorPod,
+			wantOk:     false,
+			wantReason: "pod default/app-error-pod infrastructure pod reason AppFailure container main ContainerFailure",
+			wantErr:    false,
+		},
+		{
+			name:       "success case",
+			pod:        podSuccess,
+			wantOk:     true,
+			wantReason: "",
+			wantErr:    false,
+		},
+	}
 
-		ok, reason, err := realImplementation.GetPodStatus(podSuccess)
-		if !ok || reason != "" || err != nil {
-			t.Errorf("Failed success case: ok=%v reason=%q err=%v", ok, reason, err)
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ok, reason, err := realImplementation.GetPodStatus(tt.pod)
+			if ok != tt.wantOk || reason != tt.wantReason || (err != nil) != tt.wantErr {
+				t.Errorf("Failed %s case: ok=%v reason=%q err=%v", tt.name, ok, reason, err)
+			}
+		})
+	}
+
+}
+func TestWaitForPodCompleted(t *testing.T) {
+    tests := []struct {
+        name        string
+		initialPhase   corev1.PodPhase
+        updatePhase corev1.PodPhase
+        timeout     time.Duration
+		updateDelay time.Duration
+        wantPhase   corev1.PodPhase
+        wantErr     bool
+		errorMsg  string
+    }{
+        {
+            name:        "successful completion",
+			initialPhase: corev1.PodPending,
+            updatePhase: corev1.PodSucceeded,
+            timeout:     2 * time.Second,
+			wantErr:	 false,
+            wantPhase:   corev1.PodSucceeded,
+        },
+        {
+            name:        "timeout handling",
+			initialPhase: corev1.PodPending,
+            timeout:     1 * time.Second,
+            wantErr:     true,
+			wantPhase:   corev1.PodPending,
+			errorMsg:    "timeout: pod did not complete within 1s",
+        },
+		{
+            name:         "immediate failure",
+            initialPhase: corev1.PodFailed,
+            timeout:      2 * time.Second,
+            wantPhase:    corev1.PodFailed,
+			wantErr:     false,
+        },
+        {
+            name:         "pending to failed",
+            initialPhase: corev1.PodPending,
+			updatePhase: corev1.PodFailed,
+            updateDelay:  100 * time.Millisecond,
+            timeout:      2 * time.Second,
+            wantPhase:    corev1.PodFailed,
+			wantErr:     false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Create fresh clientset for each test case
+            initialPod := &corev1.Pod{
+                ObjectMeta: metav1.ObjectMeta{
+                    Namespace: "default",
+                    Name:      tt.name + "-pod",
+                },
+                Status: corev1.PodStatus{
+                    Phase: tt.initialPhase,
+                },
+            }
+            clientset := fakeapi.NewSimpleClientset(initialPod)
+            ku := &workceptor.KubeAPIWrapper{}
+
+			if tt.updateDelay == 0 {
+				tt.updateDelay = 500 * time.Millisecond // Default update delay if not specified
+			}
+
+            if tt.updatePhase != "" {
+                go func() {
+                    time.Sleep(tt.updateDelay)
+                    updatedPod := initialPod.DeepCopy()
+                    updatedPod.Status.Phase = tt.updatePhase
+                    _, _ = clientset.CoreV1().Pods("default").Update(context.Background(), updatedPod, metav1.UpdateOptions{})
+                }()
+            }
+
+            resultPod, err := ku.WaitForPodCompleted(initialPod, clientset, tt.timeout)
+
+            if (err != nil) != tt.wantErr {
+                t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
+				if tt.errorMsg != "" && err != nil && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+            }
+            if !tt.wantErr && resultPod.Status.Phase != tt.wantPhase {
+                t.Errorf("Expected phase %v, got %v", tt.wantPhase, resultPod.Status.Phase)
+            }
+        })
+    }
 }

@@ -308,15 +308,6 @@ func TestMonitorLocalStatus(t *testing.T) {
 		sleepDuration time.Duration
 	}{
 		{
-			name:          "Error Adding Watcher",
-			statObj:       NewInfo("test", 1, 0, time.Now()),
-			addWatcherErr: fmt.Errorf("error adding watcher"),
-			statErr:       nil,
-			fsNotifyEvent: nil,
-			logOutput:     "",
-			sleepDuration: 100 * time.Millisecond,
-		},
-		{
 			name:          "Error Reading Status",
 			statObj:       nil,
 			addWatcherErr: fmt.Errorf("error adding watcher"),
@@ -334,7 +325,6 @@ func TestMonitorLocalStatus(t *testing.T) {
 			randstring := randstr.RandomString(4)
 			logFilePath := fmt.Sprintf("/tmp/monitorLocalStatusLog%s", randstring)
 
-			mockWatcher := mock_workceptor.NewMockWatcherWrapper(ctrl)
 			mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
 			bwu.Init(w, "test", "", mockFileSystem)
 
@@ -342,34 +332,21 @@ func TestMonitorLocalStatus(t *testing.T) {
 			if tc.statObjLater != nil {
 				mockFileSystem.EXPECT().Stat(gomock.Any()).Return(tc.statObjLater, nil).AnyTimes()
 			}
-			mockWatcher.EXPECT().Remove(gomock.Any()).AnyTimes()
-			mockWatcher.EXPECT().Close().AnyTimes()
 
-			if tc.fsNotifyEvent != nil {
-				logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-				if err != nil {
-					t.Error("error creating monitorLocalStatusLog file")
-				}
-				l.SetOutput(logFile)
-				eventCh := make(chan fsnotify.Event, 1)
-				mockWatcher.EXPECT().EventChannel().Return(eventCh).AnyTimes()
-				go func() { eventCh <- *tc.fsNotifyEvent }()
-
-				errorCh := make(chan error, 1)
-				mockWatcher.EXPECT().ErrorChannel().Return(errorCh).AnyTimes()
+			logFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+			if err != nil {
+				t.Error("error creating monitorLocalStatusLog file")
 			}
+			l.SetOutput(logFile)
 
 			go bwu.MonitorLocalStatus()
 			time.Sleep(tc.sleepDuration)
-
-			if tc.fsNotifyEvent != nil {
-				logOutput, err := os.ReadFile(logFilePath)
-				if err != nil && len(logOutput) == 0 {
-					t.Errorf("error reading %s file", logFilePath)
-				}
-				if !bytes.Contains(logOutput, []byte(tc.logOutput)) {
-					t.Errorf("expected log to be: %s, got %s", tc.logOutput, string(logOutput))
-				}
+			logOutput, err := os.ReadFile(logFilePath)
+			if err != nil && len(logOutput) == 0 {
+				t.Errorf("error reading %s file", logFilePath)
+			}
+			if !bytes.Contains(logOutput, []byte(tc.logOutput)) {
+				t.Errorf("expected log to be: %s, got %s", tc.logOutput, string(logOutput))
 			}
 
 			bwu.CancelContext()

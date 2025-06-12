@@ -282,10 +282,8 @@ func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod) (bool, string, e
 }
 
 func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeout time.Duration) (*corev1.Pod, error) {
-	namespace := pod.Namespace
-	name := pod.Name
+
 	interval := 1 * time.Second
-	latestPod := pod
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -293,17 +291,17 @@ func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernet
 	for {
 		select {
 		case <-ctx.Done():
-			return latestPod, fmt.Errorf("timeout: pod %s/%s did not complete within %s", pod.Namespace, pod.Name, timeout)
+			return pod, fmt.Errorf("timeout: pod %s/%s did not complete within %s", pod.Namespace, pod.Name, timeout)
 		default:
 			var err error
-			latestPod, err = clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+			pod, err = clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			if err != nil {
-				return latestPod, err
+				return pod, err
 			}
 
-			switch latestPod.Status.Phase {
+			switch pod.Status.Phase {
 			case corev1.PodSucceeded, corev1.PodFailed:
-				return latestPod, nil
+				return pod, nil
 			}
 
 			time.Sleep(interval)
@@ -497,7 +495,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					)
 
 					if false { // deactivate new code TODO write integration tests
-						_, _ = kw.CapturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) //TODO Do we have a configurable timeout already?
+						_, _ = kw.CapturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) // TODO Do we have a configurable timeout already?
 					}
 
 					return

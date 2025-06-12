@@ -23,13 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	fakeapi "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
-    fakeapi "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/remotecommand"
 )
-
 
 func startNetceptorNodeWithWorkceptor() (*workceptor.KubeUnit, error) {
 	kw := &workceptor.KubeUnit{
@@ -706,8 +705,7 @@ func TestGetPodStatus(t *testing.T) {
 }
 func TestWaitForPodCompleted(t *testing.T) {
 
-
-		ctrl := gomock.NewController(t)
+	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
@@ -715,90 +713,90 @@ func TestWaitForPodCompleted(t *testing.T) {
 	// Create real implementation instance
 	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
 
-    tests := []struct {
-        name        string
-		initialPhase   corev1.PodPhase
-        updatePhase corev1.PodPhase
-        timeout     time.Duration
-		updateDelay time.Duration
-        wantPhase   corev1.PodPhase
-        wantErr     bool
-		wantError  string
-    }{
-        {
-            name:        "successful completion",
-			initialPhase: corev1.PodPending,
-            updatePhase: corev1.PodSucceeded,
-            timeout:     2 * time.Second,
-			wantErr:	 false,
-            wantPhase:   corev1.PodSucceeded,
-        },
-        {
-            name:        "timeout handling",
-			initialPhase: corev1.PodPending,
-            timeout:     1 * time.Second,
-            wantErr:     true,
-			wantPhase:   corev1.PodPending,
-			wantError:    "timeout: pod default/timeout handling-pod did not complete within 1s",
-        },
+	tests := []struct {
+		name         string
+		initialPhase corev1.PodPhase
+		updatePhase  corev1.PodPhase
+		timeout      time.Duration
+		updateDelay  time.Duration
+		wantPhase    corev1.PodPhase
+		wantErr      bool
+		wantError    string
+	}{
 		{
-            name:         "immediate failure",
-            initialPhase: corev1.PodFailed,
-            timeout:      2 * time.Second,
-            wantPhase:    corev1.PodFailed,
-			wantErr:     false,
-        },
-        {
-            name:         "pending to failed",
-            initialPhase: corev1.PodPending,
-			updatePhase: corev1.PodFailed,
-            updateDelay:  100 * time.Millisecond,
-            timeout:      2 * time.Second,
-            wantPhase:    corev1.PodFailed,
-			wantErr:     false,
-        },
-    }
+			name:         "successful completion",
+			initialPhase: corev1.PodPending,
+			updatePhase:  corev1.PodSucceeded,
+			timeout:      2 * time.Second,
+			wantErr:      false,
+			wantPhase:    corev1.PodSucceeded,
+		},
+		{
+			name:         "timeout handling",
+			initialPhase: corev1.PodPending,
+			timeout:      1 * time.Second,
+			wantErr:      true,
+			wantPhase:    corev1.PodPending,
+			wantError:    "timeout: pod default/timeout handling-pod did not complete within 1s",
+		},
+		{
+			name:         "immediate failure",
+			initialPhase: corev1.PodFailed,
+			timeout:      2 * time.Second,
+			wantPhase:    corev1.PodFailed,
+			wantErr:      false,
+		},
+		{
+			name:         "pending to failed",
+			initialPhase: corev1.PodPending,
+			updatePhase:  corev1.PodFailed,
+			updateDelay:  100 * time.Millisecond,
+			timeout:      2 * time.Second,
+			wantPhase:    corev1.PodFailed,
+			wantErr:      false,
+		},
+	}
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // Create fresh clientset for each test case
-            initialPod := &corev1.Pod{
-                ObjectMeta: metav1.ObjectMeta{
-                    Namespace: "default",
-                    Name:      tt.name + "-pod",
-                },
-                Status: corev1.PodStatus{
-                    Phase: tt.initialPhase,
-                },
-            }
-            clientset := fakeapi.NewSimpleClientset(initialPod)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create fresh clientset for each test case
+			initialPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      tt.name + "-pod",
+				},
+				Status: corev1.PodStatus{
+					Phase: tt.initialPhase,
+				},
+			}
+			clientset := fakeapi.NewSimpleClientset(initialPod)
 
 			if tt.updateDelay == 0 {
 				tt.updateDelay = 500 * time.Millisecond // Default update delay if not specified
 			}
 
-            if tt.updatePhase != "" {
-                go func() {
-                    time.Sleep(tt.updateDelay)
-                    updatedPod := initialPod.DeepCopy()
-                    updatedPod.Status.Phase = tt.updatePhase
-                    _, _ = clientset.CoreV1().Pods("default").Update(context.Background(), updatedPod, metav1.UpdateOptions{})
-                }()
-            }
+			if tt.updatePhase != "" {
+				go func() {
+					time.Sleep(tt.updateDelay)
+					updatedPod := initialPod.DeepCopy()
+					updatedPod.Status.Phase = tt.updatePhase
+					_, _ = clientset.CoreV1().Pods("default").Update(context.Background(), updatedPod, metav1.UpdateOptions{})
+				}()
+			}
 
-            _, err := realImplementation.WaitForPodCompleted(initialPod, clientset, tt.timeout)
+			_, err := realImplementation.WaitForPodCompleted(initialPod, clientset, tt.timeout)
 
-            if (err != nil) != tt.wantErr {
-                t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
 				if tt.wantError != "" && err != nil && !strings.Contains(err.Error(), tt.wantError) {
 					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
 				}
-            }
-            if tt.wantErr && err != nil {
+			}
+			if tt.wantErr && err != nil {
 				if !strings.Contains(err.Error(), tt.wantError) {
 					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
 				}
-            }
-        })
-    }
+			}
+		})
+	}
 }

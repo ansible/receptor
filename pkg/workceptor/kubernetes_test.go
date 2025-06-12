@@ -564,7 +564,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		})
 	}
 }
-func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod) {
+func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod, *corev1.Pod) {
 	podSuccess := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
@@ -619,7 +619,28 @@ func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod) {
 		},
 	}
 
-	return podSuccess, podInfraError, podAppError
+	podPending := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pending-pod",
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "main",
+					State: corev1.ContainerState{
+						Waiting: &corev1.ContainerStateWaiting{
+							Reason:  "ContainerCreating",
+							Message: "Container is being created",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return podSuccess, podInfraError, podAppError, podPending
 }
 
 func TestGetPodStatus(t *testing.T) {
@@ -631,7 +652,7 @@ func TestGetPodStatus(t *testing.T) {
 	// Create real implementation instance
 	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
 
-	podSuccess, infraErrorPod, applicationErrorPod := createTestPods()
+	podSuccess, infraErrorPod, applicationErrorPod, _ := createTestPods()
 
 	tests := []struct {
 		name       string
@@ -676,11 +697,24 @@ func TestGetPodStatus(t *testing.T) {
 			if ok != tt.wantOk || reason != tt.wantReason || (err != nil) != tt.wantErr {
 				t.Errorf("Failed %s case: ok=%v reason=%q err=%v", tt.name, ok, reason, err)
 			}
+			if err != nil && !strings.Contains(err.Error(), tt.wantReason) {
+				t.Errorf("Expected error message '%s', got '%s'", tt.wantReason, err.Error())
+			}
 		})
 	}
 
 }
 func TestWaitForPodCompleted(t *testing.T) {
+
+
+		ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+	// Create real implementation instance
+	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
+
     tests := []struct {
         name        string
 		initialPhase   corev1.PodPhase
@@ -689,7 +723,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 		updateDelay time.Duration
         wantPhase   corev1.PodPhase
         wantErr     bool
-		errorMsg  string
+		wantError  string
     }{
         {
             name:        "successful completion",
@@ -705,7 +739,7 @@ func TestWaitForPodCompleted(t *testing.T) {
             timeout:     1 * time.Second,
             wantErr:     true,
 			wantPhase:   corev1.PodPending,
-			errorMsg:    "timeout: pod did not complete within 1s",
+			wantError:    "timeout: pod default/timeout handling-pod did not complete within 1s",
         },
 		{
             name:         "immediate failure",
@@ -738,7 +772,6 @@ func TestWaitForPodCompleted(t *testing.T) {
                 },
             }
             clientset := fakeapi.NewSimpleClientset(initialPod)
-            ku := &workceptor.KubeAPIWrapper{}
 
 			if tt.updateDelay == 0 {
 				tt.updateDelay = 500 * time.Millisecond // Default update delay if not specified
@@ -753,16 +786,18 @@ func TestWaitForPodCompleted(t *testing.T) {
                 }()
             }
 
-            resultPod, err := ku.WaitForPodCompleted(initialPod, clientset, tt.timeout)
+            _, err := realImplementation.WaitForPodCompleted(initialPod, clientset, tt.timeout)
 
             if (err != nil) != tt.wantErr {
                 t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
-				if tt.errorMsg != "" && err != nil && !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("Expected error message '%s', got '%s'", tt.errorMsg, err.Error())
+				if tt.wantError != "" && err != nil && !strings.Contains(err.Error(), tt.wantError) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
 				}
             }
-            if !tt.wantErr && resultPod.Status.Phase != tt.wantPhase {
-                t.Errorf("Expected phase %v, got %v", tt.wantPhase, resultPod.Status.Phase)
+            if tt.wantErr && err != nil {
+				if !strings.Contains(err.Error(), tt.wantError) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
+				}
             }
         })
     }

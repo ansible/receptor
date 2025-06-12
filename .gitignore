@@ -30,5 +30,4 @@ venv
 pkg/services/.lock
 pkg/workceptor/status
 pkg/workceptor/status.lock
-demo
 **/__debug_*

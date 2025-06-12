@@ -237,13 +237,13 @@ func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	return inner
 }
 
-// podInfrastructureFailure checks if the pod has failed to start due to infrastructure issues.
-func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string, error) {
-
+// podInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.
+// Any other state is considered an infrastructure failure.
+func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod, containerName string) (bool, string, error) {
 	switch pod.Status.Phase {
 	case corev1.PodFailed:
 		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.State.Terminated != nil {
+			if cs.State.Terminated != nil && cs.Name == containerName {
 				switch cs.State.Terminated.ExitCode {
 				case 0:
 					break
@@ -267,14 +267,18 @@ func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod) (bool, string
 }
 
 // podApplicationSuccess checks if the pod has successfully completed its application logic.
-func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod) (bool, string, error) {
-
+// this is called after podInfrastructureSuccess has confirmed the pod is in a terminal state.
+func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod, containerName string) (bool, string, error) {
 	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.State.Terminated == nil {
-			return true, "container has not terminated", nil
-		}
-		if cs.State.Terminated.ExitCode != 0 {
-			return false, fmt.Sprintf("container %s exited with code %d: %s", cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
+		if cs.Name == containerName {
+			if cs.State.Waiting != nil {
+				if cs.State.Terminated == nil && cs.Name == containerName {
+					return true, "container has not terminated", nil
+				}
+				if cs.State.Terminated.ExitCode != 0 && cs.Name == containerName {
+					return false, fmt.Sprintf("container %s exited with code %d: %s", cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
+				}
+			}
 		}
 	}
 
@@ -282,9 +286,7 @@ func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod) (bool, string, e
 }
 
 func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeout time.Duration) (*corev1.Pod, error) {
-
 	interval := 1 * time.Second
-
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -311,20 +313,19 @@ func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernet
 
 // GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
 func (ku KubeAPIWrapper) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
-
 	if pod == nil {
 		return false, "pod is nil", fmt.Errorf("pod is nil")
 	}
 
 	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
 
-	infraOK, reason, err := ku.podInfrastructureSuccess(pod)
+	infraOK, reason, err := ku.podInfrastructureSuccess(pod, "worker")
 
 	if !infraOK || err != nil {
 		return infraOK, fmt.Sprintf("%s infrastructure %s", podRef, reason), err
 	}
 
-	appOK, reason, err := ku.podApplicationSuccess(pod)
+	appOK, reason, err := ku.podApplicationSuccess(pod, "worker")
 	if !appOK || err != nil {
 		return appOK, fmt.Sprintf("%s application %s", podRef, reason), err
 	}

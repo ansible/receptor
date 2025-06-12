@@ -584,7 +584,7 @@ func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod, *corev1.Pod) {
 			Reason: "PodMockOOMKilled",
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
-					Name: "main",
+					Name: "worker",
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 1,
@@ -606,7 +606,7 @@ func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod, *corev1.Pod) {
 			Reason: "AppFailure",
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
-					Name: "main",
+					Name: "worker",
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 1,
@@ -627,7 +627,7 @@ func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod, *corev1.Pod) {
 			Phase: corev1.PodPending,
 			ContainerStatuses: []corev1.ContainerStatus{
 				{
-					Name: "main",
+					Name: "worker",
 					State: corev1.ContainerState{
 						Waiting: &corev1.ContainerStateWaiting{
 							Reason:  "ContainerCreating",
@@ -671,14 +671,14 @@ func TestGetPodStatus(t *testing.T) {
 			name:       "infrastructure failure",
 			pod:        infraErrorPod,
 			wantOk:     false,
-			wantReason: "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container main MockOOMKill",
+			wantReason: "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container worker MockOOMKill",
 			wantErr:    false,
 		},
 		{
 			name:       "application failure",
 			pod:        applicationErrorPod,
 			wantOk:     false,
-			wantReason: "pod default/app-error-pod infrastructure pod reason AppFailure container main ContainerFailure",
+			wantReason: "pod default/app-error-pod infrastructure pod reason AppFailure container worker ContainerFailure",
 			wantErr:    false,
 		},
 		{

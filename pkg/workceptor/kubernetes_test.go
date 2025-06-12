@@ -703,6 +703,7 @@ func TestGetPodStatus(t *testing.T) {
 	}
 
 }
+
 func TestWaitForPodCompleted(t *testing.T) {
 
 	ctrl := gomock.NewController(t)

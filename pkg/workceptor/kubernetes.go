@@ -293,7 +293,7 @@ func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernet
 	for {
 		select {
 		case <-ctx.Done():
-			return latestPod, fmt.Errorf("timeout: pod did not complete within %s", timeout)
+			return latestPod, fmt.Errorf("timeout: pod %s/%s did not complete within %s", pod.Namespace, pod.Name, timeout)
 		default:
 			var err error
 			latestPod, err = clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})

@@ -15,6 +15,34 @@ def shutdown_write(sock):
         sock.shutdown(socket.SHUT_WR)
 
 
+def contains_json_like_fragments(s):
+    """Determines if the input contains substrings that resemble JSON."""
+
+    # Pattern to match balanced {...} or [...] in a rough and non-recursive way
+    object_pattern = r'({[^{}[\]]*})'
+    array_pattern = r'(\[[^\[\]{}]*\])'
+
+    # Find all non-overlapping matches
+    matches = re.findall(f'{object_pattern}|{array_pattern}', s)
+
+    for match in matches:
+        # match is a tuple because of regex alternation. Get the first non-empty match.
+        fragment = next((m for m in match if m), None)
+        if fragment and looks_like_json(fragment):
+            return True
+
+    return False
+
+
+def looks_like_json(s):
+    """Basic structural heuristics to decide if a string resembles JSON."""
+    s = s.strip()
+    if (s.startswith('{') and s.endswith('}')) or (s.startswith('[') and s.endswith(']')):
+        if re.search(r'"\s*:\s*', s) or re.search(r'("*\w+\s*,*)*', s) or s in ['{}', '[]']:
+            return True
+    return False
+
+
 class ReceptorControl:
     def __init__(
         self,
@@ -25,6 +53,7 @@ class ReceptorControl:
         key=None,
         cert=None,
         insecureskipverify=False,
+        print_sanitized_results=False,
     ):
         if config and any((rootcas, key, cert)):
             raise RuntimeError("Cannot specify both config and rootcas, key, cert")
@@ -38,6 +67,7 @@ class ReceptorControl:
         self._key = key
         self._cert = cert
         self._insecureskipverify = insecureskipverify
+        self._print_sanitized_results = print_sanitized_results
         if config and tlsclient:
             self.readconfig(config, tlsclient)
 
@@ -246,6 +276,7 @@ class ReceptorControl:
         self.connect()
         self.writestr(f"work results {unit_id} {startpos}\n")
         text = self.readstr()
+        self.get_sanitized_results(text)
         m = re.compile("Streaming results for work unit (.+)").fullmatch(text)
         if not m:
             errmsg = "Failed to get results"
@@ -277,3 +308,21 @@ class ReceptorControl:
             return sockfile
         else:
             return
+
+    def get_sanitized_results(self, text):
+        """Prints results that are unexpected or empty."""
+        if not self._print_sanitized_results:
+            return
+
+        try:
+            if text in ['', b'', '\n']:
+                print(f'WARNING: results from work unit were empty: {text}')
+            elif looks_like_json(text):
+                try:
+                    _ = json.loads(text)
+                except (ValueError, TypeError):
+                    print(f'WARNING: results appear to be valid JSON but did not parse correctly: {text}')
+            elif contains_json_like_fragments(text):
+                print(f'WARNING: results contain both regular text and JSON fragments: {text}')
+        except:
+            pass # Ignore all errors because this function shouldn't halt processing.

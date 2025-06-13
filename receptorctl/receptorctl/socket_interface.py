@@ -19,11 +19,11 @@ def contains_json_like_fragments(s):
     """Determines if the input contains substrings that resemble JSON."""
 
     # Pattern to match balanced {...} or [...] in a rough and non-recursive way
-    object_pattern = r'({[^{}[\]]*})'
-    array_pattern = r'(\[[^\[\]{}]*\])'
+    object_pattern = r"({[^{}[\]]*})"
+    array_pattern = r"(\[[^\[\]{}]*\])"
 
     # Find all non-overlapping matches
-    matches = re.findall(f'{object_pattern}|{array_pattern}', s)
+    matches = re.findall(f"{object_pattern}|{array_pattern}", s)
 
     for match in matches:
         # match is a tuple because of regex alternation. Get the first non-empty match.
@@ -37,8 +37,8 @@ def contains_json_like_fragments(s):
 def looks_like_json(s):
     """Basic structural heuristics to decide if a string resembles JSON."""
     s = s.strip()
-    if (s.startswith('{') and s.endswith('}')) or (s.startswith('[') and s.endswith(']')):
-        if re.search(r'"\s*:\s*', s) or re.search(r'("*\w+\s*,*)*', s) or s in ['{}', '[]']:
+    if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+        if re.search(r'"\s*:\s*', s) or re.search(r'("*\w+\s*,*)*', s) or s in ["{}", "[]"]:
             return True
     return False
 
@@ -315,14 +315,16 @@ class ReceptorControl:
             return
 
         try:
-            if text in ['', b'', '\n']:
-                print(f'WARNING: results from work unit were empty: {text}')
+            if text in ["", b"", "\n"]:
+                print(f"WARNING: results from work unit were empty: {text}")
             elif looks_like_json(text):
                 try:
                     _ = json.loads(text)
                 except (ValueError, TypeError):
-                    print(f'WARNING: results appear to be valid JSON but did not parse correctly: {text}')
+                    print(
+                        f"WARNING: results appear to be valid JSON but did not parse correctly: {text}"
+                    )
             elif contains_json_like_fragments(text):
-                print(f'WARNING: results contain both regular text and JSON fragments: {text}')
-        except:
-            pass # Ignore all errors because this function shouldn't halt processing.
+                print(f"WARNING: results contain both regular text and JSON fragments: {text}")
+        except Exception:
+            pass  # Ignore all errors because this function shouldn't halt processing.

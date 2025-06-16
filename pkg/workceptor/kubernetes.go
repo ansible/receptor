@@ -1047,10 +1047,12 @@ func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout 
 		reason := fmt.Sprintf("Pod diagnostics failed: %v reason %s", err, reason)
 		kw.GetWorkceptor().nc.GetLogger().Warning("%s", reason)
 		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)
+		
 		return false, err
 	} else if !ok {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed: %s", reason)
 		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)
+
 		return false, fmt.Errorf("pod did not succeed: %s", reason)
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("Pod completed successfully: %s", pod.Status.String())

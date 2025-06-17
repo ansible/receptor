@@ -84,14 +84,7 @@ def print_error(message, nl=True):
     help="Accept any server cert",
     show_default=True,
 )
-@click.option(
-    "--print-sanitized-results",
-    "print_sanitized_results",
-    default=False,
-    help="Prints results that are unexpected or empty.",
-    show_default=True,
-)
-def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify, print_sanitized_results):
+def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
     ctx.obj = {
         "rc": None,
         "receptorctlVersion": importlib.metadata.version("receptorctl"),
@@ -107,7 +100,6 @@ def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify, 
             key=key,
             cert=cert,
             insecureskipverify=insecureskipverify,
-            print_sanitized_results=print_sanitized_results,
         )
         # Load and stash the versions
         ctx.obj["receptorVersion"] = ctx.obj["rc"].simple_command(

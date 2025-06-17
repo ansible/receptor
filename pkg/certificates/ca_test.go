@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -1039,27 +1040,30 @@ func TestCreateCertReqWithKeyNegative(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		args    args
-		want    *x509.CertificateRequest
-		want1   *rsa.PrivateKey
-		wantErr error
+		name     string
+		args     args
+		want     *x509.CertificateRequest
+		want1    *rsa.PrivateKey
+		wantErrs []string
 	}{
 		{
 			name: "Negative test for Bits",
 			args: args{
 				opts: &badCertOptions,
 			},
-			want:    nil,
-			want1:   nil,
-			wantErr: fmt.Errorf("crypto/rsa: too few primes of given length to generate an RSA key"),
+			want:  nil,
+			want1: nil,
+			wantErrs: []string{
+				"crypto/rsa: too few primes of given length to generate an RSA key",
+				"rsa: key too small",
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, gotErr := certificates.CreateCertReqWithKey(tt.args.opts)
-			if gotErr == nil || gotErr.Error() != tt.wantErr.Error() {
-				t.Errorf("CreateCertReqWithKey() error = %v, wantErr = %v", gotErr, tt.wantErr)
+			if gotErr == nil || !slices.Contains(tt.wantErrs, gotErr.Error()) {
+				t.Errorf("CreateCertReqWithKey() error = %v, wantErr = %v", gotErr, tt.wantErrs)
 			}
 		})
 	}

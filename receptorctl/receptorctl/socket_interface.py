@@ -305,8 +305,10 @@ class ReceptorControl:
             return sockfile
         else:
             return
-        
-    def get_sanitized_work_results(self, unit_id, startpos=0, return_socket=False, return_sockfile=True):
+
+    def get_sanitized_work_results(
+        self, unit_id, startpos=0, return_socket=False, return_sockfile=True
+    ):
         self.connect()
         self.writestr(f"work results {unit_id} {startpos}\n")
         text = self.readstr()
@@ -315,7 +317,7 @@ class ReceptorControl:
         # is regular text mixed with JSON fragments.
 
         if text in ["", b"", "\n"]:
-                self.writestr(f"WARNING: results from work unit were empty: {text}")
+            self.writestr(f"WARNING: results from work unit were empty: {text}")
         elif looks_like_json(text):
             try:
                 _ = json.loads(text)

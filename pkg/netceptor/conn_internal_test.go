@@ -103,7 +103,6 @@ func TestClientTLSConfig(t *testing.T) {
 
 // TestNetceptorListen tests the Listen method functionality.
 func TestNetceptorListen(t *testing.T) {
-
 	tests := []struct {
 		name                string
 		serviceName         string

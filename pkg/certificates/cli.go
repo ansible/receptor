@@ -225,7 +225,7 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 		return err
 	}
 
-	return SaveToPEMFile(certOut, []interface{}{cert}, &OsWrapper{})
+	return SaveToPEMFile(certOut, []interface{}{cert}, osWrapper)
 }
 
 type SignReqConfig struct {

@@ -1047,7 +1047,7 @@ func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout 
 		reason := fmt.Sprintf("Pod diagnostics failed: %v reason %s", err, reason)
 		kw.GetWorkceptor().nc.GetLogger().Warning("%s", reason)
 		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)
-		
+
 		return false, err
 	} else if !ok {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed: %s", reason)
@@ -1508,7 +1508,9 @@ func (kw *KubeUnit) connectToKube() error {
 	return nil
 }
 
-func readFileToString(filename string) (string, error) {
+// ReadFileToString reads a file and returns its contents as a string.
+// If filename is empty, it returns an empty string.
+func ReadFileToString(filename string) (string, error) {
 	// If filename is "", the function returns ""
 	if filename == "" {
 		return "", nil
@@ -1539,11 +1541,11 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 		return ssf
 	}
 	var err error
-	ked.KubePod, err = readFileToString(ked.KubePod)
+	ked.KubePod, err = ReadFileToString(ked.KubePod)
 	if err != nil {
 		return fmt.Errorf("could not read pod: %s", err)
 	}
-	ked.KubeConfig, err = readFileToString(ked.KubeConfig)
+	ked.KubeConfig, err = ReadFileToString(ked.KubeConfig)
 	if err != nil {
 		return fmt.Errorf("could not read kubeconfig: %s", err)
 	}
@@ -1619,6 +1621,11 @@ func (kw *KubeUnit) Status() *StatusFileData {
 	}
 
 	return status
+}
+
+// SetClientset sets the clientset for testing purposes.
+func (kw *KubeUnit) SetClientset(clientset *kubernetes.Clientset) {
+	kw.clientset = clientset
 }
 
 // Status returns a copy of the status currently loaded in memory.

@@ -53,7 +53,6 @@ class ReceptorControl:
         key=None,
         cert=None,
         insecureskipverify=False,
-        print_sanitized_results=False,
     ):
         if config and any((rootcas, key, cert)):
             raise RuntimeError("Cannot specify both config and rootcas, key, cert")
@@ -67,7 +66,6 @@ class ReceptorControl:
         self._key = key
         self._cert = cert
         self._insecureskipverify = insecureskipverify
-        self._print_sanitized_results = print_sanitized_results
         if config and tlsclient:
             self.readconfig(config, tlsclient)
 

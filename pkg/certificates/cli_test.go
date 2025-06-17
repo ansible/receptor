@@ -12,6 +12,11 @@ import (
 	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/certificates/mock_certificates"
 	"go.uber.org/mock/gomock"
+    "bytes"
+    "crypto/rand"
+    "crypto/rsa"
+    "crypto/x509"
+    "encoding/pem"
 )
 
 func TestInitCA(t *testing.T) {
@@ -110,109 +115,306 @@ func TestInitCA(t *testing.T) {
 	}
 }
 
+// setupMultiplePrivateKeysPEMData returns a PEM-encoded byte slice containing two RSA private keys.
+func setupMultiplePrivateKeysPEMData() []byte {
+    var buf bytes.Buffer
+
+    // Generate first RSA private key
+    key1, _ := rsa.GenerateKey(rand.Reader, 2048)
+    pemBlock1 := &pem.Block{
+        Type:  "RSA PRIVATE KEY",
+        Bytes: x509.MarshalPKCS1PrivateKey(key1),
+    }
+    pem.Encode(&buf, pemBlock1)
+
+    // Generate second RSA private key
+    key2, _ := rsa.GenerateKey(rand.Reader, 2048)
+    pemBlock2 := &pem.Block{
+        Type:  "RSA PRIVATE KEY",
+        Bytes: x509.MarshalPKCS1PrivateKey(key2),
+    }
+    pem.Encode(&buf, pemBlock2)
+
+    return buf.Bytes()
+}
+
 func TestMakeReq(t *testing.T) {
-	type args struct {
-		opts   *certificates.CertOptions
-		keyIn  string
-		keyOut string
-		reqOut string
-	}
+    type args struct {
+        opts   *certificates.CertOptions
+        keyIn  string
+        keyOut string
+        reqOut string
+    }
 
-	positiveKeyIn := "/tmp/receptor_key.pem"
-	positiveKeyOut := "/tmp/receptor_key_out.pem"
-	positiveReqOut := "/tmp/receptor_request_out.pem"
+    // Helper variables for filenames and data
+    positiveKeyIn := "/tmp/receptor_key.pem"
+    positiveKeyOut := "/tmp/receptor_key_out.pem"
+    positiveReqOut := "/tmp/receptor_request_out.pem"
+    negativeKeyIn := "/tmp/bad_key.pem"
+    badKeyFile := "/tmp/bad_keyfile.pem"
+    missingKeyFile := "/tmp/missing_keyfile.pem"
+    invalidReqOut := "/dev/null/req.pem"
+    invalidKeyOut := "/dev/null/key.pem"
 
-	negativeKeyIn := "/tmp"
+    tests := []struct {
+        name       string
+        args       args
+        wantErr    bool
+        setupMocks func(mockOs *mock_certificates.MockOser)
+    }{
+        // Original positive test
+        {
+            name: "Positive test with keyIn",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       8192,
+                    CommonName: "Ansible Automation Controller Nodes Mesh",
+                },
+                keyIn:  positiveKeyIn,
+                keyOut: positiveKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: false,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().ReadFile(gomock.Eq(positiveKeyIn)).Return(setupGoodPrivateKeyPEMData(), nil).Times(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(positiveKeyOut), gomock.Any(), gomock.Any()).Return(nil).MinTimes(0).MaxTimes(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(positiveReqOut), gomock.Any(), gomock.Any()).Return(nil).MinTimes(0).MaxTimes(1)
+            },
+        },
+        // Original negative test: invalid key bits
+        {
+            name: "Negative test with bad key bits",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       -1,
+                    CommonName: "Ansible Automation Controller Nodes Mesh",
+                },
+                keyIn:  negativeKeyIn,
+                keyOut: positiveKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().ReadFile(gomock.Eq(negativeKeyIn)).Return(nil, fs.ErrInvalid).Times(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(positiveKeyOut), gomock.Any(), gomock.Any()).MinTimes(0).MaxTimes(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(positiveReqOut), gomock.Any(), gomock.Any()).MinTimes(0).MaxTimes(1)
+            },
+        },
+        // Test: Valid input, generates new key (no keyIn)
+        {
+            name: "Valid input, generates new key",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       2048,
+                    CommonName: "example.com",
+                },
+                keyIn:  "",
+                keyOut: "/tmp/test_key.pem",
+                reqOut: "/tmp/test_req.pem",
+            },
+            wantErr: false,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().WriteFile(gomock.Eq("/tmp/test_key.pem"), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+                mockOs.EXPECT().WriteFile(gomock.Eq("/tmp/test_req.pem"), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+            },
+        },
+        // Test: Invalid key bits with new key
+        {
+            name: "Invalid key bits, new key",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       -1,
+                    CommonName: "example.com",
+                },
+                keyIn:  "",
+                keyOut: "/tmp/test_key.pem",
+                reqOut: "/tmp/test_req.pem",
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().WriteFile(gomock.Eq("/tmp/test_key.pem"), gomock.Any(), gomock.Any()).AnyTimes()
+                mockOs.EXPECT().WriteFile(gomock.Eq("/tmp/test_req.pem"), gomock.Any(), gomock.Any()).AnyTimes()
+            },
+        },
+        // Edge: keyIn file missing
+        {
+            name: "keyIn file missing",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       2048,
+                    CommonName: "example.com",
+                },
+                keyIn:  missingKeyFile,
+                keyOut: positiveKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().ReadFile(gomock.Eq(missingKeyFile)).Return(nil, fs.ErrNotExist).Times(1)
+            },
+        },
+        // Edge: keyIn file contains no private keys
+        {
+            name: "keyIn file contains no private keys",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       2048,
+                    CommonName: "example.com",
+                },
+                keyIn:  badKeyFile,
+                keyOut: positiveKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().ReadFile(gomock.Eq(badKeyFile)).Return([]byte("not a private key"), nil).Times(1)
+            },
+        },
+        // Edge: keyIn file contains multiple private keys
+        {
+            name: "keyIn file contains multiple private keys",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       2048,
+                    CommonName: "example.com",
+                },
+                keyIn:  "/tmp/multi_key.pem",
+                keyOut: positiveKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().ReadFile(gomock.Eq("/tmp/multi_key.pem")).Return(setupMultiplePrivateKeysPEMData(), nil).Times(1)
+            },
+        },
+        // Edge: WriteFile fails for reqOut
+        {
+            name: "WriteFile fails for reqOut",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       2048,
+                    CommonName: "example.com",
+                },
+                keyIn:  positiveKeyIn,
+                keyOut: positiveKeyOut,
+                reqOut: invalidReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().ReadFile(gomock.Eq(positiveKeyIn)).Return(setupGoodPrivateKeyPEMData(), nil).Times(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(positiveKeyOut), gomock.Any(), gomock.Any()).Return(nil).MinTimes(0).MaxTimes(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(invalidReqOut), gomock.Any(), gomock.Any()).Return(fs.ErrPermission).Times(1)
+            },
+        },
+        // Edge: WriteFile fails for keyOut
+        {
+            name: "WriteFile fails for keyOut",
+            args: args{
+                opts: &certificates.CertOptions{
+                    Bits:       2048,
+                    CommonName: "example.com",
+                },
+                keyIn:  "",
+                keyOut: invalidKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {
+                mockOs.EXPECT().WriteFile(gomock.Eq(invalidKeyOut), gomock.Any(), gomock.Any()).Return(fs.ErrPermission).Times(1)
+                mockOs.EXPECT().WriteFile(gomock.Eq(positiveReqOut), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+            },
+        },
+        // Edge: Bits missing with keyOut only (should error)
+        {
+            name: "Bits missing with keyOut only",
+            args: args{
+                opts: &certificates.CertOptions{
+                    CommonName: "example.com",
+                },
+                keyIn:  "",
+                keyOut: positiveKeyOut,
+                reqOut: positiveReqOut,
+            },
+            wantErr: true,
+            setupMocks: func(mockOs *mock_certificates.MockOser) {},
+        },
+    }
 
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "Positive test",
-			args: args{
-				opts: &certificates.CertOptions{
-					Bits:       8192,
-					CommonName: "Ansible Automation Controller Nodes Mesh",
-				},
-				keyIn:  positiveKeyIn,
-				keyOut: positiveKeyOut,
-				reqOut: positiveReqOut,
-			},
-			wantErr: false,
-		},
-		{
-			name: "Negative test",
-			args: args{
-				opts: &certificates.CertOptions{
-					Bits:       -1,
-					CommonName: "Ansible Automation Controller Nodes Mesh",
-				},
-				keyIn:  negativeKeyIn,
-				keyOut: positiveKeyOut,
-				reqOut: positiveReqOut,
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            ctrl := gomock.NewController(t)
+            defer ctrl.Finish()
+            mockOs := mock_certificates.NewMockOser(ctrl)
+            tt.setupMocks(mockOs)
+            err := certificates.MakeReq(tt.args.opts, tt.args.keyIn, tt.args.keyOut, tt.args.reqOut, mockOs)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("MakeReq() error = %v, wantErr %v", err, tt.wantErr)
+            }
+        })
+    }
+}
 
-			o := mock_certificates.NewMockOser(ctrl)
+func TestPrepare(t *testing.T) {
+    tests := []struct {
+        name      string
+        cfg       certificates.MakeReqConfig
+        wantErr   bool
+        errString string
+    }{
+        {
+            name:      "Neither InKey nor OutKey set",
+            cfg:       certificates.MakeReqConfig{InKey: "", OutKey: "", Bits: 0},
+            wantErr:   true,
+            errString: "must provide either InKey or OutKey",
+        },
+        {
+            name:      "Both InKey and OutKey set",
+            cfg:       certificates.MakeReqConfig{InKey: "akey", OutKey: "bkey", Bits: 0},
+            wantErr:   true,
+            errString: "cannot use both InKey and OutKey",
+        },
+        {
+            name:      "InKey set with Bits",
+            cfg:       certificates.MakeReqConfig{InKey: "akey", OutKey: "", Bits: 2048},
+            wantErr:   true,
+            errString: "cannot specify key bits when reading an already-existing key",
+        },
+        {
+            name:      "OutKey set without Bits",
+            cfg:       certificates.MakeReqConfig{InKey: "", OutKey: "bkey", Bits: 0},
+            wantErr:   true,
+            errString: "must specify key bits when creating a new key",
+        },
+        {
+            name:      "Valid: only InKey set",
+            cfg:       certificates.MakeReqConfig{InKey: "akey", OutKey: "", Bits: 0},
+            wantErr:   false,
+            errString: "",
+        },
+        {
+            name:      "Valid: only OutKey set with Bits",
+            cfg:       certificates.MakeReqConfig{InKey: "", OutKey: "bkey", Bits: 2048},
+            wantErr:   false,
+            errString: "",
+        },
+    }
 
-			switch tt.args.keyIn {
-			case negativeKeyIn:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(negativeKeyIn)).
-					Return(nil, fs.ErrInvalid).
-					Times(1)
-
-			case positiveKeyIn:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(positiveKeyIn)).
-					Return(setupGoodPrivateKeyPEMData(), nil).
-					Times(1)
-
-			default:
-				t.Errorf("Unexpected keyIn filename: %s", tt.args.keyIn)
-			}
-
-			switch tt.args.keyOut {
-			case positiveKeyOut:
-				o.
-					EXPECT().
-					WriteFile(gomock.Eq(positiveKeyOut), gomock.Any(), gomock.Any()).
-					Return(nil).
-					MinTimes(0).
-					MaxTimes(1)
-
-			default:
-				t.Errorf("Unexpected keyOut filename: %s", tt.args.keyOut)
-			}
-
-			switch tt.args.reqOut {
-			case positiveReqOut:
-				o.
-					EXPECT().
-					WriteFile(gomock.Eq(positiveReqOut), gomock.Any(), gomock.Any()).
-					Return(nil).
-					MinTimes(0).
-					MaxTimes(1)
-
-			default:
-				t.Errorf("Unexpected reqOut filename: %s", tt.args.reqOut)
-			}
-
-			if err := certificates.MakeReq(tt.args.opts, tt.args.keyIn, tt.args.keyOut, tt.args.reqOut, o); (err != nil) != tt.wantErr {
-				t.Errorf("MakeReq() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            err := tt.cfg.Prepare()
+            if tt.wantErr {
+                if err == nil {
+                    t.Errorf("Prepare() error = nil, want error %q", tt.errString)
+                } else if err.Error() != tt.errString {
+                    t.Errorf("Prepare() error = %q, want %q", err.Error(), tt.errString)
+                }
+            } else {
+                if err != nil {
+                    t.Errorf("Prepare() unexpected error = %v", err)
+                }
+            }
+        })
+    }
 }
 
 func TestSignReq(t *testing.T) {

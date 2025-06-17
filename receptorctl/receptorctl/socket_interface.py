@@ -276,7 +276,6 @@ class ReceptorControl:
         self.connect()
         self.writestr(f"work results {unit_id} {startpos}\n")
         text = self.readstr()
-        self.get_sanitized_results(text)
         m = re.compile("Streaming results for work unit (.+)").fullmatch(text)
         if not m:
             errmsg = "Failed to get results"
@@ -308,23 +307,55 @@ class ReceptorControl:
             return sockfile
         else:
             return
+        
+    def get_sanitized_work_results(self, unit_id, startpos=0, return_socket=False, return_sockfile=True):
+        self.connect()
+        self.writestr(f"work results {unit_id} {startpos}\n")
+        text = self.readstr()
 
-    def get_sanitized_results(self, text):
-        """Prints results that are unexpected or empty."""
-        if not self._print_sanitized_results:
-            return
+        # Check if the text that was read is empty, contains unparsable JSON, or
+        # is regular text mixed with JSON fragments.
 
+        if text in ["", b"", "\n"]:
+                self.writestr(f"WARNING: results from work unit were empty: {text}")
+        elif looks_like_json(text):
+            try:
+                _ = json.loads(text)
+            except (ValueError, TypeError):
+                self.writestr(
+                    f"WARNING: results appear to be valid JSON but did not parse correctly: {text}"
+                )
+        elif contains_json_like_fragments(text):
+            self.writestr(f"WARNING: results contain both regular text and JSON fragments: {text}")
+
+        m = re.compile("Streaming results for work unit (.+)").fullmatch(text)
+        if not m:
+            errmsg = "Failed to get results"
+            if str.startswith(text, "ERROR: "):
+                errmsg = errmsg + ": " + text[7:]
+            raise RuntimeError(errmsg)
+        shutdown_write(self._socket)
+
+        # We return the filelike object created by makefile() by default, or optionally
+        # the socket itself.  Either way, we close the other dup'd handle so the caller's
+        # close will be effective.
+
+        socket = self._socket
+        sockfile = self._sockfile
         try:
-            if text in ["", b"", "\n"]:
-                print(f"WARNING: results from work unit were empty: {text}")
-            elif looks_like_json(text):
-                try:
-                    _ = json.loads(text)
-                except (ValueError, TypeError):
-                    print(
-                        f"WARNING: results appear to be valid JSON but did not parse correctly: {text}"
-                    )
-            elif contains_json_like_fragments(text):
-                print(f"WARNING: results contain both regular text and JSON fragments: {text}")
-        except Exception:
-            pass  # Ignore all errors because this function shouldn't halt processing.
+            if not return_socket:
+                self._socket.close()
+            if not return_sockfile:
+                self._sockfile.close()
+        finally:
+            self._socket = None
+            self._sockfile = None
+
+        if return_socket and return_sockfile:
+            return socket, sockfile
+        elif return_socket:
+            return socket
+        elif return_sockfile:
+            return sockfile
+        else:
+            return

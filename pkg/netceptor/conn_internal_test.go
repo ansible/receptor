@@ -104,10 +104,6 @@ func TestClientTLSConfig(t *testing.T) {
 
 // TestNetceptorListen tests the Listen method functionality.
 func TestNetceptorListen(t *testing.T) {
-	// Skip this test in CI environments or when network operations are not possible
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping test in CI environment")
-	}
 
 	tests := []struct {
 		name                string
@@ -186,11 +182,6 @@ func TestNetceptorListen(t *testing.T) {
 
 // TestNetceptorListenAndAdvertise tests basic functionality of the ListenAndAdvertise method.
 func TestNetceptorListenAndAdvertise(t *testing.T) {
-	// Skip this test in CI environments or when network operations are not possible
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping test in CI environment")
-	}
-
 	// Create a Netceptor instance
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

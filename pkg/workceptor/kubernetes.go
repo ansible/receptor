@@ -1036,7 +1036,6 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 }
 
 func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout time.Duration) (ok bool, err error) {
-
 	pod, err = kw.KubeAPIWrapperInstance.WaitForPodCompleted(pod, kw.clientset, timeout)
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Debug("Job complete and pod is still running: %v", err)

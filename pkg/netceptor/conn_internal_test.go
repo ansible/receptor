@@ -3,7 +3,6 @@ package netceptor
 import (
 	"context"
 	"crypto/x509"
-	"os"
 	"strings"
 	"testing"
 )

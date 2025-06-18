@@ -352,6 +352,25 @@ IemSZj8QaR2JNPwXEbBEh8uPDhNvPBQFrw==
 -----END CERTIFICATE REQUEST-----`)
 }
 
+// Incompatible certificate with receptor as it is missing `DNSNames`, `IPAddresses`, `NodeIDs` fields.
+func setupBadCertificateRequestPEMData() []byte {
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	certRequestTemplate := x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   "Example",
+			Organization: []string{"Ansible"},
+		},
+		SignatureAlgorithm: x509.SHA256WithRSA,
+	}
+	certRequestBytes, _ := x509.CreateCertificateRequest(rand.Reader, &certRequestTemplate, privateKey)
+	certRequestPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: certRequestBytes,
+	})
+
+	return certRequestPEM
+}
+
 func setupGoodCertificateRequestRsaPrivateKey() (*rsa.PrivateKey, error) {
 	goodCertificateRequestRsaPrivateKeyPEMData := setupGoodCertificateRequestRsaPrivateKeyPEMData()
 	goodCertificateRequestRsaPrivateKeyBlock, rest := pem.Decode(goodCertificateRequestRsaPrivateKeyPEMData)

@@ -163,8 +163,14 @@ func (mr MakeReqConfig) Run() error {
 	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, &OsWrapper{})
 }
 
+type SignReqFunc interface {
+	SignReq(opts *CertOptions, caCert, caKey, req, outCert string, verify bool, osWrapper Oser) error
+}
+
+type SignerReqImpl struct{}
+
 // SignReq Sign Certificate Request.
-func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool, osWrapper Oser) error {
+func (s *SignerReqImpl) SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool, osWrapper Oser) error {
 	ca := &CA{}
 	var err error
 	ca.Certificate, err = LoadCertificate(caCrtPath, osWrapper)
@@ -238,7 +244,7 @@ type SignReqConfig struct {
 	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
 }
 
-func (sr SignReqConfig) Run() error {
+func (sr SignReqConfig) ValidateAndSign(signReqFunc SignReqFunc) error {
 	opts := &CertOptions{}
 	if sr.NotBefore != "" {
 		t, err := time.Parse(time.RFC3339, sr.NotBefore)
@@ -255,7 +261,11 @@ func (sr SignReqConfig) Run() error {
 		opts.NotAfter = t
 	}
 
-	return SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify, &OsWrapper{})
+	return signReqFunc.SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify, &OsWrapper{})
+}
+
+func (sr SignReqConfig) Run() error {
+	return sr.ValidateAndSign(&SignerReqImpl{})
 }
 
 func init() {

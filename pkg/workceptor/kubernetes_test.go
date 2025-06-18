@@ -1459,6 +1459,16 @@ func TestWaitForPodCompleted(t *testing.T) {
 			wantPhase:    corev1.PodFailed,
 			wantErr:      false,
 		},
+		{
+			name:         "pending to unknown",
+			initialPhase: corev1.PodPending,
+			updatePhase:  corev1.PodUnknown,
+			updateDelay:  100 * time.Millisecond,
+			timeout:      1 * time.Second,
+			wantPhase:    corev1.PodFailed,
+			wantErr:      true,
+			wantError:    "timeout: pod default/pending to unknown-pod did not complete within 1s", // unknown is not treated as as completed state
+		},
 	}
 
 	for _, tt := range tests {

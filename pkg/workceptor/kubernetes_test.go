@@ -1254,83 +1254,79 @@ func TestKubeUnitRestart(t *testing.T) {
 	})
 }
 
-func createTestPods() (*corev1.Pod, *corev1.Pod, *corev1.Pod, *corev1.Pod) {
-	podSuccess := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "test-pod",
-		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodSucceeded,
-		},
-	}
+var podSuccess = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "test-pod",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodSucceeded,
+	},
+}
 
-	podInfraError := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "infra-error-pod",
-		},
-		Status: corev1.PodStatus{
-			Phase:  corev1.PodFailed,
-			Reason: "PodMockOOMKilled",
-			ContainerStatuses: []corev1.ContainerStatus{
-				{
-					Name: "worker",
-					State: corev1.ContainerState{
-						Terminated: &corev1.ContainerStateTerminated{
-							ExitCode: 1,
-							Reason:   "MockOOMKill",
-						},
+var podInfraError = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "infra-error-pod",
+	},
+	Status: corev1.PodStatus{
+		Phase:  corev1.PodFailed,
+		Reason: "PodMockOOMKilled",
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 1,
+						Reason:   "MockOOMKill",
 					},
 				},
 			},
 		},
-	}
+	},
+}
 
-	podAppError := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "app-error-pod",
-		},
-		Status: corev1.PodStatus{
-			Phase:  corev1.PodFailed,
-			Reason: "AppFailure",
-			ContainerStatuses: []corev1.ContainerStatus{
-				{
-					Name: "worker",
-					State: corev1.ContainerState{
-						Terminated: &corev1.ContainerStateTerminated{
-							ExitCode: 1,
-							Reason:   "ContainerFailure",
-						},
+var podAppError = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "app-error-pod",
+	},
+	Status: corev1.PodStatus{
+		Phase:  corev1.PodFailed,
+		Reason: "AppFailure",
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 1,
+						Reason:   "ContainerFailure",
 					},
 				},
 			},
 		},
-	}
+	},
+}
 
-	podPending := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pending-pod",
-		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodPending,
-			ContainerStatuses: []corev1.ContainerStatus{
-				{
-					Name: "worker",
-					State: corev1.ContainerState{
-						Waiting: &corev1.ContainerStateWaiting{
-							Reason:  "ContainerCreating",
-							Message: "Container is being created",
-						},
+var podPending = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "pending-pod",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodPending,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "ContainerCreating",
+						Message: "Container is being created",
 					},
 				},
 			},
 		},
-	}
-
-	return podSuccess, podInfraError, podAppError, podPending
+	},
 }
 
 func TestGetPodStatus(t *testing.T) {
@@ -1342,14 +1338,13 @@ func TestGetPodStatus(t *testing.T) {
 	// Create real implementation instance
 	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
 
-	podSuccess, infraErrorPod, applicationErrorPod, _ := createTestPods()
-
 	tests := []struct {
 		name       string
 		pod        *corev1.Pod
 		wantOk     bool
 		wantReason string
 		wantErr    bool
+		wantError  string
 	}{
 		{
 			name:       "nil pod",
@@ -1357,17 +1352,18 @@ func TestGetPodStatus(t *testing.T) {
 			wantOk:     false,
 			wantReason: "pod is nil",
 			wantErr:    true,
+			wantError:  "pod is nil",
 		},
 		{
 			name:       "infrastructure failure",
-			pod:        infraErrorPod,
+			pod:        podInfraError,
 			wantOk:     false,
 			wantReason: "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container worker MockOOMKill",
 			wantErr:    false,
 		},
 		{
 			name:       "application failure",
-			pod:        applicationErrorPod,
+			pod:        podAppError,
 			wantOk:     false,
 			wantReason: "pod default/app-error-pod infrastructure pod reason AppFailure container worker ContainerFailure",
 			wantErr:    false,
@@ -1379,16 +1375,34 @@ func TestGetPodStatus(t *testing.T) {
 			wantReason: "",
 			wantErr:    false,
 		},
+		{
+			name:       "pending pod",
+			pod:        podPending,
+			wantOk:     true,
+			wantReason: "pod default/pending-pod infrastructure pod phase: Pending",
+			wantErr:    true,
+			wantError:  "pod not in terminal state",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ok, reason, err := realImplementation.GetPodStatus(tt.pod)
 			if ok != tt.wantOk || reason != tt.wantReason || (err != nil) != tt.wantErr {
-				t.Errorf("Failed %s case: ok=%v reason=%q err=%v", tt.name, ok, reason, err)
+				t.Errorf("Failed %s case: ok=%v wantok=%v reason=%q err=%v", tt.name, ok, tt.wantOk, reason, err)
 			}
-			if err != nil && !strings.Contains(err.Error(), tt.wantReason) {
-				t.Errorf("Expected error message '%s', got '%s'", tt.wantReason, err.Error())
+			if err != nil && tt.wantErr == false {
+				t.Errorf("Expected error message got '%s'", err.Error())
+			}
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Expected error message '%s', got nil error", tt.wantError)
+				} else if !strings.Contains(err.Error(), tt.wantError) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
+				}
+			}
+			if tt.wantError == "" && err != nil {
+				t.Errorf("Unexpected error for %s case: %v", tt.name, err)
 			}
 		})
 	}

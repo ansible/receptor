@@ -2028,6 +2028,11 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					}
 					if ok && connError != nil {
 						s.Logger.Error("Context for existing connection error: %s", connError)
+						s.connLock.Unlock()
+						// Remove the canceled connection to prevent resource leak
+						s.removeConnection(remoteNodeID)
+						s.connLock.Lock()
+						remoteNodeAccepted = true // Allow the new connection to proceed
 					}
 
 					if !remoteNodeAccepted {

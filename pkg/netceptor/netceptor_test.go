@@ -896,22 +896,22 @@ func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
 }
 
 // TestRunProtocolExistingConnWithCanceledContext tests the condition in runProtocol
-// where an existing connection has a canceled context by calling the real runProtocol function
+// where an existing connection has a canceled context by calling the real runProtocol function.
 func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
-	// Set up using helper
+	// Set up using helper.
 	ctx := context.Background()
 	s, logCapture := createNetceptorWithLogCapture("test-node")
 	remoteNodeID := "existing-node"
 
-	// Create canceled context and existing connection using helper
+	// Create canceled context and existing connection using helper.
 	canceledCtx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel it immediately
 	createExistingConnectionWithContext(s, remoteNodeID, canceledCtx, cancel)
 
-	// Create mock session using helper
+	// Create mock session using helper.
 	mockSession, bi := createMockSessionAndBackendInfo(t, s, remoteNodeID)
 
-	// Call runProtocol
+	// Call runProtocol.
 	go func() {
 		err := s.runProtocol(ctx, mockSession, bi)
 		if err != nil {
@@ -919,14 +919,14 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 		}
 	}()
 
-	// Wait for processing
+	// Wait for processing.
 	time.Sleep(200 * time.Millisecond)
 
-	// Verify new connection was established
+	// Verify new connection was established.
 	s.connLock.RLock()
 	newConn, exists := s.connections[remoteNodeID]
 	s.connLock.RUnlock()
-	
+
 	if !exists {
 		t.Error("Expected new connection to be established after removing canceled connection")
 	}
@@ -934,7 +934,7 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 		t.Error("Expected new connection to have valid context")
 	}
 
-	// Verify context error was logged using helper
+	// Verify context error was logged using helper.
 	if !checkLogForMessage(logCapture, "Context for existing connection error", "context canceled") {
 		t.Error("Expected error message about context for existing connection was not logged")
 	}
@@ -942,7 +942,7 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 
 // TestRunProtocolLogsContextErrorForExistingConnection specifically tests that
 // the "Context for existing connection error" message is logged when an existing
-// connection has a context error
+// connection has a context error.
 func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 	// Test different types of context errors using table-driven approach
 	testCases := []struct {
@@ -955,6 +955,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 			createCtx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
+
 				return ctx, cancel
 			},
 			expectedMsg: "context canceled",
@@ -964,6 +965,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 			createCtx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				time.Sleep(2 * time.Millisecond) // Ensure it times out
+
 				return ctx, cancel
 			},
 			expectedMsg: "context deadline exceeded",
@@ -972,22 +974,22 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Set up using helper (fresh instance for each subtest)
+			// Set up using helper (fresh instance for each subtest).
 			ctx := context.Background()
 			s, logCapture := createNetceptorWithLogCapture("test-node")
 			remoteNodeID := "error-node-" + tc.name
 
-			// Create context with error
+			// Create context with error.
 			errorCtx, cancel := tc.createCtx()
 			defer cancel()
 
-			// Create existing connection using helper
+			// Create existing connection using helper.
 			createExistingConnectionWithContext(s, remoteNodeID, errorCtx, cancel)
 
-			// Create mock session using helper
+			// Create mock session using helper.
 			mockSession, bi := createMockSessionAndBackendInfo(t, s, remoteNodeID)
 
-			// Call runProtocol
+			// Call runProtocol.
 			go func() {
 				err := s.runProtocol(ctx, mockSession, bi)
 				if err != nil {
@@ -995,14 +997,14 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 				}
 			}()
 
-			// Wait for processing
+			// Wait for processing.
 			time.Sleep(200 * time.Millisecond)
 
-			// Verify new connection was established
+			// Verify new connection was established.
 			s.connLock.RLock()
 			newConn, exists := s.connections[remoteNodeID]
 			s.connLock.RUnlock()
-			
+
 			if !exists {
 				t.Error("Expected new connection to be established after removing connection with context error")
 			}
@@ -1010,7 +1012,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 				t.Error("Expected new connection to have valid context")
 			}
 
-			// Verify the specific error message was logged using helper
+			// Verify the specific error message was logged using helper.
 			if !checkLogForMessage(logCapture, "Context for existing connection error", tc.expectedMsg) {
 				t.Errorf("Expected to find log message containing 'Context for existing connection error' and '%s'", tc.expectedMsg)
 			}
@@ -1019,22 +1021,22 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 }
 
 // TestRunProtocolLogsConnectionRemoval tests that connections are properly removed
-// when a connection context is canceled (functionality test rather than log message test)
+// when a connection context is canceled (functionality test rather than log message test).
 func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
-	// Set up a Netceptor instance
+	// Set up a Netceptor instance.
 	ctx := context.Background()
 	s := New(ctx, "test-node")
 
 	remoteNodeID := "removal-test-node"
 
-	// Create mock session with routing update
+	// Create mock session with routing update.
 	mockSession := &mockBackendSession{
 		sendData: make(chan []byte, 10),
 		recvData: make(chan []byte, 10),
 		closed:   make(chan struct{}),
 	}
 
-	// Prepare initial routing update message
+	// Prepare initial routing update message.
 	routingUpdate := &routingUpdate{
 		NodeID:             remoteNodeID,
 		ForwardingNode:     remoteNodeID,
@@ -1050,29 +1052,29 @@ func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
 		t.Fatalf("Failed to create routing update message: %v", err)
 	}
 
-	// Send the routing update message to establish connection
+	// Send the routing update message to establish connection.
 	mockSession.recvData <- msgBytes
 
 	bi := &BackendInfo{
 		connectionCost: 1.0,
 		nodeCost:       make(map[string]float64),
-		allowedPeers:   []string{remoteNodeID}, // Allow the remote node
+		allowedPeers:   []string{remoteNodeID}, // Allow the remote node.
 	}
 
-	// Create a cancelable context for this test
+	// Create a cancelable context for this test.
 	testCtx, cancel := context.WithCancel(ctx)
 
-	// Start runProtocol in a goroutine
+	// Start runProtocol in a goroutine.
 	errChan := make(chan error, 1)
 	go func() {
 		err := s.runProtocol(testCtx, mockSession, bi)
 		errChan <- err
 	}()
 
-	// Wait a moment for the connection to be established
+	// Wait a moment for the connection to be established.
 	time.Sleep(50 * time.Millisecond)
 
-	// Verify connection was established
+	// Verify connection was established.
 	s.connLock.RLock()
 	_, connectionExists := s.connections[remoteNodeID]
 	s.connLock.RUnlock()
@@ -1080,13 +1082,13 @@ func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
 		t.Fatal("Expected connection to be established")
 	}
 
-	// Cancel the context to trigger the connection removal
+	// Cancel the context to trigger the connection removal.
 	cancel()
 
-	// Wait for runProtocol to complete
+	// Wait for runProtocol to complete.
 	select {
 	case err := <-errChan:
-		// We expect no error (nil) when context is canceled normally
+		// We expect no error (nil) when context is canceled normally.
 		if err != nil {
 			t.Logf("runProtocol returned error (this may be expected): %v", err)
 		}
@@ -1094,14 +1096,14 @@ func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
 		t.Fatal("runProtocol did not complete within timeout")
 	}
 
-	// Wait for cleanup to complete
+	// Wait for cleanup to complete.
 	time.Sleep(100 * time.Millisecond)
 
-	// Verify the connection was properly removed
+	// Verify the connection was properly removed.
 	s.connLock.RLock()
 	_, connectionStillExists := s.connections[remoteNodeID]
 	s.connLock.RUnlock()
-	
+
 	if connectionStillExists {
 		t.Error("Expected connection to be removed after context cancellation")
 	}
@@ -1109,19 +1111,19 @@ func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
 
 // TestRunProtocolRemovesExistingConnectionWithCanceledContext verifies that when
 // runProtocol detects an existing connection with a canceled context, it properly
-// removes that connection from s.connections and allows the new connection to proceed
+// removes that connection from s.connections and allows the new connection to proceed.
 func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
-	// Set up a Netceptor instance
+	// Set up a Netceptor instance.
 	ctx := context.Background()
 	s := New(ctx, "test-node")
 
 	remoteNodeID := "leak-test-node"
 
-	// Create a canceled context for the existing connection
+	// Create a canceled context for the existing connection.
 	canceledCtx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel it immediately
 
-	// Create an existing connection with the canceled context
+	// Create an existing connection with the canceled context.
 	existingConn := &connInfo{
 		Context:          canceledCtx,
 		CancelFunc:       cancel,
@@ -1132,7 +1134,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		logger:           s.Logger,
 	}
 
-	// Add the existing connection to the connections map
+	// Add the existing connection to the connections map.
 	s.connLock.Lock()
 	if s.connections == nil {
 		s.connections = make(map[string]*connInfo)
@@ -1141,11 +1143,11 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	initialConnectionCount := len(s.connections)
 	s.connLock.Unlock()
 
-	// Verify the existing connection is there and has a canceled context
+	// Verify the existing connection is there and has a canceled context.
 	s.connLock.RLock()
 	storedConn, exists := s.connections[remoteNodeID]
 	s.connLock.RUnlock()
-	
+
 	if !exists {
 		t.Fatal("Existing connection should be in the connections map")
 	}
@@ -1153,14 +1155,14 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		t.Fatal("Existing connection context should be canceled")
 	}
 
-	// Create a mock session that will try to connect with the same remoteNodeID
+	// Create a mock session that will try to connect with the same remoteNodeID.
 	mockSession := &mockBackendSession{
 		sendData: make(chan []byte, 10),
 		recvData: make(chan []byte, 10),
 		closed:   make(chan struct{}),
 	}
 
-	// Prepare the routing update message
+	// Prepare the routing update message.
 	routingUpdate := &routingUpdate{
 		NodeID:             remoteNodeID,
 		ForwardingNode:     remoteNodeID,
@@ -1176,7 +1178,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		t.Fatalf("Failed to create routing update message: %v", err)
 	}
 
-	// Send the routing update message to the mock session
+	// Send the routing update message to the mock session.
 	mockSession.recvData <- msgBytes
 
 	bi := &BackendInfo{
@@ -1185,7 +1187,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		allowedPeers:   []string{remoteNodeID},
 	}
 
-	// Call runProtocol - this should detect the existing connection with canceled context and replace it
+	// Call runProtocol - this should detect the existing connection with canceled context and replace it.
 	go func() {
 		err = s.runProtocol(ctx, mockSession, bi)
 		if err != nil {
@@ -1193,10 +1195,10 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		}
 	}()
 
-	// Wait for the connection to be processed
+	// Wait for the connection to be processed.
 	time.Sleep(100 * time.Millisecond)
 
-	// THE KEY TEST: Verify that the canceled connection was removed and replaced
+	// THE KEY TEST: Verify that the canceled connection was removed and replaced.
 	s.connLock.RLock()
 	finalConnectionCount := len(s.connections)
 	stillExists := false
@@ -1207,7 +1209,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	}
 	s.connLock.RUnlock()
 
-	// Verify the connection was replaced, not leaked
+	// Verify the connection was replaced, not leaked.
 	if !stillExists {
 		t.Error("Expected a new connection to be established after removing canceled connection")
 	}
@@ -1221,8 +1223,8 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		t.Error("The replacement connection should be a different connection object than the original")
 	}
 
-	// Additional verification: try to connect again with the same node ID
-	// This should now fail normally because there's a valid existing connection
+	// Additional verification: try to connect again with the same node ID.
+	// This should now fail normally because there's a valid existing connection.
 	mockSession2 := &mockBackendSession{
 		sendData: make(chan []byte, 10),
 		recvData: make(chan []byte, 10),
@@ -1238,12 +1240,12 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 		t.Errorf("Expected second connection to be rejected due to existing connection, got: %v", err2)
 	}
 
-	// Final verification: should still have exactly one connection
+	// Final verification: should still have exactly one connection.
 	s.connLock.RLock()
 	finalFinalCount := len(s.connections)
 	finalConn, finalExists := s.connections[remoteNodeID]
 	s.connLock.RUnlock()
-	
+
 	if finalFinalCount != 1 {
 		t.Errorf("Expected exactly 1 connection after cleanup, but got %d", finalFinalCount)
 	}
@@ -1254,7 +1256,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	t.Logf("SUCCESS: Canceled connection was properly removed and replaced with valid connection")
 }
 
-// logCapture is a simple writer that captures log messages for testing
+// logCapture is a simple writer that captures log messages for testing.
 type logCapture struct {
 	messages []string
 	mutex    sync.Mutex
@@ -1264,21 +1266,23 @@ func (lc *logCapture) Write(p []byte) (n int, err error) {
 	lc.mutex.Lock()
 	defer lc.mutex.Unlock()
 	lc.messages = append(lc.messages, string(p))
+
 	return len(p), nil
 }
 
-// Helper functions for test setup to reduce code duplication
+// Helper functions for test setup to reduce code duplication.
 
-// createNetceptorWithLogCapture creates a Netceptor instance with log capture setup
+// createNetceptorWithLogCapture creates a Netceptor instance with log capture setup.
 func createNetceptorWithLogCapture(nodeID string) (*Netceptor, *logCapture) {
 	ctx := context.Background()
 	s := New(ctx, nodeID)
 	logCapture := &logCapture{messages: make([]string, 0)}
 	s.Logger.SetOutput(logCapture)
+
 	return s, logCapture
 }
 
-// createMockSessionAndBackendInfo creates a mock session and backend info for testing
+// createMockSessionAndBackendInfo creates a mock session and backend info for testing.
 func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID string) (*mockBackendSession, *BackendInfo) {
 	mockSession := &mockBackendSession{
 		sendData: make(chan []byte, 10),
@@ -1286,7 +1290,7 @@ func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID st
 		closed:   make(chan struct{}),
 	}
 
-	// Create routing update message
+	// Create routing update message.
 	routingUpdate := &routingUpdate{
 		NodeID:             remoteNodeID,
 		ForwardingNode:     remoteNodeID,
@@ -1313,7 +1317,7 @@ func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID st
 	return mockSession, bi
 }
 
-// createExistingConnectionWithContext creates an existing connection with the given context
+// createExistingConnectionWithContext creates an existing connection with the given context.
 func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx context.Context, cancel context.CancelFunc) {
 	existingConn := &connInfo{
 		Context:          ctx,
@@ -1333,16 +1337,17 @@ func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx 
 	s.connLock.Unlock()
 }
 
-// checkLogForMessage checks if the log contains a message with the given substrings
+// checkLogForMessage checks if the log contains a message with the given substrings.
 func checkLogForMessage(logCapture *logCapture, substrings ...string) bool {
 	logCapture.mutex.Lock()
 	defer logCapture.mutex.Unlock()
-	
+
 	for _, msg := range logCapture.messages {
 		allFound := true
 		for _, substr := range substrings {
 			if !strings.Contains(msg, substr) {
 				allFound = false
+
 				break
 			}
 		}
@@ -1350,10 +1355,11 @@ func checkLogForMessage(logCapture *logCapture, substrings ...string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
-// mockBackendSession implements BackendSession for testing
+// mockBackendSession implements BackendSession for testing.
 type mockBackendSession struct {
 	sendData chan []byte
 	recvData chan []byte
@@ -1370,8 +1376,10 @@ func (m *mockBackendSession) Send(data []byte) error {
 	}
 	select {
 	case m.sendData <- data:
+
 		return nil
 	default:
+
 		return fmt.Errorf("send buffer full")
 	}
 }
@@ -1380,16 +1388,20 @@ func (m *mockBackendSession) Recv(timeout time.Duration) ([]byte, error) {
 	m.mutex.Lock()
 	if m.isClosed {
 		m.mutex.Unlock()
+
 		return nil, fmt.Errorf("session closed")
 	}
 	m.mutex.Unlock()
 
 	select {
 	case data := <-m.recvData:
+
 		return data, nil
 	case <-time.After(timeout):
+
 		return nil, ErrTimeout
 	case <-m.closed:
+
 		return nil, fmt.Errorf("session closed")
 	}
 }
@@ -1401,5 +1413,6 @@ func (m *mockBackendSession) Close() error {
 		m.isClosed = true
 		close(m.closed)
 	}
+
 	return nil
 }

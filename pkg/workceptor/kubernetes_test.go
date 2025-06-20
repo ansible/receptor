@@ -1284,14 +1284,14 @@ var podInfraError = &corev1.Pod{
 	},
 	Status: corev1.PodStatus{
 		Phase:  corev1.PodFailed,
-		Reason: "PodMockOOMKilled",
+		Reason: "OOMKilled",
 		ContainerStatuses: []corev1.ContainerStatus{
 			{
 				Name: "worker",
 				State: corev1.ContainerState{
 					Terminated: &corev1.ContainerStateTerminated{
-						ExitCode: 1,
-						Reason:   "MockOOMKill",
+						ExitCode: 137,
+						Reason:   "OOMKill",
 					},
 				},
 			},
@@ -1306,14 +1306,14 @@ var podAppError = &corev1.Pod{
 	},
 	Status: corev1.PodStatus{
 		Phase:  corev1.PodFailed,
-		Reason: "AppFailure",
+		Reason: "Error",
 		ContainerStatuses: []corev1.ContainerStatus{
 			{
 				Name: "worker",
 				State: corev1.ContainerState{
 					Terminated: &corev1.ContainerStateTerminated{
 						ExitCode: 1,
-						Reason:   "ContainerFailure",
+						Reason:   "Error",
 					},
 				},
 			},
@@ -1368,14 +1368,14 @@ func TestGetPodStatus(t *testing.T) {
 			name:       "infrastructure failure",
 			pod:        podInfraError,
 			wantOk:     false,
-			wantReason: "pod default/infra-error-pod infrastructure pod reason PodMockOOMKilled container worker MockOOMKill",
+			wantReason: "pod default/infra-error-pod infrastructure pod reason OOMKilled container worker OOMKill",
 			wantErr:    false,
 		},
 		{
 			name:       "application failure",
 			pod:        podAppError,
 			wantOk:     false,
-			wantReason: "pod default/app-error-pod infrastructure pod reason AppFailure container worker ContainerFailure",
+			wantReason: "pod default/app-error-pod infrastructure pod reason Error container worker Error",
 			wantErr:    false,
 		},
 		{

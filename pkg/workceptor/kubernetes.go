@@ -184,6 +184,8 @@ const containerName = "worker"
 type KubePodStateHelper interface {
 	GetPodStatus(pod *corev1.Pod) (bool, string, error)
 	WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error)
+	PodInfrastructureSuccess(pod *corev1.Pod, containerName string) (bool, string, error)
+	PodApplicationSuccess(pod *corev1.Pod, containerName string) (bool, string, error)
 }
 
 func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error) {

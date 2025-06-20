@@ -4,8 +4,8 @@
 package certificates_test
 
 import (
+	"fmt"
 	"io/fs"
-	"net"
 	"testing"
 	"time"
 
@@ -105,6 +105,70 @@ func TestInitCA(t *testing.T) {
 
 			if err := certificates.InitCA(tt.args.opts, tt.args.certOut, tt.args.keyOut, o); (err != nil) != tt.wantErr {
 				t.Errorf("InitCA() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestInitCAConfigRun(t *testing.T) {
+	tests := []struct {
+		name        string
+		CAConfig    certificates.InitCAConfig
+		expectError bool
+	}{
+		{
+			name: "successful run with minimal configuration",
+			CAConfig: certificates.InitCAConfig{
+				CommonName: "Test CA",
+				Bits:       2048,
+				OutCert:    "test.crt",
+				OutKey:     "test.key",
+			},
+			expectError: false,
+		},
+		{
+			name: "successful run with full configuration",
+			CAConfig: certificates.InitCAConfig{
+				CommonName: "Test CA",
+				Bits:       2048,
+				NotBefore:  "2023-01-01T00:00:00Z",
+				NotAfter:   "2024-01-01T00:00:00Z",
+				OutCert:    "test.crt",
+				OutKey:     "test.key",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid NotBefore date",
+			CAConfig: certificates.InitCAConfig{
+				CommonName: "Test CA",
+				Bits:       2048,
+				NotBefore:  "invalid date",
+				NotAfter:   "2024-01-01T00:00:00Z",
+				OutCert:    "test.crt",
+				OutKey:     "test.key",
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid NotAfter date",
+			CAConfig: certificates.InitCAConfig{
+				CommonName: "Test CA",
+				Bits:       2048,
+				NotBefore:  "2023-01-01T00:00:00Z",
+				NotAfter:   "invalid date",
+				OutCert:    "test.crt",
+				OutKey:     "test.key",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.CAConfig.Run()
+			if (err != nil) != tt.expectError {
+				t.Errorf("InitCAConfig.Run() error = %v, expectError %v", err, tt.expectError)
 			}
 		})
 	}
@@ -238,22 +302,9 @@ func TestSignReq(t *testing.T) {
 		t.Errorf("Invalid good Certificate Request: %+v", err)
 	}
 
-	negativeCaTimeNotAfterString := "2021-01-07T00:03:51Z"
-	negativeCaTimeNotAfter, err := time.Parse(time.RFC3339, negativeCaTimeNotAfterString)
-	if err != nil {
-		t.Errorf("Invalid CA after time: %+v", err)
-	}
-
-	negativeCaTimeNotBeforeString := "2022-01-07T00:03:51Z"
-	negativeCaTimeNotBefore, err := time.Parse(time.RFC3339, negativeCaTimeNotBeforeString)
-	if err != nil {
-		t.Errorf("Invalid CA before time: %+v", err)
-	}
+	invalidPath := "invalid_path"
 
 	negativeReqPath := "/tmp/receptor_request_bad.pem"
-	negativeDNSName := "receptor.TEST.BAD"
-	negativeIPAddress := net.ParseIP("127.0.0.1").To4()
-	negativeNodeIDs := negativeDNSName
 
 	tests := []struct {
 		name    string
@@ -273,30 +324,74 @@ func TestSignReq(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Negative test",
+			name: "Error in CA Path",
 			args: args{
-				opts: &certificates.CertOptions{
-					Bits: -1,
-					CertNames: certificates.CertNames{
-						DNSNames: []string{
-							negativeDNSName,
-						},
-						IPAddresses: []net.IP{
-							negativeIPAddress,
-						},
-						NodeIDs: []string{
-							negativeNodeIDs,
-						},
-					},
-					CommonName: "Ansible Automation Controller Nodes Mesh",
-					NotAfter:   negativeCaTimeNotAfter,
-					NotBefore:  negativeCaTimeNotBefore,
-				},
+				opts:      &positiveCertOptions,
+				caCrtPath: invalidPath,
+				caKeyPath: positiveCaKeyPath,
+				reqPath:   positiveReqPath,
+				certOut:   positiveCertOut,
+				verify:    true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Error in Key Path",
+			args: args{
+				opts:      &positiveCertOptions,
+				caCrtPath: positiveCaCrtPath,
+				caKeyPath: invalidPath,
+				reqPath:   positiveReqPath,
+				certOut:   positiveCertOut,
+				verify:    true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Error in Req Path",
+			args: args{
+				opts:      &positiveCertOptions,
+				caCrtPath: positiveCaCrtPath,
+				caKeyPath: positiveCaKeyPath,
+				reqPath:   invalidPath,
+				certOut:   positiveCertOut,
+				verify:    true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "No Verify",
+			args: args{
+				opts:      &positiveCertOptions,
+				caCrtPath: positiveCaCrtPath,
+				caKeyPath: positiveCaKeyPath,
+				reqPath:   positiveReqPath,
+				certOut:   positiveCertOut,
+				verify:    false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Malformed Req file",
+			args: args{
+				opts:      &positiveCertOptions,
 				caCrtPath: positiveCaCrtPath,
 				caKeyPath: positiveCaKeyPath,
 				reqPath:   negativeReqPath,
 				certOut:   positiveCertOut,
-				verify:    true,
+				verify:    false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "No names in Req file",
+			args: args{
+				opts:      &positiveCertOptions,
+				caCrtPath: positiveCaCrtPath,
+				caKeyPath: positiveCaKeyPath,
+				reqPath:   negativeReqPath,
+				certOut:   positiveCertOut,
+				verify:    false,
 			},
 			wantErr: true,
 		},
@@ -314,10 +409,14 @@ func TestSignReq(t *testing.T) {
 					EXPECT().
 					ReadFile(gomock.Eq(positiveCaCrtPath)).
 					Return(setupGoodCaCertificatePEMData(), nil).
-					Times(1)
+					AnyTimes()
 
 			default:
-				t.Errorf("Unexpected filename: %s", tt.args.caCrtPath)
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(invalidPath)).
+					Return(nil, fmt.Errorf("Unexpected filename: %s", tt.args.caCrtPath)).
+					Times(1)
 			}
 
 			switch tt.args.caKeyPath {
@@ -326,33 +425,127 @@ func TestSignReq(t *testing.T) {
 					EXPECT().
 					ReadFile(gomock.Eq(positiveCaKeyPath)).
 					Return(setupGoodCaRsaPrivateKeyPEMData(), nil).
-					Times(1)
+					AnyTimes()
 
 			default:
-				t.Errorf("Unexpected filename: %s", tt.args.reqPath)
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(invalidPath)).
+					Return(nil, fmt.Errorf("Unexpected filename: %s", tt.args.caKeyPath)).
+					Times(1)
 			}
 
 			switch tt.args.reqPath {
-			case negativeReqPath:
-				o.
-					EXPECT().
-					ReadFile(gomock.Eq(negativeReqPath)).
-					Return(setupGoodCertificatePEMData(), nil).
-					Times(1)
-
 			case positiveReqPath:
 				o.
 					EXPECT().
 					ReadFile(gomock.Eq(positiveReqPath)).
 					Return(setupGoodCertificateRequestPEMData(), nil).
-					Times(1)
-
+					AnyTimes()
+			case negativeReqPath:
+				switch tt.name {
+				case "Malformed Req file":
+					o.
+						EXPECT().
+						ReadFile(gomock.Eq(negativeReqPath)).
+						Return([]byte{}, nil).
+						AnyTimes()
+				case "No names in Req file":
+					o.
+						EXPECT().
+						ReadFile(gomock.Eq(negativeReqPath)).
+						Return(setupBadCertificateRequestPEMData(), nil).
+						AnyTimes()
+				}
 			default:
-				t.Errorf("Unexpected filename: %s", tt.args.reqPath)
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(invalidPath)).
+					Return(nil, fmt.Errorf("Unexpected filename: %s", tt.args.reqPath)).
+					Times(1)
 			}
 
-			if err := certificates.SignReq(tt.args.opts, tt.args.caCrtPath, tt.args.caKeyPath, tt.args.reqPath, tt.args.certOut, tt.args.verify, o); (err != nil) != tt.wantErr {
+			signReqImpl := certificates.SignerReqImpl{}
+			if err := signReqImpl.SignReq(tt.args.opts, tt.args.caCrtPath, tt.args.caKeyPath, tt.args.reqPath, tt.args.certOut, tt.args.verify, o); (err != nil) != tt.wantErr {
 				t.Errorf("SignReq() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSignReqConfigValidateAndSign(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSigner := mock_certificates.NewMockSignReqFunc(ctrl)
+
+	tests := []struct {
+		name        string
+		config      certificates.SignReqConfig
+		expectError bool
+	}{
+		{
+			name: "successful run with minimal configuration",
+			config: certificates.SignReqConfig{
+				Req:     "req.pem",
+				CACert:  "ca.pem",
+				CAKey:   "ca.key",
+				OutCert: "out.pem",
+				Verify:  true,
+			},
+			expectError: false,
+		},
+		{
+			name: "successful run with full configuration",
+			config: certificates.SignReqConfig{
+				Req:       "req.pem",
+				CACert:    "ca.pem",
+				CAKey:     "ca.key",
+				NotBefore: "2023-01-01T00:00:00Z",
+				NotAfter:  "2024-01-01T00:00:00Z",
+				OutCert:   "out.pem",
+				Verify:    true,
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid NotBefore date",
+			config: certificates.SignReqConfig{
+				Req:       "req.pem",
+				CACert:    "ca.pem",
+				CAKey:     "ca.key",
+				NotBefore: "invalid-date",
+				NotAfter:  "2024-01-01T00:00:00Z",
+				OutCert:   "out.pem",
+				Verify:    true,
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid NotAfter date",
+			config: certificates.SignReqConfig{
+				Req:       "req.pem",
+				CACert:    "ca.pem",
+				CAKey:     "ca.key",
+				NotBefore: "2024-01-01T00:00:00Z",
+				NotAfter:  "invalid-date",
+				OutCert:   "out.pem",
+				Verify:    true,
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Only mock when we expect Run() to reach the SignReq call
+			if !tt.expectError {
+				mockSigner.EXPECT().SignReq(gomock.Any(), tt.config.CACert, tt.config.CAKey, tt.config.Req, tt.config.OutCert, tt.config.Verify, gomock.Any()).Return(nil)
+			}
+
+			err := tt.config.ValidateAndSign(mockSigner)
+			if (err != nil) != tt.expectError {
+				t.Errorf("SignReq.Run() error = %v, expectError %v", err, tt.expectError)
 			}
 		})
 	}

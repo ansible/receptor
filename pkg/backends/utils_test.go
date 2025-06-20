@@ -19,19 +19,19 @@ const (
 
 type mockBackendSession struct{}
 
-func (m *mockBackendSession) Send([]byte) error                      { return nil }
-func (m *mockBackendSession) Recv(time.Duration) ([]byte, error)     { return nil, nil }
-func (m *mockBackendSession) Close() error                           { return nil }
+func (m *mockBackendSession) Send([]byte) error                  { return nil }
+func (m *mockBackendSession) Recv(time.Duration) ([]byte, error) { return nil, nil }
+func (m *mockBackendSession) Close() error                       { return nil }
 
 func TestDialerSessionScenarios(t *testing.T) {
 	tests := []struct {
-		name           string
-		redial         bool
-		dialerFunc     func() func(chan struct{}) (netceptor.BackendSession, error)
-		expectSession  bool
-		expectRetries  bool
-		timeout        time.Duration
-		minCallCount   int
+		name          string
+		redial        bool
+		dialerFunc    func() func(chan struct{}) (netceptor.BackendSession, error)
+		expectSession bool
+		expectRetries bool
+		timeout       time.Duration
+		minCallCount  int
 	}{
 		{
 			name:   "successful single dial",
@@ -42,6 +42,7 @@ func TestDialerSessionScenarios(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 						close(closeChan)
 					}()
+
 					return &mockBackendSession{}, nil
 				}
 			},
@@ -68,6 +69,7 @@ func TestDialerSessionScenarios(t *testing.T) {
 			redial: true,
 			dialerFunc: func() func(chan struct{}) (netceptor.BackendSession, error) {
 				callCount := 0
+
 				return func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 					callCount++
 					if callCount == 1 {
@@ -77,6 +79,7 @@ func TestDialerSessionScenarios(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 						close(closeChan)
 					}()
+
 					return &mockBackendSession{}, nil
 				}
 			},
@@ -151,12 +154,12 @@ func TestDialerSessionScenarios(t *testing.T) {
 
 func TestContextBehavior(t *testing.T) {
 	tests := []struct {
-		name            string
-		contextTimeout  time.Duration
-		operationDelay  time.Duration
-		redial          bool
-		expectSuccess   bool
-		expectClosed    bool
+		name           string
+		contextTimeout time.Duration
+		operationDelay time.Duration
+		redial         bool
+		expectSuccess  bool
+		expectClosed   bool
 	}{
 		{
 			name:           "operation completes before timeout",
@@ -349,7 +352,7 @@ func TestListenerSessionScenarios(t *testing.T) {
 
 func TestListenerSessionContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	var wg sync.WaitGroup
 	logger := logger.NewReceptorLogger("test")
 
@@ -391,7 +394,7 @@ func TestMaxRedialDelayConstant(t *testing.T) {
 	}
 }
 
-// Test edge case where session connection closes immediately
+// Test edge case where session connection closes immediately.
 func TestDialerSessionConnectionCloseImmediate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -432,7 +435,7 @@ func TestDialerSessionConnectionCloseImmediate(t *testing.T) {
 	wg.Wait()
 }
 
-// Test to ensure redial logic properly resets delays on successful connection
+// Test to ensure redial logic properly resets delays on successful connection.
 func TestDialerSessionRedialDelayReset(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()

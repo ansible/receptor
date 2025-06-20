@@ -93,6 +93,7 @@ func TestDialerSessionScenarios(t *testing.T) {
 			redial: true,
 			dialerFunc: func() func(chan struct{}) (netceptor.BackendSession, error) {
 				callCount := 0
+
 				return func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 					callCount++
 					if callCount < 3 {
@@ -102,6 +103,7 @@ func TestDialerSessionScenarios(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 						close(closeChan)
 					}()
+
 					return &mockBackendSession{}, nil
 				}
 			},
@@ -202,6 +204,7 @@ func TestContextBehavior(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 						close(closeChan)
 					}()
+
 					return &mockBackendSession{}, nil
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -308,6 +311,7 @@ func TestListenerSessionScenarios(t *testing.T) {
 				if tt.expectedErrString != "" && !strings.Contains(err.Error(), tt.expectedErrString) {
 					t.Errorf("Expected error containing '%s', got: %v", tt.expectedErrString, err)
 				}
+
 				return
 			}
 
@@ -363,6 +367,7 @@ func TestListenerSessionContextCancellation(t *testing.T) {
 	af := func() (netceptor.BackendSession, error) {
 		// Block until context is cancelled
 		<-ctx.Done()
+
 		return nil, ctx.Err()
 	}
 
@@ -404,6 +409,7 @@ func TestDialerSessionConnectionCloseImmediate(t *testing.T) {
 
 	df := func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 		close(closeChan) // Close immediately
+
 		return &mockBackendSession{}, nil
 	}
 
@@ -453,6 +459,7 @@ func TestDialerSessionRedialDelayReset(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			close(closeChan)
 		}()
+
 		return &mockBackendSession{}, nil
 	}
 

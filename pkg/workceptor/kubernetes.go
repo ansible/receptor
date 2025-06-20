@@ -201,20 +201,11 @@ func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 	for event := range watcher.ResultChan() {
 		switch event.Type {
 		case watch.Error:
-			pod, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return pod, err
-			}
+			return pod, event.Object.(error)
 		default:
-			pod, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return pod, err
-			}
-
-			switch pod.Status.Phase {
-			case corev1.PodSucceeded, corev1.PodFailed:
-				return pod, nil
-			}
+			pod = event.Object.(*corev1.Pod)
+			fmt.Printf("%s: %s/%s (New IP: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.PodIP)
+			return pod, nil
 		}
 	}
 
@@ -512,9 +503,13 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						podName,
 					)
 
-					if false { // deactivate new code TODO write integration tests
-						timeout := int64(10)
-						_, _ = kw.CapturePodStatus(kw.Pod, stdout.Size(), &timeout) // TODO Do we have a configurable timeout already?
+					timeout := int64(10)
+					_, err = kw.CapturePodStatus(kw.Pod, stdout.Size(), &timeout)
+					if err != nil {
+						kw.GetWorkceptor().nc.GetLogger().Info("Detected error while retrieving pod status for %s/%s.",
+							podNamespace,
+							podName,
+						)
 					}
 
 					return
@@ -1036,14 +1031,13 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	pod, err := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
-	} else if false { // deactivate new code TODO write integration tests
-		timeout := int64(10)
-		ok, _ := kw.CapturePodStatus(pod, stdout.Size(), &timeout)
-		if !ok {
-			// If the pod did not succeed, we already updated the status to WorkStateFailed
-			// and we can return early.
-			return
-		}
+	}
+	timeout := int64(10)
+	ok, _ := kw.CapturePodStatus(pod, stdout.Size(), &timeout)
+	if !ok {
+		// If the pod did not succeed, we already updated the status to WorkStateFailed
+		// and we can return early.
+		return
 	}
 
 	// Only transition to WorkStateSucceeded if the work unit is still running
@@ -1079,7 +1073,7 @@ func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutS
 
 		return false, fmt.Errorf("pod did not succeed: %s", reason)
 	}
-	kw.GetWorkceptor().nc.GetLogger().Debug("Pod completed successfully: %s", pod.Status.String())
+	kw.GetWorkceptor().nc.GetLogger().Debug("Pod status captured: %s", pod.Status.String())
 
 	return true, nil
 }

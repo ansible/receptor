@@ -41,6 +41,7 @@ import (
 // KubeUnit implements the WorkUnit interface.
 type KubeUnit struct {
 	BaseWorkUnitForWorkUnit
+	KubePodStateHelper
 	KubeAPIWrapperInstance KubeAPIer
 	authMethod             string
 	streamMethod           string
@@ -88,14 +89,9 @@ type KubeAPIer interface {
 	UntilWithSync(context.Context, cache.ListerWatcher, runtime.Object, watch2.PreconditionFunc, ...watch2.ConditionFunc) (*watch.Event, error)
 	NewFakeNeverRateLimiter() flowcontrol.RateLimiter
 	NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter
-
-	// Pod status helpers
-	GetPodStatus(pod *corev1.Pod) (bool, string, error)
-	WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeout time.Duration) (*corev1.Pod, error)
 }
 
 type KubeAPIWrapper struct {
-	KubeAPIer
 }
 
 func (ku KubeAPIWrapper) NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError {
@@ -119,13 +115,6 @@ func (ku KubeAPIWrapper) Get(ctx context.Context, clientset *kubernetes.Clientse
 }
 
 func (ku KubeAPIWrapper) Create(ctx context.Context, clientset *kubernetes.Clientset, namespace string, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
-
-	// Add default system annotations
-	pod.Annotations["receptor.redhat.com/created-by"] = "automation-mesh"
-
 	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 }
 
@@ -190,6 +179,130 @@ var ErrPodFailed = fmt.Errorf("pod failed to start")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
+const containerName = "worker"
+
+type KubePodStateHelper interface {
+	GetPodStatus(pod *corev1.Pod) (bool, string, error)
+	WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error)
+}
+
+func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error) {
+	if pod == nil {
+		return nil, fmt.Errorf("pod is nil")
+	}
+
+	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
+		TimeoutSeconds: timeoutSeconds,
+		FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name})
+	if err != nil {
+		return pod, err
+	}
+
+	for event := range watcher.ResultChan() {
+		switch event.Type {
+		case watch.Error:
+			pod, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return pod, err
+			}
+		default:
+			pod, err := clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return pod, err
+			}
+
+			switch pod.Status.Phase {
+			case corev1.PodSucceeded, corev1.PodFailed:
+				return pod, nil
+			}
+		}
+	}
+
+	return pod, nil
+}
+
+// GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
+func (ku KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
+	if pod == nil {
+		return false, "pod is nil", fmt.Errorf("pod is nil")
+	}
+
+	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
+
+	infraOK, reason, err := ku.PodInfrastructureSuccess(pod, containerName)
+
+	if !infraOK || err != nil {
+		return infraOK, fmt.Sprintf("%s infrastructure %s", podRef, reason), err
+	}
+
+	appOK, reason, err := ku.PodApplicationSuccess(pod, containerName)
+	if !appOK || err != nil {
+		return appOK, fmt.Sprintf("%s application %s", podRef, reason), err
+	}
+
+	return true, "", nil
+}
+
+// podInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.
+// Any other state is considered an infrastructure failure.
+func (ku KubeUnit) PodInfrastructureSuccess(pod *corev1.Pod, containerName string) (bool, string, error) {
+	for _, cs := range pod.Status.ContainerStatuses {
+		// Check if this is the container we care about first
+		if cs.Name == containerName {
+			switch pod.Status.Phase {
+			case corev1.PodFailed:
+				if cs.State.Terminated != nil {
+					switch cs.State.Terminated.ExitCode {
+					case 0:
+						break
+					default:
+
+						return false, fmt.Sprintf("pod reason %s container %s %s", pod.Status.Reason, cs.Name, cs.State.Terminated.Reason), nil
+					}
+				}
+
+				return true, "", nil
+
+			case corev1.PodSucceeded:
+
+				return true, "", nil
+
+			case corev1.PodRunning, corev1.PodPending:
+
+				return true, fmt.Sprintf("pod phase: %s", pod.Status.Phase), nil
+
+			default:
+
+				return false, fmt.Sprintf("unknown phase: %s", pod.Status.Phase), fmt.Errorf("invalid pod phase")
+			}
+		}
+	}
+
+	return false, fmt.Sprintf("pod %s/%s does not contain container %s", pod.Namespace, pod.Name, containerName), fmt.Errorf("pod does not contain container")
+}
+
+// podApplicationSuccess checks if the pod has successfully completed its application logic.
+// this is called after podInfrastructureSuccess has confirmed the pod is in a terminal state.
+func (ku KubeUnit) PodApplicationSuccess(pod *corev1.Pod, containerName string) (bool, string, error) {
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.Name == containerName {
+			if cs.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.
+
+				return true, "container has not terminated", nil
+			}
+
+			if cs.State.Terminated.ExitCode != 0 { // exit code of 0 means success
+
+				return false, fmt.Sprintf("container %s exited with code %d: %s", cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
+			}
+
+			return true, "", nil // container terminated with exit code of 0
+		}
+	}
+
+	return false, fmt.Sprintf("pod %s/%s does not contain container %s", pod.Namespace, pod.Name, containerName), fmt.Errorf("pod does not contain container")
+}
+
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
@@ -237,102 +350,6 @@ func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	return inner
 }
 
-// podInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.
-// Any other state is considered an infrastructure failure.
-func (ku KubeAPIWrapper) podInfrastructureSuccess(pod *corev1.Pod, containerName string) (bool, string, error) {
-	switch pod.Status.Phase {
-	case corev1.PodFailed:
-		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.State.Terminated != nil && cs.Name == containerName {
-				switch cs.State.Terminated.ExitCode {
-				case 0:
-					break
-				default:
-					return false, fmt.Sprintf("pod reason %s container %s %s", pod.Status.Reason, cs.Name, cs.State.Terminated.Reason), nil
-				}
-			}
-		}
-
-		return true, "", nil
-
-	case corev1.PodSucceeded:
-		return true, "", nil
-
-	case corev1.PodRunning, corev1.PodPending:
-		return true, fmt.Sprintf("pod phase: %s", pod.Status.Phase), fmt.Errorf("pod not in terminal state")
-
-	default:
-		return false, fmt.Sprintf("unknown phase: %s", pod.Status.Phase), fmt.Errorf("invalid pod phase")
-	}
-}
-
-// podApplicationSuccess checks if the pod has successfully completed its application logic.
-// this is called after podInfrastructureSuccess has confirmed the pod is in a terminal state.
-func (ku KubeAPIWrapper) podApplicationSuccess(pod *corev1.Pod, containerName string) (bool, string, error) {
-	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.Name == containerName {
-			if cs.State.Waiting != nil {
-				if cs.State.Terminated == nil && cs.Name == containerName {
-					return true, "container has not terminated", nil
-				}
-				if cs.State.Terminated.ExitCode != 0 && cs.Name == containerName {
-					return false, fmt.Sprintf("container %s exited with code %d: %s", cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason), nil
-				}
-			}
-		}
-	}
-
-	return true, "", nil
-}
-
-func (ku KubeAPIWrapper) WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeout time.Duration) (*corev1.Pod, error) {
-	interval := 1 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return pod, fmt.Errorf("timeout: pod %s/%s did not complete within %s", pod.Namespace, pod.Name, timeout)
-		default:
-			var err error
-			pod, err = clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return pod, err
-			}
-
-			switch pod.Status.Phase {
-			case corev1.PodSucceeded, corev1.PodFailed:
-				return pod, nil
-			}
-
-			time.Sleep(interval)
-		}
-	}
-}
-
-// GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
-func (ku KubeAPIWrapper) GetPodStatus(pod *corev1.Pod) (bool, string, error) {
-	if pod == nil {
-		return false, "pod is nil", fmt.Errorf("pod is nil")
-	}
-
-	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
-
-	infraOK, reason, err := ku.podInfrastructureSuccess(pod, "worker")
-
-	if !infraOK || err != nil {
-		return infraOK, fmt.Sprintf("%s infrastructure %s", podRef, reason), err
-	}
-
-	appOK, reason, err := ku.podApplicationSuccess(pod, "worker")
-	if !appOK || err != nil {
-		return appOK, fmt.Sprintf("%s application %s", podRef, reason), err
-	}
-
-	return true, "", nil
-}
-
 func GetTimeoutOpenLogstream(kw *KubeUnit) int {
 	// RECEPTOR_OPEN_LOGSTREAM_TIMEOUT
 	// default: 1
@@ -358,7 +375,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 	podNamespace := kw.Pod.Namespace
 	podName := kw.Pod.Name
 	podOptions := &corev1.PodLogOptions{
-		Container: "worker",
+		Container: containerName,
 		Follow:    true,
 	}
 	if timestamps {
@@ -496,7 +513,8 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					)
 
 					if false { // deactivate new code TODO write integration tests
-						_, _ = kw.CapturePodStatus(kw.Pod, stdout.Size(), 10*time.Second) // TODO Do we have a configurable timeout already?
+						timeout := int64(10)
+						_, _ = kw.CapturePodStatus(kw.Pod, stdout.Size(), &timeout) // TODO Do we have a configurable timeout already?
 					}
 
 					return
@@ -589,7 +607,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		foundWorker := false
 		spec = &pod.Spec
 		for i := range spec.Containers {
-			if spec.Containers[i].Name == "worker" {
+			if spec.Containers[i].Name == containerName {
 				spec.Containers[i].Stdin = true
 				spec.Containers[i].StdinOnce = true
 				foundWorker = true
@@ -620,7 +638,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		}
 		spec = &corev1.PodSpec{
 			Containers: []corev1.Container{{
-				Name:      "worker",
+				Name:      containerName,
 				Image:     ked.Image,
 				Command:   command,
 				Args:      params,
@@ -704,7 +722,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	if err == ErrPodCompleted {
 		// Hao: shouldn't we also call kw.Cancel() in these cases?
 		for _, cstat := range kw.Pod.Status.ContainerStatuses {
-			if cstat.Name == "worker" {
+			if cstat.Name == containerName {
 				if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
 					return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
 				}
@@ -735,7 +753,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 			}
 
 			for _, cstat := range kw.Pod.Status.ContainerStatuses {
-				if cstat.Name == "worker" {
+				if cstat.Name == containerName {
 					if cstat.State.Waiting != nil {
 						return fmt.Errorf("%s, %s", err.Error(), cstat.State.Waiting.Reason)
 					}
@@ -835,7 +853,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 
 		req.VersionedParams(
 			&corev1.PodExecOptions{
-				Container: "worker",
+				Container: containerName,
 				Stdin:     true,
 				Stdout:    false,
 				Stderr:    false,
@@ -1019,7 +1037,8 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
 	} else if false { // deactivate new code TODO write integration tests
-		ok, _ := kw.CapturePodStatus(pod, stdout.Size(), 10*time.Second)
+		timeout := int64(10)
+		ok, _ := kw.CapturePodStatus(pod, stdout.Size(), &timeout)
 		if !ok {
 			// If the pod did not succeed, we already updated the status to WorkStateFailed
 			// and we can return early.
@@ -1035,19 +1054,25 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 	}
 }
 
-func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeout time.Duration) (ok bool, err error) {
-	pod, err = kw.KubeAPIWrapperInstance.WaitForPodCompleted(pod, kw.clientset, timeout)
-	if err != nil {
-		kw.GetWorkceptor().nc.GetLogger().Debug("Job complete and pod is still running: %v", err)
+func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutSeconds *int64) (ok bool, err error) {
+	if pod == nil {
+		return false, fmt.Errorf("pod is nil")
 	}
 
-	ok, reason, err := kw.KubeAPIWrapperInstance.GetPodStatus(pod)
+	if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
+		pod, err = kw.WaitForPodCompleted(kw.GetContext(), pod, kw.clientset, timeoutSeconds)
+		if err != nil {
+			kw.GetWorkceptor().nc.GetLogger().Debug("Job complete and pod is still running: %v", err)
+		}
+	}
+
+	ok, reason, err := kw.GetPodStatus(pod)
 	if err != nil {
-		reason := fmt.Sprintf("Pod diagnostics failed: %v reason %s", err, reason)
-		kw.GetWorkceptor().nc.GetLogger().Warning("%s", reason)
-		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)
+		reasonDetail := fmt.Sprintf("Pod diagnostics failed: %v reason %s", err, reason)
+		kw.GetWorkceptor().nc.GetLogger().Warning("%s", reasonDetail)
 
 		return false, err
+
 	} else if !ok {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed: %s", reason)
 		kw.UpdateBasicStatus(WorkStateFailed, reason, stdoutSize)

@@ -1330,13 +1330,10 @@ var podPending = &corev1.Pod{
 }
 
 func TestGetPodStatus(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
-
-	// Create real implementation instance
-	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
+	kw, err := startNetceptorNodeWithWorkceptor()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name       string
@@ -1387,7 +1384,7 @@ func TestGetPodStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ok, reason, err := realImplementation.GetPodStatus(tt.pod)
+			ok, reason, err := kw.GetPodStatus(tt.pod)
 			if ok != tt.wantOk || reason != tt.wantReason || (err != nil) != tt.wantErr {
 				t.Errorf("Failed %s case: ok=%v wantok=%v reason=%q err=%v", tt.name, ok, tt.wantOk, reason, err)
 			}
@@ -1409,13 +1406,10 @@ func TestGetPodStatus(t *testing.T) {
 }
 
 func TestWaitForPodCompleted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
-
-	// Create real implementation instance
-	realImplementation := &workceptor.KubeAPIWrapper{mockKubeAPI}
+	kw, err := startNetceptorNodeWithWorkceptor()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name         string
@@ -1498,7 +1492,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 				}()
 			}
 
-			_, err := realImplementation.WaitForPodCompleted(initialPod, clientset, tt.timeout)
+			_, err := kw.WaitForPodCompleted(initialPod, clientset, tt.timeout)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)

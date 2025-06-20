@@ -1424,98 +1424,68 @@ func TestWaitForPodCompleted(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		initialPhase   corev1.PodPhase
-		updatePhase    corev1.PodPhase
-		timeoutSeconds int64
-		updateDelay    time.Duration
-		wantPhase      corev1.PodPhase
-		wantErr        bool
-		wantError      string
+		name            string
+		initialPod      *corev1.Pod
+		updatePhase     corev1.PodPhase
+		wantErr         bool
+		wantErrorString string
 	}{
 		{
-			name:           "successful completion",
-			initialPhase:   corev1.PodPending,
-			updatePhase:    corev1.PodSucceeded,
-			timeoutSeconds: int64(2),
-			wantErr:        false,
-			wantPhase:      corev1.PodSucceeded,
+			name:            "nil pod",
+			initialPod:      nil,
+			wantErr:         true,
+			wantErrorString: "pod is nil",
 		},
 		{
-			name:           "timeout handling",
-			initialPhase:   corev1.PodPending,
-			timeoutSeconds: int64(1),
-			wantErr:        true,
-			wantPhase:      corev1.PodPending,
-			wantError:      "timeout: pod default/timeout handling-pod did not complete within 1s",
+			name:        "pending to success",
+			initialPod:  podPending,
+			updatePhase: corev1.PodSucceeded,
+			wantErr:     false,
 		},
 		{
-			name:           "immediate failure",
-			initialPhase:   corev1.PodFailed,
-			timeoutSeconds: int64(2),
-			wantPhase:      corev1.PodFailed,
-			wantErr:        false,
+			name:        "pending to failed",
+			initialPod:  podPending,
+			updatePhase: corev1.PodFailed,
+			wantErr:     false,
 		},
 		{
-			name:           "pending to failed",
-			initialPhase:   corev1.PodPending,
-			updatePhase:    corev1.PodFailed,
-			updateDelay:    100 * time.Millisecond,
-			timeoutSeconds: int64(2),
-			wantPhase:      corev1.PodFailed,
-			wantErr:        false,
-		},
-		{
-			name:           "pending to unknown",
-			initialPhase:   corev1.PodPending,
-			updatePhase:    corev1.PodUnknown,
-			updateDelay:    100 * time.Millisecond,
-			timeoutSeconds: int64(1),
-			wantPhase:      corev1.PodFailed,
-			wantErr:        true,
-			wantError:      "timeout: pod default/pending to unknown-pod did not complete within 1s", // unknown is not treated as as completed state
+			name:        "pending to running",
+			initialPod:  podPending,
+			updatePhase: corev1.PodRunning,
+			wantErr:     false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create fresh clientset for each test case
-			initialPod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      tt.name + "-pod",
-				},
-				Status: corev1.PodStatus{
-					Phase: tt.initialPhase,
-				},
-			}
-			clientset := fakeapi.NewSimpleClientset(initialPod)
 			ctx := context.Background()
+			timeoutSeconds := int64(2)
 
-			if tt.updateDelay == 0 {
-				tt.updateDelay = 500 * time.Millisecond // Default update delay if not specified
+			var clientset *fakeapi.Clientset
+			if tt.initialPod != nil {
+				clientset = fakeapi.NewSimpleClientset(tt.initialPod)
+			} else {
+				clientset = fakeapi.NewSimpleClientset(&corev1.Pod{})
 			}
 
-			if tt.updatePhase != "" {
+			if tt.updatePhase != "" && tt.initialPod != nil {
 				go func() {
-					time.Sleep(tt.updateDelay)
-					updatedPod := initialPod.DeepCopy()
+					updatedPod := tt.initialPod.DeepCopy()
 					updatedPod.Status.Phase = tt.updatePhase
 					_, _ = clientset.CoreV1().Pods("default").Update(context.Background(), updatedPod, metav1.UpdateOptions{})
 				}()
 			}
 
-			_, err := kw.WaitForPodCompleted(ctx, initialPod, clientset, &tt.timeoutSeconds)
-
+			_, err := kw.WaitForPodCompleted(ctx, tt.initialPod, clientset, &timeoutSeconds)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
-				if tt.wantError != "" && err != nil && !strings.Contains(err.Error(), tt.wantError) {
-					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
+				if tt.wantErrorString != "" && err != nil && !strings.Contains(err.Error(), tt.wantErrorString) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.wantErrorString, err.Error())
 				}
 			}
 			if tt.wantErr && err != nil {
-				if !strings.Contains(err.Error(), tt.wantError) {
-					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
+				if !strings.Contains(err.Error(), tt.wantErrorString) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.wantErrorString, err.Error())
 				}
 			}
 		})

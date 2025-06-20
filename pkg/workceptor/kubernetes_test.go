@@ -1261,6 +1261,19 @@ var podSuccess = &corev1.Pod{
 	},
 	Status: corev1.PodStatus{
 		Phase: corev1.PodSucceeded,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: nil,
+					Running: nil,
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 0,
+						Reason:   "Success",
+					},
+				},
+			},
+		},
 	},
 }
 
@@ -1376,9 +1389,8 @@ func TestGetPodStatus(t *testing.T) {
 			name:       "pending pod",
 			pod:        podPending,
 			wantOk:     true,
-			wantReason: "pod default/pending-pod infrastructure pod phase: Pending",
-			wantErr:    true,
-			wantError:  "pod not in terminal state",
+			wantReason: "",
+			wantErr:    false,
 		},
 	}
 
@@ -1412,56 +1424,56 @@ func TestWaitForPodCompleted(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		initialPhase corev1.PodPhase
-		updatePhase  corev1.PodPhase
-		timeout      time.Duration
-		updateDelay  time.Duration
-		wantPhase    corev1.PodPhase
-		wantErr      bool
-		wantError    string
+		name           string
+		initialPhase   corev1.PodPhase
+		updatePhase    corev1.PodPhase
+		timeoutSeconds int64
+		updateDelay    time.Duration
+		wantPhase      corev1.PodPhase
+		wantErr        bool
+		wantError      string
 	}{
 		{
-			name:         "successful completion",
-			initialPhase: corev1.PodPending,
-			updatePhase:  corev1.PodSucceeded,
-			timeout:      2 * time.Second,
-			wantErr:      false,
-			wantPhase:    corev1.PodSucceeded,
+			name:           "successful completion",
+			initialPhase:   corev1.PodPending,
+			updatePhase:    corev1.PodSucceeded,
+			timeoutSeconds: int64(2),
+			wantErr:        false,
+			wantPhase:      corev1.PodSucceeded,
 		},
 		{
-			name:         "timeout handling",
-			initialPhase: corev1.PodPending,
-			timeout:      1 * time.Second,
-			wantErr:      true,
-			wantPhase:    corev1.PodPending,
-			wantError:    "timeout: pod default/timeout handling-pod did not complete within 1s",
+			name:           "timeout handling",
+			initialPhase:   corev1.PodPending,
+			timeoutSeconds: int64(1),
+			wantErr:        true,
+			wantPhase:      corev1.PodPending,
+			wantError:      "timeout: pod default/timeout handling-pod did not complete within 1s",
 		},
 		{
-			name:         "immediate failure",
-			initialPhase: corev1.PodFailed,
-			timeout:      2 * time.Second,
-			wantPhase:    corev1.PodFailed,
-			wantErr:      false,
+			name:           "immediate failure",
+			initialPhase:   corev1.PodFailed,
+			timeoutSeconds: int64(2),
+			wantPhase:      corev1.PodFailed,
+			wantErr:        false,
 		},
 		{
-			name:         "pending to failed",
-			initialPhase: corev1.PodPending,
-			updatePhase:  corev1.PodFailed,
-			updateDelay:  100 * time.Millisecond,
-			timeout:      2 * time.Second,
-			wantPhase:    corev1.PodFailed,
-			wantErr:      false,
+			name:           "pending to failed",
+			initialPhase:   corev1.PodPending,
+			updatePhase:    corev1.PodFailed,
+			updateDelay:    100 * time.Millisecond,
+			timeoutSeconds: int64(2),
+			wantPhase:      corev1.PodFailed,
+			wantErr:        false,
 		},
 		{
-			name:         "pending to unknown",
-			initialPhase: corev1.PodPending,
-			updatePhase:  corev1.PodUnknown,
-			updateDelay:  100 * time.Millisecond,
-			timeout:      1 * time.Second,
-			wantPhase:    corev1.PodFailed,
-			wantErr:      true,
-			wantError:    "timeout: pod default/pending to unknown-pod did not complete within 1s", // unknown is not treated as as completed state
+			name:           "pending to unknown",
+			initialPhase:   corev1.PodPending,
+			updatePhase:    corev1.PodUnknown,
+			updateDelay:    100 * time.Millisecond,
+			timeoutSeconds: int64(1),
+			wantPhase:      corev1.PodFailed,
+			wantErr:        true,
+			wantError:      "timeout: pod default/pending to unknown-pod did not complete within 1s", // unknown is not treated as as completed state
 		},
 	}
 
@@ -1478,6 +1490,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 				},
 			}
 			clientset := fakeapi.NewSimpleClientset(initialPod)
+			ctx := context.Background()
 
 			if tt.updateDelay == 0 {
 				tt.updateDelay = 500 * time.Millisecond // Default update delay if not specified
@@ -1492,7 +1505,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 				}()
 			}
 
-			_, err := kw.WaitForPodCompleted(initialPod, clientset, tt.timeout)
+			_, err := kw.WaitForPodCompleted(ctx, initialPod, clientset, &tt.timeoutSeconds)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)

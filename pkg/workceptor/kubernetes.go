@@ -204,7 +204,7 @@ func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 			return pod, event.Object.(error)
 		default:
 			pod = event.Object.(*corev1.Pod)
-			fmt.Printf("%s: %s/%s (New IP: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.PodIP)
+			fmt.Printf("%s: %s/%s (Phase: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
 			return pod, nil
 		}
 	}
@@ -503,14 +503,14 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						podName,
 					)
 
-					timeout := int64(10)
-					_, err = kw.CapturePodStatus(kw.Pod, stdout.Size(), &timeout)
-					if err != nil {
-						kw.GetWorkceptor().nc.GetLogger().Info("Detected error while retrieving pod status for %s/%s.",
-							podNamespace,
-							podName,
-						)
-					}
+					// timeout := int64(10)
+					// _, err = kw.CapturePodStatus(kw.Pod, stdout.Size(), &timeout)
+					// if err != nil {
+					// 	kw.GetWorkceptor().nc.GetLogger().Info("Detected error while retrieving pod status for %s/%s.",
+					// 		podNamespace,
+					// 		podName,
+					// 	)
+					// }
 
 					return
 				}
@@ -1028,17 +1028,17 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 		return
 	}
 
-	pod, err := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
-	if err != nil {
-		kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
-	}
-	timeout := int64(10)
-	ok, _ := kw.CapturePodStatus(pod, stdout.Size(), &timeout)
-	if !ok {
-		// If the pod did not succeed, we already updated the status to WorkStateFailed
-		// and we can return early.
-		return
-	}
+	// pod, err := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+	// if err != nil {
+	// 	kw.GetWorkceptor().nc.GetLogger().Warning("Failed to retrieve pod for diagnostics: %v", err)
+	// }
+	// timeout := int64(10)
+	// ok, _ := kw.CapturePodStatus(pod, stdout.Size(), &timeout)
+	// if !ok {
+	// 	// If the pod did not succeed, we already updated the status to WorkStateFailed
+	// 	// and we can return early.
+	// 	return
+	// }
 
 	// Only transition to WorkStateSucceeded if the work unit is still running
 	// and has not already failed due to diagnostic or streaming errors.

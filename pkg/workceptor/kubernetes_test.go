@@ -507,7 +507,7 @@ func Test_IsCompatibleK8S(t *testing.T) {
 	}
 }
 
-// Helper type to simulate EOF from stream reading
+// Helper type to simulate EOF from stream reading.
 type eofReadCloser struct {
 	content string
 	hasRead bool
@@ -519,8 +519,10 @@ func (e *eofReadCloser) Read(p []byte) (n int, err error) {
 		fullContent := e.content + "\n"
 		n = copy(p, []byte(fullContent))
 		e.hasRead = true
+
 		return n, nil
 	}
+
 	return 0, io.EOF
 }
 
@@ -547,7 +549,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				// No other expectations since function should return immediately
 			},
-			stdinErr:          func() *error { err := errors.New("stdin failed"); return &err }(),
+			stdinErr: func() *error {
+				err := errors.New("stdin failed")
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    1,
 		},

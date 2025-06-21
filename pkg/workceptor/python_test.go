@@ -135,7 +135,7 @@ func TestWorkPythonConfigNewWorkerRunsToSuccess(t *testing.T) {
 }
 
 func TestWorkPythonConfigRunRunsToSuccess(t *testing.T) {
-	_, _, mockNetceptorForWorkceptor, w := createPythonUnitTestSetup(t) //nolint:dogsled
+	_, _, mockNetceptorForWorkceptor, w := createPythonUnitTestSetup(t)
 	mockNetceptorForWorkceptor.EXPECT().NodeID().AnyTimes()
 	mockNetceptorForWorkceptor.EXPECT().AddWorkCommand("", false)
 

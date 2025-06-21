@@ -531,7 +531,6 @@ func (e *eofReadCloser) Close() error {
 }
 
 func TestKubeLoggingWithReconnect(t *testing.T) {
-	// Helper function to create a test case
 	type testCase struct {
 		name              string
 		setupMocks        func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
@@ -547,7 +546,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
-				// No other expectations since function should return immediately
 			},
 			stdinErr: func() *error {
 				err := errors.New("stdin failed")
@@ -572,7 +570,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(1)
 
-				// Setup request that will be cancelled
 				req := fakerest.RESTClient{
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						// Cancel context during request to simulate cancellation during reading
@@ -603,11 +600,9 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
-				// Expect exactly 5 failed Get() calls (retry exhaustion)
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, errors.New("pod not found")).Times(5)
 
-				// Expect work state to be set to failed
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).Times(1)
 			},
 			stdinErr: func() *error {
@@ -626,7 +621,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
-				// Expect work state to be set to failed when connection exhausts retries
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 				pod := &corev1.Pod{
@@ -635,7 +629,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).AnyTimes()
 
-				// Return failed request that will cause connection handler to fail
 				failReq := fakerest.RESTClient{
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						return nil, errors.New("connection refused")
@@ -722,8 +715,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 
 				// Multiple Get() calls for retries - pod stays ready so it keeps retrying
-				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil).AnyTimes()
-				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(readyPod, nil).AnyTimes()
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(readyPod, nil).AnyTimes(),
+				)
 
 				// Return EOF each time to trigger retry exhaustion
 				req := fakerest.RESTClient{
@@ -743,7 +738,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    5, // Should timeout after retries are exhausted
+			timeoutSeconds:    5,
 		},
 		{
 			name: "successful_log_reading_with_timestamps",
@@ -849,7 +844,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create fresh test setup for each test
 			var stdoutErr error
 			_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx := createKubernetesTestSetup(t)
 			defer ctrl.Finish()
@@ -865,17 +859,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				Pod:                     pod,
 			}
 
-			// Setup mocks specific to this test
 			tt.setupMocks(mockBaseWorkUnit, mockNetceptor, mockKubeAPI, w, ctx)
 
-			// Setup stdout writer mocks
 			mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
 			mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil).AnyTimes()
 			stdout, _ := workceptor.NewStdoutWriter(mockfilesystemer, "")
 			mockFileWC := mock_workceptor.NewMockFileWriteCloser(ctrl)
 			stdout.SetWriter(mockFileWC)
 
-			// Capture writes to verify content
 			var writtenData []string
 			mockFileWC.EXPECT().Write(gomock.Any()).DoAndReturn(func(data []byte) (int, error) {
 				writtenData = append(writtenData, string(data))
@@ -883,7 +874,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return len(data), nil
 			}).AnyTimes()
 
-			// Create wait group and run test with timeout
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 
@@ -898,15 +888,12 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				kw.KubeLoggingWithReconnect(wg, stdout, tt.stdinErr, &stdoutErr)
 			}()
 
-			// Wait for completion or timeout
 			select {
 			case <-done:
-				// Test completed
 			case <-time.After(time.Duration(tt.timeoutSeconds) * time.Second):
 				t.Logf("Test timed out after %d seconds", tt.timeoutSeconds)
 			}
 
-			// Verify results
 			if tt.expectedStdoutErr && stdoutErr == nil {
 				t.Errorf("Expected stdout error but got none")
 			}
@@ -914,7 +901,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				t.Errorf("Unexpected stdout error: %v", stdoutErr)
 			}
 
-			// Log what was written for debugging
 			if len(writtenData) > 0 {
 				t.Logf("Written data: %v", writtenData)
 			}

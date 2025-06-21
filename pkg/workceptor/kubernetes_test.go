@@ -577,6 +577,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						// Cancel context during request to simulate cancellation during reading
 						cancel()
+
 						return &http.Response{
 							StatusCode: http.StatusOK,
 							Body:       io.NopCloser(strings.NewReader("2024-12-09T00:31:18.823849250Z Test log\n")),
@@ -586,7 +587,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
@@ -605,7 +610,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				// Expect work state to be set to failed
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).Times(1)
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    10, // Allow time for 5 retries with 1 second delays
 		},
@@ -635,7 +644,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(failReq.Request()).AnyTimes()
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    30, // Allow time for retries
 		},
@@ -678,7 +691,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
@@ -720,7 +737,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    5, // Should timeout after retries are exhausted
 		},
@@ -766,7 +787,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
@@ -812,7 +837,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
 			},
-			stdinErr:          func() *error { var err error; return &err }(),
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
@@ -850,6 +879,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			var writtenData []string
 			mockFileWC.EXPECT().Write(gomock.Any()).DoAndReturn(func(data []byte) (int, error) {
 				writtenData = append(writtenData, string(data))
+
 				return len(data), nil
 			}).AnyTimes()
 

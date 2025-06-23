@@ -55,28 +55,6 @@ var podInfraError = &corev1.Pod{
 	},
 }
 
-var podAppError = &corev1.Pod{
-	ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default",
-		Name:      "app-error-pod",
-	},
-	Status: corev1.PodStatus{
-		Phase:  corev1.PodFailed,
-		Reason: "Error",
-		ContainerStatuses: []corev1.ContainerStatus{
-			{
-				Name: "worker",
-				State: corev1.ContainerState{
-					Terminated: &corev1.ContainerStateTerminated{
-						ExitCode: 1,
-						Reason:   "Error",
-					},
-				},
-			},
-		},
-	},
-}
-
 var podPending = &corev1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default",
@@ -105,68 +83,57 @@ func TestGetPodStatus(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		pod        *corev1.Pod
-		wantOk     bool
-		wantReason string
-		wantErr    bool
-		wantError  string
+		name         string
+		pod          *corev1.Pod
+		wantOk       bool
+		wantErr      bool
+		wantErrorMsg string
 	}{
 		{
-			name:       "nil pod",
-			pod:        nil,
-			wantOk:     false,
-			wantReason: "pod is nil",
-			wantErr:    true,
-			wantError:  "pod is nil",
+			name:         "nil pod",
+			pod:          nil,
+			wantOk:       false,
+			wantErr:      true,
+			wantErrorMsg: "pod is nil",
 		},
 		{
-			name:       "infrastructure failure",
-			pod:        podInfraError,
-			wantOk:     false,
-			wantReason: "pod default/infra-error-pod infrastructure pod reason OOMKilled container worker OOMKill",
-			wantErr:    false,
+			name:         "pod error",
+			pod:          podInfraError,
+			wantOk:       false,
+			wantErr:      true,
+			wantErrorMsg: "container worker exited with code 137: OOMKill",
 		},
 		{
-			name:       "application failure",
-			pod:        podAppError,
-			wantOk:     false,
-			wantReason: "pod default/app-error-pod infrastructure pod reason Error container worker Error",
-			wantErr:    false,
+			name:    "success case",
+			pod:     podSuccess,
+			wantOk:  true,
+			wantErr: false,
 		},
 		{
-			name:       "success case",
-			pod:        podSuccess,
-			wantOk:     true,
-			wantReason: "",
-			wantErr:    false,
-		},
-		{
-			name:       "pending pod",
-			pod:        podPending,
-			wantOk:     true,
-			wantReason: "",
-			wantErr:    false,
+			name:    "pending pod",
+			pod:     podPending,
+			wantOk:  true,
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ok, reason, err := kw.GetPodStatus(tt.pod)
-			if ok != tt.wantOk || reason != tt.wantReason || (err != nil) != tt.wantErr {
-				t.Errorf("Failed %s case: ok=%v wantok=%v reason=%q err=%v", tt.name, ok, tt.wantOk, reason, err)
+			ok, err := kw.GetPodStatus(tt.pod)
+			if ok != tt.wantOk || (err != nil) != tt.wantErr {
+				t.Errorf("Failed %s case: ok=%v wantok=%v err=%v", tt.name, ok, tt.wantOk, err)
 			}
 			if err != nil && tt.wantErr == false {
 				t.Errorf("Expected error message got '%s'", err.Error())
 			}
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("Expected error message '%s', got nil error", tt.wantError)
-				} else if !strings.Contains(err.Error(), tt.wantError) {
-					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
+					t.Errorf("Expected error message '%s', got nil error", tt.wantErrorMsg)
+				} else if !strings.Contains(err.Error(), tt.wantErrorMsg) {
+					t.Errorf("Expected error message '%s', got '%s'", tt.wantErrorMsg, err.Error())
 				}
 			}
-			if tt.wantError == "" && err != nil {
+			if tt.wantErrorMsg == "" && err != nil {
 				t.Errorf("Unexpected error for %s case: %v", tt.name, err)
 			}
 		})
@@ -232,7 +199,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 				}()
 			}
 
-			_, err := kw.WaitForPodCompleted(ctx, tt.initialPod, clientset, &timeoutSeconds)
+			err := kw.WaitForPodCompleted(ctx, tt.initialPod, clientset, &timeoutSeconds)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
 				if tt.wantErrorString != "" && err != nil && !strings.Contains(err.Error(), tt.wantErrorString) {

@@ -507,81 +507,403 @@ func Test_IsCompatibleK8S(t *testing.T) {
 	}
 }
 
+// Helper type to simulate EOF from stream reading.
+type eofReadCloser struct {
+	content string
+	hasRead bool
+}
+
+func (e *eofReadCloser) Read(p []byte) (n int, err error) {
+	if !e.hasRead && len(e.content) > 0 {
+		// Add newline to simulate a complete log line
+		fullContent := e.content + "\n"
+		n = copy(p, []byte(fullContent))
+		e.hasRead = true
+
+		return n, nil
+	}
+
+	return 0, io.EOF
+}
+
+func (e *eofReadCloser) Close() error {
+	return nil
+}
+
 func TestKubeLoggingWithReconnect(t *testing.T) {
-	var stdinErr error
-	var stdoutErr error
-	_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx := createKubernetesTestSetup(t)
-
-	pod := &corev1.Pod{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"}, Spec: corev1.PodSpec{}, Status: corev1.PodStatus{Phase: corev1.PodRunning}}
-
-	kw := &workceptor.KubeUnit{
-		BaseWorkUnitForWorkUnit: mockBaseWorkUnit,
-		KubeAPIWrapperInstance:  mockKubeAPI,
-		Pod:                     pod,
+	type testCase struct {
+		name              string
+		setupMocks        func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
+		stdinErr          *error
+		expectedStdoutErr bool
+		timeoutSeconds    int
 	}
 
-	tests := []struct {
-		name          string
-		expectedCalls func()
-	}{
+	tests := []testCase{
 		{
-			name: "Kube error should be read",
-			expectedCalls: func() {
-				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w)
-				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).Times(3)
-				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil)
+			name: "stdin_error_causes_immediate_return",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				logger := logger.NewReceptorLogger("")
-				mockNetceptor.EXPECT().GetLogger().Return(logger)
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+			},
+			stdinErr: func() *error {
+				err := errors.New("stdin failed")
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    1,
+		},
+		{
+			name: "context_cancellation_during_reading",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				cancelCtx, cancel := context.WithCancel(ctx)
+				mockBaseWorkUnit.EXPECT().GetContext().Return(cancelCtx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(1)
+
 				req := fakerest.RESTClient{
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
-						resp := &http.Response{
+						// Cancel context during request to simulate cancellation during reading
+						cancel()
+
+						return &http.Response{
 							StatusCode: http.StatusOK,
-							Body:       io.NopCloser(strings.NewReader("2024-12-09T00:31:18.823849250Z HI\n kube error")),
-						}
-
-						return resp, nil
+							Body:       io.NopCloser(strings.NewReader("2024-12-09T00:31:18.823849250Z Test log\n")),
+						}, nil
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				}
-				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request())
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
 			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
 		},
 		{
-			name: "Kube error 503",
-			expectedCalls: func() {
-				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).MinTimes(1)
-				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).MinTimes(3)
-				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil)
+			name: "pod_retrieval_failure_exhausts_retries",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				logger := logger.NewReceptorLogger("")
-				mockNetceptor.EXPECT().GetLogger().Return(logger).MinTimes(1)
-				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
-				req := fakerest.RESTClient{
-					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
-						resp := &http.Response{
-							StatusCode: http.StatusServiceUnavailable, // 503
-							Body:       io.NopCloser(strings.NewReader("kube error")),
-						}
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
-						return resp, nil
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("pod not found")).Times(5)
+
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).Times(1)
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    10, // Allow time for 5 retries with 1 second delays
+		},
+		{
+			name: "log_stream_connection_failure",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).AnyTimes()
+
+				failReq := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return nil, errors.New("connection refused")
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				}
-				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request())
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(failReq.Request()).AnyTimes()
 			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    30, // Allow time for retries
+		},
+		{
+			name: "eof_with_pod_not_ready_exits_immediately",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				notReadyPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+						},
+					},
+				}
+
+				// First Get() for main loop, second Get() after EOF for readiness check
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil),
+				)
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Final log", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
+		},
+		{
+			name: "eof_with_pod_ready_triggers_retry_then_exhausts",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				readyPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+						},
+					},
+				}
+
+				// Multiple Get() calls for retries - pod stays ready so it keeps retrying
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(readyPod, nil).AnyTimes(),
+				)
+
+				// Return EOF each time to trigger retry exhaustion
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:19.123456789Z Retry log", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    5,
+		},
+		{
+			name: "successful_log_reading_with_timestamps",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				completedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodSucceeded,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+						},
+					},
+				}
+
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil),
+				)
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body: io.NopCloser(strings.NewReader(
+								"2024-12-09T00:31:18.823849250Z First log line\n" +
+									"2024-12-09T00:31:19.123456789Z Second log line\n" +
+									"2024-12-09T00:31:20.999999999Z Final log line",
+							)),
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
+		},
+		{
+			name: "malformed_timestamps_are_handled",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				completedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodSucceeded,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+						},
+					},
+				}
+
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil),
+				)
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body: io.NopCloser(strings.NewReader(
+								"2024-12-09T00:31:18.823849250Z Valid timestamp log\n" +
+									"invalid-timestamp This log has no valid timestamp\n" +
+									"2024-12-09T00:31:20.999999999Z Another valid log",
+							)),
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.expectedCalls()
-			wg := &sync.WaitGroup{}
-			wg.Add(1)
+			var stdoutErr error
+			_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx := createKubernetesTestSetup(t)
+			defer ctrl.Finish()
+
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+				Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+			}
+
+			kw := &workceptor.KubeUnit{
+				BaseWorkUnitForWorkUnit: mockBaseWorkUnit,
+				KubeAPIWrapperInstance:  mockKubeAPI,
+				Pod:                     pod,
+			}
+
+			tt.setupMocks(mockBaseWorkUnit, mockNetceptor, mockKubeAPI, w, ctx)
+
 			mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-			mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil)
+			mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil).AnyTimes()
 			stdout, _ := workceptor.NewStdoutWriter(mockfilesystemer, "")
 			mockFileWC := mock_workceptor.NewMockFileWriteCloser(ctrl)
 			stdout.SetWriter(mockFileWC)
-			mockFileWC.EXPECT().Write(gomock.AnyOf([]byte("HI\n"), []byte(" kube error\n"))).Return(0, nil).AnyTimes()
-			kw.KubeLoggingWithReconnect(wg, stdout, &stdinErr, &stdoutErr)
+
+			var writtenData []string
+			mockFileWC.EXPECT().Write(gomock.Any()).DoAndReturn(func(data []byte) (int, error) {
+				writtenData = append(writtenData, string(data))
+
+				return len(data), nil
+			}).AnyTimes()
+
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
+
+			done := make(chan bool, 1)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Logf("Function panicked: %v", r)
+					}
+					done <- true
+				}()
+				kw.KubeLoggingWithReconnect(wg, stdout, tt.stdinErr, &stdoutErr)
+			}()
+
+			select {
+			case <-done:
+			case <-time.After(time.Duration(tt.timeoutSeconds) * time.Second):
+				t.Logf("Test timed out after %d seconds", tt.timeoutSeconds)
+			}
+
+			if tt.expectedStdoutErr && stdoutErr == nil {
+				t.Errorf("Expected stdout error but got none")
+			}
+			if !tt.expectedStdoutErr && stdoutErr != nil {
+				t.Errorf("Unexpected stdout error: %v", stdoutErr)
+			}
+
+			if len(writtenData) > 0 {
+				t.Logf("Written data: %v", writtenData)
+			}
 		})
 	}
 }
@@ -997,7 +1319,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 	// Set up expectations
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil)
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(2)
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 

@@ -13,7 +13,6 @@ import (
 	context "context"
 	url "net/url"
 	reflect "reflect"
-	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
@@ -127,22 +126,6 @@ func (m *MockKubeAPIer) GetLogs(arg0 *kubernetes.Clientset, arg1, arg2 string, a
 func (mr *MockKubeAPIerMockRecorder) GetLogs(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockKubeAPIer)(nil).GetLogs), arg0, arg1, arg2, arg3)
-}
-
-// GetPodStatus mocks base method.
-func (m *MockKubeAPIer) GetPodStatus(pod *v1.Pod) (bool, string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPodStatus", pod)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// GetPodStatus indicates an expected call of GetPodStatus.
-func (mr *MockKubeAPIerMockRecorder) GetPodStatus(pod any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodStatus", reflect.TypeOf((*MockKubeAPIer)(nil).GetPodStatus), pod)
 }
 
 // InClusterConfig mocks base method.
@@ -336,21 +319,6 @@ func (mr *MockKubeAPIerMockRecorder) UntilWithSync(arg0, arg1, arg2, arg3 any, a
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1, arg2, arg3}, arg4...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UntilWithSync", reflect.TypeOf((*MockKubeAPIer)(nil).UntilWithSync), varargs...)
-}
-
-// WaitForPodCompleted mocks base method.
-func (m *MockKubeAPIer) WaitForPodCompleted(pod *v1.Pod, clientset kubernetes.Interface, timeout time.Duration) (*v1.Pod, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForPodCompleted", pod, clientset, timeout)
-	ret0, _ := ret[0].(*v1.Pod)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// WaitForPodCompleted indicates an expected call of WaitForPodCompleted.
-func (mr *MockKubeAPIerMockRecorder) WaitForPodCompleted(pod, clientset, timeout any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForPodCompleted", reflect.TypeOf((*MockKubeAPIer)(nil).WaitForPodCompleted), pod, clientset, timeout)
 }
 
 // Watch mocks base method.

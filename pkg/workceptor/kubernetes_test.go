@@ -515,9 +515,8 @@ type eofReadCloser struct {
 
 func (e *eofReadCloser) Read(p []byte) (n int, err error) {
 	if !e.hasRead && len(e.content) > 0 {
-		// Add newline to simulate a complete log line
-		fullContent := e.content + "\n"
-		n = copy(p, []byte(fullContent))
+		// Do NOT add newline - this simulates a partial line read that triggers the bug
+		n = copy(p, []byte(e.content))
 		e.hasRead = true
 
 		return n, nil
@@ -840,6 +839,52 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
+		{
+			name: "timestamp_leak_on_eof_with_final_line",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				notReadyPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+						},
+					},
+				}
+
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil),
+				)
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z This timestamp should be leaked", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -903,6 +948,20 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 			if len(writtenData) > 0 {
 				t.Logf("Written data: %v", writtenData)
+				
+				if tt.name == "timestamp_leak_on_eof_with_final_line" {
+					hasTimestampLeak := false
+					for _, data := range writtenData {
+						if strings.HasPrefix(data, "2024-") {
+							hasTimestampLeak = true
+							t.Logf("TIMESTAMP LEAK DETECTED: %s", data)
+							break
+						}
+					}
+					if !hasTimestampLeak {
+						t.Errorf("Expected timestamp leak but none found in written data")
+					}
+				}
 			}
 		})
 	}

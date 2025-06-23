@@ -127,6 +127,7 @@ type MakeReqConfig struct {
 	OutReq     string   `description:"File to save the certificate request to" required:"Yes"`
 	InKey      string   `description:"Private key to use for the request"`
 	OutKey     string   `description:"File to save the private key to (new key will be generated)"`
+	Osw        Oser     `description:"OS wrapper for file operations"`
 }
 
 func (mr MakeReqConfig) Prepare() error {
@@ -164,7 +165,11 @@ func (mr MakeReqConfig) Run() error {
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
 
-	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, &OsWrapper{})
+	if mr.Osw == nil {
+		mr.Osw = &OsWrapper{}
+	}
+
+	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, mr.Osw)
 }
 
 type SignReqFunc interface {

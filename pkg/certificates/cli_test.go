@@ -6,6 +6,7 @@ package certificates_test
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"testing"
 	"time"
 
@@ -363,22 +364,20 @@ func TestSignReq(t *testing.T) {
 		verify    bool
 	}
 
-	positiveCaCrtPath := "/tmp/receptor_ca_cert.pem"
-
-	positiveCaKeyPath := "/tmp/receptor_ca_key.pem"
-
-	positiveCertOut := "/tmp/receptor_cert_out.pem"
-
-	positiveReqPath := "/tmp/receptor_request.pem"
+	// Define reusable path constants
+	const (
+		positiveCaCrtPath = "/tmp/receptor_ca_cert.pem"
+		positiveCaKeyPath = "/tmp/receptor_ca_key.pem"
+		positiveCertOut   = "/tmp/receptor_cert_out.pem"
+		positiveReqPath   = "/tmp/receptor_request.pem"
+		negativeReqPath   = "/tmp/receptor_request_bad.pem"
+		invalidPath       = "invalid_path"
+	)
 
 	positiveCertOptions, _, err := setupGoodCertRequest()
 	if err != nil {
 		t.Errorf("Invalid good Certificate Request: %+v", err)
 	}
-
-	invalidPath := "invalid_path"
-
-	negativeReqPath := "/tmp/receptor_request_bad.pem"
 
 	tests := []struct {
 		name    string
@@ -689,6 +688,86 @@ func TestPrepare(t *testing.T) {
 				if err != nil {
 					t.Errorf("Prepare() unexpected error = %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestMakeReqConfigRun(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockOsw := mock_certificates.NewMockOser(ctrl)
+
+	tests := []struct {
+		name        string
+		config      certificates.MakeReqConfig
+		setupMocks  func()
+		wantErr     bool
+		expectedErr string
+	}{
+		{
+			name: "successful run with valid IP",
+			config: certificates.MakeReqConfig{
+				CommonName: "test.example.com",
+				Bits:       2048,
+				DNSName:    []string{"dns.example.com"},
+				NodeID:     []string{"node123"},
+				IPAddress:  []string{"192.168.1.1"},
+				OutReq:     "request.pem",
+				OutKey:     "key.pem",
+				Osw:        mockOsw,
+			},
+			setupMocks: func() {
+				// Mock successful file operations
+				mockOsw.EXPECT().WriteFile("request.pem", gomock.Any(), gomock.Any()).Return(nil)
+				mockOsw.EXPECT().WriteFile("key.pem", gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid IP address",
+			config: certificates.MakeReqConfig{
+				CommonName: "test.example.com",
+				Bits:       2048,
+				IPAddress:  []string{"invalid-ip"},
+				OutReq:     "request.pem",
+				OutKey:     "key.pem",
+				Osw:        mockOsw,
+			},
+			setupMocks:  func() {},
+			wantErr:     true,
+			expectedErr: "invalid IP address: invalid-ip",
+		},
+		{
+			name: "file write error",
+			config: certificates.MakeReqConfig{
+				CommonName: "test.example.com",
+				Bits:       2048,
+				OutReq:     "request.pem",
+				OutKey:     "key.pem",
+				Osw:        mockOsw,
+			},
+			setupMocks: func() {
+				// Simulate file write failure
+				mockOsw.EXPECT().WriteFile("request.pem", gomock.Any(), gomock.Any()).Return(os.ErrPermission)
+			},
+			wantErr:     true,
+			expectedErr: "permission denied",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+			err := tt.config.Run()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr && err != nil && err.Error() != tt.expectedErr {
+				t.Errorf("Expected error '%s', got '%s'", tt.expectedErr, err.Error())
 			}
 		})
 	}

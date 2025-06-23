@@ -4,12 +4,6 @@
 package certificates_test
 
 import (
-	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"io/fs"
 	"testing"
@@ -19,48 +13,6 @@ import (
 	"github.com/ansible/receptor/pkg/certificates/mock_certificates"
 	"go.uber.org/mock/gomock"
 )
-
-// setupEmptyNamesCertificateRequestPEMData returns a PEM-encoded certificate request with no names.
-func setupEmptyNamesCertificateRequestPEMData() []byte {
-	csr := &x509.CertificateRequest{
-		Subject:     pkix.Name{CommonName: "empty-names"},
-		DNSNames:    nil,
-		IPAddresses: nil,
-	}
-	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
-	csrBytes, _ := x509.CreateCertificateRequest(rand.Reader, csr, priv)
-	pemBlock := &pem.Block{
-		Type:  "CERTIFICATE REQUEST",
-		Bytes: csrBytes,
-	}
-	var buf bytes.Buffer
-	pem.Encode(&buf, pemBlock)
-
-	return buf.Bytes()
-}
-
-// setupMultiplePrivateKeysPEMData returns a PEM-encoded byte slice containing two RSA private keys.
-func setupMultiplePrivateKeysPEMData() []byte {
-	var buf bytes.Buffer
-
-	// Generate first RSA private key
-	key1, _ := rsa.GenerateKey(rand.Reader, 2048)
-	pemBlock1 := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key1),
-	}
-	pem.Encode(&buf, pemBlock1)
-
-	// Generate second RSA private key
-	key2, _ := rsa.GenerateKey(rand.Reader, 2048)
-	pemBlock2 := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key2),
-	}
-	pem.Encode(&buf, pemBlock2)
-
-	return buf.Bytes()
-}
 
 func TestInitCA(t *testing.T) {
 	type args struct {
@@ -159,6 +111,11 @@ func TestInitCA(t *testing.T) {
 }
 
 func TestInitCAConfigRun(t *testing.T) {
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	o := mock_certificates.NewMockOser(ctrl)
+
 	tests := []struct {
 		name        string
 		CAConfig    certificates.InitCAConfig
@@ -171,6 +128,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				Bits:       2048,
 				OutCert:    "test.crt",
 				OutKey:     "test.key",
+				Osw:        o,
 			},
 			expectError: false,
 		},
@@ -183,6 +141,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				NotAfter:   "2024-01-01T00:00:00Z",
 				OutCert:    "test.crt",
 				OutKey:     "test.key",
+				Osw:        o,
 			},
 			expectError: false,// setupMultiplePrivateKeysPEMData returns a PEM-encoded byte slice containing two RSA private keys.
 		},
@@ -195,6 +154,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				NotAfter:   "2024-01-01T00:00:00Z",
 				OutCert:    "test.crt",
 				OutKey:     "test.key",
+				Osw:        o,
 			},
 			expectError: true,
 		},
@@ -207,6 +167,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				NotAfter:   "invalid date",
 				OutCert:    "test.crt",
 				OutKey:     "test.key",
+				Osw:	   o,
 			},
 			expectError: true,
 		},
@@ -214,6 +175,20 @@ func TestInitCAConfigRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			o.EXPECT().
+            WriteFile(gomock.Eq(tt.CAConfig.OutCert), gomock.Any(), gomock.Any()).
+            Return(nil).
+            MinTimes(0).
+            MaxTimes(1)
+
+        // Mock WriteFile for private key if OutKey is set
+        if tt.CAConfig.OutKey != "" {
+            o.EXPECT().
+                WriteFile(gomock.Eq(tt.CAConfig.OutKey), gomock.Any(), gomock.Any()).
+                Return(nil).
+                MinTimes(0).
+                MaxTimes(1)
+        }
 			err := tt.CAConfig.Run()
 			if (err != nil) != tt.expectError {
 				t.Errorf("InitCAConfig.Run() error = %v, expectError %v", err, tt.expectError)

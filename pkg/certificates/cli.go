@@ -44,6 +44,7 @@ type InitCAConfig struct {
 	NotAfter   string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
 	OutCert    string `description:"File to save the CA certificate to" required:"Yes"`
 	OutKey     string `description:"File to save the CA private key to" required:"Yes"`
+	Osw        Oser   `description:"OS wrapper for file operations"`
 }
 
 func (ica InitCAConfig) Run() (err error) {
@@ -63,8 +64,11 @@ func (ica InitCAConfig) Run() (err error) {
 			return
 		}
 	}
+	if ica.Osw == nil {
+		ica.Osw = &OsWrapper{}
+	}
 
-	return InitCA(opts, ica.OutCert, ica.OutKey, &OsWrapper{})
+	return InitCA(opts, ica.OutCert, ica.OutKey, ica.Osw)
 }
 
 // MakeReq Create Certificate Request.

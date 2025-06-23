@@ -34,8 +34,8 @@ func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutS
 	if !ok || err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed:  %v", err)
 		kw.UpdateBasicStatus(WorkStateFailed, err.Error(), stdoutSize)
-		return false, err
 
+		return false, err
 	}
 
 	kw.GetWorkceptor().nc.GetLogger().Debug("Pod status: %s", pod.Status.String())
@@ -97,8 +97,10 @@ func (ku KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 			case corev1.PodFailed:
 				ok, err := ku.PodContainerHealthy(pod, containerName)
 				if !ok || err != nil {
+
 					return false, err
 				}
+
 				return true, nil
 			case corev1.PodSucceeded:
 				return true, nil
@@ -126,14 +128,11 @@ func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 	}
 
 	for event := range watcher.ResultChan() {
-		switch event.Type {
-		case watch.Error:
+		if event.Type == watch.Error {
 			return event.Object.(error)
-		default:
-			pod = event.Object.(*corev1.Pod)
-			fmt.Printf("%s: %s/%s (Phase: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
-			return nil
 		}
+		pod = event.Object.(*corev1.Pod)
+		fmt.Printf("%s: %s/%s (Phase: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
 	}
 
 	return nil

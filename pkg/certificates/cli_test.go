@@ -111,7 +111,6 @@ func TestInitCA(t *testing.T) {
 }
 
 func TestInitCAConfigRun(t *testing.T) {
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	o := mock_certificates.NewMockOser(ctrl)
@@ -143,7 +142,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				OutKey:     "test.key",
 				Osw:        o,
 			},
-			expectError: false,// setupMultiplePrivateKeysPEMData returns a PEM-encoded byte slice containing two RSA private keys.
+			expectError: false, // setupMultiplePrivateKeysPEMData returns a PEM-encoded byte slice containing two RSA private keys.
 		},
 		{
 			name: "invalid NotBefore date",
@@ -167,7 +166,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				NotAfter:   "invalid date",
 				OutCert:    "test.crt",
 				OutKey:     "test.key",
-				Osw:	   o,
+				Osw:        o,
 			},
 			expectError: true,
 		},
@@ -176,19 +175,19 @@ func TestInitCAConfigRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			o.EXPECT().
-            WriteFile(gomock.Eq(tt.CAConfig.OutCert), gomock.Any(), gomock.Any()).
-            Return(nil).
-            MinTimes(0).
-            MaxTimes(1)
+				WriteFile(gomock.Eq(tt.CAConfig.OutCert), gomock.Any(), gomock.Any()).
+				Return(nil).
+				MinTimes(0).
+				MaxTimes(1)
 
-        // Mock WriteFile for private key if OutKey is set
-        if tt.CAConfig.OutKey != "" {
-            o.EXPECT().
-                WriteFile(gomock.Eq(tt.CAConfig.OutKey), gomock.Any(), gomock.Any()).
-                Return(nil).
-                MinTimes(0).
-                MaxTimes(1)
-        }
+			// Mock WriteFile for private key if OutKey is set
+			if tt.CAConfig.OutKey != "" {
+				o.EXPECT().
+					WriteFile(gomock.Eq(tt.CAConfig.OutKey), gomock.Any(), gomock.Any()).
+					Return(nil).
+					MinTimes(0).
+					MaxTimes(1)
+			}
 			err := tt.CAConfig.Run()
 			if (err != nil) != tt.expectError {
 				t.Errorf("InitCAConfig.Run() error = %v, expectError %v", err, tt.expectError)
@@ -210,11 +209,14 @@ func TestMakeReq(t *testing.T) {
 	positiveReqOut := "/tmp/receptor_request_out.pem"
 
 	negativeKeyIn := "/tmp"
+	duplicateKeyIn := "/tmp/receptor_key_multiple.pem"
+	emptyKeyIn := "/tmp/receptor_key_empty.pem"
 
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name          string
+		args          args
+		wantErr       bool
+		wantErrString string
 	}{
 		{
 			name: "Positive test",
@@ -242,6 +244,34 @@ func TestMakeReq(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "multiple private keys in keyIn",
+			args: args{
+				opts: &certificates.CertOptions{
+					Bits:       8192,
+					CommonName: "Ansible Automation Controller Nodes Mesh",
+				},
+				keyIn:  duplicateKeyIn,
+				keyOut: positiveKeyOut,
+				reqOut: positiveReqOut,
+			},
+			wantErr:       true,
+			wantErrString: "multiple keys in file /tmp/receptor_key_multiple.pem",
+		},
+		{
+			name: "empty keyIn",
+			args: args{
+				opts: &certificates.CertOptions{
+					Bits:       8192,
+					CommonName: "Ansible Automation Controller Nodes Mesh",
+				},
+				keyIn:  emptyKeyIn,
+				keyOut: positiveKeyOut,
+				reqOut: positiveReqOut,
+			},
+			wantErr:       true,
+			wantErrString: "no keys in file /tmp/receptor_key_empty.pem",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -263,6 +293,20 @@ func TestMakeReq(t *testing.T) {
 					EXPECT().
 					ReadFile(gomock.Eq(positiveKeyIn)).
 					Return(setupGoodPrivateKeyPEMData(), nil).
+					Times(1)
+
+			case duplicateKeyIn:
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(duplicateKeyIn)).
+					Return(setupDuplicateKeyPEMData(), nil).
+					Times(1)
+
+			case emptyKeyIn:
+				o.
+					EXPECT().
+					ReadFile(gomock.Eq(emptyKeyIn)).
+					Return([]byte{}, nil).
 					Times(1)
 
 			default:
@@ -295,8 +339,15 @@ func TestMakeReq(t *testing.T) {
 				t.Errorf("Unexpected reqOut filename: %s", tt.args.reqOut)
 			}
 
-			if err := certificates.MakeReq(tt.args.opts, tt.args.keyIn, tt.args.keyOut, tt.args.reqOut, o); (err != nil) != tt.wantErr {
+			err := certificates.MakeReq(tt.args.opts, tt.args.keyIn, tt.args.keyOut, tt.args.reqOut, o)
+
+			if (err != nil) != tt.wantErr {
 				t.Errorf("MakeReq() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErrString != "" {
+				if err.Error() != tt.wantErrString {
+					t.Errorf("MakeReq() error = %v, wantErrString %v", err, tt.wantErrString)
+				}
 			}
 		})
 	}
@@ -579,8 +630,6 @@ func TestSignReqConfigValidateAndSign(t *testing.T) {
 		})
 	}
 }
-
-
 
 func TestPrepare(t *testing.T) {
 	tests := []struct {

@@ -86,12 +86,12 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string, osWrapper Oser) er
 				continue
 			}
 			if key != nil {
-				return fmt.Errorf("multiple private keys in file %s", keyIn)
+				return fmt.Errorf("multiple keys in file %s", keyIn)
 			}
 			key = ckey
 		}
 		if key == nil {
-			return fmt.Errorf("no private keys in file %s", keyIn)
+			return fmt.Errorf("no keys in file %s", keyIn)
 		}
 		req, err = CreateCertReq(opts, key)
 		if err != nil {

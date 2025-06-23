@@ -948,13 +948,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 			if len(writtenData) > 0 {
 				t.Logf("Written data: %v", writtenData)
-				
+
 				if tt.name == "timestamp_leak_on_eof_with_final_line" {
 					hasTimestampLeak := false
 					for _, data := range writtenData {
 						if strings.HasPrefix(data, "2024-") {
 							hasTimestampLeak = true
 							t.Logf("TIMESTAMP LEAK DETECTED: %s", data)
+
 							break
 						}
 					}

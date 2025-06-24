@@ -466,7 +466,8 @@ func setupGoodPrivateKey() (*rsa.PrivateKey, error) {
 	return goodPrivateKey, nil
 }
 
-var privateKey string = `-----BEGIN PRIVATE KEY-----
+func getPrivateKey() string {
+	return `-----BEGIN PRIVATE KEY-----
 MIIJQgIBADANBgkqhkiG9w0BAQEFAASCCSwwggkoAgEAAoICAQCnXsRTTIoV2Oqh
 5zvNJzQBYOZPpxmnKzwLvgeop44Csk++zARvg5XIpmPbSEU2PY3pNGvLTH6nD54/
 ZfOIRzSN0ipvfcrpJtkrJ7OYo1gX7ROXM30x3bj2KcJ/cMgMiZMQLqPegKhtMHLG
@@ -518,15 +519,14 @@ sa6wJArEJueVGTZbXePe5zaBUWAHdPX7DYeVISHO4WkOvEquwT1BwJ/v8KO77aKv
 qI0vTc9/cZNK/A3W8rUFjat6jPUW1CsZm8yvJ3ORU01V4xVfZMRH3JzwB0WqRGVo
 FYeY7rWtiZX43Wq4szS4xWy7nlk0Jg==
 -----END PRIVATE KEY-----`
-
-// NOSONAR
+}
 
 func setupGoodPrivateKeyPEMData() []byte {
-	return []byte(privateKey)
+	return []byte(getPrivateKey())
 }
 
 func setupDuplicateKeyPEMData() []byte {
-	return []byte(privateKey + "\n" + privateKey)
+	return []byte(getPrivateKey() + "\n" + getPrivateKey())
 }
 
 func setupGoodPublicKey() (*rsa.PublicKey, error) {

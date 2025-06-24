@@ -1634,3 +1634,129 @@ func TestKubeUnitRestart(t *testing.T) {
 		assert.Contains(t, err.Error(), "restart not implemented for streammethod tcp")
 	})
 }
+
+func TestProcessLogLine(t *testing.T) {
+	kw, err := startNetceptorNodeWithWorkceptor()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseTime := time.Date(2024, 1, 17, 12, 0, 0, 0, time.UTC)
+	laterTime := time.Date(2024, 1, 17, 12, 0, 5, 0, time.UTC)
+
+	tests := []struct {
+		name            string
+		line            string
+		sinceTime       time.Time
+		successfulWrite bool
+		expectedMsg     string
+		expectedSkip    bool
+	}{
+		{
+			name:            "Valid timestamp with message",
+			line:            "2024-01-17T12:00:05Z Hello world",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "Hello world",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Valid timestamp without message",
+			line:            "2024-01-17T12:00:05Z",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    false,
+		},
+		{
+			name:            "No timestamp - treated as regular message",
+			line:            "Regular log message without timestamp",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "Regular log message without timestamp",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Timestamp older than sinceTime with no successful write - should skip",
+			line:            "2024-01-17T11:59:55Z Old message",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    true,
+		},
+		{
+			name:            "Timestamp older than sinceTime with successful write - should not skip",
+			line:            "2024-01-17T11:59:55Z Old message but successful write",
+			sinceTime:       baseTime,
+			successfulWrite: true,
+			expectedMsg:     "Old message but successful write",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Timestamp equal to sinceTime with no successful write - should skip",
+			line:            "2024-01-17T12:00:00Z Equal timestamp",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    true,
+		},
+		{
+			name:            "Timestamp equal to sinceTime with successful write - should not skip",
+			line:            "2024-01-17T12:00:00Z Equal timestamp with successful write",
+			sinceTime:       baseTime,
+			successfulWrite: true,
+			expectedMsg:     "Equal timestamp with successful write",
+			expectedSkip:    false,
+		},
+		{
+			name:            "RFC3339Nano timestamp format",
+			line:            "2024-01-17T12:00:10.123456789Z Nano precision",
+			sinceTime:       laterTime,
+			successfulWrite: false,
+			expectedMsg:     "Nano precision",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Invalid timestamp format - treated as regular message",
+			line:            "2024-01-17 12:00:10 Invalid format message",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "2024-01-17 12:00:10 Invalid format message",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Empty line",
+			line:            "",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Line with only timestamp and space",
+			line:            "2024-01-17T12:00:10Z ",
+			sinceTime:       laterTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(tt.line, tt.sinceTime, tt.successfulWrite)
+
+			if msg != tt.expectedMsg {
+				t.Errorf("ProcessLogLine() msg = %q, want %q", msg, tt.expectedMsg)
+			}
+
+			if shouldSkip != tt.expectedSkip {
+				t.Errorf("ProcessLogLine() shouldSkip = %v, want %v", shouldSkip, tt.expectedSkip)
+			}
+
+			if newSinceTime.IsZero() && !tt.sinceTime.IsZero() {
+				t.Errorf("ProcessLogLine() returned zero time when it shouldn't")
+			}
+		})
+	}
+}

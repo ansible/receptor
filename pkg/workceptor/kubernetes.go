@@ -384,7 +384,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 				if err == io.EOF && !podConditionReady {
 					if line != "" {
-						msg, _, _ := kw.processLogLine(line, sinceTime, successfulWrite)
+						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
 						if msg != "" {
 							_, err = stdout.Write([]byte(msg + "\n"))
 						}
@@ -428,7 +428,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				if err != io.EOF {
 					*stdoutErr = err
 				} else if line != "" && err == io.EOF {
-					msg, _, _ := kw.processLogLine(line, sinceTime, successfulWrite)
+					msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
 					if msg != "" {
 						_, err = stdout.Write([]byte(msg + "\n"))
 					}
@@ -443,7 +443,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				return
 			}
 
-			msg, newSinceTime, shouldSkip := kw.processLogLine(line, sinceTime, successfulWrite)
+			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)
 			sinceTime = newSinceTime
 			if shouldSkip {
 				continue
@@ -1581,8 +1581,8 @@ func (kw *KubeUnit) Release(force bool) error {
 	return kw.BaseWorkUnitForWorkUnit.Release(force)
 }
 
-// processLogLine handles timestamp parsing and stripping from log lines.
-func (kw *KubeUnit) processLogLine(line string, sinceTime time.Time, successfulWrite bool) (msg string, newSinceTime time.Time, shouldSkip bool) {
+// ProcessLogLine handles timestamp parsing and stripping from log lines.
+func (kw *KubeUnit) ProcessLogLine(line string, sinceTime time.Time, successfulWrite bool) (msg string, newSinceTime time.Time, shouldSkip bool) {
 	split := strings.SplitN(line, " ", 2)
 	msg = line
 	newSinceTime = sinceTime

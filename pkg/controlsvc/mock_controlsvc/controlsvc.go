@@ -255,15 +255,15 @@ func (m *MockUtiler) EXPECT() *MockUtilerMockRecorder {
 }
 
 // BridgeConns mocks base method.
-func (m *MockUtiler) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
+func (m *MockUtiler) BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, arg4 *logger.ReceptorLogger) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "BridgeConns", c1, c1Name, c2, c2Name, logger)
+	m.ctrl.Call(m, "BridgeConns", c1, c1Name, c2, c2Name, arg4)
 }
 
 // BridgeConns indicates an expected call of BridgeConns.
-func (mr *MockUtilerMockRecorder) BridgeConns(c1, c1Name, c2, c2Name, logger any) *gomock.Call {
+func (mr *MockUtilerMockRecorder) BridgeConns(c1, c1Name, c2, c2Name, arg4 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BridgeConns", reflect.TypeOf((*MockUtiler)(nil).BridgeConns), c1, c1Name, c2, c2Name, logger)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BridgeConns", reflect.TypeOf((*MockUtiler)(nil).BridgeConns), c1, c1Name, c2, c2Name, arg4)
 }
 
 // UnixSocketListen mocks base method.

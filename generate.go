@@ -1,6 +1,7 @@
 package main
 
 //go:generate mockgen -source=pkg/backends/websockets.go -destination=pkg/backends/mock_backends/websockets.go
+//go:generate mockgen -source=pkg/certificates/cli.go -destination=pkg/certificates/mock_certificates/cli.go
 //go:generate mockgen -source=pkg/certificates/oser.go -destination=pkg/certificates/mock_certificates/oser.go
 //go:generate mockgen -source=pkg/certificates/rsaer.go -destination=pkg/certificates/mock_certificates/rsaer.go
 //go:generate mockgen -source=pkg/controlsvc/controlsvc.go -destination=pkg/controlsvc/mock_controlsvc/controlsvc.go

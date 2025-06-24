@@ -143,6 +143,7 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 		calls                func()
 	}
 	testCases := []testCoverageItem{
+		// === Early Failure Cases ===
 		{
 			name:                 "Fail to listen and advertise connection",
 			expectError:          true,
@@ -161,6 +162,7 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)
 			},
 		},
+		// === Non-TLS Connection Cases ===
 		{
 			name:            "Fail to dial through non-TLS TCP connection",
 			tlsClientConfig: nil,
@@ -174,6 +176,20 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 			},
 		},
 		{
+			name:            "Successfully bridge non-TLS TCP connection",
+			tlsClientConfig: nil,
+			myAcceptResults: []netceptor.AcceptResult{
+				{Conn: mockTCPConn, Err: nil},
+				{Conn: nil, Err: errors.New("failed to accept a new connection")}, // Terminate loop
+			},
+			calls: func() {
+				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)
+				mockNetLib.EXPECT().Dial(gomock.Any(), gomock.Any()).Return(mockTCPConn, nil).AnyTimes()
+				mockUtilsLib.EXPECT().BridgeConns(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			},
+		},
+		// === TLS Connection Cases ===
+		{
 			name:            "Fail to dial through TLS TCP connection",
 			tlsClientConfig: &tls.Config{},
 			myAcceptResults: []netceptor.AcceptResult{{
@@ -186,17 +202,11 @@ func TestTCPProxyServiceOutbound(t *testing.T) {
 			},
 		},
 		{
-			name:            "Complete connection bridge after successful non-TLS connection",
+			name:            "Successfully bridge TLS TCP connection",
 			tlsClientConfig: &tls.Config{},
 			myAcceptResults: []netceptor.AcceptResult{
-				{
-					Conn: mockTCPConn,
-					Err:  nil,
-				},
-				{
-					Conn: nil,
-					Err:  errors.New("failed to accept a new connection"),
-				},
+				{Conn: mockTCPConn, Err: nil},
+				{Conn: nil, Err: errors.New("failed to accept a new connection")}, // Terminate loop
 			},
 			calls: func() {
 				mockNetceptor.EXPECT().ListenAndAdvertise(gomock.Any(), gomock.Any(), gomock.Any()).Return(&myListener, nil).Times(1)

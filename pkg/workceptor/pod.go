@@ -119,9 +119,12 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 		return fmt.Errorf("pod is nil")
 	}
 
-	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
-		TimeoutSeconds: timeoutSeconds,
-		FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name})
+	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx,
+		metav1.ListOptions{
+			TimeoutSeconds: timeoutSeconds,
+			FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name,
+		},
+	)
 	if err != nil {
 		return err
 	}

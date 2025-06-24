@@ -91,8 +91,7 @@ type KubeAPIer interface {
 	NewFakeAlwaysRateLimiter() flowcontrol.RateLimiter
 }
 
-type KubeAPIWrapper struct {
-}
+type KubeAPIWrapper struct{}
 
 func (ku KubeAPIWrapper) NewNotFound(qualifiedResource schema.GroupResource, name string) *apierrors.StatusError {
 	return apierrors.NewNotFound(qualifiedResource, name)

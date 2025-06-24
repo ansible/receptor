@@ -840,7 +840,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    2,
 		},
 		{
-			name: "timestamp_leak_on_eof_with_final_line",
+			name: "timestamp_remove_on_eof_with_final_line",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
@@ -870,7 +870,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: http.StatusOK,
-							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z This timestamp should be leaked", hasRead: false},
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z This timestamp should be removed", hasRead: false},
 						}, nil
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
@@ -949,7 +949,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			if len(writtenData) > 0 {
 				t.Logf("Written data: %v", writtenData)
 
-				if tt.name == "timestamp_leak_on_eof_with_final_line" {
+				if tt.name == "timestamp_remove_on_eof_with_final_line" {
 					hasTimestampLeak := false
 					for _, data := range writtenData {
 						if strings.HasPrefix(data, "2024-") {

@@ -48,6 +48,7 @@ type KubeUnit struct {
 	allowRuntimeAuth       bool
 	allowRuntimeCommand    bool
 	allowRuntimeParams     bool
+	allowRuntimeEnvVars    bool
 	allowRuntimePod        bool
 	deletePodOnRestart     bool
 	namePrefix             string
@@ -62,6 +63,7 @@ type KubeExtraData struct {
 	Image         string
 	Command       string
 	Params        string
+	EnvVars       string
 	KubeNamespace string
 	KubeConfig    string
 	KubePod       string
@@ -453,6 +455,57 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	}
 }
 
+// parseEnvVars parses a comma-separated string of environment variables
+// in format "KEY1=value1,KEY2=value2" and returns a map
+func parseEnvVars(envVarsStr string) map[string]string {
+	if envVarsStr == "" {
+		return nil
+	}
+	
+	envMap := make(map[string]string)
+	envPairs := strings.Split(envVarsStr, ",")
+	for _, pair := range envPairs {
+		trimmedPair := strings.TrimSpace(pair)
+		if trimmedPair != "" {
+			parts := strings.SplitN(trimmedPair, "=", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+				if key != "" {
+					envMap[key] = value
+				}
+			}
+		}
+	}
+	
+	return envMap
+}
+
+// mergeEnvMaps merges two environment variable maps, with the second map taking precedence
+func mergeEnvMaps(base, overlay map[string]string) map[string]string {
+	if base == nil && overlay == nil {
+		return nil
+	}
+	
+	merged := make(map[string]string)
+	
+	// Copy base map
+	if base != nil {
+		for k, v := range base {
+			merged[k] = v
+		}
+	}
+	
+	// Overlay takes precedence
+	if overlay != nil {
+		for k, v := range overlay {
+			merged[k] = v
+		}
+	}
+	
+	return merged
+}
+
 func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	command, err := shlex.Split(ked.Command)
@@ -524,9 +577,13 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		Spec:       *spec,
 	}
 
-	if env != nil {
+	// Parse environment variables from user input and merge with passed-in env
+	userEnv := parseEnvVars(ked.EnvVars)
+	finalEnv := mergeEnvMaps(env, userEnv)
+
+	if finalEnv != nil {
 		evs := make([]corev1.EnvVar, 0)
-		for k, v := range env {
+		for k, v := range finalEnv {
 			evs = append(evs, corev1.EnvVar{
 				Name:  k,
 				Value: v,
@@ -1401,11 +1458,13 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	userCommand := ""
 	userImage := ""
 	userPod := ""
+	userEnvVars := ""
 	podPendingTimeoutString := ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
 		{name: "kube_image", permission: kw.allowRuntimeCommand, setter: setString(&userImage)},
 		{name: "kube_params", permission: kw.allowRuntimeParams, setter: setString(&userParams)},
+		{name: "envvars", permission: kw.allowRuntimeEnvVars, setter: setString(&userEnvVars)},
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
 		{name: "secret_kube_pod", permission: kw.allowRuntimePod, setter: setString(&userPod)},
@@ -1454,6 +1513,9 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 		kw.baseParams = ""
 	} else {
 		ked.Params = combineParams(kw.baseParams, userParams)
+	}
+	if userEnvVars != "" {
+		ked.EnvVars = userEnvVars
 	}
 
 	return nil
@@ -1588,6 +1650,7 @@ type KubeWorkerCfg struct {
 	AllowRuntimeAuth    bool   `description:"Allow passing API parameters at runtime" default:"false"`
 	AllowRuntimeCommand bool   `description:"Allow specifying image & command at runtime" default:"false"`
 	AllowRuntimeParams  bool   `description:"Allow adding command parameters at runtime" default:"false"`
+	AllowRuntimeEnvVars bool   `description:"Allow users to add environment variables" default:"false"`
 	AllowRuntimePod     bool   `description:"Allow passing Pod at runtime" default:"false"`
 	DeletePodOnRestart  bool   `description:"On restart, delete the pod if in pending state" default:"true"`
 	StreamMethod        string `description:"Method for connecting to worker pods: logger or tcp" default:"logger"`
@@ -1630,6 +1693,7 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		allowRuntimeAuth:        cfg.AllowRuntimeAuth,
 		allowRuntimeCommand:     cfg.AllowRuntimeCommand,
 		allowRuntimeParams:      cfg.AllowRuntimeParams,
+		allowRuntimeEnvVars:     cfg.AllowRuntimeEnvVars,
 		allowRuntimePod:         cfg.AllowRuntimePod,
 		deletePodOnRestart:      cfg.DeletePodOnRestart,
 		namePrefix:              fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),

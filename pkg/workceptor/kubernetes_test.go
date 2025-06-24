@@ -959,8 +959,8 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 							break
 						}
 					}
-					if !hasTimestampLeak {
-						t.Errorf("Expected timestamp leak but none found in written data")
+					if hasTimestampLeak {
+						t.Errorf("Did not expect a timestamp leak but one was found in written data")
 					}
 				}
 			}

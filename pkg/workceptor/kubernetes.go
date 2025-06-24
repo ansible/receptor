@@ -384,7 +384,10 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 				if err == io.EOF && !podConditionReady {
 					if line != "" {
-						_, err = stdout.Write([]byte(line + "\n"))
+						msg, _, _ := kw.processLogLine(line, sinceTime, successfulWrite)
+						if msg != "" {
+							_, err = stdout.Write([]byte(msg + "\n"))
+						}
 						if err != nil {
 							*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
 							kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
@@ -425,7 +428,10 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				if err != io.EOF {
 					*stdoutErr = err
 				} else if line != "" && err == io.EOF {
-					_, err = stdout.Write([]byte(line + "\n"))
+					msg, _, _ := kw.processLogLine(line, sinceTime, successfulWrite)
+					if msg != "" {
+						_, err = stdout.Write([]byte(msg + "\n"))
+					}
 					if err != nil {
 						*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
 						kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
@@ -437,17 +443,10 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				return
 			}
 
-			split := strings.SplitN(line, " ", 2)
-			msg := line
-			timestamp := ParseTime(split[0])
-			if timestamp != nil {
-				if !timestamp.After(sinceTime) && !successfulWrite {
-					continue
-				}
-				sinceTime = *timestamp
-				msg = split[1]
-			} else {
-				kw.GetWorkceptor().nc.GetLogger().Debug("No timestamp received, log line: '%s'", line)
+			msg, newSinceTime, shouldSkip := kw.processLogLine(line, sinceTime, successfulWrite)
+			sinceTime = newSinceTime
+			if shouldSkip {
+				continue
 			}
 
 			_, err = stdout.Write([]byte(msg))
@@ -1580,6 +1579,30 @@ func (kw *KubeUnit) Release(force bool) error {
 	}
 
 	return kw.BaseWorkUnitForWorkUnit.Release(force)
+}
+
+// processLogLine handles timestamp parsing and stripping from log lines.
+func (kw *KubeUnit) processLogLine(line string, sinceTime time.Time, successfulWrite bool) (msg string, newSinceTime time.Time, shouldSkip bool) {
+	split := strings.SplitN(line, " ", 2)
+	msg = line
+	newSinceTime = sinceTime
+
+	timestamp := ParseTime(split[0])
+	if timestamp != nil {
+		if !timestamp.After(sinceTime) && !successfulWrite {
+			return "", sinceTime, true
+		}
+		newSinceTime = *timestamp
+		if len(split) > 1 {
+			msg = split[1]
+		} else {
+			msg = ""
+		}
+	} else {
+		kw.GetWorkceptor().nc.GetLogger().Debug("No timestamp received, log line: '%s'", line)
+	}
+
+	return msg, newSinceTime, false
 }
 
 // **************************************************************************

@@ -54,16 +54,18 @@ type BaseWorkUnitForWorkUnit interface {
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.
 type commandUnit struct {
 	BaseWorkUnitForWorkUnit
-	command            string
-	baseParams         string
-	allowRuntimeParams bool
-	done               bool
+	command             string
+	baseParams          string
+	allowRuntimeParams  bool
+	allowRuntimeEnvVars bool
+	done                bool
 }
 
 // CommandExtraData is the content of the ExtraData JSON field for a command worker.
 type CommandExtraData struct {
-	Pid    int
-	Params string
+	Pid     int
+	Params  string
+	EnvVars string
 }
 
 func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
@@ -97,7 +99,7 @@ func cmdWaiter(cmd *exec.Cmd, doneChan chan bool) {
 }
 
 // commandRunner is run in a separate process, to monitor the subprocess and report back metadata.
-func commandRunner(command string, params string, unitdir string) error {
+func commandRunner(command string, params string, envvars string, unitdir string) error {
 	status := StatusFileData{}
 	status.ExtraData = &CommandExtraData{}
 	statusFilename := path.Join(unitdir, "status")
@@ -157,6 +159,20 @@ func commandRunner(command string, params string, unitdir string) error {
 	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stdout
+
+	// Parse and set environment variables
+	if envvars != "" {
+		// Start with the current environment
+		cmd.Env = os.Environ()
+		
+		// Parse environment variables in format "KEY1=value1,KEY2=value2"
+		envPairs := strings.Split(envvars, ",")
+		for _, pair := range envPairs {
+			if strings.TrimSpace(pair) != "" {
+				cmd.Env = append(cmd.Env, strings.TrimSpace(pair))
+			}
+		}
+	}
 
 	err = cmd.Start()
 	if err != nil {
@@ -246,7 +262,23 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	if cmdParams != "" && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
-	cw.GetStatusCopy().ExtraData.(*CommandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+	
+	envVars, ok := params["envvars"]
+	if !ok {
+		envVars = ""
+	}
+	if envVars != "" && !cw.allowRuntimeEnvVars {
+		return fmt.Errorf("environment variables provided but not allowed")
+	}
+	
+	// Use UpdateFullStatus to properly update the status
+	cw.UpdateFullStatus(func(status *StatusFileData) {
+		if status.ExtraData == nil {
+			status.ExtraData = &CommandExtraData{}
+		}
+		status.ExtraData.(*CommandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+		status.ExtraData.(*CommandExtraData).EnvVars = envVars
+	})
 
 	return nil
 }
@@ -322,6 +354,7 @@ func (cw *commandUnit) Start() error {
 		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
 		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*CommandExtraData).Params),
+		fmt.Sprintf("envvars=%s", cw.Status().ExtraData.(*CommandExtraData).EnvVars),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))
 
 	return cw.runCommand(cmd)
@@ -391,11 +424,12 @@ func (cw *commandUnit) Release(force bool) error {
 
 // CommandWorkerCfg is the cmdline configuration object for a worker that runs a command.
 type CommandWorkerCfg struct {
-	WorkType           string `required:"true" description:"Name for this worker type"`
-	Command            string `required:"true" description:"Command to run to process units of work"`
-	Params             string `description:"Command-line parameters"`
-	AllowRuntimeParams bool   `description:"Allow users to add more parameters" default:"false"`
-	VerifySignature    bool   `description:"Verify a signed work submission" default:"false"`
+	WorkType             string `required:"true" description:"Name for this worker type"`
+	Command              string `required:"true" description:"Command to run to process units of work"`
+	Params               string `description:"Command-line parameters"`
+	AllowRuntimeParams   bool   `description:"Allow users to add more parameters" default:"false"`
+	AllowRuntimeEnvVars  bool   `description:"Allow users to add environment variables" default:"false"`
+	VerifySignature      bool   `description:"Verify a signed work submission" default:"false"`
 }
 
 func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
@@ -412,6 +446,7 @@ func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor
 		command:                 cfg.Command,
 		baseParams:              cfg.Params,
 		allowRuntimeParams:      cfg.AllowRuntimeParams,
+		allowRuntimeEnvVars:     cfg.AllowRuntimeEnvVars,
 	}
 	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
@@ -440,12 +475,13 @@ func (cfg CommandWorkerCfg) Run() error {
 type commandRunnerCfg struct {
 	Command string `required:"true"`
 	Params  string `required:"true"`
+	EnvVars string `required:"true"`
 	UnitDir string `required:"true"`
 }
 
 // Run runs the action.
 func (cfg commandRunnerCfg) Run() error {
-	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
+	err := commandRunner(cfg.Command, cfg.Params, cfg.EnvVars, cfg.UnitDir)
 	if err != nil {
 		statusFilename := path.Join(cfg.UnitDir, "status")
 		err2 := (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))

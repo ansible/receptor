@@ -432,6 +432,12 @@ def list_units(ctx, unit_id, node, tlsclient, quiet):
     help="Additional Receptor parameter (key=value format)",
     multiple=True,
 )
+@click.option(
+    "--envvars",
+    "-e",
+    help="Environment variables (key=value format)",
+    multiple=True,
+)
 @click.argument("cmdparams", type=str, required=False, nargs=-1)
 def submit(
     ctx,
@@ -446,6 +452,7 @@ def submit(
     follow,
     rm,
     param,
+    envvars,
     cmdparams,
 ):
     pcmds = 0
@@ -487,6 +494,12 @@ def submit(
                 allparams.append(params["params"])
             allparams.extend(cmdparams)
             params["params"] = " ".join(allparams)
+        
+        # Process environment variables
+        if envvars:
+            envvar_dict = dict(s.split("=", 1) for s in envvars)
+            params["envvars"] = ",".join(f"{k}={v}" for k, v in envvar_dict.items())
+        
         if node == "":
             node = None
         rc = get_rc(ctx)

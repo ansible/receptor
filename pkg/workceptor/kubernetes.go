@@ -387,12 +387,12 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
 						if msg != "" {
 							_, err = stdout.Write([]byte(msg + "\n"))
-						}
-						if err != nil {
-							*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
-							kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
+							if err != nil {
+								*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
+								kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
 
-							return
+								return
+							}
 						}
 					}
 					kw.GetWorkceptor().nc.GetLogger().Info("Detected EOF for pod %s/%s.",
@@ -431,12 +431,12 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
 					if msg != "" {
 						_, err = stdout.Write([]byte(msg + "\n"))
-					}
-					if err != nil {
-						*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
-						kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
+						if err != nil {
+							*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
+							kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
 
-						return
+							return
+						}
 					}
 				}
 

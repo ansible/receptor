@@ -517,7 +517,9 @@ sa6wJArEJueVGTZbXePe5zaBUWAHdPX7DYeVISHO4WkOvEquwT1BwJ/v8KO77aKv
 2HcWw8NEqjF9Enb+ieyBD9Ds04NFFAaPDHA/8eWL+PXuMLtN2ALbomG1UcfsrnEL
 qI0vTc9/cZNK/A3W8rUFjat6jPUW1CsZm8yvJ3ORU01V4xVfZMRH3JzwB0WqRGVo
 FYeY7rWtiZX43Wq4szS4xWy7nlk0Jg==
------END PRIVATE KEY-----` // NOSONAR
+-----END PRIVATE KEY-----`
+
+// NOSONAR
 
 func setupGoodPrivateKeyPEMData() []byte {
 	return []byte(privateKey)

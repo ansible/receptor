@@ -44,14 +44,14 @@ func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutS
 }
 
 // GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
-func (ku KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, error) {
+func (kw KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")
 	}
 
 	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
 
-	ok, err := ku.PodHealthy(pod, containerName)
+	ok, err := kw.PodHealthy(pod, containerName)
 	if !ok || err != nil {
 		return ok, fmt.Errorf("%s %s", podRef, err)
 	}
@@ -61,7 +61,7 @@ func (ku KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, error) {
 
 // PodContainerHealthy checks if the pod has successfully completed its application logic.
 // this is called after podInfrastructureSuccess has confirmed the pod is in a terminal state.
-func (ku KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error) {
+func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")
 	}
@@ -85,7 +85,7 @@ func (ku KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 
 // PodInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.
 // Any other state is considered an infrastructure failure.
-func (ku KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, error) {
+func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")
 	}
@@ -95,9 +95,8 @@ func (ku KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 		if cs.Name == containerName {
 			switch pod.Status.Phase {
 			case corev1.PodFailed:
-				ok, err := ku.PodContainerHealthy(pod, containerName)
+				ok, err := kw.PodContainerHealthy(pod, containerName)
 				if !ok || err != nil {
-
 					return false, err
 				}
 
@@ -115,7 +114,7 @@ func (ku KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 	return false, fmt.Errorf("pod %s/%s does not contain container %s", pod.Namespace, pod.Name, containerName)
 }
 
-func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) error {
+func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) error {
 	if pod == nil {
 		return fmt.Errorf("pod is nil")
 	}

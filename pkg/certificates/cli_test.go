@@ -143,7 +143,7 @@ func TestInitCAConfigRun(t *testing.T) {
 				OutKey:     "test.key",
 				Osw:        o,
 			},
-			expectError: false, // setupMultiplePrivateKeysPEMData returns a PEM-encoded byte slice containing two RSA private keys.
+			expectError: false,
 		},
 		{
 			name: "invalid NotBefore date",

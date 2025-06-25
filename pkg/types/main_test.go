@@ -45,13 +45,6 @@ func TestMainInitNodeID(t *testing.T) {
 }
 
 func TestNodeCfgInitEmptyID(t *testing.T) {
-	originalHostname := ""
-	defer func() {
-		if originalHostname != "" {
-			os.Setenv("HOSTNAME", originalHostname)
-		}
-	}()
-
 	cfg := NodeCfg{
 		ID:      "",
 		DataDir: "/tmp/test-receptor",

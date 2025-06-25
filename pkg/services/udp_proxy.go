@@ -70,7 +70,7 @@ func UDPProxyServiceInbound(s NetcForUDPProxy, host string, port int, node strin
 				}
 				s.GetLogger().Debug("Received new UDP connection from %s\n", raddrStr)
 				connMap[raddrStr] = pc
-				go runNetceptorToUDPInbound(pc, uc, addr, s.NewAddr(node, service), s.GetLogger())
+				go RunNetceptorToUDPInbound(pc, uc, addr, s.NewAddr(node, service))
 			}
 			wn, err := pc.WriteTo(buffer[:n], ncAddr)
 			if err != nil {
@@ -89,31 +89,41 @@ func UDPProxyServiceInbound(s NetcForUDPProxy, host string, port int, node strin
 	return nil
 }
 
-func runNetceptorToUDPInbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr, logger *logger.ReceptorLogger) {
+func processInboundPacket(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr, buf []byte) {
+	n, addr, err := pc.ReadFrom(buf)
+	if err != nil {
+		pc.GetLogger().Error("Error reading from Receptor network: %s\n", err)
+
+		return
+	}
+	if addr.String() != expectedAddr.String() {
+		pc.GetLogger().Debug("Received packet from unexpected source %s\n", addr)
+
+		return
+	}
+	wn, err := uc.WriteTo(buf[:n], udpAddr)
+	if err != nil {
+		pc.GetLogger().Error("Error sending packet via UDP: %s\n", err)
+
+		return
+	}
+	if wn != n {
+		pc.GetLogger().Debug("Not all bytes written via UDP\n")
+
+		return
+	}
+}
+
+type RunNetceptorToUDPInboundFunc interface {
+	RunNetceptorToUDPInbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr)
+}
+
+type RunNetceptorToUDPInboundImpl struct{}
+
+func RunNetceptorToUDPInbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr) {
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
-		n, addr, err := pc.ReadFrom(buf)
-		if err != nil {
-			pc.GetLogger().Error("Error reading from Receptor network: %s\n", err)
-
-			continue
-		}
-		if addr != expectedAddr {
-			pc.GetLogger().Debug("Received packet from unexpected source %s\n", addr)
-
-			continue
-		}
-		wn, err := uc.WriteTo(buf[:n], udpAddr)
-		if err != nil {
-			pc.GetLogger().Error("Error sending packet via UDP: %s\n", err)
-
-			continue
-		}
-		if wn != n {
-			pc.GetLogger().Debug("Not all bytes written via UDP\n")
-
-			continue
-		}
+		processInboundPacket(pc, uc, udpAddr, expectedAddr, buf)
 	}
 }
 
@@ -151,7 +161,7 @@ func UDPProxyServiceOutbound(s NetcForUDPProxy, service string, address string, 
 				}
 				s.GetLogger().Debug("Opened new UDP connection to %s\n", raddrStr)
 				connMap[raddrStr] = uc
-				go runUDPToNetceptorOutbound(uc, pc, addr, s.GetLogger())
+				go RunUDPToNetceptorOutbound(uc, pc, addr)
 			}
 			wn, err := uc.Write(buffer[:n])
 			if err != nil {
@@ -170,26 +180,36 @@ func UDPProxyServiceOutbound(s NetcForUDPProxy, service string, address string, 
 	return nil
 }
 
-func runUDPToNetceptorOutbound(uc net_interface.UDPConnInterface, pc netceptor.PacketConner, addr net.Addr, logger *logger.ReceptorLogger) {
+type RunNetceptorToUDPOutboundFunc interface {
+	RunNetceptorToUDPOutbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr)
+}
+
+type RunNetceptorToUDPOutboundImpl struct{}
+
+func processOutboundPacket(uc net_interface.UDPConnInterface, pc netceptor.PacketConner, addr net.Addr, buf []byte) {
+	n, err := uc.Read(buf)
+	if err != nil {
+		pc.GetLogger().Error("Error reading from UDP: %s\n", err)
+
+		return
+	}
+	wn, err := pc.WriteTo(buf[:n], addr)
+	if err != nil {
+		pc.GetLogger().Error("Error writing to the Receptor network: %s\n", err)
+
+		return
+	}
+	if wn != n {
+		pc.GetLogger().Debug("Not all bytes written to the Netceptor network\n")
+
+		return
+	}
+}
+
+func RunUDPToNetceptorOutbound(uc net_interface.UDPConnInterface, pc netceptor.PacketConner, addr net.Addr) {
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
-		n, err := uc.Read(buf)
-		if err != nil {
-			pc.GetLogger().Error("Error reading from UDP: %s\n", err)
-
-			return
-		}
-		wn, err := pc.WriteTo(buf[:n], addr)
-		if err != nil {
-			pc.GetLogger().Error("Error writing to the Receptor network: %s\n", err)
-
-			continue
-		}
-		if wn != n {
-			pc.GetLogger().Debug("Not all bytes written to the Netceptor network\n")
-
-			continue
-		}
+		processOutboundPacket(uc, pc, addr, buf)
 	}
 }
 

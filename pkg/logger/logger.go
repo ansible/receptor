@@ -84,7 +84,7 @@ func RegisterLogger(msgFunc MessageFunc) {
 	logger = msgFunc
 }
 
-// GetLogger returns the current registered logger function
+// GetRegisteredLogger returns the current registered logger function.
 func GetRegisteredLogger() MessageFunc {
     return logger
 }

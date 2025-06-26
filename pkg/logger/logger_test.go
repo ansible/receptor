@@ -72,7 +72,6 @@ func TestLogLevelToNameWithError(t *testing.T) {
 }
 
 func TestLoglevelCfgInit(t *testing.T) {
-
 	testCases := []struct {
 		name      string
 		level     string
@@ -89,13 +88,13 @@ func TestLoglevelCfgInit(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-
 			cfg := logger.LoglevelCfg{Level: tt.level}
 			err := cfg.Init()
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error for level %q, got nil", tt.level)
 				}
+
 				return
 			}
 			if err != nil {
@@ -175,7 +174,6 @@ func TestSanitizedLog(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			oldLogger := logger.GetRegisteredLogger()
 			defer logger.RegisterLogger(oldLogger)
 			var called bool

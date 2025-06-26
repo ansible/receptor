@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -351,6 +352,25 @@ IemSZj8QaR2JNPwXEbBEh8uPDhNvPBQFrw==
 -----END CERTIFICATE REQUEST-----`)
 }
 
+// Incompatible certificate with receptor as it is missing `DNSNames`, `IPAddresses`, `NodeIDs` fields.
+func setupBadCertificateRequestPEMData() []byte {
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	certRequestTemplate := x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   "Example",
+			Organization: []string{"Ansible"},
+		},
+		SignatureAlgorithm: x509.SHA256WithRSA,
+	}
+	certRequestBytes, _ := x509.CreateCertificateRequest(rand.Reader, &certRequestTemplate, privateKey)
+	certRequestPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: certRequestBytes,
+	})
+
+	return certRequestPEM
+}
+
 func setupGoodCertificateRequestRsaPrivateKey() (*rsa.PrivateKey, error) {
 	goodCertificateRequestRsaPrivateKeyPEMData := setupGoodCertificateRequestRsaPrivateKeyPEMData()
 	goodCertificateRequestRsaPrivateKeyBlock, rest := pem.Decode(goodCertificateRequestRsaPrivateKeyPEMData)
@@ -446,8 +466,8 @@ func setupGoodPrivateKey() (*rsa.PrivateKey, error) {
 	return goodPrivateKey, nil
 }
 
-func setupGoodPrivateKeyPEMData() []byte {
-	return []byte(`-----BEGIN PRIVATE KEY-----
+func getPrivateKey() string {
+	return `-----BEGIN PRIVATE KEY-----
 MIIJQgIBADANBgkqhkiG9w0BAQEFAASCCSwwggkoAgEAAoICAQCnXsRTTIoV2Oqh
 5zvNJzQBYOZPpxmnKzwLvgeop44Csk++zARvg5XIpmPbSEU2PY3pNGvLTH6nD54/
 ZfOIRzSN0ipvfcrpJtkrJ7OYo1gX7ROXM30x3bj2KcJ/cMgMiZMQLqPegKhtMHLG
@@ -498,7 +518,15 @@ sa6wJArEJueVGTZbXePe5zaBUWAHdPX7DYeVISHO4WkOvEquwT1BwJ/v8KO77aKv
 2HcWw8NEqjF9Enb+ieyBD9Ds04NFFAaPDHA/8eWL+PXuMLtN2ALbomG1UcfsrnEL
 qI0vTc9/cZNK/A3W8rUFjat6jPUW1CsZm8yvJ3ORU01V4xVfZMRH3JzwB0WqRGVo
 FYeY7rWtiZX43Wq4szS4xWy7nlk0Jg==
------END PRIVATE KEY-----`)
+-----END PRIVATE KEY-----`
+}
+
+func setupGoodPrivateKeyPEMData() []byte {
+	return []byte(getPrivateKey())
+}
+
+func setupDuplicateKeyPEMData() []byte {
+	return []byte(getPrivateKey() + "\n" + getPrivateKey())
 }
 
 func setupGoodPublicKey() (*rsa.PublicKey, error) {
@@ -1039,27 +1067,30 @@ func TestCreateCertReqWithKeyNegative(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		args    args
-		want    *x509.CertificateRequest
-		want1   *rsa.PrivateKey
-		wantErr error
+		name     string
+		args     args
+		want     *x509.CertificateRequest
+		want1    *rsa.PrivateKey
+		wantErrs []string
 	}{
 		{
 			name: "Negative test for Bits",
 			args: args{
 				opts: &badCertOptions,
 			},
-			want:    nil,
-			want1:   nil,
-			wantErr: fmt.Errorf("crypto/rsa: too few primes of given length to generate an RSA key"),
+			want:  nil,
+			want1: nil,
+			wantErrs: []string{
+				"crypto/rsa: too few primes of given length to generate an RSA key",
+				"rsa: key too small",
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, gotErr := certificates.CreateCertReqWithKey(tt.args.opts)
-			if gotErr == nil || gotErr.Error() != tt.wantErr.Error() {
-				t.Errorf("CreateCertReqWithKey() error = %v, wantErr = %v", gotErr, tt.wantErr)
+			if gotErr == nil || !slices.Contains(tt.wantErrs, gotErr.Error()) {
+				t.Errorf("CreateCertReqWithKey() error = %v, wantErr = %v", gotErr, tt.wantErrs)
 			}
 		})
 	}

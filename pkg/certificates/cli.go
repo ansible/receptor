@@ -15,15 +15,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Oser is the function calls interfaces for mocking os.
-// type Oser interface {
-//	ReadFile(name string) ([]byte, error)
-//	WriteFile(name string, data []byte, perm fs.FileMode) error
-//}
-
-// OsWrapper is the Wrapper structure for Oser.
-// type OsWrapper struct{}
-
 // InitCA Initialize Certificate Authority.
 func InitCA(opts *CertOptions, certOut, keyOut string, osWrapper Oser) error {
 	ca, err := CreateCA(opts, &RsaWrapper{})
@@ -44,6 +35,7 @@ type InitCAConfig struct {
 	NotAfter   string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
 	OutCert    string `description:"File to save the CA certificate to" required:"Yes"`
 	OutKey     string `description:"File to save the CA private key to" required:"Yes"`
+	Osw        Oser   `description:"OS wrapper for file operations"`
 }
 
 func (ica InitCAConfig) Run() (err error) {
@@ -63,8 +55,11 @@ func (ica InitCAConfig) Run() (err error) {
 			return
 		}
 	}
+	if ica.Osw == nil {
+		ica.Osw = &OsWrapper{}
+	}
 
-	return InitCA(opts, ica.OutCert, ica.OutKey, &OsWrapper{})
+	return InitCA(opts, ica.OutCert, ica.OutKey, ica.Osw)
 }
 
 // MakeReq Create Certificate Request.
@@ -82,12 +77,12 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string, osWrapper Oser) er
 				continue
 			}
 			if key != nil {
-				return fmt.Errorf("multiple private keys in file %s", keyIn)
+				return fmt.Errorf("multiple keys in file %s", keyIn)
 			}
 			key = ckey
 		}
 		if key == nil {
-			return fmt.Errorf("no private keys in file %s", keyIn)
+			return fmt.Errorf("no keys in file %s", keyIn)
 		}
 		req, err = CreateCertReq(opts, key)
 		if err != nil {
@@ -123,6 +118,7 @@ type MakeReqConfig struct {
 	OutReq     string   `description:"File to save the certificate request to" required:"Yes"`
 	InKey      string   `description:"Private key to use for the request"`
 	OutKey     string   `description:"File to save the private key to (new key will be generated)"`
+	Osw        Oser     `description:"OS wrapper for file operations"`
 }
 
 func (mr MakeReqConfig) Prepare() error {
@@ -160,11 +156,21 @@ func (mr MakeReqConfig) Run() error {
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
 
-	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, &OsWrapper{})
+	if mr.Osw == nil {
+		mr.Osw = &OsWrapper{}
+	}
+
+	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, mr.Osw)
 }
 
+type SignReqFunc interface {
+	SignReq(opts *CertOptions, caCert, caKey, req, outCert string, verify bool, osWrapper Oser) error
+}
+
+type SignerReqImpl struct{}
+
 // SignReq Sign Certificate Request.
-func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool, osWrapper Oser) error {
+func (s *SignerReqImpl) SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool, osWrapper Oser) error {
 	ca := &CA{}
 	var err error
 	ca.Certificate, err = LoadCertificate(caCrtPath, osWrapper)
@@ -225,7 +231,7 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 		return err
 	}
 
-	return SaveToPEMFile(certOut, []interface{}{cert}, &OsWrapper{})
+	return SaveToPEMFile(certOut, []interface{}{cert}, osWrapper)
 }
 
 type SignReqConfig struct {
@@ -238,7 +244,7 @@ type SignReqConfig struct {
 	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
 }
 
-func (sr SignReqConfig) Run() error {
+func (sr SignReqConfig) ValidateAndSign(signReqFunc SignReqFunc) error {
 	opts := &CertOptions{}
 	if sr.NotBefore != "" {
 		t, err := time.Parse(time.RFC3339, sr.NotBefore)
@@ -255,7 +261,11 @@ func (sr SignReqConfig) Run() error {
 		opts.NotAfter = t
 	}
 
-	return SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify, &OsWrapper{})
+	return signReqFunc.SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify, &OsWrapper{})
+}
+
+func (sr SignReqConfig) Run() error {
+	return sr.ValidateAndSign(&SignerReqImpl{})
 }
 
 func init() {

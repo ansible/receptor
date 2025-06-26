@@ -360,11 +360,6 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		} else {
 			writeStatusFailures = 0
 		}
-		if err != nil {
-			rw.GetWorkceptor().nc.GetLogger().Error("Error saving local status file: %s\n", err)
-
-			return
-		}
 		if sleepOrDone(mw.Done(), 1*time.Second) {
 			return
 		}

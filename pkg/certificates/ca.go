@@ -43,7 +43,7 @@ type CA struct {
 
 // LoadFromPEMFile loads certificate data from a PEM file.
 func LoadFromPEMFile(filename string, osWrapper Oser) ([]interface{}, error) {
-	content, err := Oser.ReadFile(osWrapper, filename)
+	content, err := osWrapper.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func SaveToPEMFile(filename string, data []interface{}, osWrapper Oser) error {
 		return fmt.Errorf("unknown block type %s", elem)
 	}
 
-	return Oser.WriteFile(osWrapper, filename, []byte(strings.Join(content, "\n")), 0o600)
+	return osWrapper.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
 // LoadCertificate loads a single certificate from a file.

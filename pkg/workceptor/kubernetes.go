@@ -371,14 +371,28 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					return
 				}
 
-				if err == io.EOF {
-					if line != "" {
-						_, err = stdout.Write([]byte(line + "\n"))
-						if err != nil {
-							*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
-							kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
+				podConditionReady := false
+				erroredPod, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+				if kubeErr != nil {
+					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s'", kubeErr)
+				}
+				for _, condition := range erroredPod.Status.Conditions {
+					if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+						podConditionReady = true
+					}
+				}
 
-							return
+				if err == io.EOF && !podConditionReady {
+					if line != "" {
+						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
+						if msg != "" {
+							_, err = stdout.Write([]byte(msg + "\n"))
+							if err != nil {
+								*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
+								kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
+
+								return
+							}
 						}
 					}
 					kw.GetWorkceptor().nc.GetLogger().Info("Detected EOF for pod %s/%s.",
@@ -414,29 +428,25 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				if err != io.EOF {
 					*stdoutErr = err
 				} else if line != "" && err == io.EOF {
-					_, err = stdout.Write([]byte(line + "\n"))
-					if err != nil {
-						*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
-						kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
+					msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
+					if msg != "" {
+						_, err = stdout.Write([]byte(msg + "\n"))
+						if err != nil {
+							*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
+							kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
 
-						return
+							return
+						}
 					}
 				}
 
 				return
 			}
 
-			split := strings.SplitN(line, " ", 2)
-			msg := line
-			timestamp := ParseTime(split[0])
-			if timestamp != nil {
-				if !timestamp.After(sinceTime) && !successfulWrite {
-					continue
-				}
-				sinceTime = *timestamp
-				msg = split[1]
-			} else {
-				kw.GetWorkceptor().nc.GetLogger().Debug("No timestamp received, log line: '%s'", line)
+			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)
+			sinceTime = newSinceTime
+			if shouldSkip {
+				continue
 			}
 
 			_, err = stdout.Write([]byte(msg))
@@ -1356,7 +1366,9 @@ func (kw *KubeUnit) connectToKube() error {
 	return nil
 }
 
-func readFileToString(filename string) (string, error) {
+// ReadFileToString reads a file and returns its contents as a string.
+// If filename is empty, it returns an empty string.
+func ReadFileToString(filename string) (string, error) {
 	// If filename is "", the function returns ""
 	if filename == "" {
 		return "", nil
@@ -1387,11 +1399,11 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 		return ssf
 	}
 	var err error
-	ked.KubePod, err = readFileToString(ked.KubePod)
+	ked.KubePod, err = ReadFileToString(ked.KubePod)
 	if err != nil {
 		return fmt.Errorf("could not read pod: %s", err)
 	}
-	ked.KubeConfig, err = readFileToString(ked.KubeConfig)
+	ked.KubeConfig, err = ReadFileToString(ked.KubeConfig)
 	if err != nil {
 		return fmt.Errorf("could not read kubeconfig: %s", err)
 	}
@@ -1467,6 +1479,11 @@ func (kw *KubeUnit) Status() *StatusFileData {
 	}
 
 	return status
+}
+
+// SetClientset sets the clientset for testing purposes.
+func (kw *KubeUnit) SetClientset(clientset *kubernetes.Clientset) {
+	kw.clientset = clientset
 }
 
 // Status returns a copy of the status currently loaded in memory.
@@ -1562,6 +1579,30 @@ func (kw *KubeUnit) Release(force bool) error {
 	}
 
 	return kw.BaseWorkUnitForWorkUnit.Release(force)
+}
+
+// ProcessLogLine handles timestamp parsing and stripping from log lines.
+func (kw *KubeUnit) ProcessLogLine(line string, sinceTime time.Time, successfulWrite bool) (msg string, newSinceTime time.Time, shouldSkip bool) {
+	split := strings.SplitN(line, " ", 2)
+	msg = line
+	newSinceTime = sinceTime
+
+	timestamp := ParseTime(split[0])
+	if timestamp != nil {
+		if !timestamp.After(sinceTime) && !successfulWrite {
+			return "", sinceTime, true
+		}
+		newSinceTime = *timestamp
+		if len(split) > 1 {
+			msg = split[1]
+		} else {
+			msg = ""
+		}
+	} else {
+		kw.GetWorkceptor().nc.GetLogger().Debug("No timestamp received, log line: '%s'", line)
+	}
+
+	return msg, newSinceTime, false
 }
 
 // **************************************************************************

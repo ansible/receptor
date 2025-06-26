@@ -1,6 +1,7 @@
 package main
 
 //go:generate mockgen -source=pkg/backends/websockets.go -destination=pkg/backends/mock_backends/websockets.go
+//go:generate mockgen -source=pkg/certificates/cli.go -destination=pkg/certificates/mock_certificates/cli.go
 //go:generate mockgen -source=pkg/certificates/oser.go -destination=pkg/certificates/mock_certificates/oser.go
 //go:generate mockgen -source=pkg/certificates/rsaer.go -destination=pkg/certificates/mock_certificates/rsaer.go
 //go:generate mockgen -source=pkg/controlsvc/controlsvc.go -destination=pkg/controlsvc/mock_controlsvc/controlsvc.go
@@ -21,5 +22,4 @@ package main
 //go:generate mockgen -source=pkg/workceptor/kubernetes.go -destination=pkg/workceptor/mock_workceptor/kubernetes.go
 //go:generate mockgen -source=pkg/workceptor/stdio_utils.go -destination=pkg/workceptor/mock_workceptor/stdio_utils.go
 //go:generate mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
-//go:generate mockgen -source=pkg/workceptor/workunitbase.go -destination=pkg/workceptor/mock_workceptor/workunitbase.go
 //go:generate mockgen -package=mock_utils -destination=pkg/utils/mock_utils/io.go io ReadWriteCloser

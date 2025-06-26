@@ -23,7 +23,7 @@ func createPythonUnitTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNetceptor.EXPECT().NodeID().Return("NodeID")
-	mockNetceptor.EXPECT().GetLogger()
+	mockNetceptor.EXPECT().GetLogger().AnyTimes()
 
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
 	if err != nil {
@@ -124,14 +124,10 @@ func TestPythonUnitStartFailsOnInvalidConfig(t *testing.T) {
 }
 
 func TestWorkPythonConfigNewWorkerRunsToSuccess(t *testing.T) {
-	_, mockBaseWorkUnitForWorkUnit, mockNetceptorForWorkceptor, _ := createPythonUnitTestSetup(t)
+	_, mockBaseWorkUnitForWorkUnit, mockNetceptorForWorkceptor, w := createPythonUnitTestSetup(t)
 	mockNetceptorForWorkceptor.EXPECT().NodeID().AnyTimes()
 
 	wpc := &workceptor.WorkPythonCfg{}
-	w, err := workceptor.New(context.TODO(), mockNetceptorForWorkceptor, "")
-	if err != nil {
-		t.Errorf("Error when creating workceptor for test: %v", err)
-	}
 	workUnit := wpc.NewWorker(mockBaseWorkUnitForWorkUnit, w, "", "")
 	if workUnit == nil {
 		t.Error("Returned WorkUnit was nil")
@@ -139,17 +135,13 @@ func TestWorkPythonConfigNewWorkerRunsToSuccess(t *testing.T) {
 }
 
 func TestWorkPythonConfigRunRunsToSuccess(t *testing.T) {
-	_, _, mockNetceptorForWorkceptor, _ := createPythonUnitTestSetup(t) //nolint:dogsled
+	_, _, mockNetceptorForWorkceptor, w := createPythonUnitTestSetup(t)
 	mockNetceptorForWorkceptor.EXPECT().NodeID().AnyTimes()
 	mockNetceptorForWorkceptor.EXPECT().AddWorkCommand("", false)
 
 	wpc := &workceptor.WorkPythonCfg{}
-	w, err := workceptor.New(context.TODO(), mockNetceptorForWorkceptor, "")
-	if err != nil {
-		t.Errorf("Error when creating workceptor for test: %v", err)
-	}
 	workceptor.MainInstance = w
-	err = wpc.Run()
+	err := wpc.Run()
 	if err == nil {
 		t.Errorf("Expected deprecation warning but received none.")
 	}

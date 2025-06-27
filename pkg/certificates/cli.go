@@ -15,15 +15,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Oser is the function calls interfaces for mocking os.
-// type Oser interface {
-//	ReadFile(name string) ([]byte, error)
-//	WriteFile(name string, data []byte, perm fs.FileMode) error
-//}
-
-// OsWrapper is the Wrapper structure for Oser.
-// type OsWrapper struct{}
-
 // InitCA Initialize Certificate Authority.
 func InitCA(opts *CertOptions, certOut, keyOut string, osWrapper Oser) error {
 	ca, err := CreateCA(opts, &RsaWrapper{})

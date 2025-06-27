@@ -23,7 +23,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/vishvananda/netlink v1.3.0
 	go.uber.org/goleak v1.3.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.2
 	golang.org/x/net v0.41.0
 	golang.org/x/sys v0.33.0
 	gopkg.in/yaml.v2 v2.4.0

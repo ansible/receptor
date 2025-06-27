@@ -43,7 +43,7 @@ type CA struct {
 
 // LoadFromPEMFile loads certificate data from a PEM file.
 func LoadFromPEMFile(filename string, osWrapper Oser) ([]interface{}, error) {
-	content, err := Oser.ReadFile(osWrapper, filename)
+	content, err := osWrapper.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

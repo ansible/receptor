@@ -515,9 +515,8 @@ type eofReadCloser struct {
 
 func (e *eofReadCloser) Read(p []byte) (n int, err error) {
 	if !e.hasRead && len(e.content) > 0 {
-		// Add newline to simulate a complete log line
-		fullContent := e.content + "\n"
-		n = copy(p, []byte(fullContent))
+		// Do NOT add newline - this simulates a partial line read that triggers the bug
+		n = copy(p, []byte(e.content))
 		e.hasRead = true
 
 		return n, nil
@@ -840,6 +839,52 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
+		{
+			name: "timestamp_remove_on_eof_with_final_line",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				notReadyPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+						},
+					},
+				}
+
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil),
+				)
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z This timestamp should be removed", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).Times(1)
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -903,6 +948,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 			if len(writtenData) > 0 {
 				t.Logf("Written data: %v", writtenData)
+
+				if tt.name == "timestamp_remove_on_eof_with_final_line" {
+					hasTimestampLeak := false
+					for _, data := range writtenData {
+						if strings.HasPrefix(data, "2024-") {
+							hasTimestampLeak = true
+							t.Logf("TIMESTAMP LEAK DETECTED: %s", data)
+
+							break
+						}
+					}
+					if hasTimestampLeak {
+						t.Errorf("Did not expect a timestamp leak but one was found in written data")
+					}
+				}
 			}
 		})
 	}
@@ -1573,4 +1633,130 @@ func TestKubeUnitRestart(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "restart not implemented for streammethod tcp")
 	})
+}
+
+func TestProcessLogLine(t *testing.T) {
+	kw, err := startNetceptorNodeWithWorkceptor()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseTime := time.Date(2024, 1, 17, 12, 0, 0, 0, time.UTC)
+	laterTime := time.Date(2024, 1, 17, 12, 0, 5, 0, time.UTC)
+
+	tests := []struct {
+		name            string
+		line            string
+		sinceTime       time.Time
+		successfulWrite bool
+		expectedMsg     string
+		expectedSkip    bool
+	}{
+		{
+			name:            "Valid timestamp with message",
+			line:            "2024-01-17T12:00:05Z Hello world",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "Hello world",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Valid timestamp without message",
+			line:            "2024-01-17T12:00:05Z",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    false,
+		},
+		{
+			name:            "No timestamp - treated as regular message",
+			line:            "Regular log message without timestamp",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "Regular log message without timestamp",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Timestamp older than sinceTime with no successful write - should skip",
+			line:            "2024-01-17T11:59:55Z Old message",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    true,
+		},
+		{
+			name:            "Timestamp older than sinceTime with successful write - should not skip",
+			line:            "2024-01-17T11:59:55Z Old message but successful write",
+			sinceTime:       baseTime,
+			successfulWrite: true,
+			expectedMsg:     "Old message but successful write",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Timestamp equal to sinceTime with no successful write - should skip",
+			line:            "2024-01-17T12:00:00Z Equal timestamp",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    true,
+		},
+		{
+			name:            "Timestamp equal to sinceTime with successful write - should not skip",
+			line:            "2024-01-17T12:00:00Z Equal timestamp with successful write",
+			sinceTime:       baseTime,
+			successfulWrite: true,
+			expectedMsg:     "Equal timestamp with successful write",
+			expectedSkip:    false,
+		},
+		{
+			name:            "RFC3339Nano timestamp format",
+			line:            "2024-01-17T12:00:10.123456789Z Nano precision",
+			sinceTime:       laterTime,
+			successfulWrite: false,
+			expectedMsg:     "Nano precision",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Invalid timestamp format - treated as regular message",
+			line:            "2024-01-17 12:00:10 Invalid format message",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "2024-01-17 12:00:10 Invalid format message",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Empty line",
+			line:            "",
+			sinceTime:       baseTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    false,
+		},
+		{
+			name:            "Line with only timestamp and space",
+			line:            "2024-01-17T12:00:10Z ",
+			sinceTime:       laterTime,
+			successfulWrite: false,
+			expectedMsg:     "",
+			expectedSkip:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(tt.line, tt.sinceTime, tt.successfulWrite)
+
+			if msg != tt.expectedMsg {
+				t.Errorf("ProcessLogLine() msg = %q, want %q", msg, tt.expectedMsg)
+			}
+
+			if shouldSkip != tt.expectedSkip {
+				t.Errorf("ProcessLogLine() shouldSkip = %v, want %v", shouldSkip, tt.expectedSkip)
+			}
+
+			if newSinceTime.IsZero() && !tt.sinceTime.IsZero() {
+				t.Errorf("ProcessLogLine() returned zero time when it shouldn't")
+			}
+		})
+	}
 }

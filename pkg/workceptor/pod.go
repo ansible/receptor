@@ -19,11 +19,11 @@ type KubePodStateHelper interface {
 }
 
 func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutSeconds *int64) (bool, error) {
-	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
 	if pod == nil {
-		return false, fmt.Errorf("%s pod is nil", podRef)
+		return false, fmt.Errorf("pod is nil")
 	}
 
+	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
 	if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
 		_, err := kw.WaitForPodCompleted(kw.GetContext(), pod, kw.clientset, timeoutSeconds)
 		if err != nil {
@@ -52,7 +52,7 @@ func (kw KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, error) {
 
 	ok, err := kw.PodHealthy(pod, containerName)
 	if !ok || err != nil {
-		return ok, fmt.Errorf(err.Error())
+		return ok, err
 	}
 
 	return ok, nil
@@ -131,11 +131,12 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 	for event := range watcher.ResultChan() {
 		if event.Type == watch.Error {
 			return pod, event.Object.(error)
-		}
+		} else {
+			pod = event.Object.(*corev1.Pod)
+			fmt.Printf("%s: (Phase: %s)\n", event.Type, pod.Status.Phase)
 
-		pod = event.Object.(*corev1.Pod)
-		fmt.Printf("%s: (Phase: %s)\n", event.Type, pod.Status.Phase)
-		return pod, nil
+			return pod, nil
+		}
 	}
 
 	return pod, nil

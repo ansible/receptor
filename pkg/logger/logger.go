@@ -86,9 +86,8 @@ func RegisterLogger(msgFunc MessageFunc) {
 
 // GetRegisteredLogger returns the current registered logger function.
 func GetRegisteredLogger() MessageFunc {
-    return logger
+	return logger
 }
-
 
 type ReceptorLogger struct {
 	log.Logger

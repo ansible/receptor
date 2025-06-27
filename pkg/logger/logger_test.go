@@ -116,55 +116,55 @@ func TestSanitizedLog(t *testing.T) {
 	logger.SetGlobalLogLevel(logger.DebugLevel)
 
 	testCases := []struct {
-		name                 string
-		level                int
-		prefix               string
-		format               string
-		args                 []interface{}
-		expectContains       []string
+		name                  string
+		level                 int
+		prefix                string
+		format                string
+		args                  []interface{}
+		expectContains        []string
 		expectNoNewlineInside bool
-		registerLogger       bool
-		loggerCheck          func(t *testing.T, level int, format string, v ...interface{})
+		registerLogger        bool
+		loggerCheck           func(t *testing.T, level int, format string, v ...interface{})
 	}{
 		{
-			name:   "valid level with prefix and newline",
-			level:  logger.InfoLevel,
-			prefix: "testPrefix",
-			format: "hello\nworld %d",
-			args:   []interface{}{42},
-			expectContains: []string{"testPrefix INFO", "helloworld 42"},
+			name:                  "valid level with prefix and newline",
+			level:                 logger.InfoLevel,
+			prefix:                "testPrefix",
+			format:                "hello\nworld %d",
+			args:                  []interface{}{42},
+			expectContains:        []string{"testPrefix INFO", "helloworld 42"},
 			expectNoNewlineInside: true,
-			registerLogger: false,
+			registerLogger:        false,
 		},
 		{
-			name:   "invalid log level triggers error",
-			level:  9999,
-			prefix: "testPrefix",
-			format: "bad\nmessage %d",
-			args:   []interface{}{7},
-			expectContains: []string{"Log entry received with invalid level: badmessage 7"},
+			name:                  "invalid log level triggers error",
+			level:                 9999,
+			prefix:                "testPrefix",
+			format:                "bad\nmessage %d",
+			args:                  []interface{}{7},
+			expectContains:        []string{"Log entry received with invalid level: badmessage 7"},
 			expectNoNewlineInside: true,
-			registerLogger: false,
+			registerLogger:        false,
 		},
 		{
-			name:   "no prefix",
-			level:  logger.InfoLevel,
-			prefix: "",
-			format: "noprefix %s",
-			args:   []interface{}{"ok"},
-			expectContains: []string{"INFO", "noprefix ok"},
+			name:                  "no prefix",
+			level:                 logger.InfoLevel,
+			prefix:                "",
+			format:                "noprefix %s",
+			args:                  []interface{}{"ok"},
+			expectContains:        []string{"INFO", "noprefix ok"},
 			expectNoNewlineInside: false,
-			registerLogger: false,
+			registerLogger:        false,
 		},
 		{
-			name:   "logger function registered",
-			level:  logger.InfoLevel,
-			prefix: "testPrefix",
-			format: "delegated %d",
-			args:   []interface{}{1},
-			expectContains: []string{},
+			name:                  "logger function registered",
+			level:                 logger.InfoLevel,
+			prefix:                "testPrefix",
+			format:                "delegated %d",
+			args:                  []interface{}{1},
+			expectContains:        []string{},
 			expectNoNewlineInside: false,
-			registerLogger: true,
+			registerLogger:        true,
 			loggerCheck: func(t *testing.T, level int, format string, v ...interface{}) {
 				if level != logger.InfoLevel || format != "delegated %d" || v[0].(int) != 1 {
 					t.Errorf("logger delegate called with wrong args: %v %v %v", level, format, v)
@@ -215,7 +215,6 @@ func TestSanitizedLog(t *testing.T) {
 		})
 	}
 }
-
 
 func TestDebugPayload(t *testing.T) {
 	var logBuffer bytes.Buffer

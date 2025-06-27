@@ -7,7 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
+	fakeapi "k8s.io/client-go/kubernetes/fake"
 )
 
 var podSuccess = &corev1.Pod{
@@ -184,11 +184,11 @@ func TestWaitForPodCompleted(t *testing.T) {
 			ctx := context.Background()
 			timeoutSeconds := int64(2)
 
-			var clientset *fake.Clientset
+			var clientset *fakeapi.Clientset
 			if tt.initialPod != nil {
-				clientset = fake.NewSimpleClientset(tt.initialPod)
+				clientset = fakeapi.NewSimpleClientset(tt.initialPod)
 			} else {
-				clientset = fake.NewSimpleClientset(&corev1.Pod{})
+				clientset = fakeapi.NewSimpleClientset(&corev1.Pod{})
 			}
 
 			if tt.updatePhase != "" && tt.initialPod != nil {
@@ -199,7 +199,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 				}()
 			}
 
-			err := kw.WaitForPodCompleted(ctx, tt.initialPod, clientset, &timeoutSeconds)
+			_, err := kw.WaitForPodCompleted(ctx, tt.initialPod, clientset, &timeoutSeconds)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WaitForPodCompleted() error = %v, wantErr %v", err, tt.wantErr)
 				if tt.wantErrorString != "" && err != nil && !strings.Contains(err.Error(), tt.wantErrorString) {

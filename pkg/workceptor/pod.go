@@ -19,26 +19,27 @@ type KubePodStateHelper interface {
 }
 
 func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutSeconds *int64) (bool, error) {
+	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
 	if pod == nil {
-		return false, fmt.Errorf("pod is nil")
+		return false, fmt.Errorf("%s pod is nil", podRef)
 	}
 
 	if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
-		err := kw.WaitForPodCompleted(kw.GetContext(), pod, kw.clientset, timeoutSeconds)
+		_, err := kw.WaitForPodCompleted(kw.GetContext(), pod, kw.clientset, timeoutSeconds)
 		if err != nil {
-			kw.GetWorkceptor().nc.GetLogger().Debug("Pod error detected while waiting for completion: %v", err)
+			kw.GetWorkceptor().nc.GetLogger().Debug("%s pod error detected while waiting for completion: %v", podRef, err)
 		}
 	}
 
 	ok, err := kw.GetPodStatus(pod)
 	if !ok || err != nil {
-		kw.GetWorkceptor().nc.GetLogger().Warning("Pod did not succeed:  %v", err)
+		kw.GetWorkceptor().nc.GetLogger().Warning("%s pod did not succeed:  %v", podRef, err)
 		kw.UpdateBasicStatus(WorkStateFailed, err.Error(), stdoutSize)
 
 		return false, err
 	}
 
-	kw.GetWorkceptor().nc.GetLogger().Debug("Pod status: %s", pod.Status.String())
+	kw.GetWorkceptor().nc.GetLogger().Debug("%s pod status: %s", podRef, pod.Status.String())
 
 	return true, nil
 }
@@ -49,11 +50,9 @@ func (kw KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, error) {
 		return false, fmt.Errorf("pod is nil")
 	}
 
-	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
-
 	ok, err := kw.PodHealthy(pod, containerName)
 	if !ok || err != nil {
-		return ok, fmt.Errorf("%s %s", podRef, err)
+		return ok, fmt.Errorf(err.Error())
 	}
 
 	return ok, nil
@@ -80,7 +79,7 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 		}
 	}
 
-	return false, fmt.Errorf("pod %s/%s does not contain container %s", pod.Namespace, pod.Name, containerName)
+	return false, fmt.Errorf("pod does not contain container %s", containerName)
 }
 
 // PodInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.
@@ -111,12 +110,12 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 		}
 	}
 
-	return false, fmt.Errorf("pod %s/%s does not contain container %s", pod.Namespace, pod.Name, containerName)
+	return false, fmt.Errorf("pod does not contain container %s", containerName)
 }
 
-func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) error {
+func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error) {
 	if pod == nil {
-		return fmt.Errorf("pod is nil")
+		return nil, fmt.Errorf("pod is nil")
 	}
 
 	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx,
@@ -126,16 +125,18 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 		},
 	)
 	if err != nil {
-		return err
+		return pod, err
 	}
 
 	for event := range watcher.ResultChan() {
 		if event.Type == watch.Error {
-			return event.Object.(error)
+			return pod, event.Object.(error)
 		}
+
 		pod = event.Object.(*corev1.Pod)
-		fmt.Printf("%s: %s/%s (Phase: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
+		fmt.Printf("%s: (Phase: %s)\n", event.Type, pod.Status.Phase)
+		return pod, nil
 	}
 
-	return nil
+	return pod, nil
 }

@@ -135,6 +135,8 @@ func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 		return nil, fmt.Errorf("pod is nil")
 	}
 
+	original_phase := pod.Status.Phase
+
 	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
 		TimeoutSeconds: timeoutSeconds,
 		FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name})
@@ -148,8 +150,11 @@ func (ku KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 			return pod, event.Object.(error)
 		default:
 			pod = event.Object.(*corev1.Pod)
-			fmt.Printf("%s: %s/%s (Phase: %s)\n", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
-			return pod, nil
+			if pod.Status.Phase != original_phase {
+				ku.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase changed from %s to %s", pod.Namespace, pod.Name, original_phase, pod.Status.Phase)
+				return pod, nil
+			}
+			ku.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
 		}
 	}
 

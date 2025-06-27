@@ -104,6 +104,7 @@ func TestLoglevelCfgInit(t *testing.T) {
 			if got != tt.wantLevel {
 				t.Errorf("expected log level %d, got %d", tt.wantLevel, got)
 			}
+			logger.SetGlobalLogLevel(logger.InfoLevel) // Reset to default after test
 		})
 	}
 }

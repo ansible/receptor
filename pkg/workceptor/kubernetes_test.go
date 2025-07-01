@@ -6,8 +6,10 @@ package workceptor_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -1756,6 +1758,412 @@ func TestProcessLogLine(t *testing.T) {
 
 			if newSinceTime.IsZero() && !tt.sinceTime.IsZero() {
 				t.Errorf("ProcessLogLine() returned zero time when it shouldn't")
+			}
+		})
+	}
+}
+
+func TestKubeAPIWrapper_NewSPDYExecutor(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      *rest.Config
+		method      string
+		urlString   string
+		expectError bool
+		description string
+	}{
+		{
+			name: "Valid config and URL",
+			config: &rest.Config{
+				Host: "https://kubernetes.default.svc",
+			},
+			method:      "POST",
+			urlString:   "https://kubernetes.default.svc/api/v1/namespaces/default/pods/test/exec",
+			expectError: false,
+			description: "Should create SPDY executor with valid inputs",
+		},
+		{
+			name:        "Nil config",
+			config:      nil,
+			method:      "POST",
+			urlString:   "https://kubernetes.default.svc/api/v1/namespaces/default/pods/test/exec",
+			expectError: true,
+			description: "Should panic with nil config - wrapped as expectError for testing",
+		},
+		{
+			name: "Invalid URL",
+			config: &rest.Config{
+				Host: "https://kubernetes.default.svc",
+			},
+			method:      "POST",
+			urlString:   "://invalid-url",
+			expectError: true,
+			description: "URL parsing should fail with malformed URL",
+		},
+		{
+			name: "Empty method",
+			config: &rest.Config{
+				Host: "https://kubernetes.default.svc",
+			},
+			method:      "",
+			urlString:   "https://kubernetes.default.svc/api/v1/namespaces/default/pods/test/exec",
+			expectError: false,
+			description: "Should handle empty method (defaulted internally)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wrapper := workceptor.KubeAPIWrapper{}
+
+			var testURL *url.URL
+			var urlErr error
+			if tt.urlString != "" {
+				testURL, urlErr = url.Parse(tt.urlString)
+				if urlErr != nil {
+					// URL parsing failed - this is part of the test
+					if tt.expectError {
+						assert.Error(t, urlErr, "URL parsing should fail for "+tt.description)
+						return
+					} else {
+						t.Fatalf("Failed to parse test URL: %v", urlErr)
+					}
+				}
+			}
+
+			// Handle panic for nil config case
+			if tt.config == nil && tt.expectError {
+				defer func() {
+					if r := recover(); r != nil {
+						// Expected panic for nil config
+						assert.Contains(t, fmt.Sprintf("%v", r), "nil pointer", tt.description)
+					}
+				}()
+				
+				executor, err := wrapper.NewSPDYExecutor(tt.config, tt.method, testURL)
+				// If we get here without panic, test should fail
+				t.Errorf("Expected panic for nil config, but got executor=%v, err=%v", executor, err)
+				return
+			}
+
+			executor, err := wrapper.NewSPDYExecutor(tt.config, tt.method, testURL)
+
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+				assert.Nil(t, executor)
+			} else {
+				assert.NoError(t, err, tt.description)
+				assert.NotNil(t, executor)
+			}
+		})
+	}
+}
+
+func TestKubeAPIWrapper_NewForConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      *rest.Config
+		expectError bool
+		description string
+	}{
+		{
+			name: "Valid config",
+			config: &rest.Config{
+				Host: "https://kubernetes.default.svc",
+			},
+			expectError: false,
+			description: "Should create clientset with valid config",
+		},
+		{
+			name:        "Nil config",
+			config:      nil,
+			expectError: true,
+			description: "Should return error with nil config",
+		},
+		{
+			name: "Invalid host config",
+			config: &rest.Config{
+				Host: "://invalid-url",
+			},
+			expectError: true,
+			description: "Should return error with malformed host URL",
+		},
+		{
+			name:        "Empty config",
+			config:      &rest.Config{},
+			expectError: false,
+			description: "Should accept empty config (will use defaults)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wrapper := workceptor.KubeAPIWrapper{}
+			
+			// Handle panic for nil config case
+			if tt.config == nil && tt.expectError {
+				defer func() {
+					if r := recover(); r != nil {
+						// Expected panic for nil config
+						assert.Contains(t, fmt.Sprintf("%v", r), "nil pointer", tt.description)
+					}
+				}()
+				
+				clientset, err := wrapper.NewForConfig(tt.config)
+				// If we get here without panic, test should fail
+				t.Errorf("Expected panic for nil config, but got clientset=%v, err=%v", clientset, err)
+				return
+			}
+
+			clientset, err := wrapper.NewForConfig(tt.config)
+
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+				assert.Nil(t, clientset)
+			} else {
+				assert.NoError(t, err, tt.description)
+				assert.NotNil(t, clientset)
+			}
+		})
+	}
+}
+
+func TestKubeUnit_SetFromParams(t *testing.T) {
+	tests := []struct {
+		name              string
+		params            map[string]string
+		allowRuntimeAuth  bool
+		allowRuntimeCmd   bool
+		allowRuntimeParams bool
+		allowRuntimePod   bool
+		authMethod        string
+		expectError       bool
+		expectedErrorMsg  string
+		description       string
+	}{
+		{
+			name: "Valid parameters with all permissions",
+			params: map[string]string{
+				"kube_command":       "echo hello",
+				"kube_image":         "busybox:latest",
+				"kube_params":        "--verbose",
+				"kube_namespace":     "test-ns",
+				"pod_pending_timeout": "5m",
+			},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "incluster",
+			expectError:        false,
+			description:        "Should accept valid parameters when permissions allow",
+		},
+		{
+			name: "Command without permission",
+			params: map[string]string{
+				"kube_command": "echo hello",
+			},
+			allowRuntimeAuth:   false,
+			allowRuntimeCmd:    false,
+			allowRuntimeParams: false,
+			allowRuntimePod:    false,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "kube_command provided but not allowed",
+			description:        "Should reject command when allowRuntimeCommand is false",
+		},
+		{
+			name: "Image without permission",
+			params: map[string]string{
+				"kube_image": "busybox:latest",
+			},
+			allowRuntimeAuth:   false,
+			allowRuntimeCmd:    false,
+			allowRuntimeParams: false,
+			allowRuntimePod:    false,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "kube_image provided but not allowed",
+			description:        "Should reject image when allowRuntimeCommand is false",
+		},
+		{
+			name: "Params without permission",
+			params: map[string]string{
+				"kube_params": "--verbose",
+			},
+			allowRuntimeAuth:   false,
+			allowRuntimeCmd:    false,
+			allowRuntimeParams: false,
+			allowRuntimePod:    false,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "kube_params provided but not allowed",
+			description:        "Should reject params when allowRuntimeParams is false",
+		},
+		{
+			name: "Namespace without permission",
+			params: map[string]string{
+				"kube_namespace": "test-ns",
+			},
+			allowRuntimeAuth:   false,
+			allowRuntimeCmd:    false,
+			allowRuntimeParams: false,
+			allowRuntimePod:    false,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "kube_namespace provided but not allowed",
+			description:        "Should reject namespace when allowRuntimeAuth is false",
+		},
+		{
+			name: "Pod definition without permission",
+			params: map[string]string{
+				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
+			},
+			allowRuntimeAuth:   false,
+			allowRuntimeCmd:    false,
+			allowRuntimeParams: false,
+			allowRuntimePod:    false,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "secret_kube_pod provided but not allowed",
+			description:        "Should reject pod when allowRuntimePod is false",
+		},
+		{
+			name: "Runtime auth method without kubeconfig",
+			params: map[string]string{
+				"kube_image": "busybox:latest",
+			},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "runtime",
+			expectError:        true,
+			expectedErrorMsg:   "param secret_kube_config must be provided if AuthMethod=runtime",
+			description:        "Should require kubeconfig when authMethod is runtime",
+		},
+		{
+			name: "Pod with conflicting image parameter",
+			params: map[string]string{
+				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
+				"kube_image":      "busybox:latest",
+			},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "params kube_command, kube_image, kube_params not compatible with secret_kube_pod",
+			description:        "Should reject conflicting pod and image parameters",
+		},
+		{
+			name: "Pod with conflicting command parameter",
+			params: map[string]string{
+				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
+				"kube_command":    "echo hello",
+			},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "params kube_command, kube_image, kube_params not compatible with secret_kube_pod",
+			description:        "Should reject conflicting pod and command parameters",
+		},
+		{
+			name: "Invalid pod pending timeout",
+			params: map[string]string{
+				"pod_pending_timeout": "invalid-duration",
+			},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "incluster",
+			expectError:        true,
+			expectedErrorMsg:   "time: invalid duration",
+			description:        "Should reject invalid duration format",
+		},
+		{
+			name: "Valid pod pending timeout",
+			params: map[string]string{
+				"pod_pending_timeout": "10m30s",
+			},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "incluster",
+			expectError:        false,
+			description:        "Should accept valid duration format",
+		},
+		{
+			name:               "Empty parameters",
+			params:             map[string]string{},
+			allowRuntimeAuth:   true,
+			allowRuntimeCmd:    true,
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			authMethod:         "incluster",
+			expectError:        false,
+			description:        "Should handle empty parameters gracefully",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+
+			// Create KubeWorkerCfg with test configuration
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:          tt.authMethod,
+				StreamMethod:        "logger",
+				AllowRuntimeAuth:    tt.allowRuntimeAuth,
+				AllowRuntimeCommand: tt.allowRuntimeCmd,
+				AllowRuntimeParams:  tt.allowRuntimeParams,
+				AllowRuntimePod:     tt.allowRuntimePod,
+			}
+
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Mock the GetStatusCopy call
+			extraData := &workceptor.KubeExtraData{}
+			status := workceptor.StatusFileData{ExtraData: extraData}
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(status).AnyTimes()
+
+			// Mock GetWorkceptor and logger for timeout parsing errors
+			if strings.Contains(tt.expectedErrorMsg, "time: invalid duration") {
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			}
+
+			err = kubeUnit.SetFromParams(tt.params)
+
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+				if tt.expectedErrorMsg != "" {
+					assert.Contains(t, err.Error(), tt.expectedErrorMsg, tt.description)
+				}
+			} else {
+				assert.NoError(t, err, tt.description)
 			}
 		})
 	}

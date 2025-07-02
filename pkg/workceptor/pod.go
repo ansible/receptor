@@ -11,37 +11,10 @@ import (
 )
 
 type KubePodStateHelper interface {
-	CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutSeconds *int64) (ok bool, err error)
 	GetPodStatus(pod *corev1.Pod) (bool, error)
 	PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error)
-	PodHealthy(pod *corev1.Pod, containerName string) (bool, string, error)
+	PodHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	WaitForPodCompleted(pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error)
-}
-
-func (kw *KubeUnit) CapturePodStatus(pod *corev1.Pod, stdoutSize int64, timeoutSeconds *int64) (bool, error) {
-	if pod == nil {
-		return false, fmt.Errorf("pod is nil")
-	}
-
-	podRef := fmt.Sprintf("pod %s/%s", pod.Namespace, pod.Name)
-	if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
-		_, err := kw.WaitForPodCompleted(kw.GetContext(), pod, kw.clientset, timeoutSeconds)
-		if err != nil {
-			kw.GetWorkceptor().nc.GetLogger().Debug("%s pod error detected while waiting for completion: %v", podRef, err)
-		}
-	}
-
-	ok, err := kw.GetPodStatus(pod)
-	if !ok || err != nil {
-		kw.GetWorkceptor().nc.GetLogger().Warning("%s pod did not succeed:  %v", podRef, err)
-		kw.UpdateBasicStatus(WorkStateFailed, err.Error(), stdoutSize)
-
-		return false, err
-	}
-
-	kw.GetWorkceptor().nc.GetLogger().Debug("%s pod status: %s", podRef, pod.Status.String())
-
-	return true, nil
 }
 
 // GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.

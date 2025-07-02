@@ -1824,6 +1824,7 @@ func TestKubeAPIWrapper_NewSPDYExecutor(t *testing.T) {
 					// URL parsing failed - this is part of the test
 					if tt.expectError {
 						assert.Error(t, urlErr, "URL parsing should fail for "+tt.description)
+
 						return
 					} else {
 						t.Fatalf("Failed to parse test URL: %v", urlErr)
@@ -1839,10 +1840,11 @@ func TestKubeAPIWrapper_NewSPDYExecutor(t *testing.T) {
 						assert.Contains(t, fmt.Sprintf("%v", r), "nil pointer", tt.description)
 					}
 				}()
-				
+
 				executor, err := wrapper.NewSPDYExecutor(tt.config, tt.method, testURL)
 				// If we get here without panic, test should fail
 				t.Errorf("Expected panic for nil config, but got executor=%v, err=%v", executor, err)
+
 				return
 			}
 
@@ -1899,7 +1901,7 @@ func TestKubeAPIWrapper_NewForConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wrapper := workceptor.KubeAPIWrapper{}
-			
+
 			// Handle panic for nil config case
 			if tt.config == nil && tt.expectError {
 				defer func() {
@@ -1908,10 +1910,11 @@ func TestKubeAPIWrapper_NewForConfig(t *testing.T) {
 						assert.Contains(t, fmt.Sprintf("%v", r), "nil pointer", tt.description)
 					}
 				}()
-				
+
 				clientset, err := wrapper.NewForConfig(tt.config)
 				// If we get here without panic, test should fail
 				t.Errorf("Expected panic for nil config, but got clientset=%v, err=%v", clientset, err)
+
 				return
 			}
 
@@ -1930,24 +1933,24 @@ func TestKubeAPIWrapper_NewForConfig(t *testing.T) {
 
 func TestKubeUnit_SetFromParams(t *testing.T) {
 	tests := []struct {
-		name              string
-		params            map[string]string
-		allowRuntimeAuth  bool
-		allowRuntimeCmd   bool
+		name               string
+		params             map[string]string
+		allowRuntimeAuth   bool
+		allowRuntimeCmd    bool
 		allowRuntimeParams bool
-		allowRuntimePod   bool
-		authMethod        string
-		expectError       bool
-		expectedErrorMsg  string
-		description       string
+		allowRuntimePod    bool
+		authMethod         string
+		expectError        bool
+		expectedErrorMsg   string
+		description        string
 	}{
 		{
 			name: "Valid parameters with all permissions",
 			params: map[string]string{
-				"kube_command":       "echo hello",
-				"kube_image":         "busybox:latest",
-				"kube_params":        "--verbose",
-				"kube_namespace":     "test-ns",
+				"kube_command":        "echo hello",
+				"kube_image":          "busybox:latest",
+				"kube_params":         "--verbose",
+				"kube_namespace":      "test-ns",
 				"pod_pending_timeout": "5m",
 			},
 			allowRuntimeAuth:   true,

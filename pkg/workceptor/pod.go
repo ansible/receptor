@@ -48,12 +48,17 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 		if cs.Name == containerName {
 			switch pod.Status.Phase {
 			case corev1.PodFailed:
-				ok, err := kw.PodContainerHealthy(pod, containerName)
-				if !ok || err != nil {
-					return false, err
+				podError := fmt.Errorf("pod failed with reason: %s", pod.Status.Reason)
+				if pod.Status.Message != "" {
+					podError = fmt.Errorf("%s: %s", podError.Error(), pod.Status.Message)
+				}
+				ok, containerError := kw.PodContainerHealthy(pod, containerName)
+				if !ok || containerError != nil {
+					return false, fmt.Errorf("%s %v", podError.Error(), containerError)
 				}
 
-				return true, nil
+				return false, podError
+
 			case corev1.PodSucceeded:
 				return true, nil
 			case corev1.PodRunning, corev1.PodPending:

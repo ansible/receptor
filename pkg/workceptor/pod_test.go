@@ -38,14 +38,14 @@ var podInfraError = &corev1.Pod{
 	},
 	Status: corev1.PodStatus{
 		Phase:  corev1.PodFailed,
-		Reason: "OOMKilled",
+		Reason: "Pod OOMKilled",
 		ContainerStatuses: []corev1.ContainerStatus{
 			{
 				Name: "worker",
 				State: corev1.ContainerState{
 					Terminated: &corev1.ContainerStateTerminated{
 						ExitCode: 137,
-						Reason:   "OOMKill",
+						Reason:   "Container OOMKill",
 					},
 				},
 			},
@@ -117,6 +117,34 @@ var podUnknownPhase = &corev1.Pod{
 	},
 }
 
+var podMultipleContainers = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "multi-container-pod",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{
+						StartedAt: metav1.Now(),
+					},
+				},
+			},
+			{
+				Name: "helper",
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{
+						StartedAt: metav1.Now(),
+					},
+				},
+			},
+		},
+	},
+}
+
 func TestPodHeathy(t *testing.T) {
 	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
@@ -168,6 +196,28 @@ func TestPodHeathy(t *testing.T) {
 			wantOk:    false,
 			wantErr:   true,
 			wantError: "unknown phase: NotARealPhase",
+		},
+		{
+			name:      "pod with multiple containers",
+			pod:       podMultipleContainers,
+			container: "worker",
+			wantOk:    true,
+			wantErr:   false,
+		},
+		{
+			name:      "pod with multiple containers, different container",
+			pod:       podMultipleContainers,
+			container: "helper",
+			wantOk:    true,
+			wantErr:   false,
+		},
+		{
+			name:      "pod with oomkill error",
+			pod:       podInfraError,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "pod: pod failed with reason: Pod OOMKilled container: container worker exited with code 137: Container OOMKilled too",
 		},
 	}
 	for _, tt := range tests {
@@ -286,7 +336,7 @@ func TestGetPodStatus(t *testing.T) {
 			pod:       podInfraError,
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "container worker exited with code 137: OOMKill",
+			wantError: "pod failed with reason: Pod OOMKilled container worker exited with code 137: Container OOMKill",
 		},
 		{
 			name:      "application failure",

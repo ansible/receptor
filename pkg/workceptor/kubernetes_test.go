@@ -2730,6 +2730,86 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 			},
 			description: "Should handle context cancellation and exit early with warning",
 		},
+		{
+			name: "Successful pod retrieval but stdout file creation failure",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod (skipStdin=true case)
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "default",
+					PodName:       "existing-pod-789", // Non-empty triggers existing pod path
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				
+				// Mock successful pod retrieval (no retries needed)
+				existingPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "existing-pod-789",
+						Namespace: "default",
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+					},
+				}
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "existing-pod-789", gomock.Any()).Return(existingPod, nil)
+				
+				// Mock UnitDir call for stdout file creation - but we'll trigger failure in NewStdoutWriter
+				// This simulates line 812: stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
+				mockBWU.EXPECT().UnitDir().Return("/invalid/path/that/causes/stdout/writer/failure")
+				
+				// Mock error logging for stdout file creation failure
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle successful pod retrieval but fail on stdout file creation",
+		},
+		{
+			name: "Pod retrieval with partial retry success - covers retry logic",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod that requires retries
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "default",
+					PodName:       "retry-pod-456", // Non-empty triggers existing pod path
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				
+				// Mock pod retrieval with 2 failures then 1 success (covers retry logic and success path)
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "retry-pod-456", gomock.Any()).Return(nil, fmt.Errorf("temporary failure")).Times(2)
+				
+				// Third attempt succeeds
+				retrievedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "retry-pod-456",
+						Namespace: "default",
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+					},
+				}
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "retry-pod-456", gomock.Any()).Return(retrievedPod, nil)
+				
+				// Mock warning messages for the two failed attempts
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				
+				// After successful retrieval, try to create stdout file but fail
+				mockBWU.EXPECT().UnitDir().Return("/nonexistent/path/for/stdout")
+				
+				// Mock error logging for stdout file creation failure
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle pod retrieval retries with eventual success, then fail on stdout",
+		},
 	}
 
 	for _, tt := range tests {

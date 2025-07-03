@@ -667,7 +667,7 @@ func (kw *KubeUnit) runWorkUsingLogger() {
 // - Setting up SPDY executors for stdin streaming
 // - Managing goroutines for stdin/stdout coordination
 // - Error propagation and status transitions
-// - Proper cleanup and resource management
+// - Proper cleanup and resource management.
 func (kw *KubeUnit) RunWorkUsingLogger() {
 	skipStdin := true
 

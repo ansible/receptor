@@ -217,7 +217,7 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "pod: pod failed with reason: Pod OOMKilled container: container worker exited with code 137: Container OOMKilled too",
+			wantError: "pod failed with reason: Pod OOMKilled container worker exited with code 137: Container OOMKill",
 		},
 	}
 	for _, tt := range tests {

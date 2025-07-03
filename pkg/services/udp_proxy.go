@@ -33,62 +33,7 @@ func (n *NetUDPWrapper) DialUDP(network string, laddr *net.UDPAddr, raddr *net.U
 	return net.DialUDP(network, laddr, raddr)
 }
 
-// UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service.
-func UDPProxyServiceInbound(s NetcForUDPProxy, host string, port int, node string, service string, nett net_interface.NetterUDP) error {
-	connMap := make(map[string]netceptor.PacketConner)
-	buffer := make([]byte, utils.NormalBufferSize)
-
-	addrStr := fmt.Sprintf("%s:%d", host, port)
-	udpAddr, err := nett.ResolveUDPAddr("udp", addrStr)
-	if err != nil {
-		return fmt.Errorf("could not resolve address %s", addrStr)
-	}
-
-	uc, err := nett.ListenUDP("udp", udpAddr)
-	if err != nil {
-		return fmt.Errorf("error listening on UDP: %s", err)
-	}
-
-	ncAddr := s.NewAddr(node, service)
-
-	go func() {
-		for {
-			n, addr, err := uc.ReadFrom(buffer)
-			if err != nil {
-				s.GetLogger().Error("Error reading from UDP: %s\n", err)
-
-				return
-			}
-			raddrStr := addr.String()
-			pc, ok := connMap[raddrStr]
-			if !ok {
-				pc, err = s.ListenPacket("")
-				if err != nil {
-					s.GetLogger().Error("Error listening on Receptor network: %s\n", err)
-
-					return
-				}
-				s.GetLogger().Debug("Received new UDP connection from %s\n", raddrStr)
-				connMap[raddrStr] = pc
-				go RunNetceptorToUDPInbound(pc, uc, addr, s.NewAddr(node, service))
-			}
-			wn, err := pc.WriteTo(buffer[:n], ncAddr)
-			if err != nil {
-				s.GetLogger().Error("Error sending packet on Receptor network: %s\n", err)
-
-				continue
-			}
-			if wn != n {
-				s.GetLogger().Debug("Not all bytes written on Receptor network\n")
-
-				continue
-			}
-		}
-	}()
-
-	return nil
-}
-
+// processInboundPacket processes a single inbound packet from the Receptor network and forwards it to UDP.
 func processInboundPacket(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr, buf []byte) {
 	n, addr, err := pc.ReadFrom(buf)
 	if err != nil {
@@ -114,65 +59,70 @@ func processInboundPacket(pc netceptor.PacketConner, uc net_interface.UDPConnInt
 	}
 }
 
-type RunNetceptorToUDPInboundFunc interface {
-	RunNetceptorToUDPInbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr)
-}
+// runUDPProxyServiceInbound executes the main loop for the UDP inbound proxy
+// Returns false if an error is found, true if it should continue.
+func runUDPProxyServiceInbound(s NetcForUDPProxy, uc net_interface.UDPConnInterface, buffer []byte, connMap map[string]netceptor.PacketConner, ncAddr netceptor.Addr, node string, service string) bool {
+	n, addr, err := uc.ReadFrom(buffer)
+	if err != nil {
+		s.GetLogger().Error("Error reading from UDP: %s\n", err)
 
-type RunNetceptorToUDPInboundImpl struct{}
-
-func RunNetceptorToUDPInbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr) {
-	buf := make([]byte, utils.NormalBufferSize)
-	for {
-		processInboundPacket(pc, uc, udpAddr, expectedAddr, buf)
+		return false
 	}
+	raddrStr := addr.String()
+	pc, ok := connMap[raddrStr]
+	if !ok {
+		pc, err = s.ListenPacket("")
+		if err != nil {
+			s.GetLogger().Error("Error listening on Receptor network: %s\n", err)
+
+			return false
+		}
+		s.GetLogger().Debug("Received new UDP connection from %s\n", raddrStr)
+		connMap[raddrStr] = pc
+		go func() {
+			buf := make([]byte, utils.NormalBufferSize)
+			for {
+				processInboundPacket(pc, uc, addr, s.NewAddr(node, service), buf)
+			}
+		}()
+	}
+	wn, err := pc.WriteTo(buffer[:n], ncAddr)
+	if err != nil {
+		s.GetLogger().Error("Error sending packet on Receptor network: %s\n", err)
+
+		return true // continue
+	}
+	if wn != n {
+		s.GetLogger().Debug("Not all bytes written on Receptor network\n")
+
+		return true // continue
+	}
+
+	return true // continue
 }
 
-// UDPProxyServiceOutbound listens on the Receptor network and forwards packets via UDP.
-func UDPProxyServiceOutbound(s NetcForUDPProxy, service string, address string, nett net_interface.NetterUDP) error {
-	connMap := make(map[string]net_interface.UDPConnInterface)
+// UDPProxyServiceInbound listens on a UDP port and forwards packets to a remote Receptor service.
+func UDPProxyServiceInbound(s NetcForUDPProxy, host string, port int, node string, service string, nett net_interface.NetterUDP) error {
+	connMap := make(map[string]netceptor.PacketConner)
 	buffer := make([]byte, utils.NormalBufferSize)
-	udpAddr, err := nett.ResolveUDPAddr("udp", address)
+
+	addrStr := fmt.Sprintf("%s:%d", host, port)
+	udpAddr, err := nett.ResolveUDPAddr("udp", addrStr)
 	if err != nil {
-		return fmt.Errorf("could not resolve UDP address %s", address)
+		return fmt.Errorf("could not resolve address %s", addrStr)
 	}
-	pc, err := s.ListenPacketAndAdvertise(service, map[string]string{
-		"type":    "UDP Proxy",
-		"address": address,
-	})
+
+	uc, err := nett.ListenUDP("udp", udpAddr)
 	if err != nil {
-		return fmt.Errorf("error listening on service %s: %s", service, err)
+		return fmt.Errorf("error listening on UDP: %s", err)
 	}
+
+	ncAddr := s.NewAddr(node, service)
+
 	go func() {
 		for {
-			n, addr, err := pc.ReadFrom(buffer)
-			if err != nil {
-				s.GetLogger().Error("Error reading from Receptor network: %s\n", err)
-
+			if !runUDPProxyServiceInbound(s, uc, buffer, connMap, ncAddr, node, service) {
 				return
-			}
-			raddrStr := addr.String()
-			uc, ok := connMap[raddrStr]
-			if !ok {
-				uc, err = nett.DialUDP("udp", nil, udpAddr)
-				if err != nil {
-					s.GetLogger().Error("Error connecting via UDP: %s\n", err)
-
-					return
-				}
-				s.GetLogger().Debug("Opened new UDP connection to %s\n", raddrStr)
-				connMap[raddrStr] = uc
-				go RunUDPToNetceptorOutbound(uc, pc, addr)
-			}
-			wn, err := uc.Write(buffer[:n])
-			if err != nil {
-				s.GetLogger().Error("Error writing to UDP: %s\n", err)
-
-				continue
-			}
-			if wn != n {
-				s.GetLogger().Debug("Not all bytes written to UDP\n")
-
-				continue
 			}
 		}
 	}()
@@ -180,12 +130,7 @@ func UDPProxyServiceOutbound(s NetcForUDPProxy, service string, address string, 
 	return nil
 }
 
-type RunNetceptorToUDPOutboundFunc interface {
-	RunNetceptorToUDPOutbound(pc netceptor.PacketConner, uc net_interface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr)
-}
-
-type RunNetceptorToUDPOutboundImpl struct{}
-
+// processOutboundPacket processes a single outbound packet from the Receptor network and forwards it to UDP.
 func processOutboundPacket(uc net_interface.UDPConnInterface, pc netceptor.PacketConner, addr net.Addr, buf []byte) {
 	n, err := uc.Read(buf)
 	if err != nil {
@@ -206,11 +151,72 @@ func processOutboundPacket(uc net_interface.UDPConnInterface, pc netceptor.Packe
 	}
 }
 
-func RunUDPToNetceptorOutbound(uc net_interface.UDPConnInterface, pc netceptor.PacketConner, addr net.Addr) {
-	buf := make([]byte, utils.NormalBufferSize)
-	for {
-		processOutboundPacket(uc, pc, addr, buf)
+// runUDPProxyServiceOutbound executes the main loop for the UDP outbound proxy
+// Returns false if an error is found, true if it should continue.
+func runUDPProxyServiceOutbound(s NetcForUDPProxy, pc netceptor.PacketConner, buffer []byte, connMap map[string]net_interface.UDPConnInterface, udpAddr *net.UDPAddr, nett net_interface.NetterUDP) bool {
+	n, addr, err := pc.ReadFrom(buffer)
+	if err != nil {
+		s.GetLogger().Error("Error reading from Receptor network: %s\n", err)
+
+		return false
 	}
+	raddrStr := addr.String()
+	uc, ok := connMap[raddrStr]
+	if !ok {
+		uc, err = nett.DialUDP("udp", nil, udpAddr)
+		if err != nil {
+			s.GetLogger().Error("Error connecting via UDP: %s\n", err)
+
+			return false
+		}
+		s.GetLogger().Debug("Opened new UDP connection to %s\n", raddrStr)
+		connMap[raddrStr] = uc
+		go func() {
+			buf := make([]byte, utils.NormalBufferSize)
+			for {
+				processOutboundPacket(uc, pc, addr, buf)
+			}
+		}()
+	}
+	wn, err := uc.Write(buffer[:n])
+	if err != nil {
+		s.GetLogger().Error("Error writing to UDP: %s\n", err)
+
+		return true // continue
+	}
+	if wn != n {
+		s.GetLogger().Debug("Not all bytes written to UDP\n")
+
+		return true // continue
+	}
+
+	return true // continue
+}
+
+// UDPProxyServiceOutbound listens on the Receptor network and forwards packets via UDP.
+func UDPProxyServiceOutbound(s NetcForUDPProxy, service string, address string, nett net_interface.NetterUDP) error {
+	connMap := make(map[string]net_interface.UDPConnInterface)
+	buffer := make([]byte, utils.NormalBufferSize)
+	udpAddr, err := nett.ResolveUDPAddr("udp", address)
+	if err != nil {
+		return fmt.Errorf("could not resolve UDP address %s", address)
+	}
+	pc, err := s.ListenPacketAndAdvertise(service, map[string]string{
+		"type":    "UDP Proxy",
+		"address": address,
+	})
+	if err != nil {
+		return fmt.Errorf("error listening on service %s: %s", service, err)
+	}
+	go func() {
+		for {
+			if !runUDPProxyServiceOutbound(s, pc, buffer, connMap, udpAddr, nett) {
+				return
+			}
+		}
+	}()
+
+	return nil
 }
 
 // udpProxyInboundCfg is the cmdline configuration object for a UDP inbound proxy.

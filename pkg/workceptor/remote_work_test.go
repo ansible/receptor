@@ -114,9 +114,9 @@ func TestRemoteWorkStatusRedaction(t *testing.T) {
 		{
 			name: "multiple secrets redacted",
 			remoteParams: map[string]string{
-				"secret_key":      "hidden1",
-				"SECRET_TOKEN":    "hidden2",
-				"public_setting":  "visible",
+				"secret_key":     "hidden1",
+				"SECRET_TOKEN":   "hidden2",
+				"public_setting": "visible",
 			},
 			expectedSecret: false,
 			expectedPublic: true,
@@ -145,6 +145,7 @@ func TestRemoteWorkStatusRedaction(t *testing.T) {
 			for k := range red.RemoteParams {
 				if strings.HasPrefix(strings.ToLower(k), "secret_") {
 					hasSecret = true
+
 					break
 				}
 			}
@@ -158,6 +159,7 @@ func TestRemoteWorkStatusRedaction(t *testing.T) {
 			for k := range red.RemoteParams {
 				if !strings.HasPrefix(strings.ToLower(k), "secret_") {
 					hasPublic = true
+
 					break
 				}
 			}
@@ -294,18 +296,6 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 	}
 }
 
-// Mock connection for testing StartRemoteUnit
-type testConn struct {
-	writeData []byte
-	closed    bool
-}
-
-func (tc *testConn) CloseConnection() error {
-	tc.closed = true
-	return nil
-}
-
-
 func TestRemoteWorkStartRemoteUnitInvalidResponse(t *testing.T) {
 	t.Parallel()
 	wu, mockBaseWorkUnit, _, w := createRemoteWorkTestSetup(t)
@@ -333,54 +323,13 @@ func TestRemoteWorkStartRemoteUnitInvalidResponse(t *testing.T) {
 	if wu == nil {
 		t.Error("Expected WorkUnit to be created")
 	}
-	
+
 	// Verify the unit has proper extra data setup
 	status := wu.UnredactedStatus()
 	if status == nil {
 		t.Error("Expected status to be available")
 	}
 }
-
-// Mock connection for testing
-type mockNetConn struct {
-	writeData []byte
-	closed    bool
-	writeErr  error
-	readData  string
-	readErr   error
-}
-
-func (mc *mockNetConn) Read(b []byte) (n int, err error) {
-	if mc.readErr != nil {
-		return 0, mc.readErr
-	}
-	copy(b, []byte(mc.readData))
-	return len(mc.readData), nil
-}
-
-func (mc *mockNetConn) Write(b []byte) (n int, err error) {
-	if mc.writeErr != nil {
-		return 0, mc.writeErr
-	}
-	mc.writeData = append(mc.writeData, b...)
-	return len(b), nil
-}
-
-func (mc *mockNetConn) Close() error {
-	mc.closed = true
-	return nil
-}
-
-func (mc *mockNetConn) CloseConnection() error {
-	mc.closed = true
-	return nil
-}
-
-func (mc *mockNetConn) LocalAddr() net.Addr  { return nil }
-func (mc *mockNetConn) RemoteAddr() net.Addr { return nil }
-func (mc *mockNetConn) SetDeadline(t time.Time) error      { return nil }
-func (mc *mockNetConn) SetReadDeadline(t time.Time) error  { return nil }
-func (mc *mockNetConn) SetWriteDeadline(t time.Time) error { return nil }
 
 func TestRemoteWorkGetConnection(t *testing.T) {
 	t.Parallel()
@@ -493,15 +442,15 @@ func TestRemoteWorkStartRemoteUnit(t *testing.T) {
 			errorContains: "could not parse response",
 		},
 		{
-			name:          "valid response format",
-			response:      "Work unit submitted with ID abc123.",
-			expectError:   false,
+			name:        "valid response format",
+			response:    "Work unit submitted with ID abc123.",
+			expectError: false,
 		},
 		{
-			name:          "signed work valid response",
-			response:      "Work unit submitted with ID def456.",
-			signWork:      true,
-			expectError:   false,
+			name:        "signed work valid response",
+			response:    "Work unit submitted with ID def456.",
+			signWork:    true,
+			expectError: false,
 		},
 	}
 
@@ -612,23 +561,23 @@ func TestRemoteWorkMonitoring(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		forRelease  bool
+		name          string
+		forRelease    bool
 		remoteStarted bool
 	}{
 		{
-			name:        "monitor for normal operation",
-			forRelease:  false,
+			name:          "monitor for normal operation",
+			forRelease:    false,
 			remoteStarted: true,
 		},
 		{
-			name:        "monitor for release",
-			forRelease:  true,
+			name:          "monitor for release",
+			forRelease:    true,
 			remoteStarted: true,
 		},
 		{
-			name:        "monitor not started unit",
-			forRelease:  false,
+			name:          "monitor not started unit",
+			forRelease:    false,
 			remoteStarted: false,
 		},
 	}
@@ -670,28 +619,28 @@ func TestRemoteWorkExpiration(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		expiration  time.Time
+		name          string
+		expiration    time.Time
 		remoteStarted bool
-		expectFail  bool
+		expectFail    bool
 	}{
 		{
-			name:        "not expired, remote started",
-			expiration:  time.Now().Add(1 * time.Hour),
+			name:          "not expired, remote started",
+			expiration:    time.Now().Add(1 * time.Hour),
 			remoteStarted: true,
-			expectFail:  false,
+			expectFail:    false,
 		},
 		{
-			name:        "expired, not started",
-			expiration:  time.Now().Add(-1 * time.Hour),
+			name:          "expired, not started",
+			expiration:    time.Now().Add(-1 * time.Hour),
 			remoteStarted: false,
-			expectFail:  true,
+			expectFail:    true,
 		},
 		{
-			name:        "zero expiration time",
-			expiration:  time.Time{},
+			name:          "zero expiration time",
+			expiration:    time.Time{},
 			remoteStarted: false,
-			expectFail:  false,
+			expectFail:    false,
 		},
 	}
 
@@ -732,50 +681,50 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		tlsClientName     string
-		remoteNode        string
-		tlsError          error
-		dialError         error
-		expectError       bool
-		errorContains     string
+		name          string
+		tlsClientName string
+		remoteNode    string
+		tlsError      error
+		dialError     error
+		expectError   bool
+		errorContains string
 	}{
 		{
-			name:             "missing extra data",
-			expectError:      true,
-			errorContains:    "remote ExtraData missing",
+			name:          "missing extra data",
+			expectError:   true,
+			errorContains: "remote ExtraData missing",
 		},
 		{
-			name:             "TLS config error",
-			tlsClientName:    "test-client", 
-			remoteNode:       "test-node",
-			tlsError:         fmt.Errorf("TLS configuration failed"),
-			expectError:      true,
-			errorContains:    "TLS configuration failed",
+			name:          "TLS config error",
+			tlsClientName: "test-client",
+			remoteNode:    "test-node",
+			tlsError:      fmt.Errorf("TLS configuration failed"),
+			expectError:   true,
+			errorContains: "TLS configuration failed",
 		},
 		{
-			name:             "dial context error",
-			tlsClientName:    "test-client",
-			remoteNode:       "test-node",
-			dialError:        fmt.Errorf("connection refused"),
-			expectError:      true,
-			errorContains:    "connection refused",
+			name:          "dial context error",
+			tlsClientName: "test-client",
+			remoteNode:    "test-node",
+			dialError:     fmt.Errorf("connection refused"),
+			expectError:   true,
+			errorContains: "connection refused",
 		},
 		{
-			name:             "dial context timeout",
-			tlsClientName:    "test-client",
-			remoteNode:       "test-node",
-			dialError:        fmt.Errorf("context deadline exceeded"),
-			expectError:      true,
-			errorContains:    "context deadline exceeded",
+			name:          "dial context timeout",
+			tlsClientName: "test-client",
+			remoteNode:    "test-node",
+			dialError:     fmt.Errorf("context deadline exceeded"),
+			expectError:   true,
+			errorContains: "context deadline exceeded",
 		},
 		{
-			name:             "TLS config nil client name",
-			tlsClientName:    "invalid-client",
-			remoteNode:       "test-node",
-			tlsError:         fmt.Errorf("client certificate not found"),
-			expectError:      true,
-			errorContains:    "client certificate not found",
+			name:          "TLS config nil client name",
+			tlsClientName: "invalid-client",
+			remoteNode:    "test-node",
+			tlsError:      fmt.Errorf("client certificate not found"),
+			expectError:   true,
+			errorContains: "client certificate not found",
 		},
 	}
 
@@ -840,10 +789,9 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 					if reader != nil {
 						t.Error("Expected reader to be nil on error")
 					}
-				} else {
-					if err != nil {
-						t.Errorf("Unexpected error: %v", err)
-					}
+				}
+				if !tt.expectError && err != nil {
+					t.Errorf("Unexpected error: %v", err)
 				}
 			} else {
 				t.Error("WorkUnit doesn't implement ConnectToRemote method")

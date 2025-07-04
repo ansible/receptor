@@ -2174,14 +2174,14 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 
 func TestKubeUnit_CreatePod(t *testing.T) {
 	tests := []struct {
-		name              string
-		extraData         *workceptor.KubeExtraData
-		env               map[string]string
-		setupMocks        func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *workceptor.Workceptor)
-		expectError       bool
-		expectedErrorMsg  string
-		validateResult    func(*testing.T, *workceptor.KubeUnit)
-		description       string
+		name             string
+		extraData        *workceptor.KubeExtraData
+		env              map[string]string
+		setupMocks       func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *workceptor.Workceptor)
+		expectError      bool
+		expectedErrorMsg string
+		validateResult   func(*testing.T, *workceptor.KubeUnit)
+		description      string
 	}{
 		{
 			name: "Successful pod creation with simple image",
@@ -2200,7 +2200,7 @@ func TestKubeUnit_CreatePod(t *testing.T) {
 				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
 				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
 					Image:         "busybox:latest",
-					Command:       "echo hello", 
+					Command:       "echo hello",
 					Params:        "--verbose",
 					KubeNamespace: "default",
 				}}
@@ -2209,27 +2209,27 @@ func TestKubeUnit_CreatePod(t *testing.T) {
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
 				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
-				
+
 				// Mock pod creation
 				createdPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-123", Namespace: "default"},
 					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
 				}
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(createdPod, nil)
-				
+
 				// Mock status update
 				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
 					// Verify the status update function works
 					status := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
 					updateFunc.(func(*workceptor.StatusFileData))(status)
 				})
-				
+
 				// Mock pod waiting
 				selector := &hasTerm{field: "metadata.name", value: "test-pod-123"}
 				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "test-pod-123").Return(selector)
 				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
 				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(nil, nil).AnyTimes()
-				
+
 				watchEvent := &watch.Event{
 					Type:   watch.Modified,
 					Object: createdPod,
@@ -2286,19 +2286,19 @@ spec:
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
 				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
-				
+
 				createdPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "custom-pod-abc", Namespace: "custom-ns"},
 					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
 				}
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "custom-ns", gomock.Any(), gomock.Any()).Return(createdPod, nil)
 				mockBWU.EXPECT().UpdateFullStatus(gomock.Any())
-				
+
 				selector := &hasTerm{field: "metadata.name", value: "custom-pod-abc"}
 				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "custom-pod-abc").Return(selector)
 				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "custom-ns", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
 				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "custom-ns", gomock.Any()).Return(nil, nil).AnyTimes()
-				
+
 				watchEvent := &watch.Event{Type: watch.Modified, Object: createdPod}
 				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil)
 			},
@@ -2444,7 +2444,7 @@ spec:
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
-				
+
 				// Mock failed pod creation
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("insufficient quota"))
 			},
@@ -2469,14 +2469,14 @@ spec:
 					KubeNamespace: "default",
 				}}
 				mockBWU.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
-	mockBWU.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}})
-	mockBWU.EXPECT().GetStatusCopy().Return(status)
-				
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}})
+				mockBWU.EXPECT().GetStatusCopy().Return(status)
+
 				// Create cancelled context
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
-				
+
 				createdPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-123", Namespace: "default"},
 				}
@@ -2540,40 +2540,40 @@ func TestKubeUnit_LoggingMethodSelection(t *testing.T) {
 	// Test environment variable parsing that determines whether kubeLoggingNoReconnect is used
 	// This provides indirect testing of the kubeLoggingNoReconnect execution path
 	tests := []struct {
-		name                string
-		envValue           string
+		name                 string
+		envValue             string
 		expectedUseReconnect bool
-		description        string
+		description          string
 	}{
 		{
-			name:                "Reconnect disabled - uses kubeLoggingNoReconnect",
-			envValue:           "disabled",
+			name:                 "Reconnect disabled - uses kubeLoggingNoReconnect",
+			envValue:             "disabled",
 			expectedUseReconnect: false,
-			description:        "When disabled, should use kubeLoggingNoReconnect method",
+			description:          "When disabled, should use kubeLoggingNoReconnect method",
 		},
 		{
-			name:                "Empty value - uses kubeLoggingNoReconnect", 
-			envValue:           "",
+			name:                 "Empty value - uses kubeLoggingNoReconnect",
+			envValue:             "",
 			expectedUseReconnect: false,
-			description:        "When unset, should default to kubeLoggingNoReconnect method",
+			description:          "When unset, should default to kubeLoggingNoReconnect method",
 		},
 		{
-			name:                "Invalid value - uses kubeLoggingNoReconnect",
-			envValue:           "invalid",
+			name:                 "Invalid value - uses kubeLoggingNoReconnect",
+			envValue:             "invalid",
 			expectedUseReconnect: false,
-			description:        "Invalid values should default to kubeLoggingNoReconnect method",
+			description:          "Invalid values should default to kubeLoggingNoReconnect method",
 		},
 		{
-			name:                "Reconnect enabled",
-			envValue:           "enabled",
+			name:                 "Reconnect enabled",
+			envValue:             "enabled",
 			expectedUseReconnect: true,
-			description:        "When enabled, should use reconnect method instead",
+			description:          "When enabled, should use reconnect method instead",
 		},
 		{
-			name:                "Auto mode",
-			envValue:           "auto", 
+			name:                 "Auto mode",
+			envValue:             "auto",
 			expectedUseReconnect: true,
-			description:        "Auto mode should enable reconnect method",
+			description:          "Auto mode should enable reconnect method",
 		},
 	}
 
@@ -2588,7 +2588,7 @@ func TestKubeUnit_LoggingMethodSelection(t *testing.T) {
 					os.Unsetenv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
 				}
 			}()
-			
+
 			if tt.envValue != "" {
 				os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", tt.envValue)
 			} else {
@@ -2607,7 +2607,7 @@ func TestKubeUnit_LoggingMethodSelection(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedUseReconnect, useReconnect, tt.description)
-			
+
 			// Log which method would be used
 			if useReconnect {
 				t.Logf("Would use KubeLoggingWithReconnect")
@@ -2641,17 +2641,17 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
-				
+
 				// CreatePod path mocks
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
 				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
-				
+
 				// Mock clientset injection (CreatePod may need this)
 				mockBWU.EXPECT().UnitDir().Return("/tmp/test").AnyTimes()
-				
+
 				// Mock failed pod creation
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("insufficient resources"))
-				
+
 				// Mock error logging and status update for failed pod creation
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
@@ -2672,7 +2672,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
-				
+
 				// Mock error logging and status update for missing namespace
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
@@ -2694,10 +2694,10 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
-				
+
 				// Mock failed pod retrieval (5 retries) - should have proper expectations
 				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "missing-pod-123", gomock.Any()).Return(nil, fmt.Errorf("pod not found")).Times(5)
-				
+
 				// Mock warning and error logging (5 warnings + 1 error)
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
@@ -2718,12 +2718,12 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
-				
+
 				// Mock cancelled context
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Pre-cancel the context
 				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
-				
+
 				// Mock warning logging for context cancellation
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
@@ -2744,7 +2744,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
-				
+
 				// Mock successful pod retrieval (no retries needed)
 				existingPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2756,11 +2756,11 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 					},
 				}
 				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "existing-pod-789", gomock.Any()).Return(existingPod, nil)
-				
+
 				// Mock UnitDir call for stdout file creation - but we'll trigger failure in NewStdoutWriter
 				// This simulates line 812: stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 				mockBWU.EXPECT().UnitDir().Return("/invalid/path/that/causes/stdout/writer/failure")
-				
+
 				// Mock error logging for stdout file creation failure
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
@@ -2782,10 +2782,10 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
 				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
 				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
-				
+
 				// Mock pod retrieval with 2 failures then 1 success (covers retry logic and success path)
 				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "retry-pod-456", gomock.Any()).Return(nil, fmt.Errorf("temporary failure")).Times(2)
-				
+
 				// Third attempt succeeds
 				retrievedPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2797,14 +2797,14 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 					},
 				}
 				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "retry-pod-456", gomock.Any()).Return(retrievedPod, nil)
-				
+
 				// Mock warning messages for the two failed attempts
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
-				
+
 				// After successful retrieval, try to create stdout file but fail
 				mockBWU.EXPECT().UnitDir().Return("/nonexistent/path/for/stdout")
-				
+
 				// Mock error logging for stdout file creation failure
 				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 			},
@@ -2845,11 +2845,9 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 			// This tests the early error paths which should return cleanly
 			t.Logf("Testing %s", tt.description)
 			kubeUnit.RunWorkUsingLogger()
-			
+
 			// If we reach here, the test passed - the function returned after handling the error
 			t.Logf("Function completed successfully for error path test")
 		})
 	}
 }
-
-

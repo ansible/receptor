@@ -256,10 +256,10 @@ func TestListenerAccept(t *testing.T) {
 	mockNetC := &netceptor.Netceptor{}
 	ql := &quic.Listener{}
 	syncOnce := &sync.Once{}
-	doneChan := make(chan struct{})
-	acceptChan := make(chan *netceptor.AcceptResult)
 
 	t.Run("accept channel error", func(t *testing.T) {
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult)
 		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
 		wantErr := errors.New("accept channel error")
 		go func() {
@@ -276,6 +276,8 @@ func TestListenerAccept(t *testing.T) {
 	})
 
 	t.Run("accept channel closed", func(t *testing.T) {
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult)
 		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
 		wantErr := errors.New("listener closed")
 		close(listener.AcceptChan)
@@ -286,6 +288,8 @@ func TestListenerAccept(t *testing.T) {
 	})
 
 	t.Run("done channel closed", func(t *testing.T) {
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult)
 		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
 		close(listener.DoneChan)
 		_, gotErr := listener.Accept()

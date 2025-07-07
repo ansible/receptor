@@ -45,7 +45,7 @@ jobs:
         run: sudo chmod a+x /usr/local/bin/receptor
 
       - name: Set up nox
-        uses: wntrblm/nox@2025.02.09
+        uses: wntrblm/nox@2025.05.01
         with:
           python-versions: ${{ inputs.python-version }}
 

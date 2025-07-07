@@ -51,6 +51,7 @@ type QuicListener struct {
 func (s *QuicListener) Accept(ctx context.Context) (quic.Connection, error) {
 	return s.ql.Accept(ctx)
 }
+
 func (s *QuicListener) Addr() net.Addr {
 	return s.ql.Addr()
 }

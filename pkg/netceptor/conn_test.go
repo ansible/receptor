@@ -232,3 +232,21 @@ func TestSetWriteDeadline(t *testing.T) {
 		}
 	})
 }
+
+func TestListenerAddr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockNetC := mock_netceptor.NewMockNetC(ctrl)
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+	doneChan := make(chan struct{})
+	acceptChan := make(chan *netceptor.AcceptResult)
+	syncOnce := &sync.Once{}
+
+	mockPacketConner.EXPECT().LocalAddr().Return(nil)
+
+	listner := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+	got := listner.Addr()
+	if got != nil {
+		t.Errorf("Wanted %v, got %v", nil, got)
+	}
+}

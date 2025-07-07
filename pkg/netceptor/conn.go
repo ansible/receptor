@@ -38,6 +38,27 @@ type QuicConnectionForConn interface {
 	quic.Connection
 }
 
+type QuicListenerForListener interface {
+	Accept(ctx context.Context) (quic.Connection, error)
+	Addr() net.Addr
+	Close() error
+}
+
+type QuicListener struct {
+	ql *quic.Listener
+}
+
+func (s *QuicListener) Accept(ctx context.Context) (quic.Connection, error) {
+	return s.ql.Accept(ctx)
+}
+func (s *QuicListener) Addr() net.Addr {
+	return s.ql.Addr()
+}
+
+func (s *QuicListener) Close() error {
+	return s.ql.Close()
+}
+
 type AcceptResult struct {
 	Conn net.Conn
 	Err  error
@@ -45,12 +66,23 @@ type AcceptResult struct {
 
 // Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
-	s          *Netceptor
+	s          NetC
 	pc         PacketConner
-	ql         *quic.Listener
+	ql         QuicListenerForListener
 	AcceptChan chan *AcceptResult
 	DoneChan   chan struct{}
 	doneOnce   *sync.Once
+}
+
+func NewListener(s NetC, pc PacketConner, ql QuicListenerForListener, acceptChan chan *AcceptResult, doneChan chan struct{}, doneOnce *sync.Once) *Listener {
+	return &Listener{
+		s:          s,
+		pc:         pc,
+		ql:         ql,
+		AcceptChan: acceptChan,
+		DoneChan:   doneChan,
+		doneOnce:   doneOnce,
+	}
 }
 
 // Internal implementation of Listen and ListenAndAdvertise.
@@ -125,14 +157,9 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 			return
 		}
 	}()
-	li := &Listener{
-		s:          s,
-		pc:         pc,
-		ql:         ql,
-		AcceptChan: make(chan *AcceptResult),
-		DoneChan:   doneChan,
-		doneOnce:   &sync.Once{},
-	}
+	acceptChan := make(chan *AcceptResult)
+	syncOnce := &sync.Once{}
+	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
 
 	go li.acceptLoop(ctx)
 
@@ -259,7 +286,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 				return
 			}
 			doneChan := make(chan struct{}, 1)
-			cctx, ccancel := context.WithCancel(li.s.context)
+			cctx, ccancel := context.WithCancel(li.s.Context())
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -318,7 +345,7 @@ func (li *Listener) Addr() net.Addr {
 
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
-	s        *Netceptor
+	s        NetC
 	pc       PacketConner
 	qc       QuicConnectionForConn
 	qs       QuicStreamForConn
@@ -499,7 +526,7 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
+	c.s.GetLogger().Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

@@ -241,12 +241,58 @@ func TestListenerAddr(t *testing.T) {
 	doneChan := make(chan struct{})
 	acceptChan := make(chan *netceptor.AcceptResult)
 	syncOnce := &sync.Once{}
+	listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
 
 	mockPacketConner.EXPECT().LocalAddr().Return(nil)
-
-	listner := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
-	got := listner.Addr()
+	got := listener.Addr()
 	if got != nil {
 		t.Errorf("Wanted %v, got %v", nil, got)
 	}
+}
+
+func TestListenerAccept(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockNetC := mock_netceptor.NewMockNetC(ctrl)
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	ql := &quic.Listener{}
+	syncOnce := &sync.Once{}
+	doneChan := make(chan struct{})
+	acceptChan := make(chan *netceptor.AcceptResult)
+
+	t.Run("accept channel error", func(t *testing.T) {
+		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+		wantErr := errors.New("accept channel error")
+		go func() {
+			_, gotErr := listener.Accept()
+			if gotErr.Error() != wantErr.Error() {
+				t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+			}
+		}()
+		ar := &netceptor.AcceptResult{
+			Conn: nil,
+			Err:  wantErr,
+		}
+		listener.AcceptChan <- ar
+	})
+
+	t.Run("accept channel closed", func(t *testing.T) {
+		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+		wantErr := errors.New("listener closed")
+		close(listener.AcceptChan)
+		_, gotErr := listener.Accept()
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
+
+	t.Run("done channel closed", func(t *testing.T) {
+		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+		close(listener.DoneChan)
+		_, gotErr := listener.Accept()
+		wantErr := errors.New("listener closed")
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
+
 }

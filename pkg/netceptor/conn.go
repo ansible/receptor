@@ -298,7 +298,11 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 func (li *Listener) Accept() (net.Conn, error) {
 	select {
 	case ar := <-li.AcceptChan:
-		return ar.Conn, ar.Err
+		if ar == nil {
+			return nil, fmt.Errorf("listener closed")
+		} else {
+			return ar.Conn, ar.Err
+		}
 	case <-li.DoneChan:
 		return nil, fmt.Errorf("listener closed")
 	}

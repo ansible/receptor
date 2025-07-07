@@ -38,28 +38,6 @@ type QuicConnectionForConn interface {
 	quic.Connection
 }
 
-type QuicListenerForListener interface {
-	Accept(ctx context.Context) (quic.Connection, error)
-	Addr() net.Addr
-	Close() error
-}
-
-type QuicListener struct {
-	ql *quic.Listener
-}
-
-func (s *QuicListener) Accept(ctx context.Context) (quic.Connection, error) {
-	return s.ql.Accept(ctx)
-}
-
-func (s *QuicListener) Addr() net.Addr {
-	return s.ql.Addr()
-}
-
-func (s *QuicListener) Close() error {
-	return s.ql.Close()
-}
-
 type AcceptResult struct {
 	Conn net.Conn
 	Err  error
@@ -69,13 +47,13 @@ type AcceptResult struct {
 type Listener struct {
 	s          NetC
 	pc         PacketConner
-	ql         QuicListenerForListener
+	ql         *quic.Listener
 	AcceptChan chan *AcceptResult
 	DoneChan   chan struct{}
 	doneOnce   *sync.Once
 }
 
-func NewListener(s NetC, pc PacketConner, ql QuicListenerForListener, acceptChan chan *AcceptResult, doneChan chan struct{}, doneOnce *sync.Once) *Listener {
+func NewListener(s NetC, pc PacketConner, ql *quic.Listener, acceptChan chan *AcceptResult, doneChan chan struct{}, doneOnce *sync.Once) *Listener {
 	return &Listener{
 		s:          s,
 		pc:         pc,

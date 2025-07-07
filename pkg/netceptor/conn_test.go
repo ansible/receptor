@@ -295,3 +295,34 @@ func TestListenerAccept(t *testing.T) {
 		}
 	})
 }
+
+func TestListenerClose(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockNetC := &netceptor.Netceptor{}
+	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+	syncOnce := &sync.Once{}
+	doneChan := make(chan struct{})
+	acceptChan := make(chan *netceptor.AcceptResult)
+
+	t.Run("packetconner error", func(t *testing.T) {
+		listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+		wantErr := errors.New("packetconner error")
+		mockListener.EXPECT().Close()
+		mockPacketConner.EXPECT().Close().Return(wantErr)
+		gotErr := listener.Close()
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
+	t.Run("quiclistener error", func(t *testing.T) {
+		listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+		wantErr := errors.New("quiclistener error")
+		mockPacketConner.EXPECT().Close()
+		mockListener.EXPECT().Close().Return(wantErr)
+		gotErr := listener.Close()
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
+}

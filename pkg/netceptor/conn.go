@@ -38,6 +38,27 @@ type QuicConnectionForConn interface {
 	quic.Connection
 }
 
+type QuicListenerForListener interface {
+	Accept(ctx context.Context) (quic.Connection, error)
+	Addr() net.Addr
+	Close() error
+}
+
+type QuicListener struct {
+	ql *quic.Listener
+}
+
+func (s *QuicListener) Accept(ctx context.Context) (quic.Connection, error) {
+	return s.ql.Accept(ctx)
+}
+func (s *QuicListener) Addr() net.Addr {
+	return s.ql.Addr()
+}
+
+func (s *QuicListener) Close() error {
+	return s.ql.Close()
+}
+
 type AcceptResult struct {
 	Conn net.Conn
 	Err  error

@@ -45,7 +45,7 @@ type AcceptResult struct {
 
 // Listener implements the net.Listener interface via the Receptor network.
 type Listener struct {
-	s          NetC
+	s          *Netceptor
 	pc         PacketConner
 	ql         *quic.Listener
 	AcceptChan chan *AcceptResult
@@ -53,7 +53,7 @@ type Listener struct {
 	doneOnce   *sync.Once
 }
 
-func NewListener(s NetC, pc PacketConner, ql *quic.Listener, acceptChan chan *AcceptResult, doneChan chan struct{}, doneOnce *sync.Once) *Listener {
+func NewListener(s *Netceptor, pc PacketConner, ql *quic.Listener, acceptChan chan *AcceptResult, doneChan chan struct{}, doneOnce *sync.Once) *Listener {
 	return &Listener{
 		s:          s,
 		pc:         pc,
@@ -265,7 +265,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 				return
 			}
 			doneChan := make(chan struct{}, 1)
-			cctx, ccancel := context.WithCancel(li.s.Context())
+			cctx, ccancel := context.WithCancel(li.s.context)
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -328,7 +328,7 @@ func (li *Listener) Addr() net.Addr {
 
 // Conn implements the net.Conn interface via the Receptor network.
 type Conn struct {
-	s        NetC
+	s        *Netceptor
 	pc       PacketConner
 	qc       QuicConnectionForConn
 	qs       QuicStreamForConn

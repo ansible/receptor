@@ -235,8 +235,8 @@ func TestSetWriteDeadline(t *testing.T) {
 
 func TestListenerAddr(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockNetC := mock_netceptor.NewMockNetC(ctrl)
 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockNetC := &netceptor.Netceptor{}
 	ql := &quic.Listener{}
 	doneChan := make(chan struct{})
 	acceptChan := make(chan *netceptor.AcceptResult)
@@ -252,8 +252,8 @@ func TestListenerAddr(t *testing.T) {
 
 func TestListenerAccept(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockNetC := mock_netceptor.NewMockNetC(ctrl)
 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockNetC := &netceptor.Netceptor{}
 	ql := &quic.Listener{}
 	syncOnce := &sync.Once{}
 	doneChan := make(chan struct{})
@@ -294,5 +294,4 @@ func TestListenerAccept(t *testing.T) {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
-
 }

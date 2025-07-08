@@ -33,6 +33,11 @@ require (
 )
 
 require (
+	github.com/pkg/errors v0.9.1 // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+)
+
+require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/stretchr/testify v1.10.0
 )

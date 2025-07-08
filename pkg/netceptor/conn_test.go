@@ -11,6 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
 	"github.com/quic-go/quic-go"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
@@ -350,5 +351,11 @@ func TestNeceptorListen(t *testing.T) {
 		if gotErr.Error() != wantErr.Error() {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
+	})
+	t.Run("monkey patch tlscfg.GetConfigForClient", func(t *testing.T) {
+		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+		assert.NotPanics(t, func() {
+			_, _ = mockNetC.Listen("testNode", &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert})
+		})
 	})
 }

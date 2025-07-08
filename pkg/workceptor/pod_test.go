@@ -240,7 +240,7 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "pod failed with reason: Pod OOMKilled container worker exited with code 137: Container OOMKill",
+			wantError: "pod failed with reason: OOMKilled container worker exited with code 137: OOMKill",
 		},
 		{
 			name:      "pod with application error",

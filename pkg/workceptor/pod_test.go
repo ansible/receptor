@@ -38,7 +38,30 @@ var podInfraError = &corev1.Pod{
 	},
 	Status: corev1.PodStatus{
 		Phase:  corev1.PodFailed,
-		Reason: "Pod OOMKilled",
+		Reason: "OOMKilled",
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 137,
+						Reason:   "OOMKill",
+					},
+				},
+			},
+		},
+	},
+}
+
+var podInfraErrorWithMessage = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "infra-error-pod",
+	},
+	Status: corev1.PodStatus{
+		Phase:   corev1.PodFailed,
+		Reason:  "Pod OOMKilled",
+		Message: "The pod was killed because it ran out of memory",
 		ContainerStatuses: []corev1.ContainerStatus{
 			{
 				Name: "worker",
@@ -217,7 +240,23 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "pod failed with reason: Pod OOMKilled container worker exited with code 137: Container OOMKill",
+			wantError: "pod failed with reason: OOMKilled container worker exited with code 137: OOMKill",
+		},
+		{
+			name:      "pod with application error",
+			pod:       podAppError,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "pod failed with reason: Error container worker exited with code 1: Error",
+		},
+		{
+			name:      "pod with oomkill error and message",
+			pod:       podInfraErrorWithMessage,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "pod failed with reason: Pod OOMKilled message: The pod was killed because it ran out of memory container worker exited with code 137: Container OOMKill",
 		},
 	}
 	for _, tt := range tests {
@@ -291,84 +330,6 @@ func TestPodContainerHealthy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ok, err := kw.PodContainerHealthy(tt.pod, tt.container)
-			if ok != tt.wantOk || (err != nil) != tt.wantErr {
-				t.Errorf("Failed %s case: ok=%v wantok=%v err=%v", tt.name, ok, tt.wantOk, err)
-			}
-			if err != nil && tt.wantErr == false {
-				t.Errorf("Expected error message got '%s'", err.Error())
-			}
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Expected error message '%s', got nil error", tt.wantError)
-				} else if !strings.Contains(err.Error(), tt.wantError) {
-					t.Errorf("Expected error message '%s', got '%s'", tt.wantError, err.Error())
-				}
-			}
-			if tt.wantError == "" && err != nil {
-				t.Errorf("Unexpected error for %s case: %v", tt.name, err)
-			}
-		})
-	}
-}
-
-func TestGetPodStatus(t *testing.T) {
-	kw, err := startNetceptorNodeWithWorkceptor()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := []struct {
-		name      string
-		pod       *corev1.Pod
-		wantOk    bool
-		wantErr   bool
-		wantError string
-	}{
-		{
-			name:      "nil pod",
-			pod:       nil,
-			wantOk:    false,
-			wantErr:   true,
-			wantError: "pod is nil",
-		},
-		{
-			name:      "infrastructure failure",
-			pod:       podInfraError,
-			wantOk:    false,
-			wantErr:   true,
-			wantError: "pod failed with reason: Pod OOMKilled container worker exited with code 137: Container OOMKill",
-		},
-		{
-			name:      "application failure",
-			pod:       podAppError,
-			wantOk:    false,
-			wantErr:   true,
-			wantError: "container worker exited with code 1: Error",
-		},
-		{
-			name:    "success case",
-			pod:     podSuccess,
-			wantOk:  true,
-			wantErr: false,
-		},
-		{
-			name:    "pending pod",
-			pod:     podPending,
-			wantOk:  true,
-			wantErr: false,
-		},
-		{
-			name:      "pod with no container",
-			pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "no-container-pod", Namespace: "default"}},
-			wantOk:    false,
-			wantErr:   true,
-			wantError: "pod does not contain container worker",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ok, err := kw.GetPodStatus(tt.pod)
 			if ok != tt.wantOk || (err != nil) != tt.wantErr {
 				t.Errorf("Failed %s case: ok=%v wantok=%v err=%v", tt.name, ok, tt.wantOk, err)
 			}

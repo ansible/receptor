@@ -38,14 +38,14 @@ var podInfraError = &corev1.Pod{
 	},
 	Status: corev1.PodStatus{
 		Phase:  corev1.PodFailed,
-		Reason: "Pod OOMKilled",
+		Reason: "OOMKilled",
 		ContainerStatuses: []corev1.ContainerStatus{
 			{
 				Name: "worker",
 				State: corev1.ContainerState{
 					Terminated: &corev1.ContainerStateTerminated{
 						ExitCode: 137,
-						Reason:   "Container OOMKill",
+						Reason:   "OOMKill",
 					},
 				},
 			},

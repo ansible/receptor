@@ -168,6 +168,69 @@ var podMultipleContainers = &corev1.Pod{
 	},
 }
 
+var podImagePullBackOff = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "pod-image-pull-backoff",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodPending,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "ImagePullBackOff",
+						Message: "Back-off pulling image",
+					},
+				},
+			},
+		},
+	},
+}
+
+var podErrImagePull = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "pod-error-image-pull",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodPending,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "ErrImagePull",
+						Message: "Error when pulling image",
+					},
+				},
+			},
+		},
+	},
+}
+
+var podCrashLoopBackOff = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "pod-crash-loop-backoff",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodPending,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "CrashLoopBackOff",
+						Message: "Error when starting image",
+					},
+				},
+			},
+		},
+	},
+}
+
 func TestPodHeathy(t *testing.T) {
 	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
@@ -183,6 +246,30 @@ func TestPodHeathy(t *testing.T) {
 		wantError string
 	}{
 		{
+			name:      "pod err image pull",
+			pod:       podErrImagePull,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "container worker is waiting: ErrImagePull Error when pulling image",
+		},
+		{
+			name:      "backoff image backoff pod",
+			pod:       podImagePullBackOff,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "container worker is waiting: ImagePullBackOff Back-off pulling image",
+		},
+		{
+			name:      "crash loop backoff pod",
+			pod:       podCrashLoopBackOff,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "ontainer worker is waiting: CrashLoopBackOff Error when starting image",
+		},
+		{
 			name:      "nil pod",
 			pod:       nil,
 			container: "worker",
@@ -194,8 +281,9 @@ func TestPodHeathy(t *testing.T) {
 			name:      "pod not terminated",
 			pod:       podPending,
 			container: "worker",
-			wantOk:    true,
-			wantErr:   false,
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "container worker is waiting: ContainerCreating Container is being created",
 		},
 		{
 			name:      "container missing",
@@ -308,8 +396,9 @@ func TestPodContainerHealthy(t *testing.T) {
 			name:      "pod not terminated",
 			pod:       podPending,
 			container: "worker",
-			wantOk:    true,
-			wantErr:   false,
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "container worker is waiting: ContainerCreating Container is being created",
 		},
 		{
 			name:      "container missing",
@@ -325,6 +414,14 @@ func TestPodContainerHealthy(t *testing.T) {
 			container: "worker",
 			wantOk:    true,
 			wantErr:   false,
+		},
+		{
+			name:      "pod ImagePullBackOff",
+			pod:       podImagePullBackOff,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "container worker is waiting: ImagePullBackOff Back-off pulling image",
 		},
 	}
 	for _, tt := range tests {

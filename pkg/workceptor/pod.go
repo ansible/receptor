@@ -31,6 +31,9 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 	if foundContainer == nil {
 		return false, fmt.Errorf("pod does not contain container %s", containerName)
 	}
+	if foundContainer.State.Waiting != nil { // means it is waiting, so application logic has not completed yet. Normal behavior when job completes successfully.
+		return false, fmt.Errorf("container %s is waiting: %s %s", containerName, foundContainer.State.Waiting.Reason, foundContainer.State.Waiting.Message)
+	}
 	if foundContainer.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.
 		return true, nil
 	}
@@ -42,8 +45,7 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 	return true, nil // container terminated with exit code of 0
 }
 
-// PodInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.
-// Any other state is considered an infrastructure failure.
+// PodHealthy checks if the pod and container are in a healthy state.
 func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")

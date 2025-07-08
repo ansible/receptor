@@ -99,6 +99,7 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 				// The watcher channel was closed, which is the expected behavior on timeout.
 				// Log this event and return the current pod state without an error.
 				kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase %s timeout (no change)", pod.Namespace, pod.Name, pod.Status.Phase)
+
 				return pod, nil
 			}
 

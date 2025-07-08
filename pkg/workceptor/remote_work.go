@@ -44,8 +44,8 @@ type RemoteExtraData struct {
 
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
 
-// connectToRemote establishes a control socket connection to a remote node.
-func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Reader, error) {
+// ConnectToRemote establishes a control socket connection to a remote node.
+func (rw *remoteUnit) ConnectToRemote(ctx context.Context) (net.Conn, *bufio.Reader, error) {
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
@@ -79,11 +79,11 @@ func (rw *remoteUnit) connectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	return conn, reader, nil
 }
 
-// getConnection retries connectToRemote until connected or the context expires.
-func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
+// GetConnection retries connectToRemote until connected or the context expires.
+func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
 	for {
-		conn, reader, err := rw.connectToRemote(ctx)
+		conn, reader, err := rw.ConnectToRemote(ctx)
 		if err == nil {
 			return conn, reader
 		}
@@ -113,7 +113,7 @@ func (rw *remoteUnit) getConnection(ctx context.Context) (net.Conn, *bufio.Reade
 
 // connectAndRun makes a single attempt to connect to a remote node and runs an action function.
 func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) error {
-	conn, reader, err := rw.connectToRemote(ctx)
+	conn, reader, err := rw.ConnectToRemote(ctx)
 	if err != nil {
 		return utils.WrapErrorWithKind(err, "connection")
 	}
@@ -134,7 +134,7 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 		}
 	}
 	go func() {
-		conn, reader := rw.getConnection(ctx)
+		conn, reader := rw.GetConnection(ctx)
 		if conn != nil {
 			err := action(ctx, conn, reader)
 			if err != nil {
@@ -148,8 +148,8 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 	return ErrPending
 }
 
-// startRemoteUnit makes a single attempt to start a remote unit.
-func (rw *remoteUnit) startRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+// StartRemoteUnit makes a single attempt to start a remote unit.
+func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 	defer conn.(interface{ CloseConnection() error }).CloseConnection()
 	red := rw.UnredactedStatus().ExtraData.(*RemoteExtraData)
 	workSubmitCmd := make(map[string]interface{})
@@ -287,7 +287,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	}
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
-	conn, reader := rw.getConnection(mw)
+	conn, reader := rw.GetConnection(mw)
 	defer func() {
 		if conn != nil {
 			conn.(interface{ CloseConnection() error }).CloseConnection()
@@ -299,7 +299,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	writeStatusFailures := 0
 	for {
 		if conn == nil {
-			conn, reader = rw.getConnection(mw)
+			conn, reader = rw.GetConnection(mw)
 			if conn == nil {
 				return
 			}
@@ -412,7 +412,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		if IsComplete(status.State) && diskStdoutSize >= remoteStdoutSize {
 			return
 		} else if diskStdoutSize < remoteStdoutSize {
-			conn, reader := rw.getConnection(mw)
+			conn, reader := rw.GetConnection(mw)
 			defer func() {
 				if conn != nil {
 					cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
@@ -627,7 +627,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 			go rw.setExpiration(rw.topJC)
 		}
 
-		return rw.runAndMonitor(rw.topJC, false, rw.startRemoteUnit)
+		return rw.runAndMonitor(rw.topJC, false, rw.StartRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
 		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased)

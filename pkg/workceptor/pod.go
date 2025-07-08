@@ -11,9 +11,9 @@ import (
 )
 
 type KubePodStateHelper interface {
-	GetPodStatus(pod *corev1.Pod) (bool, error)
 	PodHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error)
+	WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error)
 }
 
 // PodContainerHealthy checks if the pod has successfully completed its application logic.
@@ -86,10 +86,10 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 		TimeoutSeconds: timeoutSeconds,
 		FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name,
 	})
-	defer watcher.Stop()
 	if err != nil {
 		return pod, err
 	}
+	defer watcher.Stop()
 
 	for event := range watcher.ResultChan() {
 		switch event.Type {

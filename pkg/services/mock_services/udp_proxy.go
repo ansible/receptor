@@ -10,12 +10,10 @@
 package mock_services
 
 import (
-	net "net"
 	reflect "reflect"
 
 	logger "github.com/ansible/receptor/pkg/logger"
 	netceptor "github.com/ansible/receptor/pkg/netceptor"
-	netinterface "github.com/ansible/receptor/pkg/services/interfaces"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -99,76 +97,4 @@ func (m *MockNetcForUDPProxy) NewAddr(node, service string) netceptor.Addr {
 func (mr *MockNetcForUDPProxyMockRecorder) NewAddr(node, service any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddr", reflect.TypeOf((*MockNetcForUDPProxy)(nil).NewAddr), node, service)
-}
-
-// MockRunNetceptorToUDPInboundFunc is a mock of RunNetceptorToUDPInboundFunc interface.
-type MockRunNetceptorToUDPInboundFunc struct {
-	ctrl     *gomock.Controller
-	recorder *MockRunNetceptorToUDPInboundFuncMockRecorder
-	isgomock struct{}
-}
-
-// MockRunNetceptorToUDPInboundFuncMockRecorder is the mock recorder for MockRunNetceptorToUDPInboundFunc.
-type MockRunNetceptorToUDPInboundFuncMockRecorder struct {
-	mock *MockRunNetceptorToUDPInboundFunc
-}
-
-// NewMockRunNetceptorToUDPInboundFunc creates a new mock instance.
-func NewMockRunNetceptorToUDPInboundFunc(ctrl *gomock.Controller) *MockRunNetceptorToUDPInboundFunc {
-	mock := &MockRunNetceptorToUDPInboundFunc{ctrl: ctrl}
-	mock.recorder = &MockRunNetceptorToUDPInboundFuncMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRunNetceptorToUDPInboundFunc) EXPECT() *MockRunNetceptorToUDPInboundFuncMockRecorder {
-	return m.recorder
-}
-
-// RunNetceptorToUDPInbound mocks base method.
-func (m *MockRunNetceptorToUDPInboundFunc) RunNetceptorToUDPInbound(pc netceptor.PacketConner, uc netinterface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RunNetceptorToUDPInbound", pc, uc, udpAddr, expectedAddr)
-}
-
-// RunNetceptorToUDPInbound indicates an expected call of RunNetceptorToUDPInbound.
-func (mr *MockRunNetceptorToUDPInboundFuncMockRecorder) RunNetceptorToUDPInbound(pc, uc, udpAddr, expectedAddr any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunNetceptorToUDPInbound", reflect.TypeOf((*MockRunNetceptorToUDPInboundFunc)(nil).RunNetceptorToUDPInbound), pc, uc, udpAddr, expectedAddr)
-}
-
-// MockRunNetceptorToUDPOutboundFunc is a mock of RunNetceptorToUDPOutboundFunc interface.
-type MockRunNetceptorToUDPOutboundFunc struct {
-	ctrl     *gomock.Controller
-	recorder *MockRunNetceptorToUDPOutboundFuncMockRecorder
-	isgomock struct{}
-}
-
-// MockRunNetceptorToUDPOutboundFuncMockRecorder is the mock recorder for MockRunNetceptorToUDPOutboundFunc.
-type MockRunNetceptorToUDPOutboundFuncMockRecorder struct {
-	mock *MockRunNetceptorToUDPOutboundFunc
-}
-
-// NewMockRunNetceptorToUDPOutboundFunc creates a new mock instance.
-func NewMockRunNetceptorToUDPOutboundFunc(ctrl *gomock.Controller) *MockRunNetceptorToUDPOutboundFunc {
-	mock := &MockRunNetceptorToUDPOutboundFunc{ctrl: ctrl}
-	mock.recorder = &MockRunNetceptorToUDPOutboundFuncMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRunNetceptorToUDPOutboundFunc) EXPECT() *MockRunNetceptorToUDPOutboundFuncMockRecorder {
-	return m.recorder
-}
-
-// RunNetceptorToUDPOutbound mocks base method.
-func (m *MockRunNetceptorToUDPOutboundFunc) RunNetceptorToUDPOutbound(pc netceptor.PacketConner, uc netinterface.UDPConnInterface, udpAddr net.Addr, expectedAddr netceptor.Addr) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RunNetceptorToUDPOutbound", pc, uc, udpAddr, expectedAddr)
-}
-
-// RunNetceptorToUDPOutbound indicates an expected call of RunNetceptorToUDPOutbound.
-func (mr *MockRunNetceptorToUDPOutboundFuncMockRecorder) RunNetceptorToUDPOutbound(pc, uc, udpAddr, expectedAddr any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunNetceptorToUDPOutbound", reflect.TypeOf((*MockRunNetceptorToUDPOutboundFunc)(nil).RunNetceptorToUDPOutbound), pc, uc, udpAddr, expectedAddr)
 }

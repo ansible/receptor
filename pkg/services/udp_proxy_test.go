@@ -9,6 +9,7 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
+	net_interface "github.com/ansible/receptor/pkg/services/interfaces"
 	mock_net_interface "github.com/ansible/receptor/pkg/services/interfaces/mock_interfaces"
 	"github.com/ansible/receptor/pkg/services/mock_services"
 	"github.com/ansible/receptor/pkg/utils"
@@ -268,6 +269,210 @@ func TestProcessOutboundPacket(t *testing.T) {
 			}
 			buf := make([]byte, utils.NormalBufferSize)
 			processOutboundPacket(mockUDPConnInterface, mockPacketConner, destinationAddr, buf)
+		})
+	}
+}
+
+func TestRunUDPProxyServiceInbound(t *testing.T) {
+	var mockNetceptor *mock_services.MockNetcForUDPProxy
+	var mockUDPConn *mock_net_interface.MockUDPConnInterface
+	var mockPacketCon *mock_netceptor.MockPacketConner
+	tests := []struct {
+		name           string
+		calls          func()
+		expectContinue bool
+	}{
+		{
+			name: "ReadFrom error - should return false",
+			calls: func() {
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("ReadFrom error")).Times(1)
+			},
+			expectContinue: false,
+		},
+		{
+			name: "ListenPacket error for new connection - should return false",
+			calls: func() {
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(1, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetceptor.EXPECT().ListenPacket("").Return(nil, fmt.Errorf("ListenPacket error")).Times(1)
+			},
+			expectContinue: false,
+		},
+		{
+			name: "WriteTo error - should return true (continue)",
+			calls: func() {
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(1, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetceptor.EXPECT().ListenPacket("").Return(mockPacketCon, nil).Times(1)
+				mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{}).AnyTimes() // For the goroutine
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("WriteTo error")).Times(1)
+				// Expectations for the goroutine that might run after the test
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("test cleanup")).AnyTimes()
+				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+			},
+			expectContinue: true,
+		},
+		{
+			name: "Partial write - should return true (continue)",
+			calls: func() {
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(10, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetceptor.EXPECT().ListenPacket("").Return(mockPacketCon, nil).Times(1)
+				mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{}).AnyTimes() // For the goroutine
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(5, nil).Times(1)
+				// Expectations for the goroutine that might run after the test
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("test cleanup")).AnyTimes()
+				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+			},
+			expectContinue: true,
+		},
+		{
+			name: "Successful write with new connection - should return true (continue)",
+			calls: func() {
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(10, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetceptor.EXPECT().ListenPacket("").Return(mockPacketCon, nil).Times(1)
+				mockNetceptor.EXPECT().NewAddr(gomock.Any(), gomock.Any()).Return(netceptor.Addr{}).AnyTimes() // For the goroutine
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(10, nil).Times(1)
+				// Expectations for the goroutine that might run after the test
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("test cleanup")).AnyTimes()
+				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+			},
+			expectContinue: true,
+		},
+		{
+			name: "Successful write with existing connection - should return true (continue)",
+			calls: func() {
+				mockUDPConn.EXPECT().ReadFrom(gomock.Any()).Return(10, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(10, nil).Times(1)
+			},
+			expectContinue: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockNetceptor, _, mockUDPConn, mockPacketCon = setUpMocks(ctrl)
+			if tt.calls != nil {
+				tt.calls()
+			}
+
+			connMap := make(map[string]netceptor.PacketConner)
+			if tt.name == "Successful write with existing connection - should return true (continue)" {
+				// Pre-populate the connection map for this test
+				connMap["127.0.0.1:8080"] = mockPacketCon
+			}
+
+			buffer := make([]byte, utils.NormalBufferSize)
+			ncAddr := netceptor.Addr{}
+
+			result := runUDPProxyServiceInbound(mockNetceptor, mockUDPConn, buffer, connMap, ncAddr, "testnode", "testservice")
+
+			if result != tt.expectContinue {
+				t.Errorf("Expected runUDPProxyServiceInbound to return %v, but got %v", tt.expectContinue, result)
+			}
+		})
+	}
+}
+
+func TestRunUDPProxyServiceOutbound(t *testing.T) {
+	var mockNetceptor *mock_services.MockNetcForUDPProxy
+	var mockNetter *mock_net_interface.MockNetterUDP
+	var mockUDPConn *mock_net_interface.MockUDPConnInterface
+	var mockPacketCon *mock_netceptor.MockPacketConner
+	tests := []struct {
+		name           string
+		calls          func()
+		expectContinue bool
+	}{
+		{
+			name: "ReadFrom error - should return false",
+			calls: func() {
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("ReadFrom error")).Times(1)
+			},
+			expectContinue: false,
+		},
+		{
+			name: "DialUDP error for new connection - should return false",
+			calls: func() {
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(1, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetter.EXPECT().DialUDP("udp", nil, gomock.Any()).Return(nil, fmt.Errorf("DialUDP error")).Times(1)
+			},
+			expectContinue: false,
+		},
+		{
+			name: "Write error - should return true (continue)",
+			calls: func() {
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(1, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetter.EXPECT().DialUDP("udp", nil, gomock.Any()).Return(mockUDPConn, nil).Times(1)
+				mockUDPConn.EXPECT().Write(gomock.Any()).Return(0, fmt.Errorf("Write error")).Times(1)
+				// Expectations for the goroutine that might run after the test
+				mockUDPConn.EXPECT().Read(gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+			},
+			expectContinue: true,
+		},
+		{
+			name: "Partial write - should return true (continue)",
+			calls: func() {
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(10, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetter.EXPECT().DialUDP("udp", nil, gomock.Any()).Return(mockUDPConn, nil).Times(1)
+				mockUDPConn.EXPECT().Write(gomock.Any()).Return(5, nil).Times(1)
+				// Expectations for the goroutine that might run after the test
+				mockUDPConn.EXPECT().Read(gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+			},
+			expectContinue: true,
+		},
+		{
+			name: "Successful write with new connection - should return true (continue)",
+			calls: func() {
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(10, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockNetter.EXPECT().DialUDP("udp", nil, gomock.Any()).Return(mockUDPConn, nil).Times(1)
+				mockUDPConn.EXPECT().Write(gomock.Any()).Return(10, nil).Times(1)
+				// Expectations for the goroutine that might run after the test
+				mockUDPConn.EXPECT().Read(gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+			},
+			expectContinue: true,
+		},
+		{
+			name: "Successful write with existing connection - should return true (continue)",
+			calls: func() {
+				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(10, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, nil).Times(1)
+				mockUDPConn.EXPECT().Write(gomock.Any()).Return(10, nil).Times(1)
+			},
+			expectContinue: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockNetceptor, mockNetter, mockUDPConn, mockPacketCon = setUpMocks(ctrl)
+			if tt.calls != nil {
+				tt.calls()
+			}
+
+			connMap := make(map[string]net_interface.UDPConnInterface)
+			if tt.name == "Successful write with existing connection - should return true (continue)" {
+				// Pre-populate the connection map for this test
+				connMap["127.0.0.1:8080"] = mockUDPConn
+			}
+
+			buffer := make([]byte, utils.NormalBufferSize)
+			udpAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}
+
+			result := runUDPProxyServiceOutbound(mockNetceptor, mockPacketCon, buffer, connMap, udpAddr, mockNetter)
+
+			if result != tt.expectContinue {
+				t.Errorf("Expected runUDPProxyServiceOutbound to return %v, but got %v", tt.expectContinue, result)
+			}
 		})
 	}
 }

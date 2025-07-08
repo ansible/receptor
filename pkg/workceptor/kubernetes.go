@@ -652,7 +652,23 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	return nil
 }
 
+// runWorkUsingLogger is a private wrapper that calls the public RunWorkUsingLogger method.
+// This maintains backward compatibility while enabling direct testing.
 func (kw *KubeUnit) runWorkUsingLogger() {
+	kw.RunWorkUsingLogger()
+}
+
+// RunWorkUsingLogger orchestrates the complete workflow for running work in a Kubernetes pod
+// using logger-based streaming. This method is exposed publicly to enable comprehensive testing
+// of the complex pod lifecycle, stdin/stdout streaming, and error handling logic.
+//
+// The method handles:
+// - Creating new pods or resuming existing ones
+// - Setting up SPDY executors for stdin streaming
+// - Managing goroutines for stdin/stdout coordination
+// - Error propagation and status transitions
+// - Proper cleanup and resource management.
+func (kw *KubeUnit) RunWorkUsingLogger() {
 	skipStdin := true
 
 	status := kw.Status()

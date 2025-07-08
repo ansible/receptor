@@ -2171,3 +2171,601 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 		})
 	}
 }
+
+func TestKubeUnit_CreatePod(t *testing.T) {
+	tests := []struct {
+		name             string
+		extraData        *workceptor.KubeExtraData
+		env              map[string]string
+		setupMocks       func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *workceptor.Workceptor)
+		expectError      bool
+		expectedErrorMsg string
+		validateResult   func(*testing.T, *workceptor.KubeUnit)
+		description      string
+	}{
+		{
+			name: "Successful pod creation with simple image",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				Params:        "--verbose",
+				KubeNamespace: "default",
+			},
+			env: map[string]string{
+				"TEST_VAR": "test_value",
+			},
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					Params:        "--verbose",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+
+				// Mock pod creation
+				createdPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-123", Namespace: "default"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(createdPod, nil)
+
+				// Mock status update
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+					// Verify the status update function works
+					status := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+					updateFunc.(func(*workceptor.StatusFileData))(status)
+				})
+
+				// Mock pod waiting
+				selector := &hasTerm{field: "metadata.name", value: "test-pod-123"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "test-pod-123").Return(selector)
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(nil, nil).AnyTimes()
+
+				watchEvent := &watch.Event{
+					Type:   watch.Modified,
+					Object: createdPod,
+				}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil)
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, ku *workceptor.KubeUnit) {
+				assert.NotNil(t, ku.Pod)
+				assert.Equal(t, "test-pod-123", ku.Pod.Name)
+				assert.Equal(t, "default", ku.Pod.Namespace)
+			},
+			description: "Should successfully create pod with image, command, params and environment variables",
+		},
+		{
+			name: "Pod creation with custom pod definition",
+			extraData: &workceptor.KubeExtraData{
+				KubePod: `apiVersion: v1
+kind: Pod
+metadata:
+  name: custom-pod
+  namespace: custom-ns
+spec:
+  containers:
+  - name: worker
+    image: custom:latest
+    command: ["sh", "-c"]
+    args: ["echo custom"]
+  restartPolicy: Never`,
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubePod: `apiVersion: v1
+kind: Pod
+metadata:
+  name: custom-pod
+  namespace: custom-ns
+spec:
+  containers:
+  - name: worker
+    image: custom:latest
+    command: ["sh", "-c"]
+    args: ["echo custom"]
+  restartPolicy: Never`,
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+
+				createdPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "custom-pod-abc", Namespace: "custom-ns"},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "custom-ns", gomock.Any(), gomock.Any()).Return(createdPod, nil)
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any())
+
+				selector := &hasTerm{field: "metadata.name", value: "custom-pod-abc"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "custom-pod-abc").Return(selector)
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "custom-ns", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "custom-ns", gomock.Any()).Return(nil, nil).AnyTimes()
+
+				watchEvent := &watch.Event{Type: watch.Modified, Object: createdPod}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil)
+			},
+			expectError: false,
+			description: "Should successfully create pod with custom pod definition",
+		},
+		{
+			name: "Invalid command parsing",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo 'unclosed quote",
+				Params:        "--verbose",
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo 'unclosed quote",
+					Params:        "--verbose",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+			},
+			expectError:      true,
+			expectedErrorMsg: "EOF found when expecting closing quote",
+			description:      "Should return error when command cannot be parsed",
+		},
+		{
+			name: "Invalid params parsing",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				Params:        "--option 'unclosed quote",
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					Params:        "--option 'unclosed quote",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+			},
+			expectError:      true,
+			expectedErrorMsg: "EOF found when expecting closing quote",
+			description:      "Should return error when params cannot be parsed",
+		},
+		{
+			name: "Invalid pod definition YAML",
+			extraData: &workceptor.KubeExtraData{
+				KubePod: `invalid: yaml: content
+  missing: proper: structure`,
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubePod: `invalid: yaml: content
+  missing: proper: structure`,
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+			},
+			expectError:      true,
+			expectedErrorMsg: "yaml: mapping values are not allowed in this context",
+			description:      "Should return error when pod definition is invalid",
+		},
+		{
+			name: "Pod definition without worker container",
+			extraData: &workceptor.KubeExtraData{
+				KubePod: `apiVersion: v1
+kind: Pod
+metadata:
+  name: no-worker-pod
+spec:
+  containers:
+  - name: other-container
+    image: busybox:latest`,
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubePod: `apiVersion: v1
+kind: Pod
+metadata:
+  name: no-worker-pod
+spec:
+  containers:
+  - name: other-container
+    image: busybox:latest`,
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+			},
+			expectError:      true,
+			expectedErrorMsg: "at least one container must be named worker",
+			description:      "Should return error when pod definition lacks worker container",
+		},
+		{
+			name: "Kubernetes API Create failure",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				Params:        "",
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				// Mock status calls for UnredactedStatus
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					Params:        "",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+
+				// Mock failed pod creation
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("insufficient quota"))
+			},
+			expectError:      true,
+			expectedErrorMsg: "insufficient quota",
+			description:      "Should return error when Kubernetes API Create fails",
+		},
+		{
+			name: "Context cancelled during creation",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				Params:        "",
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				status := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					Params:        "",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}})
+				mockBWU.EXPECT().GetStatusCopy().Return(status)
+
+				// Create cancelled context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Cancel immediately
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+
+				createdPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-123", Namespace: "default"},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(createdPod, nil)
+			},
+			expectError:      true,
+			expectedErrorMsg: "cancelled",
+			description:      "Should return error when context is cancelled",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			// Create KubeUnit
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Setup test-specific mocks
+			tt.setupMocks(mockBaseWorkUnit, mockKubeAPI, w)
+
+			// Execute the test
+			err = kubeUnit.CreatePod(tt.env)
+
+			// Verify results
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+				if tt.expectedErrorMsg != "" {
+					assert.Contains(t, err.Error(), tt.expectedErrorMsg, tt.description)
+				}
+			} else {
+				assert.NoError(t, err, tt.description)
+				if tt.validateResult != nil {
+					tt.validateResult(t, kubeUnit)
+				}
+			}
+		})
+	}
+}
+
+func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
+	// Test basic execution paths that are feasible to test with focused mocking
+	tests := []struct {
+		name        string
+		setupMocks  func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor)
+		description string
+	}{
+		{
+			name: "CreatePod failure - error path",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for new pod creation that will fail
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					KubeNamespace: "default",
+					PodName:       "", // Empty triggers new pod creation
+				}}
+				// Multiple Status() calls: 1 from RunWorkUsingLogger, 1 from CreatePod
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+
+				// CreatePod path mocks
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+
+				// Mock clientset injection (CreatePod may need this)
+				mockBWU.EXPECT().UnitDir().Return("/tmp/test").AnyTimes()
+
+				// Mock failed pod creation
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("insufficient resources"))
+
+				// Mock error logging and status update for failed pod creation
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle CreatePod failures and exit early with error status",
+		},
+		{
+			name: "Missing namespace for existing pod - error path",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod with missing namespace
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "", // Empty namespace with existing pod name
+					PodName:       "existing-pod-123",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+
+				// Mock error logging and status update for missing namespace
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle missing namespace error and exit early with error status",
+		},
+		{
+			name: "Pod retrieval failure after retries - error path",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod that fails retrieval
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "default",
+					PodName:       "missing-pod-123",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+
+				// Mock failed pod retrieval (5 retries) - should have proper expectations
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "missing-pod-123", gomock.Any()).Return(nil, fmt.Errorf("pod not found")).Times(5)
+
+				// Mock warning and error logging (5 warnings + 1 error)
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle pod retrieval failures and exit with error status after retries",
+		},
+		{
+			name: "Context cancellation during pod retrieval - early exit",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "default",
+					PodName:       "cancelled-pod-123",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+
+				// Mock cancelled context
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // Pre-cancel the context
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+
+				// Mock warning logging for context cancellation
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+			},
+			description: "Should handle context cancellation and exit early with warning",
+		},
+		{
+			name: "Successful pod retrieval but stdout file creation failure",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod (skipStdin=true case)
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "default",
+					PodName:       "existing-pod-789", // Non-empty triggers existing pod path
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+
+				// Mock successful pod retrieval (no retries needed)
+				existingPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "existing-pod-789",
+						Namespace: "default",
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+					},
+				}
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "existing-pod-789", gomock.Any()).Return(existingPod, nil)
+
+				// Mock UnitDir call for stdout file creation - but we'll trigger failure in NewStdoutWriter
+				// This simulates line 812: stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
+				mockBWU.EXPECT().UnitDir().Return("/invalid/path/that/causes/stdout/writer/failure")
+
+				// Mock error logging for stdout file creation failure
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle successful pod retrieval but fail on stdout file creation",
+		},
+		{
+			name: "Pod retrieval with partial retry success - covers retry logic",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls for existing pod that requires retries
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeNamespace: "default",
+					PodName:       "retry-pod-456", // Non-empty triggers existing pod path
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData)
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+
+				// Mock pod retrieval with 2 failures then 1 success (covers retry logic and success path)
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "retry-pod-456", gomock.Any()).Return(nil, fmt.Errorf("temporary failure")).Times(2)
+
+				// Third attempt succeeds
+				retrievedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "retry-pod-456",
+						Namespace: "default",
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+					},
+				}
+				mockAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "retry-pod-456", gomock.Any()).Return(retrievedPod, nil)
+
+				// Mock warning messages for the two failed attempts
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+
+				// After successful retrieval, try to create stdout file but fail
+				mockBWU.EXPECT().UnitDir().Return("/nonexistent/path/for/stdout")
+
+				// Mock error logging for stdout file creation failure
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			description: "Should handle pod retrieval retries with eventual success, then fail on stdout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			// Create KubeUnit
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Set up mocks
+			tt.setupMocks(mockBaseWorkUnit, mockKubeAPI, mockNetceptor, w)
+
+			// Execute the function directly (no goroutine)
+			// This tests the early error paths which should return cleanly
+			t.Logf("Testing %s", tt.description)
+			kubeUnit.RunWorkUsingLogger()
+
+			// If we reach here, the test passed - the function returned after handling the error
+			t.Logf("Function completed successfully for error path test")
+		})
+	}
+}

@@ -418,8 +418,8 @@ func TestWaitForPodCompleted(t *testing.T) {
 			name:        "pending to pending", // This simulates a pod that remains pending despite an update.
 			initialPod:  podPending,
 			updatePhase: corev1.PodPending,
-			wantErr:     false,
-			debugLine:   "Pod default/pending-pod event MODIFIED phase Pending (no change)",
+			wantErr:     true,
+			debugLine:   "context deadline exceeded",
 		},
 	}
 	for _, tt := range tests {

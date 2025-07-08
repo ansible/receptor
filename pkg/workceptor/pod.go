@@ -19,21 +19,27 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 		return false, fmt.Errorf("pod is nil")
 	}
 
-	for _, cs := range pod.Status.ContainerStatuses {
+	var foundContainer *corev1.ContainerStatus = nil
+
+	for i, cs := range pod.Status.ContainerStatuses {
 		if cs.Name == containerName {
-			if cs.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.
-				return true, nil
-			}
+			foundContainer = &pod.Status.ContainerStatuses[i]
 
-			if cs.State.Terminated.ExitCode != 0 { // exit code of 0 means success
-				return false, fmt.Errorf("container %s exited with code %d: %s", cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason)
-			}
-
-			return true, nil // container terminated with exit code of 0
+			break
 		}
 	}
+	if foundContainer == nil {
+		return false, fmt.Errorf("pod does not contain container %s", containerName)
+	}
+	if foundContainer.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.
+		return true, nil
+	}
 
-	return false, fmt.Errorf("pod does not contain container %s", containerName)
+	if foundContainer.State.Terminated.ExitCode != 0 { // exit code of 0 means success
+		return false, fmt.Errorf("container %s exited with code %d: %s", containerName, foundContainer.State.Terminated.ExitCode, foundContainer.State.Terminated.Reason)
+	}
+
+	return true, nil // container terminated with exit code of 0
 }
 
 // PodInfrastructureSuccess checks if the pod has either successfully started, is pending or is running, or has is successfully terminated.

@@ -43,45 +43,24 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 		return false, fmt.Errorf("pod is nil")
 	}
 
-	for _, cs := range pod.Status.ContainerStatuses {
-		// Check if this is the container we care about first
-		if cs.Name == containerName {
-			switch pod.Status.Phase {
-			case corev1.PodFailed:
-				podError := fmt.Errorf("pod failed with reason: %s", pod.Status.Reason)
-				if pod.Status.Message != "" {
-					podError = fmt.Errorf("%s: %s", podError.Error(), pod.Status.Message)
-				}
-				ok, containerError := kw.PodContainerHealthy(pod, containerName)
-				if !ok || containerError != nil {
-					return false, fmt.Errorf("%s %v", podError.Error(), containerError)
-				}
+	containerDiag := fmt.Sprintf("container %s is healthy", containerName)
+	containerOk, containerError := kw.PodContainerHealthy(pod, containerName)
+	if containerError != nil {
+		containerDiag = fmt.Sprintf("%v", containerError)
+	}
 
-				return false, podError
-
-			case corev1.PodSucceeded:
-				return true, nil
-			case corev1.PodRunning, corev1.PodPending:
-				return true, nil
-			default:
-				return false, fmt.Errorf("unknown phase: %s", pod.Status.Phase)
-			}
+	switch pod.Status.Phase {
+	case corev1.PodFailed:
+		podError := fmt.Errorf("pod failed with reason: %s", pod.Status.Reason)
+		if pod.Status.Message != "" {
+			podError = fmt.Errorf("%s message: %s", podError, pod.Status.Message)
 		}
+
+		return false, fmt.Errorf("%s %v", podError, containerDiag)
+
+	case corev1.PodSucceeded, corev1.PodRunning, corev1.PodPending:
+		return containerOk, containerError
+	default:
+		return false, fmt.Errorf("unknown phase: %s %s", pod.Status.Phase, containerDiag)
 	}
-
-	return false, fmt.Errorf("pod does not contain container %s", containerName)
-}
-
-// GetPodStatus checks if the pod has successfully completed its application logic and infrastructure is healthy.
-func (kw KubeUnit) GetPodStatus(pod *corev1.Pod) (bool, error) {
-	if pod == nil {
-		return false, fmt.Errorf("pod is nil")
-	}
-
-	ok, err := kw.PodHealthy(pod, WorkerContainerName)
-	if !ok || err != nil {
-		return ok, err
-	}
-
-	return ok, nil
 }

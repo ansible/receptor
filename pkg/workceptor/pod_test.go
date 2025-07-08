@@ -422,10 +422,10 @@ func TestWaitForPodCompleted(t *testing.T) {
 			debugLine:   "Pod default/pending-pod event MODIFIED phase Pending (no change)",
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Set a timeout for the context
+			defer cancel()
 			timeoutSeconds := int64(2)
 			logBuffer.Reset()
 
@@ -438,6 +438,7 @@ func TestWaitForPodCompleted(t *testing.T) {
 
 			if tt.updatePhase != "" && tt.initialPod != nil {
 				go func() {
+					time.Sleep(100 * time.Millisecond) // Ensure the watcher is set up before updating
 					updatedPod := tt.initialPod.DeepCopy()
 					updatedPod.Status.Phase = tt.updatePhase
 					_, _ = clientset.CoreV1().Pods("default").Update(context.Background(), updatedPod, metav1.UpdateOptions{})

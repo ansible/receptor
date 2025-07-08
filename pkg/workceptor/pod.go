@@ -82,35 +82,64 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 
 	originalPhase := pod.Status.Phase
 
+	// Create a watcher for the pod
 	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
 		TimeoutSeconds: timeoutSeconds,
-		FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name,
+		FieldSelector:  "metadata.name=" + pod.Name, // Use metadata.name instead of involvedObject
 	})
 	if err != nil {
-		return pod, err
+		return pod, fmt.Errorf("failed to watch pod: %w", err)
 	}
 	defer watcher.Stop()
 
-	for event := range watcher.ResultChan() {
-		switch event.Type {
-		case watch.Error:
-			kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s (error)", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
-
-			return pod, event.Object.(error)
-		default:
-			pod = event.Object.(*corev1.Pod)
-			if pod.Status.Phase != originalPhase {
-				kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase changed from %s to %s", pod.Namespace, pod.Name, originalPhase, pod.Status.Phase)
-
+	for {
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				// The watcher channel was closed, which is the expected behavior on timeout.
+				// Log this event and return the current pod state without an error.
+				kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase %s timeout (no change)", pod.Namespace, pod.Name, pod.Status.Phase)
 				return pod, nil
 			}
-			kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s (no change)", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
 
-			return pod, nil
+			switch event.Type {
+			case watch.Error:
+				// Handle error events
+				if err, ok := event.Object.(error); ok {
+					kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s (error)", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
+
+					return pod, err
+				}
+
+				return pod, fmt.Errorf("received error event without error object")
+
+			case watch.Added, watch.Modified:
+				// Update the pod object
+				updatedPod, ok := event.Object.(*corev1.Pod)
+				if !ok {
+					return pod, fmt.Errorf("unexpected object type: %T", event.Object)
+				}
+				pod = updatedPod
+
+				// Check if the phase has changed
+				if pod.Status.Phase != originalPhase {
+					kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase changed from %s to %s", pod.Namespace, pod.Name, originalPhase, pod.Status.Phase)
+
+					return pod, nil
+				}
+
+				kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s (no change)", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
+
+			default:
+				// Handle other event types if necessary
+				kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s received unexpected event type: %s", pod.Namespace, pod.Name, event.Type)
+			}
+
+		case <-ctx.Done():
+			// Handle context cancellation
+			kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s watch cancelled due to context: %s", pod.Namespace, pod.Name, ctx.Err())
+
+			return pod, ctx.Err()
 		}
 	}
-
-	kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase %s timeout (no change)", pod.Namespace, pod.Name, pod.Status.Phase)
-
-	return pod, nil
 }

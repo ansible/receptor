@@ -99,6 +99,7 @@ linters-settings:
           - "k8s.io/apimachinery/pkg/selection"
           - "k8s.io/apimachinery/pkg/watch"
           - "k8s.io/client-go/kubernetes"
+          - "k8s.io/client-go/testing"
           - "k8s.io/client-go/rest"
           - "k8s.io/client-go/tools/remotecommand"
           - "github.com/quic-go/quic-go"

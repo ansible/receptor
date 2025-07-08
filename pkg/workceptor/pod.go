@@ -1,9 +1,13 @@
 package workceptor
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 )
 
 type KubePodStateHelper interface {
@@ -69,4 +73,44 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 	default:
 		return false, fmt.Errorf("unknown phase: %s %s", pod.Status.Phase, containerDiag)
 	}
+}
+
+func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error) {
+	if pod == nil {
+		return nil, fmt.Errorf("pod is nil")
+	}
+
+	originalPhase := pod.Status.Phase
+
+	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
+		TimeoutSeconds: timeoutSeconds,
+		FieldSelector:  "involvedObject.kind=Pod,involvedObject.name=" + pod.Name,
+	})
+	defer watcher.Stop()
+	if err != nil {
+		return pod, err
+	}
+
+	for event := range watcher.ResultChan() {
+		switch event.Type {
+		case watch.Error:
+			kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s (error)", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
+
+			return pod, event.Object.(error)
+		default:
+			pod = event.Object.(*corev1.Pod)
+			if pod.Status.Phase != originalPhase {
+				kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase changed from %s to %s", pod.Namespace, pod.Name, originalPhase, pod.Status.Phase)
+
+				return pod, nil
+			}
+			kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s event %s phase %s (no change)", pod.Namespace, pod.Name, event.Type, pod.Status.Phase)
+
+			return pod, nil
+		}
+	}
+
+	kw.GetWorkceptor().nc.GetLogger().Debug("Pod %s/%s phase %s timeout (no change)", pod.Namespace, pod.Name, pod.Status.Phase)
+
+	return pod, nil
 }

@@ -337,13 +337,13 @@ func TestNeceptorListen(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
 	ctx := context.Background()
-	mockNetC := netceptor.New(ctx, "testNode")
 	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 	syncOnce := &sync.Once{}
 	doneChan := make(chan struct{})
 	acceptChan := make(chan *netceptor.AcceptResult)
 
 	t.Run("service is already listening", func(t *testing.T) {
+		mockNetC := netceptor.New(ctx, "testNode")
 		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
 		wantErr := errors.New("service testNode is already listening")
 		_, _ = mockNetC.Listen("testNode", &tls.Config{})
@@ -353,6 +353,7 @@ func TestNeceptorListen(t *testing.T) {
 		}
 	})
 	t.Run("monkey patch tlscfg.GetConfigForClient", func(t *testing.T) {
+		mockNetC := netceptor.New(ctx, "testNode")
 		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
 		assert.NotPanics(t, func() {
 			_, _ = mockNetC.Listen("testNode", &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert})

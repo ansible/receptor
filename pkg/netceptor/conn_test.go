@@ -2,6 +2,7 @@ package netceptor_test
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"sync"
 	"testing"
@@ -325,6 +326,27 @@ func TestListenerClose(t *testing.T) {
 		mockPacketConner.EXPECT().Close()
 		mockListener.EXPECT().Close().Return(wantErr)
 		gotErr := listener.Close()
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
+}
+
+func TestNeceptorListen(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	ctx := context.Background()
+	mockNetC := netceptor.New(ctx, "testNode")
+	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+	syncOnce := &sync.Once{}
+	doneChan := make(chan struct{})
+	acceptChan := make(chan *netceptor.AcceptResult)
+
+	t.Run("service is already listening", func(t *testing.T) {
+		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+		wantErr := errors.New("service testNode is already listening")
+		_, _ = mockNetC.Listen("testNode", &tls.Config{})
+		_, gotErr := mockNetC.Listen("testNode", &tls.Config{})
 		if gotErr.Error() != wantErr.Error() {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}

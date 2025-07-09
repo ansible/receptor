@@ -64,6 +64,39 @@ func startNetceptorNodeWithWorkceptor() (*workceptor.KubeUnit, error) {
 	return kw, nil
 }
 
+func startNetceptorNodeWithWorkceptorWithLogger(rlogger *logger.ReceptorLogger) (*workceptor.KubeUnit, error) {
+	kw := &workceptor.KubeUnit{
+		BaseWorkUnitForWorkUnit: &workceptor.BaseWorkUnit{},
+	}
+
+	if rlogger == nil {
+		rlogger = logger.NewReceptorLogger("")
+	}
+
+	// Create Netceptor node using external backends
+	n1 := netceptor.New(context.Background(), "node1")
+	n1.Logger = rlogger
+
+	b1, err := netceptor.NewExternalBackend()
+	if err != nil {
+		return kw, err
+	}
+
+	err = n1.AddBackend(b1)
+	if err != nil {
+		return kw, err
+	}
+
+	w, err := workceptor.New(context.Background(), n1, "")
+	if err != nil {
+		return kw, err
+	}
+
+	kw.SetWorkceptor(w)
+
+	return kw, nil
+}
+
 func TestShouldUseReconnect(t *testing.T) {
 	const envVariable string = "RECEPTOR_KUBE_SUPPORT_RECONNECT"
 

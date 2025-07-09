@@ -14,7 +14,7 @@ type KubePodStateHelper interface {
 	PodHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error)
-	GetPodStatus(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, containerName string) (bool, error)
+	GetPodStatus(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, containerName string, timeoutSeconds *int64) (bool, error)
 }
 
 // PodContainerHealthy checks if the pod has successfully completed its application logic.
@@ -103,6 +103,13 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 	}
 
 	originalPhase := pod.Status.Phase
+	if originalPhase == corev1.PodSucceeded {
+		return pod, nil // Pod already completed successfully
+	}
+
+	if originalPhase == corev1.PodFailed {
+		return pod, fmt.Errorf("pod already failed with reason: %s %s", pod.Status.Reason, pod.Status.Message)
+	}
 
 	// Create a watcher for the pod
 	watcher, err := clientset.CoreV1().Pods(pod.Namespace).Watch(ctx, metav1.ListOptions{
@@ -167,8 +174,8 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 	}
 }
 
-func (kw KubeUnit) GetPodStatus(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, containerName string) (bool, error) {
-	pod, err := kw.WaitForPodCompleted(ctx, pod, clientset, (*int64)(&kw.config.Timeout))
+func (kw KubeUnit) GetPodStatus(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, containerName string, timeout_seconds int64) (bool, error) {
+	pod, err := kw.WaitForPodCompleted(ctx, pod, clientset, &timeout_seconds)
 	if err != nil {
 		return false, err
 	}

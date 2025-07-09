@@ -654,6 +654,7 @@ func TestWaitForPodCompleted_HandlesTimeoutAndErrorEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
 				Status:     corev1.PodStatus{Phase: corev1.PodPending},
 			},
+
 			watchEvents: []watch.Event{},
 			expectedDebugLogs: []string{
 				"Pod default/test-pod phase Pending timeout (no change)\n",
@@ -740,15 +741,18 @@ func TestWaitForPodCompleted_HandlesTimeoutAndErrorEvents(t *testing.T) {
 
 // create a test for GetPodStatus that uses the mock_workceptor package
 func TestGetPodStatus(t *testing.T) {
-
-
 	kw, err := startNetceptorNodeWithWorkceptor()
 
 	// Create a context
 	ctx := context.Background()
+	clientset := fake.NewSimpleClientset()
 
 	// Call the method under test
-	result, err := kw.GetPodStatus(ctx, podSuccess, clientset, "worker")
+	ok, err := kw.GetPodStatus(ctx, podSuccess, clientset, "worker", 1)
 	assert.NoError(t, err, "GetPodStatus should not return an error")
-	assert.True(t, result, "GetPodStatus should return true for a healthy pod")
+	assert.True(t, ok, "GetPodStatus should return true for a healthy pod")
+
+	ok, err = kw.GetPodStatus(ctx, podInfraError, clientset, "worker", 1)
+	assert.Error(t, err, "GetPodStatus should not return an error")
+	assert.False(t, ok, "GetPodStatus should return false for an unhealthy pod")
 }

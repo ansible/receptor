@@ -51,10 +51,10 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 		return false, fmt.Errorf("pod is nil")
 	}
 
-	containerDiag := fmt.Sprintf("container %s is healthy", containerName)
+	var containerDiag string = ""
 	containerOk, containerError := kw.PodContainerHealthy(pod, containerName)
 	if containerError != nil {
-		containerDiag = fmt.Sprintf("%v", containerError)
+		containerDiag = fmt.Sprintf(" %v", containerError)
 	}
 
 	switch pod.Status.Phase {
@@ -64,11 +64,11 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 			podError = fmt.Errorf("%s message: %s", podError, pod.Status.Message)
 		}
 
-		return false, fmt.Errorf("%s %v", podError, containerDiag)
+		return false, fmt.Errorf("%s%s", podError, containerDiag)
 
 	case corev1.PodSucceeded, corev1.PodRunning, corev1.PodPending:
 		return containerOk, containerError
 	default:
-		return false, fmt.Errorf("unknown phase: %s %s", pod.Status.Phase, containerDiag)
+		return false, fmt.Errorf("unknown phase: %s%s", pod.Status.Phase, containerDiag)
 	}
 }

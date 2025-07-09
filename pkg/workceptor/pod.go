@@ -36,18 +36,37 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 	if foundContainer == nil {
 		return false, fmt.Errorf("pod does not contain container %s", containerName)
 	}
-	if foundContainer.State.Waiting != nil { // means it is waiting, so application logic has not completed yet.
-		return false, fmt.Errorf("container %s is waiting: %s %s", containerName, foundContainer.State.Waiting.Reason, foundContainer.State.Waiting.Message)
-	}
-	if foundContainer.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.
-		return true, nil
+
+	state := foundContainer.State
+
+	// Check if container is running and ready
+	if state.Running != nil {
+		return foundContainer.Ready, nil // Use Ready field for health
 	}
 
-	if foundContainer.State.Terminated.ExitCode != 0 { // exit code of 0 means success.
-		return false, fmt.Errorf("container %s exited with code %d: %s", containerName, foundContainer.State.Terminated.ExitCode, foundContainer.State.Terminated.Reason)
+	// Check if container terminated successfully
+	if state.Terminated != nil {
+		if state.Terminated.ExitCode == 0 {
+			return true, nil // Successfully completed
+		}
+
+		return false, fmt.Errorf("container %s failed with exit code %d: %s %s",
+			containerName, state.Terminated.ExitCode, state.Terminated.Reason, state.Terminated.Message)
 	}
 
-	return true, nil // container terminated with exit code of 0
+	// Container is waiting - usually not healthy yet
+	if state.Waiting != nil {
+		// Check if it's a problematic waiting state
+		reason := state.Waiting.Reason
+		if reason == "ImagePullBackOff" || reason == "ErrImagePull" ||
+			reason == "CrashLoopBackOff" || reason == "CreateContainerConfigError" {
+			return false, fmt.Errorf("container %s in error state: %s %s", containerName, reason, state.Waiting.Message)
+		}
+		// Normal waiting states like "ContainerCreating", "PodInitializing"
+		return false, nil // Not healthy yet, but not an error
+	}
+
+	return false, fmt.Errorf("container %s in unknown state: %v", containerName, state)
 }
 
 // PodHealthy checks if the pod and container are in a healthy state.WaitForPodCompleted.

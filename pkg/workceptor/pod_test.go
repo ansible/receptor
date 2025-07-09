@@ -155,6 +155,7 @@ var podMultipleContainers = &corev1.Pod{
 						StartedAt: metav1.Now(),
 					},
 				},
+				Ready: true,
 			},
 			{
 				Name: "helper",
@@ -163,6 +164,7 @@ var podMultipleContainers = &corev1.Pod{
 						StartedAt: metav1.Now(),
 					},
 				},
+				Ready: true,
 			},
 		},
 	},
@@ -182,6 +184,27 @@ var podImagePullBackOff = &corev1.Pod{
 					Waiting: &corev1.ContainerStateWaiting{
 						Reason:  "ImagePullBackOff",
 						Message: "Back-off pulling image",
+					},
+				},
+			},
+		},
+	},
+}
+
+var podCreateContainerConfigError = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "pod-Create-Container-ConfigErrorf",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodPending,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "CreateContainerConfigError",
+						Message: "Create container error",
 					},
 				},
 			},
@@ -231,6 +254,27 @@ var podCrashLoopBackOff = &corev1.Pod{
 	},
 }
 
+var podCreating = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "pod-creating",
+	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodPending,
+		ContainerStatuses: []corev1.ContainerStatus{
+			{
+				Name: "worker",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "ContainerCreating",
+						Message: "Container is being created",
+					},
+				},
+			},
+		},
+	},
+}
+
 func TestPodHeathy(t *testing.T) {
 	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
@@ -251,7 +295,7 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "container worker is waiting: ErrImagePull Error when pulling image",
+			wantError: "container worker in error state: ErrImagePull Error when pulling image",
 		},
 		{
 			name:      "backoff image backoff pod",
@@ -259,7 +303,15 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "container worker is waiting: ImagePullBackOff Back-off pulling image",
+			wantError: "container worker in error state: ImagePullBackOff Back-off pulling image",
+		},
+		{
+			name:      "Create Container Config Error pod",
+			pod:       podCreateContainerConfigError,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   true,
+			wantError: "container worker in error state: CreateContainerConfigError Create container error",
 		},
 		{
 			name:      "crash loop backoff pod",
@@ -267,7 +319,14 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "ontainer worker is waiting: CrashLoopBackOff Error when starting image",
+			wantError: "container worker in error state: CrashLoopBackOff Error when starting image",
+		},
+		{
+			name:      "pod creating",
+			pod:       podCreating,
+			container: "worker",
+			wantOk:    false,
+			wantErr:   false,
 		},
 		{
 			name:      "nil pod",
@@ -282,8 +341,7 @@ func TestPodHeathy(t *testing.T) {
 			pod:       podPending,
 			container: "worker",
 			wantOk:    false,
-			wantErr:   true,
-			wantError: "container worker is waiting: ContainerCreating Container is being created",
+			wantErr:   false,
 		},
 		{
 			name:      "container missing",
@@ -328,7 +386,7 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "pod failed with reason: OOMKilled container worker exited with code 137: OOMKill",
+			wantError: "pod failed with reason: OOMKilled container worker failed with exit code 137: OOMKill",
 		},
 		{
 			name:      "pod with application error",
@@ -336,7 +394,7 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "pod failed with reason: Error container worker exited with code 1: Error",
+			wantError: "pod failed with reason: Error container worker failed with exit code 1: Error ",
 		},
 		{
 			name:      "pod with oomkill error and message",
@@ -344,7 +402,7 @@ func TestPodHeathy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "pod failed with reason: Pod OOMKilled message: The pod was killed because it ran out of memory container worker exited with code 137: Container OOMKill",
+			wantError: "pod failed with reason: Pod OOMKilled message: The pod was killed because it ran out of memory container worker failed with exit code 137: Container OOMKill ",
 		},
 	}
 	for _, tt := range tests {
@@ -397,8 +455,7 @@ func TestPodContainerHealthy(t *testing.T) {
 			pod:       podPending,
 			container: "worker",
 			wantOk:    false,
-			wantErr:   true,
-			wantError: "container worker is waiting: ContainerCreating Container is being created",
+			wantErr:   false,
 		},
 		{
 			name:      "container missing",
@@ -421,7 +478,7 @@ func TestPodContainerHealthy(t *testing.T) {
 			container: "worker",
 			wantOk:    false,
 			wantErr:   true,
-			wantError: "container worker is waiting: ImagePullBackOff Back-off pulling image",
+			wantError: "container worker in error state: ImagePullBackOff Back-off pulling image",
 		},
 	}
 	for _, tt := range tests {

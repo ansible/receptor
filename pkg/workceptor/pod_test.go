@@ -680,3 +680,18 @@ func TestWaitForPodCompleted_HandlesTimeoutAndErrorEvents(t *testing.T) {
 		})
 	}
 }
+
+// create a test for GetPodStatus that uses the mock_workceptor package
+func TestGetPodStatus(t *testing.T) {
+
+
+	kw, err := startNetceptorNodeWithWorkceptor()
+
+	// Create a context
+	ctx := context.Background()
+
+	// Call the method under test
+	result, err := kw.GetPodStatus(ctx, podSuccess, clientset, "worker")
+	assert.NoError(t, err, "GetPodStatus should not return an error")
+	assert.True(t, result, "GetPodStatus should return true for a healthy pod")
+}

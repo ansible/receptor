@@ -14,6 +14,7 @@ type KubePodStateHelper interface {
 	PodHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, timeoutSeconds *int64) (*corev1.Pod, error)
+	GetPodStatus(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, containerName string) (bool, error)
 }
 
 // PodContainerHealthy checks if the pod has successfully completed its application logic.
@@ -35,21 +36,21 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 	if foundContainer == nil {
 		return false, fmt.Errorf("pod does not contain container %s", containerName)
 	}
-	if foundContainer.State.Waiting != nil { // means it is waiting, so application logic has not completed yet. Normal behavior when job completes successfully.
+	if foundContainer.State.Waiting != nil { // means it is waiting, so application logic has not completed yet.
 		return false, fmt.Errorf("container %s is waiting: %s %s", containerName, foundContainer.State.Waiting.Reason, foundContainer.State.Waiting.Message)
 	}
 	if foundContainer.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.
 		return true, nil
 	}
 
-	if foundContainer.State.Terminated.ExitCode != 0 { // exit code of 0 means success
+	if foundContainer.State.Terminated.ExitCode != 0 { // exit code of 0 means success.
 		return false, fmt.Errorf("container %s exited with code %d: %s", containerName, foundContainer.State.Terminated.ExitCode, foundContainer.State.Terminated.Reason)
 	}
 
 	return true, nil // container terminated with exit code of 0
 }
 
-// PodHealthy checks if the pod and container are in a healthy state.
+// PodHealthy checks if the pod and container are in a healthy state.WaitForPodCompleted.
 func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, error) {
 	if pod == nil {
 		return false, fmt.Errorf("pod is nil")
@@ -145,4 +146,13 @@ func (kw KubeUnit) WaitForPodCompleted(ctx context.Context, pod *corev1.Pod, cli
 			return pod, ctx.Err()
 		}
 	}
+}
+
+func (kw KubeUnit) GetPodStatus(ctx context.Context, pod *corev1.Pod, clientset kubernetes.Interface, containerName string) (bool, error) {
+	pod, err := kw.WaitForPodCompleted(ctx, pod, clientset, (*int64)(&kw.config.Timeout))
+	if err != nil {
+		return false, err
+	}
+
+	return kw.PodHealthy(pod, containerName)
 }

@@ -30,7 +30,7 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 	if foundContainer == nil {
 		return false, fmt.Errorf("pod does not contain container %s", containerName)
 	}
-	if foundContainer.State.Waiting != nil { // means it is waiting, so application logic has not completed yet. Normal behavior when job completes successfully.
+	if foundContainer.State.Waiting != nil { // means it is waiting, so application logic has not completed yet.
 		return false, fmt.Errorf("container %s is waiting: %s %s", containerName, foundContainer.State.Waiting.Reason, foundContainer.State.Waiting.Message)
 	}
 	if foundContainer.State.Terminated == nil { // means it is waiting or running, so application logic has not completed yet. Normal behavior when job completes successfully.

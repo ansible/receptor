@@ -7,7 +7,6 @@ import (
 )
 
 type KubePodStateHelper interface {
-	GetPodStatus(pod *corev1.Pod) (bool, error)
 	PodHealthy(pod *corev1.Pod, containerName string) (bool, error)
 	PodContainerHealthy(pod *corev1.Pod, containerName string) (bool, error)
 }

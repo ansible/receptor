@@ -34,32 +34,33 @@ func (kw KubeUnit) PodContainerHealthy(pod *corev1.Pod, containerName string) (b
 	state := foundContainer.State
 
 	// Check if container is running and ready
-    if state.Running != nil {
-        return foundContainer.Ready, nil // Use Ready field for health
-    }
+	if state.Running != nil {
+		return foundContainer.Ready, nil // Use Ready field for health
+	}
 
-   // Check if container terminated successfully
-    if state.Terminated != nil {
-        if state.Terminated.ExitCode == 0 {
-            return true, nil // Successfully completed
-        }
-        return false, fmt.Errorf("container %s failed with exit code %d: %s %s", 
-            containerName, state.Terminated.ExitCode, state.Terminated.Reason,  state.Terminated.Message)
-    }
+	// Check if container terminated successfully
+	if state.Terminated != nil {
+		if state.Terminated.ExitCode == 0 {
+			return true, nil // Successfully completed
+		}
 
-    // Container is waiting - usually not healthy yet
-    if state.Waiting != nil {
-        // Check if it's a problematic waiting state
-        reason := state.Waiting.Reason
-        if reason == "ImagePullBackOff" || reason == "ErrImagePull" || 
-           reason == "CrashLoopBackOff" || reason == "CreateContainerConfigError" {
-            return false, fmt.Errorf("container %s in error state: %s %s", containerName, reason, state.Waiting.Message)
-        }
-        // Normal waiting states like "ContainerCreating", "PodInitializing"
-        return false, nil // Not healthy yet, but not an error
-    }
+		return false, fmt.Errorf("container %s failed with exit code %d: %s %s",
+			containerName, state.Terminated.ExitCode, state.Terminated.Reason, state.Terminated.Message)
+	}
 
-	 return false, fmt.Errorf("container %s in unknown state: %v", containerName, state)
+	// Container is waiting - usually not healthy yet
+	if state.Waiting != nil {
+		// Check if it's a problematic waiting state
+		reason := state.Waiting.Reason
+		if reason == "ImagePullBackOff" || reason == "ErrImagePull" ||
+			reason == "CrashLoopBackOff" || reason == "CreateContainerConfigError" {
+			return false, fmt.Errorf("container %s in error state: %s %s", containerName, reason, state.Waiting.Message)
+		}
+		// Normal waiting states like "ContainerCreating", "PodInitializing"
+		return false, nil // Not healthy yet, but not an error
+	}
+
+	return false, fmt.Errorf("container %s in unknown state: %v", containerName, state)
 }
 
 // PodHealthy checks if the pod and container are in a healthy state.

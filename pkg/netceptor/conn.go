@@ -136,10 +136,8 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		select {
 		case <-s.context.Done():
 			_ = ql.Close()
-			return
 		case <-ctx.Done():
 			_ = ql.Close()
-			return
 		case <-doneChan:
 			return
 		}

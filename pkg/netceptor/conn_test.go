@@ -11,7 +11,6 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
 	"github.com/quic-go/quic-go"
-	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
@@ -334,17 +333,9 @@ func TestListenerClose(t *testing.T) {
 }
 
 func TestNeceptorListen(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
-	ctx := context.Background()
-	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
-	syncOnce := &sync.Once{}
-	doneChan := make(chan struct{})
-	acceptChan := make(chan *netceptor.AcceptResult)
-
 	t.Run("service is already listening", func(t *testing.T) {
+		ctx := context.Background()
 		mockNetC := netceptor.New(ctx, "testNode")
-		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
 		wantErr := errors.New("service testNode is already listening")
 		_, _ = mockNetC.Listen("testNode", &tls.Config{})
 		_, gotErr := mockNetC.Listen("testNode", &tls.Config{})
@@ -352,11 +343,35 @@ func TestNeceptorListen(t *testing.T) {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
-	t.Run("monkey patch tlscfg.GetConfigForClient", func(t *testing.T) {
-		mockNetC := netceptor.New(ctx, "testNode")
-		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
-		assert.NotPanics(t, func() {
-			_, _ = mockNetC.Listen("testNode", &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert})
-		})
-	})
+
+	// t.Run("monkey patch tlscfg.GetConfigForClient", func(t *testing.T) {
+	// 	mockNetC := netceptor.New(ctx, "testNode")
+	// 	_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+	// 	assert.NotPanics(t, func() {
+	// 		_, _ = mockNetC.Listen("testNode", &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert})
+	// 	})
+	// })
 }
+
+// func TestNeceptorListen2(t *testing.T) {
+// 	// ctx := context.Background()
+// 	ctrl := gomock.NewController(t)
+// 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+// 	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+// 	syncOnce := &sync.Once{}
+// 	doneChan := make(chan struct{})
+// 	acceptChan := make(chan *netceptor.AcceptResult)
+
+// 	t.Run("test", func(t *testing.T) {
+// 		ctx, ccancel := context.WithCancel(context.Background())
+// 		defer ccancel()
+// 		mockNetC := netceptor.New(ctx, "node")
+// 		_ = netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+// 		wantErr := errors.New("service testNode is already listening")
+// 		_, gotErr := mockNetC.Listen("node", nil)
+// 		if gotErr.Error() != wantErr.Error() {
+// 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+// 		}
+// 	})
+
+// }

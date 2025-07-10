@@ -146,7 +146,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	syncOnce := &sync.Once{}
 	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
 
-	go li.acceptLoop(s.context)
+	go li.acceptLoop(ctx)
 
 	return li, nil
 }

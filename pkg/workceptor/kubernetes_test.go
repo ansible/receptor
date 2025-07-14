@@ -2769,3 +2769,738 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 		})
 	}
 }
+
+// TestKubeAPIWrapper_StreamWithContext tests the StreamWithContext method.
+func TestKubeAPIWrapper_StreamWithContext(t *testing.T) {
+	wrapper := workceptor.KubeAPIWrapper{}
+
+	// Test with nil executor - should panic
+	t.Run("Nil executor", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				// Expected panic
+				assert.Contains(t, fmt.Sprintf("%v", r), "nil pointer")
+			}
+		}()
+
+		ctx := context.Background()
+		options := remotecommand.StreamOptions{}
+
+		_ = wrapper.StreamWithContext(ctx, nil, options)
+		t.Error("Expected panic for nil executor")
+	})
+
+	// Test method exists and has correct signature
+	t.Run("Method signature", func(t *testing.T) {
+		methodType := reflect.TypeOf(wrapper.StreamWithContext)
+		assert.Equal(t, "func(context.Context, remotecommand.Executor, remotecommand.StreamOptions) error", methodType.String())
+	})
+}
+
+// TestKubeAPIWrapper_UntilWithSync tests the UntilWithSync method.
+func TestKubeAPIWrapper_UntilWithSync(t *testing.T) {
+	wrapper := workceptor.KubeAPIWrapper{}
+
+	// Test method exists and has correct signature
+	t.Run("Method signature", func(t *testing.T) {
+		methodType := reflect.TypeOf(wrapper.UntilWithSync)
+		assert.Contains(t, methodType.String(), "func(context.Context, cache.ListerWatcher, runtime.Object")
+		assert.Contains(t, methodType.String(), "(*watch.Event, error)")
+	})
+
+	// Test with nil parameters - just verify it doesn't panic
+	t.Run("Nil parameters", func(t *testing.T) {
+		ctx := context.Background()
+		// This will likely panic or return an error depending on the implementation
+		// Let's just verify the method can be called
+		assert.NotPanics(t, func() {
+			_, _ = wrapper.UntilWithSync(ctx, nil, nil, nil)
+		}, "Should not panic with nil parameters")
+	})
+}
+
+// TestKubeWorkerCfg_NewWorker tests the NewWorker method.
+func TestKubeWorkerCfg_NewWorker(t *testing.T) {
+	tests := []struct {
+		name         string
+		cfg          workceptor.KubeWorkerCfg
+		setupMocks   func() (workceptor.BaseWorkUnitForWorkUnit, *workceptor.Workceptor)
+		unitID       string
+		workType     string
+		expectResult bool
+		description  string
+	}{
+		{
+			name: "Valid configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Command:      "echo hello",
+				Params:       "--verbose",
+				Namespace:    "default",
+			},
+			setupMocks: func() (workceptor.BaseWorkUnitForWorkUnit, *workceptor.Workceptor) {
+				ctrl := gomock.NewController(t)
+				mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+				mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+
+				mockNetceptor.EXPECT().NodeID().Return("test-node")
+				ctx := context.Background()
+				w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+				if err != nil {
+					t.Fatalf("Error creating Workceptor: %v", err)
+				}
+
+				mockBaseWorkUnit.EXPECT().Init(w, "test-unit", "test-work", workceptor.FileSystem{})
+
+				return mockBaseWorkUnit, w
+			},
+			unitID:       "test-unit",
+			workType:     "test-work",
+			expectResult: true,
+			description:  "Should create WorkUnit with valid configuration",
+		},
+		{
+			name: "With nil BaseWorkUnit",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Command:      "echo hello",
+				Params:       "--verbose",
+				Namespace:    "default",
+			},
+			setupMocks: func() (workceptor.BaseWorkUnitForWorkUnit, *workceptor.Workceptor) {
+				ctrl := gomock.NewController(t)
+				mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+
+				mockNetceptor.EXPECT().NodeID().Return("test-node")
+				ctx := context.Background()
+				w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+				if err != nil {
+					t.Fatalf("Error creating Workceptor: %v", err)
+				}
+
+				return nil, w
+			},
+			unitID:       "test-unit",
+			workType:     "test-work",
+			expectResult: true,
+			description:  "Should create WorkUnit with nil BaseWorkUnit by creating default one",
+		},
+		{
+			name: "Different work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "custom-work",
+				AuthMethod:   "kubeconfig",
+				StreamMethod: "tcp",
+				Image:        "alpine:latest",
+				Command:      "sh",
+				Params:       "-c 'echo test'",
+				Namespace:    "custom-ns",
+			},
+			setupMocks: func() (workceptor.BaseWorkUnitForWorkUnit, *workceptor.Workceptor) {
+				ctrl := gomock.NewController(t)
+				mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+				mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+
+				mockNetceptor.EXPECT().NodeID().Return("test-node")
+				ctx := context.Background()
+				w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+				if err != nil {
+					t.Fatalf("Error creating Workceptor: %v", err)
+				}
+
+				mockBaseWorkUnit.EXPECT().Init(w, "custom-unit", "custom-work", workceptor.FileSystem{})
+
+				return mockBaseWorkUnit, w
+			},
+			unitID:       "custom-unit",
+			workType:     "custom-work",
+			expectResult: true,
+			description:  "Should create WorkUnit with different work type and parameters",
+		},
+		{
+			name: "With runtime permissions",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:            "runtime-work",
+				AuthMethod:          "runtime",
+				StreamMethod:        "logger",
+				AllowRuntimeAuth:    true,
+				AllowRuntimeCommand: true,
+				AllowRuntimeParams:  true,
+				AllowRuntimePod:     true,
+				DeletePodOnRestart:  true,
+			},
+			setupMocks: func() (workceptor.BaseWorkUnitForWorkUnit, *workceptor.Workceptor) {
+				ctrl := gomock.NewController(t)
+				mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+				mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+
+				mockNetceptor.EXPECT().NodeID().Return("test-node")
+				ctx := context.Background()
+				w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+				if err != nil {
+					t.Fatalf("Error creating Workceptor: %v", err)
+				}
+
+				mockBaseWorkUnit.EXPECT().Init(w, "runtime-unit", "runtime-work", workceptor.FileSystem{})
+
+				return mockBaseWorkUnit, w
+			},
+			unitID:       "runtime-unit",
+			workType:     "runtime-work",
+			expectResult: true,
+			description:  "Should create WorkUnit with runtime permissions enabled",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockBWU, w := tt.setupMocks()
+
+			result := tt.cfg.NewWorker(mockBWU, w, tt.unitID, tt.workType)
+
+			if tt.expectResult {
+				assert.NotNil(t, result, tt.description)
+				assert.Implements(t, (*workceptor.WorkUnit)(nil), result, tt.description)
+
+				// Verify it's a KubeUnit
+				kubeUnit, ok := result.(*workceptor.KubeUnit)
+				assert.True(t, ok, "Should return a KubeUnit")
+				assert.NotNil(t, kubeUnit, "KubeUnit should not be nil")
+			} else {
+				assert.Nil(t, result, tt.description)
+			}
+		})
+	}
+}
+
+// TestKubeWorkerCfg_Prepare tests the Prepare method.
+func TestKubeWorkerCfg_Prepare(t *testing.T) {
+	// Create a temporary kubeconfig file for testing
+	tmpfile, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	kubeconfig := `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://localhost:8443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+	if _, err := tmpfile.Write([]byte(kubeconfig)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name             string
+		cfg              workceptor.KubeWorkerCfg
+		expectError      bool
+		expectedErrorMsg string
+		description      string
+	}{
+		{
+			name: "Valid incluster configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError: false,
+			description: "Should accept valid incluster configuration",
+		},
+		{
+			name: "Valid kubeconfig configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "kubeconfig",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				KubeConfig:   tmpfile.Name(),
+			},
+			expectError: false,
+			description: "Should accept valid kubeconfig configuration",
+		},
+		{
+			name: "Valid runtime configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:         "test-work",
+				AuthMethod:       "runtime",
+				StreamMethod:     "logger",
+				AllowRuntimeAuth: true,
+				AllowRuntimePod:  true,
+			},
+			expectError: false,
+			description: "Should accept valid runtime configuration",
+		},
+		{
+			name: "Invalid auth method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "invalid-auth",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError:      true,
+			expectedErrorMsg: "invalid AuthMethod: invalid-auth",
+			description:      "Should reject invalid auth method",
+		},
+		{
+			name: "Missing namespace with incluster",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				// Missing Namespace
+			},
+			expectError:      true,
+			expectedErrorMsg: "must provide namespace when AuthMethod is not kubeconfig",
+			description:      "Should reject missing namespace with incluster auth",
+		},
+		{
+			name: "KubeConfig with wrong auth method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+				KubeConfig:   tmpfile.Name(),
+			},
+			expectError:      true,
+			expectedErrorMsg: "can only provide KubeConfig when AuthMethod=kubeconfig",
+			description:      "Should reject KubeConfig with non-kubeconfig auth method",
+		},
+		{
+			name: "Non-existent kubeconfig file",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "kubeconfig",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				KubeConfig:   "/non/existent/file",
+			},
+			expectError:      true,
+			expectedErrorMsg: "error accessing kubeconfig file",
+			description:      "Should reject non-existent kubeconfig file",
+		},
+		{
+			name: "Pod with conflicting image",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+				Pod:          "apiVersion: v1\nkind: Pod",
+			},
+			expectError:      true,
+			expectedErrorMsg: "can only provide Pod when Image, Command, and Params are empty",
+			description:      "Should reject pod with conflicting image",
+		},
+		{
+			name: "Pod with conflicting command",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Command:      "echo hello",
+				Namespace:    "default",
+				Pod:          "apiVersion: v1\nkind: Pod",
+			},
+			expectError:      true,
+			expectedErrorMsg: "can only provide Pod when Image, Command, and Params are empty",
+			description:      "Should reject pod with conflicting command",
+		},
+		{
+			name: "Pod with conflicting params",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Params:       "--verbose",
+				Namespace:    "default",
+				Pod:          "apiVersion: v1\nkind: Pod",
+			},
+			expectError:      true,
+			expectedErrorMsg: "can only provide Pod when Image, Command, and Params are empty",
+			description:      "Should reject pod with conflicting params",
+		},
+		{
+			name: "Missing image and pod without runtime permissions",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Namespace:    "default",
+				// Missing Image, Pod, and runtime permissions
+			},
+			expectError:      true,
+			expectedErrorMsg: "must specify a container image to run",
+			description:      "Should reject missing image/pod without runtime permissions",
+		},
+		{
+			name: "Valid configuration with runtime command allowed",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:            "test-work",
+				AuthMethod:          "incluster",
+				StreamMethod:        "logger",
+				Namespace:           "default",
+				AllowRuntimeCommand: true,
+			},
+			expectError: false,
+			description: "Should accept missing image with runtime command permission",
+		},
+		{
+			name: "Valid configuration with runtime pod allowed",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:        "test-work",
+				AuthMethod:      "incluster",
+				StreamMethod:    "logger",
+				Namespace:       "default",
+				AllowRuntimePod: true,
+			},
+			expectError: false,
+			description: "Should accept missing image with runtime pod permission",
+		},
+		{
+			name: "Invalid stream method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "invalid-stream",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError:      true,
+			expectedErrorMsg: "stream mode must be logger or tcp",
+			description:      "Should reject invalid stream method",
+		},
+		{
+			name: "Valid TCP stream method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "tcp",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError: false,
+			description: "Should accept valid TCP stream method",
+		},
+		{
+			name: "Valid logger stream method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError: false,
+			description: "Should accept valid logger stream method",
+		},
+		{
+			name: "Case insensitive auth method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "INCLUSTER",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError: false,
+			description: "Should accept case insensitive auth method",
+		},
+		{
+			name: "Case insensitive stream method",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "LOGGER",
+				Image:        "busybox:latest",
+				Namespace:    "default",
+			},
+			expectError: false,
+			description: "Should accept case insensitive stream method",
+		},
+		{
+			name: "Valid pod only configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+				Namespace:    "default",
+				Pod:          "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test-pod",
+			},
+			expectError: false,
+			description: "Should accept valid pod only configuration",
+		},
+		{
+			name: "Kubeconfig namespace detection",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:     "test-work",
+				AuthMethod:   "kubeconfig",
+				StreamMethod: "logger",
+				Image:        "busybox:latest",
+				KubeConfig:   tmpfile.Name(),
+				// Namespace will be detected from kubeconfig
+			},
+			expectError: false,
+			description: "Should accept kubeconfig without explicit namespace",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Prepare()
+
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+				if tt.expectedErrorMsg != "" {
+					assert.Contains(t, err.Error(), tt.expectedErrorMsg, tt.description)
+				}
+			} else {
+				assert.NoError(t, err, tt.description)
+			}
+		})
+	}
+}
+
+// TestKubeWorkerCfg_GetWorkType tests the GetWorkType method.
+func TestKubeWorkerCfg_GetWorkType(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         workceptor.KubeWorkerCfg
+		expected    string
+		description string
+	}{
+		{
+			name: "Basic work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType: "test-work",
+			},
+			expected:    "test-work",
+			description: "Should return configured work type",
+		},
+		{
+			name: "Kubernetes work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType: "kubernetes",
+			},
+			expected:    "kubernetes",
+			description: "Should return kubernetes work type",
+		},
+		{
+			name: "Custom work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType: "custom-k8s-worker",
+			},
+			expected:    "custom-k8s-worker",
+			description: "Should return custom work type",
+		},
+		{
+			name: "Empty work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType: "",
+			},
+			expected:    "",
+			description: "Should return empty work type",
+		},
+		{
+			name: "Work type with spaces",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType: "work type with spaces",
+			},
+			expected:    "work type with spaces",
+			description: "Should return work type with spaces",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.cfg.GetWorkType()
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+// TestKubeWorkerCfg_GetVerifySignature tests the GetVerifySignature method.
+func TestKubeWorkerCfg_GetVerifySignature(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         workceptor.KubeWorkerCfg
+		expected    bool
+		description string
+	}{
+		{
+			name: "Verify signature true",
+			cfg: workceptor.KubeWorkerCfg{
+				VerifySignature: true,
+			},
+			expected:    true,
+			description: "Should return true when verify signature is enabled",
+		},
+		{
+			name: "Verify signature false",
+			cfg: workceptor.KubeWorkerCfg{
+				VerifySignature: false,
+			},
+			expected:    false,
+			description: "Should return false when verify signature is disabled",
+		},
+		{
+			name: "Default verify signature",
+			cfg:  workceptor.KubeWorkerCfg{
+				// Default value (false)
+			},
+			expected:    false,
+			description: "Should return false by default",
+		},
+		{
+			name: "Verify signature with other config",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:        "test-work",
+				AuthMethod:      "incluster",
+				StreamMethod:    "logger",
+				VerifySignature: true,
+			},
+			expected:    true,
+			description: "Should return true when verify signature is enabled with other config",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.cfg.GetVerifySignature()
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+// TestKubeWorkerCfg_Run tests the Run method.
+func TestKubeWorkerCfg_Run(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         workceptor.KubeWorkerCfg
+		expectError bool
+		description string
+	}{
+		{
+			name: "Valid configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:        "test-work",
+				AuthMethod:      "incluster",
+				StreamMethod:    "logger",
+				Image:           "busybox:latest",
+				Namespace:       "default",
+				VerifySignature: false,
+			},
+			expectError: false,
+			description: "Should successfully register worker with valid configuration",
+		},
+		{
+			name: "With signature verification",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:        "signed-work",
+				AuthMethod:      "incluster",
+				StreamMethod:    "logger",
+				Image:           "busybox:latest",
+				Namespace:       "default",
+				VerifySignature: true,
+			},
+			expectError: false,
+			description: "Should successfully register worker with signature verification",
+		},
+		{
+			name: "Different work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:        "custom-kubernetes-worker",
+				AuthMethod:      "kubeconfig",
+				StreamMethod:    "tcp",
+				Image:           "alpine:latest",
+				Namespace:       "custom-ns",
+				VerifySignature: false,
+			},
+			expectError: false,
+			description: "Should successfully register worker with different configuration",
+		},
+		{
+			name: "Empty work type",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType:        "",
+				AuthMethod:      "incluster",
+				StreamMethod:    "logger",
+				Image:           "busybox:latest",
+				Namespace:       "default",
+				VerifySignature: false,
+			},
+			expectError: false,
+			description: "Should handle empty work type (MainInstance.RegisterWorker handles validation)",
+		},
+		{
+			name: "Minimal valid configuration",
+			cfg: workceptor.KubeWorkerCfg{
+				WorkType: "minimal-work",
+			},
+			expectError: false,
+			description: "Should handle minimal configuration (validation happens elsewhere)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up a proper workceptor instance for MainInstance
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			ctx := context.Background()
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+			mockNetceptor.EXPECT().GetLogger().Return(&logger.ReceptorLogger{}).AnyTimes()
+			mockNetceptor.EXPECT().AddWorkCommand(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			assert.NoError(t, err, "Should create workceptor instance")
+
+			// Set MainInstance to our test workceptor
+			originalMainInstance := workceptor.MainInstance
+			workceptor.MainInstance = w
+			defer func() {
+				workceptor.MainInstance = originalMainInstance
+			}()
+
+			// Test the Run method
+			err = tt.cfg.Run()
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+			} else {
+				assert.NoError(t, err, tt.description)
+			}
+		})
+	}
+}

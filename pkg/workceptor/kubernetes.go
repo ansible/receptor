@@ -177,6 +177,8 @@ var ErrPodFailed = fmt.Errorf("pod failed to start")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
+const WorkerContainerName = "worker"
+
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
@@ -249,7 +251,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 	podNamespace := kw.Pod.Namespace
 	podName := kw.Pod.Name
 	podOptions := &corev1.PodLogOptions{
-		Container: "worker",
+		Container: WorkerContainerName,
 		Follow:    true,
 	}
 	if timestamps {
@@ -486,7 +488,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		foundWorker := false
 		spec = &pod.Spec
 		for i := range spec.Containers {
-			if spec.Containers[i].Name == "worker" {
+			if spec.Containers[i].Name == WorkerContainerName {
 				spec.Containers[i].Stdin = true
 				spec.Containers[i].StdinOnce = true
 				foundWorker = true
@@ -517,7 +519,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		}
 		spec = &corev1.PodSpec{
 			Containers: []corev1.Container{{
-				Name:      "worker",
+				Name:      WorkerContainerName,
 				Image:     ked.Image,
 				Command:   command,
 				Args:      params,
@@ -601,7 +603,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	if err == ErrPodCompleted {
 		// Hao: shouldn't we also call kw.Cancel() in these cases?
 		for _, cstat := range kw.Pod.Status.ContainerStatuses {
-			if cstat.Name == "worker" {
+			if cstat.Name == WorkerContainerName {
 				if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
 					return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
 				}
@@ -632,7 +634,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 			}
 
 			for _, cstat := range kw.Pod.Status.ContainerStatuses {
-				if cstat.Name == "worker" {
+				if cstat.Name == WorkerContainerName {
 					if cstat.State.Waiting != nil {
 						return fmt.Errorf("%s, %s", err.Error(), cstat.State.Waiting.Reason)
 					}
@@ -748,7 +750,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 
 		req.VersionedParams(
 			&corev1.PodExecOptions{
-				Container: "worker",
+				Container: WorkerContainerName,
 				Stdin:     true,
 				Stdout:    false,
 				Stderr:    false,

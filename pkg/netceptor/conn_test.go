@@ -349,7 +349,6 @@ func TestListenerSendResult(t *testing.T) {
 	// go assert.NotPanics(t, func() { listener.SendResult(ctx, mockConn, nil) })
 	go listener.SendResult(ctx, mockConn, nil)
 	time.AfterFunc(500*time.Millisecond, cancel)
-
 }
 
 func TestNeceptorListen(t *testing.T) {

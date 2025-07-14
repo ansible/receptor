@@ -10,6 +10,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
+	"github.com/ansible/receptor/pkg/utils/mock_utils"
 	"github.com/quic-go/quic-go"
 	"go.uber.org/mock/gomock"
 )
@@ -332,6 +333,25 @@ func TestListenerClose(t *testing.T) {
 	})
 }
 
+func TestListenerSendResult(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctrl := gomock.NewController(t)
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockConn := mock_utils.NewMockNetConn(ctrl)
+	mockNetC := &netceptor.Netceptor{}
+	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+	syncOnce := &sync.Once{}
+	doneChan := make(chan struct{})
+	acceptChan := make(chan *netceptor.AcceptResult)
+	listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+
+	// go assert.NotPanics(t, func() { listener.SendResult(ctx, mockConn, nil) })
+	go listener.SendResult(ctx, mockConn, nil)
+	time.AfterFunc(500*time.Millisecond, cancel)
+
+}
+
 func TestNeceptorListen(t *testing.T) {
 	t.Run("service is already listening", func(t *testing.T) {
 		ctx := context.Background()
@@ -343,4 +363,22 @@ func TestNeceptorListen(t *testing.T) {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
 	})
+
+	// t.Run("send result context done", func(t *testing.T){
+	// ctrl := gomock.NewController(t)
+	// mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	// mockNetC := &netceptor.Netceptor{}
+	// mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+	// syncOnce := &sync.Once{}
+	// doneChan := make(chan struct{})
+	// acceptChan := make(chan *netceptor.AcceptResult)
+	// listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+	// wantErr := errors.New("packetconner error")
+
+	// _, gotErr := listener.SendResult()
+
+	// if gotErr.Error() != wantErr.Error() {
+	// 	t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+	// }
+	// })
 }

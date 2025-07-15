@@ -80,6 +80,16 @@ type ListenConfig struct {
 	pc        *PacketConn
 }
 
+func (s *Netceptor) NewQuicConfigWithConst() *quic.Config {
+	return &quic.Config{
+		Tracer:                  s.tracer,
+		HandshakeIdleTimeout:    15 * time.Second,
+		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
+		Allow0RTT:               true,
+		DisablePathMTUDiscovery: false,
+	}
+}
+
 func NewListenConfig(s *Netceptor, ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string, quiccfg *quic.Config, pc *PacketConn) *ListenConfig {
 	var connType byte
 	var _tlsconfig *tls.Config
@@ -97,13 +107,7 @@ func NewListenConfig(s *Netceptor, ctx context.Context, service string, tlscfg *
 
 	var _quiccfg *quic.Config
 	if quiccfg == nil {
-		_quiccfg = &quic.Config{
-			Tracer:                  s.tracer,
-			HandshakeIdleTimeout:    15 * time.Second,
-			MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
-			Allow0RTT:               true,
-			DisablePathMTUDiscovery: false,
-		}
+		_quiccfg = s.NewQuicConfigWithConst()
 	} else {
 		_quiccfg = quiccfg
 	}
@@ -412,14 +416,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	rAddr := s.NewAddr(node, service)
-	cfg := &quic.Config{
-		Tracer:                  s.tracer,
-		HandshakeIdleTimeout:    15 * time.Second,
-		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
-		Allow0RTT:               true,
-		DisablePathMTUDiscovery: false,
-	}
-
+	cfg := s.NewQuicConfigWithConst()
 	if KeepAliveForQuicConnections {
 		cfg.KeepAlivePeriod = MaxIdleTimeoutForQuicConnections / 2
 	}

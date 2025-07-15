@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -137,9 +136,6 @@ func NewListenConfig(s *Netceptor, ctx context.Context, service string, tlscfg *
 
 // Internal implementation of Listen and ListenAndAdvertise.
 func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
-	if cfg == nil {
-		return nil, errors.New("nil listen config passed")
-	}
 	if len(cfg.service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", cfg.service)
 	}
@@ -157,18 +153,6 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 	cfg.pc.StartUnreachable()
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, cfg.service)
 	s.listenerRegistry[cfg.service] = cfg.pc
-	var quiccfg *quic.Config
-	if cfg.quicCfg == nil {
-		quiccfg = &quic.Config{
-			Tracer:                  s.tracer,
-			HandshakeIdleTimeout:    15 * time.Second,
-			MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
-			Allow0RTT:               true,
-			DisablePathMTUDiscovery: false,
-		}
-	} else {
-		quiccfg = cfg.quicCfg
-	}
 	statelessResetKey := make([]byte, 32)
 	rand.Read(statelessResetKey)
 	tr := quic.Transport{
@@ -176,7 +160,7 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := tr.Listen(cfg.tlsCfg, quiccfg)
+	ql, err := tr.Listen(cfg.tlsCfg, cfg.quicCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +240,7 @@ func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags 
 }
 
 func (s *Netceptor) ListenWithConfig(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, tags map[string]string, quiccfg *quic.Config, pc *PacketConn) (*Listener, error) {
-	return s.listen(NewListenConfig(s, s.context, service, tlscfg, advertise, tags, quiccfg, pc))
+	return s.listen(NewListenConfig(s, ctx, service, tlscfg, advertise, tags, quiccfg, pc))
 }
 
 func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {

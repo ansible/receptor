@@ -355,9 +355,33 @@ func TestNeceptorListen(t *testing.T) {
 	})
 }
 
+func TestNewListenConfig(t *testing.T) {
+	t.Run("listenconfig with tlsconfig", func(t *testing.T) {
+		ctx := context.Background()
+		mockNetC := netceptor.New(ctx, "node1")
+		tlsconfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+		assert.NotPanics(t, func() { netceptor.NewListenConfig(mockNetC, ctx, "node1", tlsconfig, false, nil, nil, nil) })
+	})
+
+	t.Run("listenconfig with quic config", func(t *testing.T) {
+		ctx := context.Background()
+		mockNetC := netceptor.New(ctx, "node1")
+		quicconfig := &quic.Config{}
+		assert.NotPanics(t, func() { netceptor.NewListenConfig(mockNetC, ctx, "node1", nil, false, nil, quicconfig, nil) })
+	})
+
+	t.Run("listenconfig with packet conn", func(t *testing.T) {
+		ctx := context.Background()
+		mockNetC := netceptor.New(ctx, "node1")
+		packetConn := &netceptor.PacketConn{}
+		assert.NotPanics(t, func() { netceptor.NewListenConfig(mockNetC, ctx, "node1", nil, false, nil, nil, packetConn) })
+	})
+}
+
 func TestNeceptorListenWithConfig(t *testing.T) {
 	t.Run("service is already listening", func(t *testing.T) {
-
 		ctx := context.Background()
 		mockNetC := netceptor.New(ctx, "node1")
 		wantErr := errors.New("service node1 is already listening")

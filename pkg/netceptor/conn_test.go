@@ -333,24 +333,6 @@ func TestListenerClose(t *testing.T) {
 	})
 }
 
-// func TestListenerSendResult(t *testing.T) {
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-// 	ctrl := gomock.NewController(t)
-// 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
-// 	mockConn := mock_utils.NewMockNetConn(ctrl)
-// 	mockNetC := &netceptor.Netceptor{}
-// 	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
-// 	syncOnce := &sync.Once{}
-// 	doneChan := make(chan struct{})
-// 	acceptChan := make(chan *netceptor.AcceptResult)
-// 	listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
-
-// 	// go assert.NotPanics(t, func() { listener.SendResult(ctx, mockConn, nil) })
-// 	go listener.SendResult(ctx, mockConn, nil)
-// 	time.AfterFunc(500*time.Millisecond, cancel)
-// }
-
 func TestNeceptorListen(t *testing.T) {
 	t.Run("service is already listening", func(t *testing.T) {
 		ctx := context.Background()
@@ -371,33 +353,27 @@ func TestNeceptorListen(t *testing.T) {
 		// Assert cancelling netceptor context doesn't create panic
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
 	})
+}
 
-	// t.Run("service is already listening", func(t *testing.T) {
-	// 	ctx := context.Background()
-	// 	mockNetC := netceptor.New(ctx, "node1")
-	// 	wantErr := errors.New("service node1 is already listening")
-	// 	_, _ = mockNetC.Listen("node1", &tls.Config{})
-	// 	_, gotErr := mockNetC.Listen("node1", &tls.Config{})
-	// 	if gotErr.Error() != wantErr.Error() {
-	// 		t.Errorf("Wanted %v, got %v", wantErr, gotErr)
-	// 	}
-	// })
+func TestNeceptorListenWithConfig(t *testing.T) {
+	t.Run("service is already listening", func(t *testing.T) {
 
-	// t.Run("send result context done", func(t *testing.T){
-	// ctrl := gomock.NewController(t)
-	// mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
-	// mockNetC := &netceptor.Netceptor{}
-	// mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
-	// syncOnce := &sync.Once{}
-	// doneChan := make(chan struct{})
-	// acceptChan := make(chan *netceptor.AcceptResult)
-	// listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
-	// wantErr := errors.New("packetconner error")
+		ctx := context.Background()
+		mockNetC := netceptor.New(ctx, "node1")
+		wantErr := errors.New("service node1 is already listening")
+		_, _ = mockNetC.ListenWithConfig(ctx, "node1", nil, false, nil, nil, nil)
+		_, gotErr := mockNetC.ListenWithConfig(ctx, "node1", nil, false, nil, nil, nil)
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
 
-	// _, gotErr := listener.SendResult()
-
-	// if gotErr.Error() != wantErr.Error() {
-	// 	t.Errorf("Wanted %v, got %v", wantErr, gotErr)
-	// }
-	// })
+	t.Run("context cancelled does not panic", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		mockNetC := netceptor.New(ctx, "nodecc")
+		_, _ = mockNetC.ListenWithConfig(ctx, "nodecc", nil, false, nil, nil, nil)
+		// Assert cancelling netceptor context doesn't create panic
+		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
+	})
 }

@@ -72,14 +72,67 @@ func NewListener(s *Netceptor, pc PacketConner, ql QuicListenerForListener, acce
 }
 
 type ListenConfig struct {
-	advertise             bool
-	adTags                map[string]string
-	ctx                   context.Context
-	tlsCfg                *tls.Config
-	quicCfg               *quic.Config
-	quicStatelessResetKey *quic.StatelessResetKey
-	service               string
-	pc                    *PacketConn
+	advertise bool
+	adTags    map[string]string
+	ctx       context.Context
+	tlsCfg    *tls.Config
+	quicCfg   *quic.Config
+	service   string
+	pc        *PacketConn
+}
+
+func NewListenConfig(s *Netceptor, ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string, quiccfg *quic.Config, pc *PacketConn) *ListenConfig {
+	var connType byte
+	var _tlsconfig *tls.Config
+	if tlscfg == nil {
+		connType = ConnTypeStream
+		_tlsconfig = generateServerTLSConfig()
+	} else {
+		connType = ConnTypeStreamTLS
+		_tlsconfig = tlscfg.Clone()
+		_tlsconfig.NextProtos = []string{"netceptor"}
+		if _tlsconfig.ClientAuth == tls.RequireAndVerifyClientCert {
+			_tlsconfig.GetConfigForClient = s.getConfigForClient(_tlsconfig)
+		}
+	}
+
+	var _quiccfg *quic.Config
+	if quiccfg == nil {
+		_quiccfg = &quic.Config{
+			Tracer:                  s.tracer,
+			HandshakeIdleTimeout:    15 * time.Second,
+			MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
+			Allow0RTT:               true,
+			DisablePathMTUDiscovery: false,
+		}
+	} else {
+		_quiccfg = quiccfg
+	}
+
+	var _pc *PacketConn
+	if pc == nil {
+		_pc = &PacketConn{
+			s:            s,
+			localService: service,
+			recvChan:     make(chan *MessageData),
+			advertise:    advertise,
+			adTags:       adTags,
+			connType:     connType,
+			hopsToLive:   s.maxForwardingHops,
+		}
+	} else {
+		_pc = pc
+	}
+
+	return &ListenConfig{
+		advertise: advertise,
+		adTags:    adTags,
+		ctx:       ctx,
+		service:   service,
+		quicCfg:   _quiccfg,
+		tlsCfg:    _tlsconfig,
+		pc:        _pc,
+	}
 }
 
 // Internal implementation of Listen and ListenAndAdvertise.
@@ -101,35 +154,9 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 		return nil, fmt.Errorf("service %s is already listening", cfg.service)
 	}
 	_ = s.AddNameHash(cfg.service)
-	var connType byte
-	if cfg.tlsCfg == nil {
-		connType = ConnTypeStream
-		cfg.tlsCfg = generateServerTLSConfig()
-	} else {
-		connType = ConnTypeStreamTLS
-		cfg.tlsCfg = cfg.tlsCfg.Clone()
-		cfg.tlsCfg.NextProtos = []string{"netceptor"}
-		if cfg.tlsCfg.ClientAuth == tls.RequireAndVerifyClientCert {
-			cfg.tlsCfg.GetConfigForClient = s.getConfigForClient(cfg.tlsCfg)
-		}
-	}
-	var pc *PacketConn
-	if cfg.pc == nil {
-		pc = &PacketConn{
-			s:            s,
-			localService: cfg.service,
-			recvChan:     make(chan *MessageData),
-			advertise:    cfg.advertise,
-			adTags:       cfg.adTags,
-			connType:     connType,
-			hopsToLive:   s.maxForwardingHops,
-		}
-	} else {
-		pc = cfg.pc
-	}
-	pc.StartUnreachable()
+	cfg.pc.StartUnreachable()
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, cfg.service)
-	s.listenerRegistry[cfg.service] = pc
+	s.listenerRegistry[cfg.service] = cfg.pc
 	var quiccfg *quic.Config
 	if cfg.quicCfg == nil {
 		quiccfg = &quic.Config{
@@ -142,16 +169,10 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 	} else {
 		quiccfg = cfg.quicCfg
 	}
-	var statelessResetKey *quic.StatelessResetKey
-	if cfg.quicStatelessResetKey == nil {
-		randkey := make([]byte, 32)
-		rand.Read(randkey)
-		statelessResetKey = (*quic.StatelessResetKey)(randkey)
-	} else {
-		statelessResetKey = cfg.quicStatelessResetKey
-	}
+	statelessResetKey := make([]byte, 32)
+	rand.Read(statelessResetKey)
 	tr := quic.Transport{
-		Conn:              pc,
+		Conn:              cfg.pc,
 		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
@@ -160,7 +181,7 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 		return nil, err
 	}
 	if cfg.advertise {
-		s.AddLocalServiceAdvertisement(cfg.service, connType, cfg.adTags)
+		s.AddLocalServiceAdvertisement(cfg.service, cfg.pc.connType, cfg.adTags)
 	}
 	doneChan := make(chan struct{})
 	go func() {
@@ -175,7 +196,7 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 	}()
 	acceptChan := make(chan *AcceptResult)
 	syncOnce := &sync.Once{}
-	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
+	li := NewListener(s, cfg.pc, ql, acceptChan, doneChan, syncOnce)
 
 	go li.acceptLoop(cfg.ctx)
 
@@ -226,30 +247,16 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
-	cfg := &ListenConfig{
-		ctx:       s.context,
-		service:   service,
-		tlsCfg:    tlscfg,
-		advertise: false,
-		adTags:    nil,
-	}
-	return s.listen(cfg)
+	return s.listen(NewListenConfig(s, s.context, service, tlscfg, false, nil, nil, nil))
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	cfg := &ListenConfig{
-		ctx:       s.context,
-		service:   service,
-		tlsCfg:    tlscfg,
-		advertise: true,
-		adTags:    tags,
-	}
-	return s.listen(cfg)
+	return s.listen(NewListenConfig(s, s.context, service, tlscfg, true, tags, nil, nil))
 }
 
-func (s *Netceptor) ListenWithConfig(cfg *ListenConfig) (*Listener, error) {
-	return s.listen(cfg)
+func (s *Netceptor) ListenWithConfig(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, tags map[string]string, quiccfg *quic.Config, pc *PacketConn) (*Listener, error) {
+	return s.listen(NewListenConfig(s, s.context, service, tlscfg, advertise, tags, quiccfg, pc))
 }
 
 func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {

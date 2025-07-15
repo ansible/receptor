@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -346,6 +347,7 @@ func TestNeceptorListen(t *testing.T) {
 	})
 
 	t.Run("context cancelled does not panic", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mockNetC := netceptor.New(ctx, "nodecc")
@@ -368,8 +370,9 @@ func TestNewListenConfig(t *testing.T) {
 	t.Run("listenconfig with quic config", func(t *testing.T) {
 		ctx := context.Background()
 		mockNetC := netceptor.New(ctx, "node1")
-		quicconfig := &quic.Config{}
-		assert.NotPanics(t, func() { netceptor.NewListenConfig(mockNetC, ctx, "node1", nil, false, nil, quicconfig, nil) })
+		quiccfg := mockNetC.NewQuicConfigWithConst()
+		quiccfg.Versions = append(quiccfg.Versions, (quic.Version)(math.MaxUint32-1))
+		assert.NotPanics(t, func() { netceptor.NewListenConfig(mockNetC, ctx, "node1", nil, false, nil, quiccfg, nil) })
 	})
 
 	t.Run("listenconfig with packet conn", func(t *testing.T) {
@@ -392,12 +395,35 @@ func TestNeceptorListenWithConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("context cancelled does not panic", func(t *testing.T) {
+	t.Run("netceptor context cancelled does not panic", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mockNetC := netceptor.New(ctx, "nodecc")
 		_, _ = mockNetC.ListenWithConfig(ctx, "nodecc", nil, false, nil, nil, nil)
 		// Assert cancelling netceptor context doesn't create panic
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
+	})
+
+	t.Run("context cancelled does not panic", func(t *testing.T) {
+		t.Parallel()
+		nctx := context.Background()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		mockNetC := netceptor.New(nctx, "nodecc")
+		_, _ = mockNetC.ListenWithConfig(ctx, "nodecc", nil, false, nil, nil, nil)
+		// Assert cancelling netceptor context doesn't create panic
+		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
+	})
+
+	t.Run("invalid quic version", func(t *testing.T) {
+		ctx := context.Background()
+		mockNetC := netceptor.New(ctx, "node2")
+		wantErr := errors.New("invalid QUIC version: 0xfffffffe")
+		quiccfg := mockNetC.NewQuicConfigWithConst()
+		quiccfg.Versions = append(quiccfg.Versions, (quic.Version)(math.MaxUint32-1))
+		_, gotErr := mockNetC.ListenWithConfig(ctx, "node2", nil, false, nil, quiccfg, nil)
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
 	})
 }

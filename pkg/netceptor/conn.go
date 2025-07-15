@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -70,73 +71,103 @@ func NewListener(s *Netceptor, pc PacketConner, ql QuicListenerForListener, acce
 	}
 }
 
+type ListenConfig struct {
+	advertise             bool
+	adTags                map[string]string
+	ctx                   context.Context
+	tlsCfg                *tls.Config
+	quicCfg               *quic.Config
+	quicStatelessResetKey *quic.StatelessResetKey
+	service               string
+	pc                    *PacketConn
+}
+
 // Internal implementation of Listen and ListenAndAdvertise.
-func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
-	if len(service) > 8 {
-		return nil, fmt.Errorf("service name %s too long", service)
+func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
+	if cfg == nil {
+		return nil, errors.New("nil listen config passed")
 	}
-	if service == "" {
-		service = s.GetEphemeralService()
+	if len(cfg.service) > 8 {
+		return nil, fmt.Errorf("service name %s too long", cfg.service)
+	}
+	if cfg.service == "" {
+		cfg.service = s.GetEphemeralService()
 	}
 	s.listenerLock.Lock()
 	defer s.listenerLock.Unlock()
-	_, isReserved := s.reservedServices[service]
-	_, isListening := s.listenerRegistry[service]
+	_, isReserved := s.reservedServices[cfg.service]
+	_, isListening := s.listenerRegistry[cfg.service]
 	if isReserved || isListening {
-		return nil, fmt.Errorf("service %s is already listening", service)
+		return nil, fmt.Errorf("service %s is already listening", cfg.service)
 	}
-	_ = s.AddNameHash(service)
+	_ = s.AddNameHash(cfg.service)
 	var connType byte
-	if tlscfg == nil {
+	if cfg.tlsCfg == nil {
 		connType = ConnTypeStream
-		tlscfg = generateServerTLSConfig()
+		cfg.tlsCfg = generateServerTLSConfig()
 	} else {
 		connType = ConnTypeStreamTLS
-		tlscfg = tlscfg.Clone()
-		tlscfg.NextProtos = []string{"netceptor"}
-		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
-			tlscfg.GetConfigForClient = s.getConfigForClient(tlscfg)
+		cfg.tlsCfg = cfg.tlsCfg.Clone()
+		cfg.tlsCfg.NextProtos = []string{"netceptor"}
+		if cfg.tlsCfg.ClientAuth == tls.RequireAndVerifyClientCert {
+			cfg.tlsCfg.GetConfigForClient = s.getConfigForClient(cfg.tlsCfg)
 		}
 	}
-	pc := &PacketConn{
-		s:            s,
-		localService: service,
-		recvChan:     make(chan *MessageData),
-		advertise:    advertise,
-		adTags:       adTags,
-		connType:     connType,
-		hopsToLive:   s.maxForwardingHops,
+	var pc *PacketConn
+	if cfg.pc == nil {
+		pc = &PacketConn{
+			s:            s,
+			localService: cfg.service,
+			recvChan:     make(chan *MessageData),
+			advertise:    cfg.advertise,
+			adTags:       cfg.adTags,
+			connType:     connType,
+			hopsToLive:   s.maxForwardingHops,
+		}
+	} else {
+		pc = cfg.pc
 	}
 	pc.StartUnreachable()
-	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
-	s.listenerRegistry[service] = pc
-	cfg := &quic.Config{
-		Tracer:                  s.tracer,
-		HandshakeIdleTimeout:    15 * time.Second,
-		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
-		Allow0RTT:               true,
-		DisablePathMTUDiscovery: false,
+	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, cfg.service)
+	s.listenerRegistry[cfg.service] = pc
+	var quiccfg *quic.Config
+	if cfg.quicCfg == nil {
+		quiccfg = &quic.Config{
+			Tracer:                  s.tracer,
+			HandshakeIdleTimeout:    15 * time.Second,
+			MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
+			Allow0RTT:               true,
+			DisablePathMTUDiscovery: false,
+		}
+	} else {
+		quiccfg = cfg.quicCfg
 	}
-	statelessResetKey := make([]byte, 32)
-	rand.Read(statelessResetKey)
+	var statelessResetKey *quic.StatelessResetKey
+	if cfg.quicStatelessResetKey == nil {
+		randkey := make([]byte, 32)
+		rand.Read(randkey)
+		statelessResetKey = (*quic.StatelessResetKey)(randkey)
+	} else {
+		statelessResetKey = cfg.quicStatelessResetKey
+	}
 	tr := quic.Transport{
 		Conn:              pc,
 		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
 	}
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
-	ql, err := tr.Listen(tlscfg, cfg)
+	ql, err := tr.Listen(cfg.tlsCfg, quiccfg)
 	if err != nil {
 		return nil, err
 	}
-	if advertise {
-		s.AddLocalServiceAdvertisement(service, connType, adTags)
+	if cfg.advertise {
+		s.AddLocalServiceAdvertisement(cfg.service, connType, cfg.adTags)
 	}
 	doneChan := make(chan struct{})
 	go func() {
 		select {
 		case <-s.context.Done():
 			_ = ql.Close()
-		case <-ctx.Done():
+		case <-cfg.ctx.Done():
 			_ = ql.Close()
 		case <-doneChan:
 			return
@@ -146,7 +177,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	syncOnce := &sync.Once{}
 	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
 
-	go li.acceptLoop(ctx)
+	go li.acceptLoop(cfg.ctx)
 
 	return li, nil
 }
@@ -195,15 +226,33 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(s.context, service, tlscfg, false, nil)
+	cfg := &ListenConfig{
+		ctx:       s.context,
+		service:   service,
+		tlsCfg:    tlscfg,
+		advertise: false,
+		adTags:    nil,
+	}
+	return s.listen(cfg)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(s.context, service, tlscfg, true, tags)
+	cfg := &ListenConfig{
+		ctx:       s.context,
+		service:   service,
+		tlsCfg:    tlscfg,
+		advertise: true,
+		adTags:    tags,
+	}
+	return s.listen(cfg)
 }
 
-func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
+func (s *Netceptor) ListenWithConfig(cfg *ListenConfig) (*Listener, error) {
+	return s.listen(cfg)
+}
+
+func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {
 	select {
 	case <-ctx.Done():
 		return
@@ -231,7 +280,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 		default:
 		}
 		if err != nil {
-			li.SendResult(ctx, nil, err)
+			li.sendResult(ctx, nil, err)
 
 			continue
 		}
@@ -252,7 +301,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 				return
 			} else if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("AcceptStream Error: %s", err.Error()))
-				li.SendResult(ctx, nil, err)
+				li.sendResult(ctx, nil, err)
 
 				return
 			}
@@ -260,13 +309,13 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			n, err := qs.Read(buf)
 			if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("Read Error: %s", err.Error()))
-				li.SendResult(ctx, nil, err)
+				li.sendResult(ctx, nil, err)
 
 				return
 			}
 			if n != 1 || buf[0] != 0 {
 				_ = qc.CloseWithError(500, "Read Data Error")
-				li.SendResult(ctx, nil, fmt.Errorf("stream failed to initialize"))
+				li.sendResult(ctx, nil, fmt.Errorf("stream failed to initialize"))
 
 				return
 			}
@@ -295,7 +344,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 					return
 				}
 			}()
-			li.SendResult(ctx, conn, err)
+			li.sendResult(ctx, conn, err)
 		}()
 	}
 }

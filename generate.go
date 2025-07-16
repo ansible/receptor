@@ -9,6 +9,7 @@ package main
 //go:generate mockgen -source=pkg/framer/framer.go -destination=pkg/framer/mock_framer/framer.go
 //go:generate mockgen -source=pkg/netceptor/conn.go -destination=pkg/netceptor/mock_netceptor/conn.go
 //go:generate mockgen -source=pkg/netceptor/external_backend.go -destination=pkg/netceptor/mock_netceptor/external_backend.go
+//go:generate mockgen -source=pkg/netceptor/interface.go -destination=pkg/netceptor/mock_netceptor/interface.go
 //go:generate mockgen -source=pkg/netceptor/netceptor.go -destination=pkg/netceptor/mock_netceptor/netceptor.go
 //go:generate mockgen -source=pkg/netceptor/packetconn.go -destination=pkg/netceptor/mock_netceptor/packetconn.go
 //go:generate mockgen -source=pkg/netceptor/ping.go -destination=pkg/netceptor/mock_netceptor/ping.go

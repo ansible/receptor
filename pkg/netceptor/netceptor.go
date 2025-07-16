@@ -99,6 +99,9 @@ const (
 	FirewallResultDrop
 )
 
+// Ensure that Netceptor implements the Netceptor interface.
+var _ NetceptorInterface = &Netceptor{}
+
 // Netceptor is the main object of the Receptor mesh network protocol.
 type Netceptor struct {
 	nodeID                   string

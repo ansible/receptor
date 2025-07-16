@@ -393,3 +393,70 @@ func (mr *MockQuicConnectionForConnMockRecorder) SendDatagram(payload any) *gomo
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendDatagram", reflect.TypeOf((*MockQuicConnectionForConn)(nil).SendDatagram), payload)
 }
+
+// MockQuicListenerForListener is a mock of QuicListenerForListener interface.
+type MockQuicListenerForListener struct {
+	ctrl     *gomock.Controller
+	recorder *MockQuicListenerForListenerMockRecorder
+	isgomock struct{}
+}
+
+// MockQuicListenerForListenerMockRecorder is the mock recorder for MockQuicListenerForListener.
+type MockQuicListenerForListenerMockRecorder struct {
+	mock *MockQuicListenerForListener
+}
+
+// NewMockQuicListenerForListener creates a new mock instance.
+func NewMockQuicListenerForListener(ctrl *gomock.Controller) *MockQuicListenerForListener {
+	mock := &MockQuicListenerForListener{ctrl: ctrl}
+	mock.recorder = &MockQuicListenerForListenerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockQuicListenerForListener) EXPECT() *MockQuicListenerForListenerMockRecorder {
+	return m.recorder
+}
+
+// Accept mocks base method.
+func (m *MockQuicListenerForListener) Accept(ctx context.Context) (quic.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Accept", ctx)
+	ret0, _ := ret[0].(quic.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Accept indicates an expected call of Accept.
+func (mr *MockQuicListenerForListenerMockRecorder) Accept(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockQuicListenerForListener)(nil).Accept), ctx)
+}
+
+// Addr mocks base method.
+func (m *MockQuicListenerForListener) Addr() net.Addr {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Addr")
+	ret0, _ := ret[0].(net.Addr)
+	return ret0
+}
+
+// Addr indicates an expected call of Addr.
+func (mr *MockQuicListenerForListenerMockRecorder) Addr() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Addr", reflect.TypeOf((*MockQuicListenerForListener)(nil).Addr))
+}
+
+// Close mocks base method.
+func (m *MockQuicListenerForListener) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockQuicListenerForListenerMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockQuicListenerForListener)(nil).Close))
+}

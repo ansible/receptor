@@ -2,6 +2,7 @@ package netceptor_test
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"sync"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
 	"github.com/quic-go/quic-go"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
@@ -328,5 +330,30 @@ func TestListenerClose(t *testing.T) {
 		if gotErr.Error() != wantErr.Error() {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
 		}
+	})
+}
+
+func TestNeceptorListen(t *testing.T) {
+	t.Parallel()
+	t.Run("service is already listening", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		mockNetC := netceptor.New(ctx, "node1")
+		wantErr := errors.New("service node1 is already listening")
+		_, _ = mockNetC.Listen("node1", &tls.Config{})
+		_, gotErr := mockNetC.Listen("node1", &tls.Config{})
+		if gotErr.Error() != wantErr.Error() {
+			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		}
+	})
+
+	t.Run("context cancelled does not panic", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		mockNetC := netceptor.New(ctx, "nodecc")
+		_, _ = mockNetC.Listen("nodecc", &tls.Config{})
+		// Assert cancelling netceptor context doesn't create panic
+		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
 	})
 }

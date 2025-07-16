@@ -335,7 +335,9 @@ func TestListenerClose(t *testing.T) {
 }
 
 func TestNeceptorListen(t *testing.T) {
+	t.Parallel()
 	t.Run("service is already listening", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		mockNetC := netceptor.New(ctx, "node1")
 		wantErr := errors.New("service node1 is already listening")

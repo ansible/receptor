@@ -185,7 +185,6 @@ func (s *Netceptor) listen(cfg *ListenConfig) (*Listener, error) {
 	acceptChan := make(chan *AcceptResult)
 	syncOnce := &sync.Once{}
 	li := NewListener(s, cfg.pc, ql, acceptChan, doneChan, syncOnce)
-
 	go li.acceptLoop(cfg.ctx)
 
 	return li, nil

@@ -71,7 +71,7 @@ func NewListener(s *Netceptor, pc PacketConner, ql QuicListenerForListener, acce
 }
 
 // Internal implementation of Listen and ListenAndAdvertise.
-func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
+func (s *Netceptor) listen(service string, tlscfg *tls.Config, advertise bool, adTags map[string]string) (*Listener, error) {
 	if len(service) > 8 {
 		return nil, fmt.Errorf("service name %s too long", service)
 	}
@@ -136,22 +136,15 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		select {
 		case <-s.context.Done():
 			_ = ql.Close()
-		case <-ctx.Done():
-			_ = ql.Close()
 		case <-doneChan:
 			return
 		}
 	}()
-	li := &Listener{
-		s:          s,
-		pc:         pc,
-		ql:         ql,
-		AcceptChan: make(chan *AcceptResult),
-		DoneChan:   doneChan,
-		doneOnce:   &sync.Once{},
-	}
+	acceptChan := make(chan *AcceptResult)
+	syncOnce := &sync.Once{}
+	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
 
-	go li.acceptLoop(ctx)
+	go li.acceptLoop(s.context)
 
 	return li, nil
 }
@@ -200,12 +193,12 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(s.context, service, tlscfg, false, nil)
+	return s.listen(service, tlscfg, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(s.context, service, tlscfg, true, tags)
+	return s.listen(service, tlscfg, true, tags)
 }
 
 func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {

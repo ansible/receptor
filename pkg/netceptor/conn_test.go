@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"net"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -235,102 +237,481 @@ func TestSetWriteDeadline(t *testing.T) {
 	})
 }
 
-func TestListenerAddr(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
-	mockNetC := &netceptor.Netceptor{}
-	ql := &quic.Listener{}
-	doneChan := make(chan struct{})
-	acceptChan := make(chan *netceptor.AcceptResult)
-	syncOnce := &sync.Once{}
-	listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+func TestListenerAccept(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupAction   func(*netceptor.Listener)
+		expectedError string
+		expectedConn  bool
+	}{
+		{
+			name: "accept channel error",
+			setupAction: func(listener *netceptor.Listener) {
+				go func() {
+					listener.AcceptChan <- &netceptor.AcceptResult{
+						Conn: nil,
+						Err:  errors.New("accept channel error"),
+					}
+				}()
+			},
+			expectedError: "accept channel error",
+		},
+		{
+			name: "accept channel closed",
+			setupAction: func(listener *netceptor.Listener) {
+				close(listener.AcceptChan)
+			},
+			expectedError: "listener closed",
+		},
+		{
+			name: "done channel closed",
+			setupAction: func(listener *netceptor.Listener) {
+				close(listener.DoneChan)
+			},
+			expectedError: "listener closed",
+		},
+		{
+			name: "successful accept",
+			setupAction: func(listener *netceptor.Listener) {
+				go func() {
+					listener.AcceptChan <- &netceptor.AcceptResult{
+						Conn: &netceptor.Conn{},
+						Err:  nil,
+					}
+				}()
+			},
+			expectedConn: true,
+		},
+	}
 
-	mockPacketConner.EXPECT().LocalAddr().Return(nil)
-	got := listener.Addr()
-	if got != nil {
-		t.Errorf("Wanted %v, got %v", nil, got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Common listener setup moved outside the table
+			mockNetC := &netceptor.Netceptor{}
+			ql := &quic.Listener{}
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult)
+			syncOnce := &sync.Once{}
+			listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+
+			tt.setupAction(listener)
+
+			conn, err := listener.Accept()
+
+			if tt.expectedError != "" {
+				if err == nil {
+					t.Errorf("Expected error %q, got nil", tt.expectedError)
+				} else if err.Error() != tt.expectedError {
+					t.Errorf("Expected error %q, got %q", tt.expectedError, err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+
+			if tt.expectedConn {
+				if conn == nil {
+					t.Error("Expected connection, got nil")
+				}
+			} else if conn != nil {
+				t.Errorf("Expected no connection, got %v", conn)
+			}
+		})
 	}
 }
 
-func TestListenerAccept(t *testing.T) {
+func TestListenerClose(t *testing.T) {
+	tests := []struct {
+		name             string
+		setupMocks       func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener)
+		expectedError    string
+		multipleClose    bool
+		validateDoneChan bool
+	}{
+		{
+			name: "packetconner error",
+			setupMocks: func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener) {
+				mockQL.EXPECT().Close().Return(nil)
+				mockPC.EXPECT().Close().Return(errors.New("packetconner error"))
+			},
+			expectedError: "packetconner error",
+		},
+		{
+			name: "quiclistener error",
+			setupMocks: func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener) {
+				mockPC.EXPECT().Close().Return(nil)
+				mockQL.EXPECT().Close().Return(errors.New("quiclistener error"))
+			},
+			expectedError: "quiclistener error",
+		},
+		{
+			name: "successful close",
+			setupMocks: func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener) {
+				mockPC.EXPECT().Close().Return(nil)
+				mockQL.EXPECT().Close().Return(nil)
+			},
+			validateDoneChan: true,
+		},
+		{
+			name: "multiple close calls are safe",
+			setupMocks: func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener) {
+				mockPC.EXPECT().Close().Return(nil).Times(2)
+				mockQL.EXPECT().Close().Return(nil).Times(2)
+			},
+			multipleClose:    true,
+			validateDoneChan: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+			mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+			mockNetC := &netceptor.Netceptor{}
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult)
+			syncOnce := &sync.Once{}
+
+			listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+
+			tt.setupMocks(mockPacketConner, mockListener)
+
+			// First close
+			err1 := listener.Close()
+			if tt.expectedError != "" {
+				if err1 == nil {
+					t.Errorf("Expected error %q, got nil", tt.expectedError)
+				} else if err1.Error() != tt.expectedError {
+					t.Errorf("Expected error %q, got %q", tt.expectedError, err1.Error())
+				}
+			} else if err1 != nil {
+				t.Errorf("Expected no error, got %v", err1)
+			}
+
+			// Test multiple close if requested
+			if tt.multipleClose {
+				err2 := listener.Close()
+				if err2 != nil {
+					t.Errorf("Second close should not error, got %v", err2)
+				}
+			}
+
+			// Validate DoneChan is closed if requested
+			if tt.validateDoneChan {
+				select {
+				case <-listener.DoneChan:
+					// Expected - channel should be closed
+				default:
+					t.Error("DoneChan should be closed after Close()")
+				}
+			}
+		})
+	}
+}
+
+func TestListenerAddr(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupMock    func(*mock_netceptor.MockPacketConner)
+		expectedAddr net.Addr
+	}{
+		{
+			name: "returns non-nil addr",
+			setupMock: func(mockPC *mock_netceptor.MockPacketConner) {
+				testAddr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}
+				mockPC.EXPECT().LocalAddr().Return(testAddr)
+			},
+			expectedAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080},
+		},
+		{
+			name: "handles nil addr from PacketConner",
+			setupMock: func(mockPC *mock_netceptor.MockPacketConner) {
+				mockPC.EXPECT().LocalAddr().Return(nil)
+			},
+			expectedAddr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+			mockNetC := &netceptor.Netceptor{}
+			ql := &quic.Listener{}
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult)
+			syncOnce := &sync.Once{}
+
+			listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+
+			tt.setupMock(mockPacketConner)
+
+			got := listener.Addr()
+			if !reflect.DeepEqual(got, tt.expectedAddr) {
+				t.Errorf("Expected %v, got %v", tt.expectedAddr, got)
+			}
+		})
+	}
+}
+
+func TestListenerAcceptEdgeCases(t *testing.T) {
+	tests := []struct {
+		name              string
+		setupAction       func(*netceptor.Listener)
+		expectedError     string
+		expectedConnCount int
+		concurrent        bool
+	}{
+		{
+			name: "accept returns nil AcceptResult",
+			setupAction: func(listener *netceptor.Listener) {
+				go func() {
+					listener.AcceptChan <- nil
+				}()
+			},
+			expectedError: "listener closed",
+		},
+		{
+			name: "accept with successful connection",
+			setupAction: func(listener *netceptor.Listener) {
+				conn := &netceptor.Conn{}
+				go func() {
+					listener.AcceptChan <- &netceptor.AcceptResult{
+						Conn: conn,
+						Err:  nil,
+					}
+				}()
+			},
+			expectedConnCount: 1,
+		},
+		{
+			name: "concurrent accepts",
+			setupAction: func(listener *netceptor.Listener) {
+				conn1 := &netceptor.Conn{}
+				conn2 := &netceptor.Conn{}
+				// Send two connections
+				go func() {
+					listener.AcceptChan <- &netceptor.AcceptResult{Conn: conn1, Err: nil}
+					listener.AcceptChan <- &netceptor.AcceptResult{Conn: conn2, Err: nil}
+				}()
+			},
+			expectedConnCount: 2,
+			concurrent:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockNetC := &netceptor.Netceptor{}
+			ql := &quic.Listener{}
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult, 2)
+			syncOnce := &sync.Once{}
+
+			listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+
+			tt.setupAction(listener)
+
+			if tt.concurrent {
+				// Handle concurrent accepts
+				results := make(chan net.Conn, 2)
+				errors := make(chan error, 2)
+
+				for i := 0; i < tt.expectedConnCount; i++ {
+					go func() {
+						conn, err := listener.Accept()
+						results <- conn
+						errors <- err
+					}()
+				}
+
+				// Collect results
+				var conns []net.Conn
+				for i := 0; i < tt.expectedConnCount; i++ {
+					conn := <-results
+					err := <-errors
+					if err != nil {
+						t.Errorf("Accept %d failed: %v", i, err)
+					}
+					conns = append(conns, conn)
+				}
+
+				if len(conns) != tt.expectedConnCount {
+					t.Errorf("Expected %d connections, got %d", tt.expectedConnCount, len(conns))
+				}
+			} else {
+				// Handle single accept
+				conn, err := listener.Accept()
+
+				if tt.expectedError != "" {
+					if err == nil {
+						t.Errorf("Expected error %q, got nil", tt.expectedError)
+					} else if err.Error() != tt.expectedError {
+						t.Errorf("Expected error %q, got %q", tt.expectedError, err.Error())
+					}
+				} else if err != nil {
+					t.Errorf("Expected no error, got %v", err)
+				}
+
+				if tt.expectedConnCount > 0 {
+					if conn == nil {
+						t.Error("Expected connection, got nil")
+					}
+				} else if conn != nil {
+					t.Errorf("Expected no connection, got %v", conn)
+				}
+			}
+		})
+	}
+}
+
+func TestNewListener(t *testing.T) {
+	tests := []struct {
+		name             string
+		netceptor        *netceptor.Netceptor
+		validateChannels bool
+		shouldNotBeNil   bool
+	}{
+		{
+			name:             "creates listener with all fields set",
+			netceptor:        &netceptor.Netceptor{},
+			validateChannels: true,
+			shouldNotBeNil:   true,
+		},
+		{
+			name:           "creates listener with nil netceptor",
+			netceptor:      nil,
+			shouldNotBeNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+			mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult)
+			syncOnce := &sync.Once{}
+
+			listener := netceptor.NewListener(tt.netceptor, mockPacketConner, mockQL, acceptChan, doneChan, syncOnce)
+
+			if tt.shouldNotBeNil {
+				if listener == nil {
+					t.Error("NewListener should not return nil")
+				}
+			}
+
+			if tt.validateChannels && listener != nil {
+				if listener.AcceptChan != acceptChan {
+					t.Error("AcceptChan not properly assigned")
+				}
+				if listener.DoneChan != doneChan {
+					t.Error("DoneChan not properly assigned")
+				}
+			}
+		})
+	}
+}
+
+func TestListenerAcceptWithContextCancellation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
 	mockNetC := &netceptor.Netceptor{}
 	ql := &quic.Listener{}
-	syncOnce := &sync.Once{}
 
-	t.Run("accept channel error", func(t *testing.T) {
+	t.Run("accept blocks and then receives done signal", func(t *testing.T) {
 		doneChan := make(chan struct{})
 		acceptChan := make(chan *netceptor.AcceptResult)
+		syncOnce := &sync.Once{}
 		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
-		wantErr := errors.New("accept channel error")
+
+		resultChan := make(chan error, 1)
+
+		// Start accept in goroutine
 		go func() {
-			_, gotErr := listener.Accept()
-			if gotErr.Error() != wantErr.Error() {
-				t.Errorf("Wanted %v, got %v", wantErr, gotErr)
-			}
+			_, err := listener.Accept()
+			resultChan <- err
 		}()
-		ar := &netceptor.AcceptResult{
-			Conn: nil,
-			Err:  wantErr,
-		}
-		listener.AcceptChan <- ar
-	})
 
-	t.Run("accept channel closed", func(t *testing.T) {
-		doneChan := make(chan struct{})
-		acceptChan := make(chan *netceptor.AcceptResult)
-		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
-		wantErr := errors.New("listener closed")
-		close(listener.AcceptChan)
-		_, gotErr := listener.Accept()
-		if gotErr.Error() != wantErr.Error() {
-			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
-		}
-	})
+		// Give Accept time to start blocking
+		time.Sleep(10 * time.Millisecond)
 
-	t.Run("done channel closed", func(t *testing.T) {
-		doneChan := make(chan struct{})
-		acceptChan := make(chan *netceptor.AcceptResult)
-		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
-		close(listener.DoneChan)
-		_, gotErr := listener.Accept()
-		wantErr := errors.New("listener closed")
-		if gotErr.Error() != wantErr.Error() {
-			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
+		// Close done channel to signal shutdown
+		close(doneChan)
+
+		// Should receive error quickly
+		select {
+		case err := <-resultChan:
+			if err == nil {
+				t.Error("Expected error when done channel closed")
+			}
+			if err.Error() != "listener closed" {
+				t.Errorf("Expected 'listener closed', got %v", err)
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Accept should have returned quickly after done channel closed")
 		}
 	})
 }
 
-func TestListenerClose(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
-	mockNetC := &netceptor.Netceptor{}
-	mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
-	syncOnce := &sync.Once{}
-	doneChan := make(chan struct{})
-	acceptChan := make(chan *netceptor.AcceptResult)
+func TestListenerCloseErrorPrecedence(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupMocks    func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener)
+		expectedError string
+	}{
+		{
+			name: "quic listener error takes precedence over packet conner error",
+			setupMocks: func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener) {
+				pcErr := errors.New("packet conner error")
+				qlErr := errors.New("quic listener error")
+				mockPC.EXPECT().Close().Return(pcErr)
+				mockQL.EXPECT().Close().Return(qlErr)
+			},
+			expectedError: "quic listener error",
+		},
+		{
+			name: "packet conner error returned when quic listener succeeds",
+			setupMocks: func(mockPC *mock_netceptor.MockPacketConner, mockQL *mock_netceptor.MockQuicListenerForListener) {
+				pcErr := errors.New("packet conner error")
+				mockPC.EXPECT().Close().Return(pcErr)
+				mockQL.EXPECT().Close().Return(nil)
+			},
+			expectedError: "packet conner error",
+		},
+	}
 
-	t.Run("packetconner error", func(t *testing.T) {
-		listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
-		wantErr := errors.New("packetconner error")
-		mockListener.EXPECT().Close()
-		mockPacketConner.EXPECT().Close().Return(wantErr)
-		gotErr := listener.Close()
-		if gotErr.Error() != wantErr.Error() {
-			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
-		}
-	})
-	t.Run("quiclistener error", func(t *testing.T) {
-		listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
-		wantErr := errors.New("quiclistener error")
-		mockPacketConner.EXPECT().Close()
-		mockListener.EXPECT().Close().Return(wantErr)
-		gotErr := listener.Close()
-		if gotErr.Error() != wantErr.Error() {
-			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+			mockListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+			mockNetC := &netceptor.Netceptor{}
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult)
+			syncOnce := &sync.Once{}
+
+			listener := netceptor.NewListener(mockNetC, mockPacketConner, mockListener, acceptChan, doneChan, syncOnce)
+
+			tt.setupMocks(mockPacketConner, mockListener)
+
+			gotErr := listener.Close()
+			if gotErr == nil {
+				t.Errorf("Expected error %q, got nil", tt.expectedError)
+			} else if gotErr.Error() != tt.expectedError {
+				t.Errorf("Expected error %q, got %q", tt.expectedError, gotErr.Error())
+			}
+		})
+	}
 }
 
 func TestNeceptorListen(t *testing.T) {

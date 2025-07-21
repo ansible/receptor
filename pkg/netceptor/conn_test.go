@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
 	"sync"
@@ -736,5 +737,188 @@ func TestNeceptorListen(t *testing.T) {
 		_, _ = mockNetC.Listen("nodecc", &tls.Config{})
 		// Assert cancelling netceptor context doesn't create panic
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
+	})
+}
+
+func TestListenerSendResult(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupAction    func(*netceptor.Listener, context.Context)
+		expectedResult *netceptor.AcceptResult
+		shouldTimeout  bool
+		ctxTimeout     time.Duration
+	}{
+		{
+			name: "successful send to AcceptChan",
+			setupAction: func(listener *netceptor.Listener, ctx context.Context) {
+				conn := &netceptor.Conn{}
+				go listener.SendResult(ctx, conn, nil)
+			},
+			expectedResult: &netceptor.AcceptResult{
+				Conn: &netceptor.Conn{},
+				Err:  nil,
+			},
+		},
+		{
+			name: "successful send with error",
+			setupAction: func(listener *netceptor.Listener, ctx context.Context) {
+				testErr := fmt.Errorf("test error")
+				go listener.SendResult(ctx, nil, testErr)
+			},
+			expectedResult: &netceptor.AcceptResult{
+				Conn: nil,
+				Err:  fmt.Errorf("test error"),
+			},
+		},
+		{
+			name: "context cancelled - should not send",
+			setupAction: func(listener *netceptor.Listener, ctx context.Context) {
+				// Create a cancelled context
+				cancelledCtx, cancel := context.WithCancel(ctx)
+				cancel()
+				go listener.SendResult(cancelledCtx, nil, nil)
+			},
+			shouldTimeout: true,
+		},
+		{
+			name: "done channel closed - should not send",
+			setupAction: func(listener *netceptor.Listener, ctx context.Context) {
+				close(listener.DoneChan)
+				go listener.SendResult(ctx, nil, nil)
+			},
+			shouldTimeout: true,
+		},
+		{
+			name: "context timeout - should not send",
+			setupAction: func(listener *netceptor.Listener, ctx context.Context) {
+				// Create context with very short timeout
+				timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
+				defer cancel()
+				// Wait for timeout before calling
+				time.Sleep(5 * time.Millisecond)
+				go listener.SendResult(timeoutCtx, nil, nil)
+			},
+			shouldTimeout: true,
+		},
+		{
+			name: "context cancelled during send - should be interrupted",
+			setupAction: func(listener *netceptor.Listener, ctx context.Context) {
+				// Create a context that we'll cancel during the send
+				cancelCtx, cancel := context.WithCancel(ctx)
+				// Use unbuffered channel to block on send
+				listener.AcceptChan = make(chan *netceptor.AcceptResult)
+
+				go func() {
+					// Cancel after a short delay while SendResult is trying to send
+					time.Sleep(10 * time.Millisecond)
+					cancel()
+				}()
+
+				go listener.SendResult(cancelCtx, nil, nil)
+			},
+			shouldTimeout: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockNetC := &netceptor.Netceptor{}
+			ql := &quic.Listener{}
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult, 1) // Buffered to prevent blocking in most cases
+			syncOnce := &sync.Once{}
+
+			listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+			ctx := context.Background()
+
+			tt.setupAction(listener, ctx)
+
+			if tt.shouldTimeout {
+				// Should not receive anything within timeout
+				select {
+				case result := <-acceptChan:
+					t.Errorf("Expected no result but got: %+v", result)
+				case <-time.After(50 * time.Millisecond):
+					// Expected - no result received
+				}
+			} else {
+				// Should receive the expected result
+				select {
+				case result := <-acceptChan:
+					if tt.expectedResult.Conn != nil && result.Conn == nil {
+						t.Error("Expected connection, got nil")
+					}
+					if tt.expectedResult.Conn == nil && result.Conn != nil {
+						t.Error("Expected nil connection, got non-nil")
+					}
+
+					if tt.expectedResult.Err != nil {
+						if result.Err == nil {
+							t.Error("Expected error, got nil")
+						} else if result.Err.Error() != tt.expectedResult.Err.Error() {
+							t.Errorf("Expected error %q, got %q", tt.expectedResult.Err, result.Err)
+						}
+					} else if result.Err != nil {
+						t.Errorf("Expected no error, got %v", result.Err)
+					}
+				case <-time.After(100 * time.Millisecond):
+					t.Error("Timed out waiting for AcceptResult")
+				}
+			}
+		})
+	}
+}
+
+func TestListenerSendResultConcurrency(t *testing.T) {
+	t.Run("concurrent SendResult calls", func(t *testing.T) {
+		mockNetC := &netceptor.Netceptor{}
+		ql := &quic.Listener{}
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult, 10) // Large buffer for concurrent sends
+		syncOnce := &sync.Once{}
+
+		listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+		ctx := context.Background()
+
+		const numGoroutines = 5
+		var wg sync.WaitGroup
+
+		// Send multiple results concurrently
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+				testErr := fmt.Errorf("error-%d", index)
+				listener.SendResult(ctx, nil, testErr)
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Verify all results were received
+		results := make([]*netceptor.AcceptResult, 0, numGoroutines)
+		for i := 0; i < numGoroutines; i++ {
+			select {
+			case result := <-acceptChan:
+				results = append(results, result)
+			case <-time.After(100 * time.Millisecond):
+				t.Errorf("Only received %d results out of %d expected", len(results), numGoroutines)
+				return
+			}
+		}
+
+		if len(results) != numGoroutines {
+			t.Errorf("Expected %d results, got %d", numGoroutines, len(results))
+		}
+
+		// Verify all results have errors and no connections
+		for i, result := range results {
+			if result.Conn != nil {
+				t.Errorf("Result %d: expected nil connection, got %v", i, result.Conn)
+			}
+			if result.Err == nil {
+				t.Errorf("Result %d: expected error, got nil", i)
+			}
+		}
 	})
 }

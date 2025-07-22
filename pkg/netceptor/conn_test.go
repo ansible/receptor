@@ -903,6 +903,7 @@ func TestListenerSendResultConcurrency(t *testing.T) {
 				results = append(results, result)
 			case <-time.After(100 * time.Millisecond):
 				t.Errorf("Only received %d results out of %d expected", len(results), numGoroutines)
+
 				return
 			}
 		}

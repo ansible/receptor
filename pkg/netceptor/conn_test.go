@@ -793,7 +793,7 @@ func TestListenerSendResult(t *testing.T) {
 		}
 	})
 
-	t.Run("context cancelled - should not send", func(t *testing.T) {
+	t.Run("context cancelled - sends nil conn and err", func(t *testing.T) {
 		listener, acceptChan := createListener()
 		cancelledCtx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
@@ -802,13 +802,18 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			t.Errorf("Expected no result but got: %+v", result)
+			if result.Conn != nil {
+				t.Error("Expected nil connection, got non-nil")
+			}
+			if result.Err != nil {
+				t.Error("Expected error, got non-nil")
+			}
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}
 	})
 
-	t.Run("done channel closed - should not send", func(t *testing.T) {
+	t.Run("done channel closed - sends nil conn and err", func(t *testing.T) {
 		listener, acceptChan := createListener()
 		ctx := context.Background()
 		close(listener.DoneChan) // Close the done channel
@@ -817,13 +822,18 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			t.Errorf("Expected no result but got: %+v", result)
+			if result.Conn != nil {
+				t.Error("Expected nil connection, got non-nil")
+			}
+			if result.Err != nil {
+				t.Error("Expected error, got non-nil")
+			}
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}
 	})
 
-	t.Run("context timeout - should not send", func(t *testing.T) {
+	t.Run("context timeout - sends nil conn and err", func(t *testing.T) {
 		listener, acceptChan := createListener()
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
@@ -833,13 +843,18 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			t.Errorf("Expected no result but got: %+v", result)
+			if result.Conn != nil {
+				t.Error("Expected nil connection, got non-nil")
+			}
+			if result.Err != nil {
+				t.Error("Expected error, got non-nil")
+			}
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}
 	})
 
-	t.Run("context cancelled during send - should be interrupted", func(t *testing.T) {
+	t.Run("context cancelled during send - should be interrupted - sends nil conn and err", func(t *testing.T) {
 		mockNetC := &netceptor.Netceptor{}
 		ql := &quic.Listener{}
 		doneChan := make(chan struct{})
@@ -858,13 +873,18 @@ func TestListenerSendResult(t *testing.T) {
 		// Verify no result was sent to acceptChan due to cancellation
 		select {
 		case result := <-acceptChan:
-			t.Errorf("Expected no result due to cancellation but got: %+v", result)
+			if result.Conn != nil {
+				t.Error("Expected nil connection, got non-nil")
+			}
+			if result.Err != nil {
+				t.Error("Expected error, got non-nil")
+			}
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received due to cancellation
 		}
 	})
 
-	t.Run("both done channel and context cancelled - should not send", func(t *testing.T) {
+	t.Run("both done channel and context cancelled - sends nil conn and err", func(t *testing.T) {
 		listener, acceptChan := createListener()
 		cancelledCtx, cancel := context.WithCancel(context.Background())
 
@@ -876,7 +896,12 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			t.Errorf("Expected no result but got: %+v", result)
+			if result.Conn != nil {
+				t.Error("Expected nil connection, got non-nil")
+			}
+			if result.Err != nil {
+				t.Error("Expected error, got non-nil")
+			}
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}

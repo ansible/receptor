@@ -305,12 +305,12 @@ func (li *Listener) Accept() (net.Conn, error) {
 	select {
 	case ar := <-li.AcceptChan:
 		if ar == nil {
-			return nil, fmt.Errorf("listener closed")
+			return nil, fmt.Errorf("listener accept channel closed")
 		} else {
 			return ar.Conn, ar.Err
 		}
 	case <-li.DoneChan:
-		return nil, fmt.Errorf("listener closed")
+		return nil, fmt.Errorf("listener done channel closed")
 	}
 }
 

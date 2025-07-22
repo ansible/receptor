@@ -995,8 +995,7 @@ func TestMonitorUnreachable(t *testing.T) {
 		n := netceptor.New(context.Background(), "test")
 		defer n.Shutdown()
 		remoteAddr := n.NewAddr("testnode", "testsvc")
-		cancelled := false
-		cancel := func() { cancelled = true }
+		cancel := func() { close(doneChan) }
 
 		// Create a notification channel that we'll send messages to
 		msgCh := make(chan netceptor.UnreachableNotification, 1)
@@ -1026,11 +1025,11 @@ func TestMonitorUnreachable(t *testing.T) {
 		// Close the channel to end the range loop
 		close(msgCh)
 
-		// Give the goroutine time to process
-		time.Sleep(10 * time.Millisecond)
-
-		// Verify cancel was called
-		if !cancelled {
+		// Wait for cancel to be called (doneChan to be closed)
+		select {
+		case <-doneChan:
+			// Cancel was called as expected
+		case <-time.After(100 * time.Millisecond):
 			t.Error("Expected cancel to be called when matching message is received")
 		}
 	})

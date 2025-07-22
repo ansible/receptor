@@ -212,7 +212,7 @@ func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
 		return
 	default:
 	}
-	
+
 	// Then try to send
 	select {
 	case li.AcceptChan <- &AcceptResult{Conn: conn, Err: err}:

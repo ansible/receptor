@@ -802,12 +802,7 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			if result.Conn != nil {
-				t.Error("Expected nil connection, got non-nil")
-			}
-			if result.Err != nil {
-				t.Error("Expected error, got non-nil")
-			}
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}
@@ -822,12 +817,7 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			if result.Conn != nil {
-				t.Error("Expected nil connection, got non-nil")
-			}
-			if result.Err != nil {
-				t.Error("Expected error, got non-nil")
-			}
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}
@@ -843,12 +833,7 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			if result.Conn != nil {
-				t.Error("Expected nil connection, got non-nil")
-			}
-			if result.Err != nil {
-				t.Error("Expected error, got non-nil")
-			}
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}
@@ -873,12 +858,7 @@ func TestListenerSendResult(t *testing.T) {
 		// Verify no result was sent to acceptChan due to cancellation
 		select {
 		case result := <-acceptChan:
-			if result.Conn != nil {
-				t.Error("Expected nil connection, got non-nil")
-			}
-			if result.Err != nil {
-				t.Error("Expected error, got non-nil")
-			}
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received due to cancellation
 		}
@@ -896,12 +876,7 @@ func TestListenerSendResult(t *testing.T) {
 
 		select {
 		case result := <-acceptChan:
-			if result.Conn != nil {
-				t.Error("Expected nil connection, got non-nil")
-			}
-			if result.Err != nil {
-				t.Error("Expected error, got non-nil")
-			}
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
 		case <-time.After(50 * time.Millisecond):
 			// Expected - no result received
 		}

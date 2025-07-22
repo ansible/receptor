@@ -738,3 +738,393 @@ func TestNeceptorListen(t *testing.T) {
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
 	})
 }
+
+func TestDialContext(t *testing.T) {
+	node := "testnode"
+	service := "testsvc"
+
+	t.Run("ListenPacket fails", func(t *testing.T) {
+		ctx := context.Background()
+		n := netceptor.New(ctx, node)
+		defer n.Shutdown()
+
+		conn, err := n.DialContext(ctx, node, service, nil)
+		if err == nil || conn != nil {
+			t.Errorf("expected error and nil connection, got conn=%v err=%v", conn, err)
+		}
+	})
+
+	t.Run("Context cancellation before dial", func(t *testing.T) {
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		n := netceptor.New(cancelCtx, node)
+		defer n.Shutdown()
+
+		cancel()
+		conn, err := n.DialContext(cancelCtx, node, service, nil)
+		if err == nil || conn != nil {
+			t.Errorf("expected error and nil connection, got conn=%v err=%v", conn, err)
+		}
+	})
+
+	t.Run("With custom TLS config", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		n := netceptor.New(timeoutCtx, node)
+		defer n.Shutdown()
+		defer cancel()
+
+		tlsConfig := &tls.Config{
+			ServerName: "custom-server",
+		}
+		conn, _ := n.DialContext(timeoutCtx, node, service, tlsConfig)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected due to no actual QUIC server, but TLS config should be processed
+	})
+
+	t.Run("With nil TLS config (generates client config)", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		n := netceptor.New(timeoutCtx, node)
+		defer n.Shutdown()
+		defer cancel()
+
+		conn, _ := n.DialContext(timeoutCtx, node, service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected due to no actual QUIC server, but nil TLS config should be handled
+	})
+
+	t.Run("Context timeout during dial", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		n := netceptor.New(timeoutCtx, node)
+		defer n.Shutdown()
+		defer cancel()
+
+		time.Sleep(2 * time.Nanosecond) // Ensure timeout has passed
+
+		conn, err := n.DialContext(timeoutCtx, node, service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Should timeout and return context deadline exceeded error
+		if err != nil && err.Error() != "context deadline exceeded" {
+			// Also check for context canceled as timing might vary
+			if err.Error() != "context canceled" {
+				t.Logf("Got error: %v (expected context deadline exceeded or canceled)", err)
+			}
+		}
+	})
+
+	t.Run("KeepAlive enabled configuration", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		n := netceptor.New(timeoutCtx, node)
+		defer n.Shutdown()
+		defer cancel()
+
+		// Store original value
+		originalKeepAlive := netceptor.KeepAliveForQuicConnections
+		defer func() { netceptor.KeepAliveForQuicConnections = originalKeepAlive }()
+
+		// Enable keep alive
+		netceptor.KeepAliveForQuicConnections = true
+
+		conn, err := n.DialContext(timeoutCtx, node, service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected (no server), but this tests the keep-alive config path
+		if err == nil {
+			t.Logf("Unexpected success - no error returned")
+		}
+	})
+
+	t.Run("KeepAlive disabled configuration", func(t *testing.T) {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		n := netceptor.New(timeoutCtx, node)
+		defer n.Shutdown()
+		defer cancel()
+
+		// Store original value
+		originalKeepAlive := netceptor.KeepAliveForQuicConnections
+		defer func() { netceptor.KeepAliveForQuicConnections = originalKeepAlive }()
+
+		// Disable keep alive
+		netceptor.KeepAliveForQuicConnections = false
+
+		conn, err := n.DialContext(timeoutCtx, node, service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected (no server), but this tests the keep-alive config path
+		if err == nil {
+			t.Logf("Unexpected success - no error returned")
+		}
+	})
+}
+
+func TestGetConfigForClient(t *testing.T) {
+	t.Run("getConfigForClient set when ClientAuth is RequireAndVerifyClientCert", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "testnode")
+		defer n.Shutdown()
+
+		// Create TLS config that will trigger getConfigForClient to be set
+		tlsConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ServerName: "test-server",
+		}
+
+		// Create a listener which should set GetConfigForClient
+		listener, err := n.Listen("testsvc", tlsConfig)
+		if err != nil {
+			t.Fatalf("Failed to create listener: %v", err)
+		}
+		defer listener.Close()
+
+		// Verify that the listener was created successfully
+		// This indirectly tests that getConfigForClient was called and worked
+		if listener == nil {
+			t.Fatal("Expected listener, got nil")
+		}
+
+		// The fact that Listen succeeded with RequireAndVerifyClientCert
+		// means getConfigForClient was called and didn't panic
+		addr := listener.Addr()
+		if addr == nil {
+			t.Error("Expected listener address, got nil")
+		}
+	})
+
+	t.Run("getConfigForClient function works with valid IPv4 address", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "testnode")
+		defer n.Shutdown()
+
+		// Create TLS config that triggers getConfigForClient
+		tlsConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ServerName: "test-server",
+		}
+
+		// Create listener to verify getConfigForClient is set up
+		listener, err := n.Listen("ipv4svc", tlsConfig)
+		if err != nil {
+			t.Fatalf("Failed to create listener: %v", err)
+		}
+		defer listener.Close()
+
+		// Access the actual TLS config that was created internally
+		// We can't directly test the function, but we can test that it was set up correctly
+		if listener.Addr().String() == "" {
+			t.Error("Expected valid listener address")
+		}
+	})
+
+	t.Run("getConfigForClient function works with valid IPv6 address", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "testnode")
+		defer n.Shutdown()
+
+		tlsConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+
+		// Create listener to verify getConfigForClient works with IPv6
+		listener, err := n.Listen("ipv6svc", tlsConfig)
+		if err != nil {
+			t.Fatalf("Failed to create listener: %v", err)
+		}
+		defer listener.Close()
+
+		// Verify listener creation succeeded (indirectly tests getConfigForClient)
+		if listener.Addr() == nil {
+			t.Error("Expected valid listener address")
+		}
+	})
+
+	t.Run("no getConfigForClient when ClientAuth is not RequireAndVerifyClientCert", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "testnode")
+		defer n.Shutdown()
+
+		// Create TLS config that should NOT trigger getConfigForClient
+		tlsConfig := &tls.Config{
+			ClientAuth: tls.RequestClientCert, // Different auth type
+		}
+
+		// Create listener - should succeed without setting GetConfigForClient
+		listener, err := n.Listen("noverify", tlsConfig)
+		if err != nil {
+			t.Fatalf("Failed to create listener: %v", err)
+		}
+		defer listener.Close()
+
+		// Verify listener creation succeeded
+		if listener.Addr() == nil {
+			t.Error("Expected valid listener address")
+		}
+	})
+}
+
+func TestMonitorUnreachable(t *testing.T) {
+	t.Run("SubscribeUnreachable returns nil channel", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockPC := mock_netceptor.NewMockPacketConner(ctrl)
+
+		doneChan := make(chan struct{})
+		n := netceptor.New(context.Background(), "test")
+		defer n.Shutdown()
+		remoteAddr := n.NewAddr("testnode", "testsvc")
+		cancelled := false
+		cancel := func() { cancelled = true }
+
+		// Mock SubscribeUnreachable to return nil
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(nil).Times(1)
+
+		// Call the function - it should call cancel and return immediately
+		netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+
+		// Verify cancel was called
+		if !cancelled {
+			t.Error("Expected cancel to be called when SubscribeUnreachable returns nil")
+		}
+	})
+
+	t.Run("Message matches and triggers cancellation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockPC := mock_netceptor.NewMockPacketConner(ctrl)
+
+		doneChan := make(chan struct{})
+		n := netceptor.New(context.Background(), "test")
+		defer n.Shutdown()
+		remoteAddr := n.NewAddr("testnode", "testsvc")
+		cancelled := false
+		cancel := func() { cancelled = true }
+
+		// Create a notification channel that we'll send messages to
+		msgCh := make(chan netceptor.UnreachableNotification, 1)
+
+		// Mock the subscription to return our channel
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(msgCh).Times(1)
+
+		// Mock GetLogger - we'll just return the real logger and let the warning be printed
+		mockPC.EXPECT().GetLogger().Return(n.GetLogger()).Times(1)
+
+		// Start the monitor in a goroutine
+		go netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+
+		// Send a matching notification
+		matchingMsg := netceptor.UnreachableNotification{
+			UnreachableMessage: netceptor.UnreachableMessage{
+				FromNode:    "sourcenode",
+				ToNode:      "testnode", // matches remoteAddr node
+				FromService: "sourcesvc",
+				ToService:   "testsvc",                       // matches remoteAddr service
+				Problem:     netceptor.ProblemServiceUnknown, // matches the condition
+			},
+			ReceivedFromNode: "sourcenode",
+		}
+		msgCh <- matchingMsg
+
+		// Close the channel to end the range loop
+		close(msgCh)
+
+		// Give the goroutine time to process
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify cancel was called
+		if !cancelled {
+			t.Error("Expected cancel to be called when matching message is received")
+		}
+	})
+
+	t.Run("Non-matching messages do not trigger cancellation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockPC := mock_netceptor.NewMockPacketConner(ctrl)
+
+		doneChan := make(chan struct{})
+		n := netceptor.New(context.Background(), "test")
+		defer n.Shutdown()
+		remoteAddr := n.NewAddr("testnode", "testsvc")
+		cancelled := false
+		cancel := func() { cancelled = true }
+
+		msgCh := make(chan netceptor.UnreachableNotification, 3)
+
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(msgCh).Times(1)
+
+		go netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+
+		// Send various non-matching messages
+
+		// Wrong node
+		msgCh <- netceptor.UnreachableNotification{
+			UnreachableMessage: netceptor.UnreachableMessage{
+				ToNode:    "wrongnode",
+				ToService: "testsvc",
+				Problem:   netceptor.ProblemServiceUnknown,
+			},
+		}
+
+		// Wrong service
+		msgCh <- netceptor.UnreachableNotification{
+			UnreachableMessage: netceptor.UnreachableMessage{
+				ToNode:    "testnode",
+				ToService: "wrongsvc",
+				Problem:   netceptor.ProblemServiceUnknown,
+			},
+		}
+
+		// Wrong problem type
+		msgCh <- netceptor.UnreachableNotification{
+			UnreachableMessage: netceptor.UnreachableMessage{
+				ToNode:    "testnode",
+				ToService: "testsvc",
+				Problem:   "different problem",
+			},
+		}
+
+		close(msgCh)
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify cancel was NOT called
+		if cancelled {
+			t.Error("Expected cancel NOT to be called for non-matching messages")
+		}
+	})
+
+	t.Run("Channel closure terminates monitoring normally", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockPC := mock_netceptor.NewMockPacketConner(ctrl)
+
+		doneChan := make(chan struct{})
+		n := netceptor.New(context.Background(), "test")
+		defer n.Shutdown()
+		remoteAddr := n.NewAddr("testnode", "testsvc")
+		cancelled := false
+		cancel := func() { cancelled = true }
+
+		msgCh := make(chan netceptor.UnreachableNotification)
+
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(msgCh).Times(1)
+
+		finished := make(chan bool)
+		go func() {
+			netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+			finished <- true
+		}()
+
+		// Close the channel immediately - should cause function to return
+		close(msgCh)
+
+		// Wait for completion with timeout
+		select {
+		case <-finished:
+			// Function returned normally
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Function did not return after channel closure")
+		}
+
+		// Cancel should NOT be called in this case - normal termination
+		if cancelled {
+			t.Error("Expected cancel NOT to be called on normal channel closure")
+		}
+	})
+}

@@ -18,3 +18,18 @@ func (a Addr) Network() string {
 func (a Addr) String() string {
 	return fmt.Sprintf("%s:%s", a.node, a.service)
 }
+
+// SetNetwork sets the network variable.
+func (a *Addr) SetNetwork(network string) {
+	a.network = network
+}
+
+// SetNetwork sets the node variable.
+func (a *Addr) SetNode(node string) {
+	a.node = node
+}
+
+// SetNetwork sets the service variable.
+func (a *Addr) SetService(service string) {
+	a.service = service
+}

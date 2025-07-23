@@ -1,3 +1,4 @@
+//go:build windows && !no_workceptor
 // +build windows,!no_workceptor
 
 package workceptor

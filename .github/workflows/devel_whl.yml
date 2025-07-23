@@ -2,7 +2,7 @@
 
 name: Publish nightly wheel
 
-on:
+on:  # yamllint disable-line rule:truthy
   push:
     branches: [devel]
 
@@ -11,10 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     name: Build wheel
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
+      - name: Install build dependencies
+        run: |
+          pip install build
+
       - name: Build wheel
         run: |
           make clean receptorctl_wheel

@@ -1,3 +1,4 @@
+---
 - node:
     id: node2
 
@@ -8,4 +9,5 @@
     port: 11121
 
 - control-service:
-    filename: /tmp/receptorctltest/node2.sock
+    filename: /tmp/receptorctltest/mesh1/node2.sock
+...

@@ -40,6 +40,7 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 // RunControlSvc runs the main accept loop of the control service
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
-	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config) error {
+	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
+) error {
 	return ErrNotImplemented
 }

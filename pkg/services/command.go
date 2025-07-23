@@ -1,55 +1,73 @@
-//go:build !windows && !no_command_service && !windows && !no_services
-// +build !windows,!no_command_service,!windows,!no_services
+//go:build !windows
+// +build !windows
 
 package services
 
 import (
-	"fmt"
+	"crypto/tls"
+	"errors"
 	"net"
 	"os/exec"
-	"strings"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/tls"
-	"github.com/ansible/receptor/pkg/utils"
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
+	"github.com/google/shlex"
+	"github.com/spf13/viper"
 )
 
-func runCommand(qc net.Conn, command string) error {
-	args := strings.Split(command, " ")
+type NetCForCommandService interface {
+	GetLogger() *logger.ReceptorLogger
+	ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*netceptor.Listener, error)
+}
+
+func runCommand(qc net.Conn, command string, logger *logger.ReceptorLogger, utilsLib UtilsLib) error {
+	// Note: shlex.Split does not return error for the empty string
+	args, err := shlex.Split(command)
+	if err != nil {
+		return err
+	}
+	if len(args) == 0 {
+		return errors.New("shell command is empty")
+	}
 	cmd := exec.Command(args[0], args[1:]...)
 	tty, err := pty.Start(cmd)
 	if err != nil {
 		return err
 	}
-	utils.BridgeConns(tty, "external command", qc, "command service")
+	utilsLib.BridgeConns(tty, "external command", qc, "command service", logger)
 
 	return nil
 }
 
 // CommandService listens on the Receptor network and runs a local command.
-func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, command string) {
+func CommandService(s NetCForCommandService, service string, tlscfg *tls.Config, command string, utilsLib UtilsLib) {
+	if command == "" {
+		s.GetLogger().Error("initializing command service: command not provided\n")
+
+		return
+	}
+
 	qli, err := s.ListenAndAdvertise(service, tlscfg, map[string]string{
 		"type": "Command Service",
 	})
 	if err != nil {
-		logger.Error("Error listening on Receptor network: %s\n", err)
+		s.GetLogger().Error("listening on Receptor network: %s\n", err)
 
 		return
 	}
 	for {
 		qc, err := qli.Accept()
 		if err != nil {
-			logger.Error("Error accepting connection on Receptor network: %s\n", err)
+			s.GetLogger().Error("accepting connection on Receptor network: %s\n", err)
 
 			return
 		}
 		go func() {
-			err := runCommand(qc, command)
+			err := runCommand(qc, command, s.GetLogger(), utilsLib)
 			if err != nil {
-				logger.Error("Error running command: %s\n", err)
+				s.GetLogger().Error("running command: %s\n", err)
 			}
 			_ = qc.Close()
 		}()
@@ -57,51 +75,30 @@ func CommandService(s *netceptor.Netceptor, service string, tlscfg *tls.Config, 
 }
 
 // commandSvcCfg is the cmdline configuration object for a command service.
-type commandSvcCfg struct {
+type CommandSvcCfg struct {
 	Service string `required:"true" description:"Receptor service name to bind to"`
 	Command string `required:"true" description:"Command to execute on a connection"`
 	TLS     string `description:"Name of TLS server config"`
 }
 
 // Run runs the action.
-func (cfg commandSvcCfg) Run() error {
-	logger.Info("Running command service %s\n", cfg)
+func (cfg CommandSvcCfg) Run() error {
+	netceptor.MainInstance.Logger.Info("Running command service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
 	}
-	go CommandService(netceptor.MainInstance, cfg.Service, tlscfg, cfg.Command)
+
+	go CommandService(netceptor.MainInstance, cfg.Service, tlscfg, cfg.Command, &UtilsTCPWrapper{})
 
 	return nil
 }
 
 func init() {
-	cmdline.RegisterConfigTypeForApp("receptor-command-service",
-		"command-service", "Run an interactive command via a Receptor service", commandSvcCfg{}, cmdline.Section(servicesSection))
-}
-
-// Command executes a command on a connection.
-type Command struct {
-	// Receptor service name to bind to.
-	Service string `mapstructure:"service"`
-	// Command to execute on a connection.
-	Command string `mapstructure:"command"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	TLS *tls.ServerConf `mapstructure:"tls"`
-}
-
-func (s *Command) setup(nc *netceptor.Netceptor) error {
-	var t *tls.Config
-	var err error
-	if s.TLS != nil {
-		t, err = s.TLS.TLSConfig()
-		if err != nil {
-			return fmt.Errorf("could not create tls config for command service %s: %w", s.Service, err)
-		}
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
 	}
-
-	go CommandService(nc, s.Service, t, s.Command)
-
-	return nil
+	cmdline.RegisterConfigTypeForApp("receptor-command-service",
+		"command-service", "Run an interactive command via a Receptor service", CommandSvcCfg{}, cmdline.Section(servicesSection))
 }

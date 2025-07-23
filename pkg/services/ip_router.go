@@ -1,5 +1,5 @@
-//go:build linux && !no_ip_router && linux && !no_services
-// +build linux,!no_ip_router,linux,!no_services
+//go:build linux
+// +build linux
 
 package services
 
@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 	"github.com/songgao/water"
+	"github.com/spf13/viper"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -40,14 +40,15 @@ type IPRouterService struct {
 	destIP          net.IP
 	tunIf           *water.Interface
 	link            netlink.Link
-	nConn           *netceptor.PacketConn
+	nConn           netceptor.PacketConner
 	knownRoutes     []ipRoute
 	knownRoutesLock *sync.RWMutex
 }
 
 // NewIPRouter creates a new IP router service.
 func NewIPRouter(nc *netceptor.Netceptor, networkName string, tunInterface string,
-	localNet string, routes string) (*IPRouterService, error) {
+	localNet string, routes string,
+) (*IPRouterService, error) {
 	ipr := &IPRouterService{
 		nc:              nc,
 		networkName:     networkName,
@@ -126,7 +127,7 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 	defer ipr.knownRoutesLock.RUnlock()
 	routes, err := netlink.RouteList(ipr.link, netlink.FAMILY_ALL)
 	if err != nil {
-		logger.Error("error retrieving kernel routes list: %s", err)
+		ipr.nc.Logger.Error("error retrieving kernel routes list: %s", err)
 
 		return
 	}
@@ -153,10 +154,10 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 			}
 		}
 		if !found {
-			logger.Debug("Adding route to %s", kr.dest.String())
+			ipr.nc.Logger.Debug("Adding route to %s", kr.dest.String())
 			err := ipr.addRoute(kr.dest)
 			if err != nil {
-				logger.Error("error adding kernel route to %s: %s", kr.dest.String(), err)
+				ipr.nc.Logger.Error("error adding kernel route to %s: %s", kr.dest.String(), err)
 			}
 		}
 	}
@@ -179,10 +180,10 @@ func (ipr *IPRouterService) reconcileRoutingTable() {
 			}
 		}
 		if !found {
-			logger.Debug("Removing route to %s", route.Dst.String())
+			ipr.nc.Logger.Debug("Removing route to %s", route.Dst.String())
 			err := netlink.RouteDel(&route)
 			if err != nil {
-				logger.Error("error deleting kernel route to %s: %s", route.Dst.String(), err)
+				ipr.nc.Logger.Error("error deleting kernel route to %s: %s", route.Dst.String(), err)
 			}
 		}
 	}
@@ -201,7 +202,7 @@ func (ipr *IPRouterService) runAdvertisingWatcher() {
 }
 
 func (ipr *IPRouterService) runTunToNetceptor() {
-	logger.Debug("Running tunnel-to-Receptor forwarder\n")
+	ipr.nc.Logger.Debug("Running tunnel-to-Receptor forwarder\n")
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ipr.nc.Context().Err() != nil {
@@ -209,7 +210,7 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		}
 		n, err := ipr.tunIf.Read(buf)
 		if err != nil {
-			logger.Error("Error reading from tun device: %s\n", err)
+			ipr.nc.Logger.Error("Error reading from tun device: %s\n", err)
 
 			continue
 		}
@@ -222,17 +223,17 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 		case 4:
 			header, err := ipv4.ParseHeader(packet)
 			if err != nil {
-				logger.Debug("Malformed ipv4 packet received: %s", err)
+				ipr.nc.Logger.Debug("Malformed ipv4 packet received: %s", err)
 			}
 			destIP = header.Dst
 		case 6:
 			header, err := ipv6.ParseHeader(packet)
 			if err != nil {
-				logger.Debug("Malformed ipv6 packet received: %s", err)
+				ipr.nc.Logger.Debug("Malformed ipv6 packet received: %s", err)
 			}
 			destIP = header.Dst
 		default:
-			logger.Debug("Packet received with unknown version %d", ipVersion)
+			ipr.nc.Logger.Debug("Packet received with unknown version %d", ipVersion)
 
 			continue
 		}
@@ -259,16 +260,16 @@ func (ipr *IPRouterService) runTunToNetceptor() {
 
 		// Send the packet via Receptor
 		remoteAddr := ipr.nc.NewAddr(remoteNode, ipr.networkName)
-		logger.Trace("    Forwarding data length %d to %s via %s\n", n, destIP, remoteAddr.String())
+		ipr.nc.Logger.Trace("    Forwarding data length %d to %s via %s\n", n, destIP, remoteAddr.String())
 		wn, err := ipr.nConn.WriteTo(packet, remoteAddr)
 		if err != nil || wn != n {
-			logger.Error("Error writing to Receptor network: %s\n", err)
+			ipr.nc.Logger.Error("Error writing to Receptor network: %s\n", err)
 		}
 	}
 }
 
 func (ipr *IPRouterService) runNetceptorToTun() {
-	logger.Debug("Running netceptor to tunnel forwarder\n")
+	ipr.nc.Logger.Debug("Running netceptor to tunnel forwarder\n")
 	buf := make([]byte, utils.NormalBufferSize)
 	for {
 		if ipr.nc.Context().Err() != nil {
@@ -276,15 +277,15 @@ func (ipr *IPRouterService) runNetceptorToTun() {
 		}
 		n, addr, err := ipr.nConn.ReadFrom(buf)
 		if err != nil {
-			logger.Error("Error reading from Receptor: %s\n", err)
+			ipr.nc.Logger.Error("Error reading from Receptor: %s\n", err)
 
 			continue
 		}
-		logger.Trace("    Forwarding data length %d from %s to %s\n", n,
+		ipr.nc.Logger.Trace("    Forwarding data length %d from %s to %s\n", n,
 			addr.String(), ipr.tunIf.Name())
 		wn, err := ipr.tunIf.Write(buf[:n])
 		if err != nil || wn != n {
-			logger.Error("Error writing to tun device: %s\n", err)
+			ipr.nc.Logger.Error("Error writing to tun device: %s\n", err)
 		}
 	}
 }
@@ -359,17 +360,9 @@ func (ipr *IPRouterService) run() error {
 	return nil
 }
 
-// ipRouterCfg is the cmdline configuration object for an IP router.
-type ipRouterCfg struct {
-	NetworkName string `required:"true" description:"Name of this network and service."`
-	Interface   string `description:"Name of the local tun interface"`
-	LocalNet    string `required:"true" description:"Local /30 CIDR address"`
-	Routes      string `description:"Comma separated list of CIDR subnets to advertise"`
-}
-
 // Run runs the action.
-func (cfg ipRouterCfg) Run() error {
-	logger.Debug("Running tun router service %s\n", cfg)
+func (cfg IPRouterCfg) Run() error {
+	netceptor.MainInstance.Logger.Debug("Running tun router service %s\n", cfg)
 	_, err := NewIPRouter(netceptor.MainInstance, cfg.NetworkName, cfg.Interface, cfg.LocalNet, cfg.Routes)
 	if err != nil {
 		return err
@@ -379,24 +372,10 @@ func (cfg ipRouterCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-ip-router",
-		"ip-router", "Run an IP router using a tun interface", ipRouterCfg{}, cmdline.Section(servicesSection))
-}
-
-// IPRouter routes IP packages through receptor.
-type IPRouter struct {
-	// Name of this network and service.
-	NetworkName string `mapstructure:"network-name"`
-	// Name of the local tun interface.
-	Interface string `mapstructure:"interface"`
-	// Local /30 CIDR address.
-	LocalNet string `mapstructure:"local-net"`
-	// Comma separated list of CIDR subnets to advertise.
-	Routes string `mapstructure:"routes"`
-}
-
-func (s *IPRouter) setup(nc *netceptor.Netceptor) error {
-	_, err := NewIPRouter(nc, s.NetworkName, s.Interface, s.LocalNet, s.Routes)
-
-	return err
+		"ip-router", "Run an IP router using a tun interface", IPRouterCfg{}, cmdline.Section(servicesSection))
 }

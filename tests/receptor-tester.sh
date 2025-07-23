@@ -151,7 +151,7 @@ Command list:
   run-all           run all tests. Returns 0 if pass
   container-runtime show container runtime available
   requirements      check all system requirements
-  help              show this help section
+  help              Displays this help text
 HELP_INFO
 }
 

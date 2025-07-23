@@ -5,31 +5,30 @@ package workceptor
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func newCommandWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &commandUnit{
-		BaseWorkUnit: BaseWorkUnit{
+		BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 			status: StatusFileData{
-				ExtraData: &commandExtraData{},
+				ExtraData: &CommandExtraData{},
 			},
 		},
 		command:            "echo",
 		baseParams:         "foo",
 		allowRuntimeParams: true,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }
 
 func TestWorkceptorJson(t *testing.T) {
-	tmpdir, err := ioutil.TempDir(os.TempDir(), "receptor-test-*")
+	tmpdir, err := os.MkdirTemp(os.TempDir(), "receptor-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,12 +42,12 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cw, err := w.AllocateUnit("command", make(map[string]string))
+	cw, err := w.AllocateUnit("command", "", make(map[string]string))
 	if err != nil {
 		t.Fatal(err)
 	}
 	cw.UpdateFullStatus(func(status *StatusFileData) {
-		ed, ok := status.ExtraData.(*commandExtraData)
+		ed, ok := status.ExtraData.(*CommandExtraData)
 		if !ok {
 			t.Fatal("ExtraData type assertion failed")
 		}
@@ -58,12 +57,12 @@ func TestWorkceptorJson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cw2 := newCommandWorker(w, cw.ID(), "command")
+	cw2 := newCommandWorker(nil, w, cw.ID(), "command")
 	err = cw2.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ed2, ok := cw2.Status().ExtraData.(*commandExtraData)
+	ed2, ok := cw2.Status().ExtraData.(*CommandExtraData)
 	if !ok {
 		t.Fatal("ExtraData type assertion failed")
 	}

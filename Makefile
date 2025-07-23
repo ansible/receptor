@@ -1,21 +1,15 @@
-# Calculate version number
-# - If we are on an exact Git tag, then this is official and gets a -1 release
-# - If we are not, then this is unofficial and gets a -0.date.gitref release
+# If the current git commit has been tagged, use <tag> as the version. (e.g. v1.4.5)
+# Otherwise the version is <tag>+git<short commit hash> (e.g. 1.4.5+f031d2)
 OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
-VERSION := $(shell cd receptorctl && python3 setup.py --version)
-ifeq ($(OFFICIAL_VERSION),)
-RELEASE := 0.git$(shell date +'%Y%m%d').$(shell git rev-parse --short HEAD)
-OFFICIAL :=
-APPVER := $(VERSION)-$(RELEASE)
-else
-RELEASE := 1
-OFFICIAL := yes
-APPVER := $(VERSION)
+ifneq ($(OFFICIAL_VERSION),)
+	VERSION := $(OFFICIAL_VERSION)
+else ifneq ($(shell git tag --list),)
+	VERSION := $(shell git describe --tags | cut -d - -f -1)+git$(shell git rev-parse --short HEAD)
+else ifeq ($(VERSION),)
+	VERSION := $(error No tags found in git repository)
+# else VERSION was passed as a command-line argument to make
 endif
 
-# Container command can be docker or podman
-CONTAINERCMD ?= podman
-TAG ?= receptor:latest
 
 # When building Receptor, tags can be used to remove undesired
 # features.  This is primarily used for deploying Receptor in a
@@ -48,27 +42,119 @@ else
 	TAGPARAM=--tags $(TAGS)
 endif
 
-receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 go build -o receptor -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(APPVER)'" $(TAGPARAM) ./cmd/receptor-cl
+DEBUG ?=
+ifeq ($(DEBUG),1)
+	DEBUGFLAGS=-gcflags=all="-N -l"
+else
+	DEBUGFLAGS=
+endif
 
-lint:
-	@golint cmd/... pkg/... example/...
+GO ?= go
+
+receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
+	CGO_ENABLED=0 GOFLAGS="-buildvcs=false" $(GO) build \
+		-o receptor \
+		$(DEBUGFLAGS) \
+		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
+		$(TAGPARAM) \
+		./cmd/receptor-cl
+
+clean:
+	@rm -fv .container-flag*
+	@rm -fv .VERSION
+	@rm -fv receptorctl/.VERSION
+	@rm -fv receptor-python-worker/.VERSION
+	@rm -rfv dist/
+	@rm -fv $(KUBECTL_BINARY)
+	@rm -fv packaging/container/receptor
+	@rm -rfv packaging/container/RPMS/
+	@rm -fv packaging/container/*.whl
+	@rm -fv receptor receptor.exe receptor.app net
+	@rm -fv receptorctl/dist/*
+	@rm -fv receptor-python-worker/dist/*
+	@rm -rfv receptorctl-test-venv/
+
+ARCH ?= amd64
+OS=linux
+
+KUBECTL_BINARY=./kubectl
+STABLE_KUBECTL_VERSION=$(shell curl --silent https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+kubectl:
+	if [ "$(wildcard $(KUBECTL_BINARY))" != "" ]; \
+	then \
+		FOUND_KUBECTL_VERSION=$$(./kubectl version --client=true | head --lines=1 | cut --delimiter=' ' --field=3); \
+	else \
+		FOUND_KUBECTL_VERSION=; \
+	fi
+	if [ "${FOUND_KUBECTL_VERSION}" != "$(STABLE_KUBECTL_VERSION)" ]; \
+	then \
+		curl \
+			--location \
+			--output $(KUBECTL_BINARY) \
+			https://storage.googleapis.com/kubernetes-release/release/$(STABLE_KUBECTL_VERSION)/bin/$(OS)/$(ARCH)/kubectl; \
+		chmod 0700 $(KUBECTL_BINARY); \
+	fi
+
+GOLANGCI_LINT_VERSION ?= v1.60.3
+GOLANGCI_LINT_BINARY := $(shell go env GOPATH)/bin/golangci-lint
+
+lint: $(GOLANGCI_LINT_BINARY)
+	@$(GOLANGCI_LINT_BINARY) run cmd/... pkg/... example/...
+
+$(GOLANGCI_LINT_BINARY):
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(shell go env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
+
+receptorctl-lint: receptor
+	@cd receptorctl && nox -s lint
 
 format:
-	@find cmd/ pkg/ -type f -name '*.go' -exec go fmt {} \;
+	@find cmd/ pkg/ -type f -name '*.go' -exec $(GO) fmt {} \;
 
 fmt: format
+
+generate:
+	${GO} generate  ./...
+
+generate-clean:
+	@echo "Removing existing mocks"
+	@find . -type d -name 'mock*' -prune -exec rm -rf {} +
 
 pre-commit:
 	@pre-commit run --all-files
 
 build-all:
 	@echo "Running Go builds..." && \
-	GOOS=windows go build -o receptor.exe ./cmd/receptor-cl && \
-	GOOS=darwin go build -o receptor.app ./cmd/receptor-cl && \
-	go build example/*.go && \
-	go build -o receptor --tags no_controlsvc,no_backends,no_services,no_tls_config,no_workceptor,no_cert_auth ./cmd/receptor-cl && \
-	go build -o receptor ./cmd/receptor-cl
+	GOOS=windows $(GO) build \
+		-o receptor.exe \
+		./cmd/receptor-cl && \
+	GOOS=darwin $(GO) build \
+		-o receptor.app \
+		./cmd/receptor-cl && \
+	$(GO) build \
+		example/*.go && \
+	$(GO) build \
+		-o receptor \
+		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
+		./cmd/receptor-cl
+
+BINNAME='receptor'
+CHECKSUM_PROGRAM='sha256sum'
+GOARCH=$(ARCH)
+GOOS=$(OS)
+DIST := receptor_$(shell echo '$(VERSION)' | sed 's/^v//')_$(GOOS)_$(GOARCH)
+build-package:
+	@echo "Building and packaging binary for $(GOOS)/$(GOARCH) as dist/$(DIST).tar.gz" && \
+	mkdir -p dist/$(DIST) && \
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build \
+		-o dist/$(DIST)/$(BINNAME) \
+		$(DEBUGFLAGS) \
+		-ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" \
+		$(TAGPARAM) \
+		./cmd/receptor-cl && \
+	tar -C dist/$(DIST) -zcf dist/$(DIST).tar.gz $(BINNAME) && \
+	cd dist/ && \
+	$(CHECKSUM_PROGRAM) $(DIST).tar.gz >> checksums.txt
 
 RUNTEST ?=
 ifeq ($(RUNTEST),)
@@ -77,73 +163,83 @@ else
 TESTCMD = -run $(RUNTEST)
 endif
 
-test:
-	@go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1
+BLOCKLIST='/tests/|mock_|example'
+COVERAGE_FILE='coverage.txt'
+
+coverage: build-all
+	PATH="${PWD}:${PATH}" \
+		$(GO) test $$($(GO) list ./... | grep -vE $(BLOCKLIST)) \
+		$(TESTCMD) \
+		-count=1 \
+		-cover \
+		-covermode=atomic \
+		-coverprofile=$(COVERAGE_FILE) \
+		-race \
+		-timeout 5m
+
+test: receptor
+	PATH="${PWD}:${PATH}" \
+		$(GO) test $$($(GO) list ./...) \
+		$(TESTCMD) \
+		-count=1 \
+		-race \
+		-timeout 5m
+
+receptorctl-test: receptor
+	@cd receptorctl && nox -s tests
 
 testloop: receptor
 	@i=1; while echo "------ $$i" && \
-	  go test ./... -p 1 -parallel=16 $(TESTCMD) -count=1; do \
+	  make test; do \
 	  i=$$((i+1)); done
-
-kubectl:
-	curl -LO "https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
-	chmod a+x kubectl
 
 kubetest: kubectl
 	./kubectl get nodes
 
 version:
-	@echo $(APPVER) > .VERSION
-	@echo ".VERSION created for $(APPVER)"
+	@echo $(VERSION) > .VERSION
+	@echo ".VERSION created for $(VERSION)"
 
-RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION)-py3-none-any.whl
-$(RECEPTORCTL_WHEEL): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 setup.py bdist_wheel
+RECEPTORCTL_WHEEL = receptorctl/dist/receptorctl-$(VERSION:v%=%)-py3-none-any.whl
+$(RECEPTORCTL_WHEEL): $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTORCTL=$(VERSION) python3 -m build --wheel
 
 receptorctl_wheel: $(RECEPTORCTL_WHEEL)
 
-RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION).tar.gz
-$(RECEPTORCTL_SDIST): receptorctl/README.md receptorctl/setup.py $(shell find receptorctl/receptorctl -type f -name '*.py')
-	@cd receptorctl && python3 setup.py sdist
+RECEPTORCTL_SDIST = receptorctl/dist/receptorctl-$(VERSION:v%=%).tar.gz
+$(RECEPTORCTL_SDIST): $(shell find receptorctl/receptorctl -type f -name '*.py')
+	@cd receptorctl && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTORCTL=$(VERSION) python3 -m build --sdist
 
 receptorctl_sdist: $(RECEPTORCTL_SDIST)
 
-RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION)-py3-none-any.whl
-$(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-python-worker/setup.py $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
-	@cd receptor-python-worker && python3 setup.py bdist_wheel
+RECEPTOR_PYTHON_WORKER_WHEEL = receptor-python-worker/dist/receptor_python_worker-$(VERSION:v%=%)-py3-none-any.whl
+$(RECEPTOR_PYTHON_WORKER_WHEEL): $(shell find receptor-python-worker/receptor_python_worker -type f -name '*.py')
+	@cd receptor-python-worker && SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RECEPTOR_PYTHON_WORKER=$(VERSION) python3 -m build --wheel
 
-container: .container-flag-$(VERSION)
-.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+# Container command can be docker or podman
+CONTAINERCMD ?= podman
+
+# Repo without tag
+REPO := quay.io/ansible/receptor
+# TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
+TAG := $(subst +,-,$(VERSION))
+# Set this to tag image as :latest in addition to :$(VERSION)
+LATEST :=
+
+EXTRA_OPTS ?=
+
+space := $(subst ,, )
+CONTAINER_FLAG_FILE = .container-flag-$(VERSION)$(subst $(space),,$(subst /,,$(EXTRA_OPTS)))
+container: $(CONTAINER_FLAG_FILE)
+$(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION) -t $(TAG) $(if $(OFFICIAL),-t receptor:$(VERSION),)
-	@touch .container-flag-$(VERSION)
+	$(CONTAINERCMD) build $(EXTRA_OPTS) packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	touch $@
 
 tc-image: container
 	@cp receptor packaging/tc-image/
 	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
-
-receptorctl-test-venv/bin/pytest:
-	virtualenv receptorctl-test-venv -p python3
-	receptorctl-test-venv/bin/pip install -e receptorctl
-	receptorctl-test-venv/bin/pip install -r receptorctl/test-requirements.txt
-
-receptorctl-tests: receptor receptorctl-test-venv/bin/pytest
-	cd receptorctl && \
-		PATH=$(PATH):$(PWD) \
-		../receptorctl-test-venv/bin/pytest tests/
-
-clean:
-	@rm -fv receptor receptor.exe receptor.app net
-	@rm -rfv packaging/container/RPMS/
-	@rm -fv receptorctl/dist/*
-	@rm -fv receptor-python-worker/dist/*
-	@rm -fv packaging/container/receptor
-	@rm -fv packaging/container/*.whl
-	@rm -fv .container-flag*
-	@rm -fv .VERSION
-	@rm -rfv receptorctl-test-venv/
-	@rm -fv kubectl
 
 .PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest

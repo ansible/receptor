@@ -4,6 +4,7 @@
 package workceptor
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -11,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {
@@ -133,7 +133,7 @@ func boolFromMap(config map[string]interface{}, name string) (bool, error) {
 		return false, nil
 	}
 
-	return false, fmt.Errorf("field %s value %s is not convertible to an bool", name, value)
+	return false, fmt.Errorf("field %s value %s is not convertible to a bool", name, value)
 }
 
 func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (controlsvc.ControlCommand, error) {
@@ -195,8 +195,8 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 	return c, nil
 }
 
-func (c *workceptorCommand) processSignature(workType, signature string, connIsUnix bool) error {
-	shouldVerifySignature := c.w.ShouldVerifySignature(workType)
+func (c *workceptorCommand) processSignature(workType, signature string, connIsUnix, signWork bool) error {
+	shouldVerifySignature := c.w.ShouldVerifySignature(workType, signWork)
 	if !shouldVerifySignature && signature != "" {
 		return fmt.Errorf("work type did not expect a signature")
 	}
@@ -210,8 +210,17 @@ func (c *workceptorCommand) processSignature(workType, signature string, connIsU
 	return nil
 }
 
+func getSignWorkFromStatus(status *StatusFileData) bool {
+	red, ok := status.ExtraData.(*RemoteExtraData)
+	if ok {
+		return red.SignWork
+	}
+
+	return false
+}
+
 // Worker function called by the control service to process a "work" command.
-func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.NetceptorForControlCommand, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	addr := cfo.RemoteAddr()
 	connIsUnix := false
 	if addr.Network() == "unix" {
@@ -243,6 +252,10 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			signature = ""
 		}
+		workUnitID, err := strFromMap(c.params, "workUnitID")
+		if err != nil {
+			workUnitID = ""
+		}
 		workParams := make(map[string]string)
 		nonParams := []string{"command", "subcommand", "node", "worktype", "tlsclient", "ttl", "signwork", "signature"}
 		inNonParams := func(p string) bool {
@@ -264,7 +277,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			}
 			workParams[k] = vStr
 		}
-		err = c.processSignature(workType, signature, connIsUnix)
+		err = c.processSignature(workType, signature, connIsUnix, signWork)
 		if err != nil {
 			return nil, err
 		}
@@ -274,19 +287,21 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			if ttl != "" {
 				return nil, fmt.Errorf("ttl option is intended for remote work only")
 			}
-			worker, err = c.w.AllocateUnit(workType, workParams)
+			worker, err = c.w.AllocateUnit(workType, workUnitID, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsClient, ttl, signWork, workParams)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, workUnitID, tlsClient, ttl, signWork, workParams)
 		}
 		if err != nil {
 			return nil, err
 		}
+		cfr := make(map[string]interface{})
+		cfr["unitid"] = worker.ID()
 		stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O_WRONLY, 0o600)
 		if err != nil {
 			return nil, err
 		}
 		worker.UpdateBasicStatus(WorkStatePending, "Waiting for Input Data", 0)
-		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin)
+		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin, &controlsvc.SocketConnIO{})
 		if err != nil {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
 
@@ -303,10 +318,8 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil && !IsPending(err) {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error starting worker: %s", err), 0)
 
-			return nil, err
+			return cfr, err
 		}
-		cfr := make(map[string]interface{})
-		cfr["unitid"] = worker.ID()
 		if IsPending(err) {
 			cfr["result"] = "Job Submitted"
 		} else {
@@ -370,7 +383,8 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			return cfr, err
 		}
 		status := unit.Status()
-		err = c.processSignature(status.WorkType, signature, connIsUnix)
+		signWork := getSignWorkFromStatus(status)
+		err = c.processSignature(status.WorkType, signature, connIsUnix, signWork)
 		if err != nil {
 			return nil, err
 		}
@@ -407,15 +421,13 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 			return nil, err
 		}
 		status := unit.Status()
-		err = c.processSignature(status.WorkType, signature, connIsUnix)
+		signWork := getSignWorkFromStatus(status)
+		err = c.processSignature(status.WorkType, signature, connIsUnix, signWork)
 		if err != nil {
 			return nil, err
 		}
-		doneChan := make(chan struct{})
-		defer func() {
-			close(doneChan)
-		}()
-		resultChan, err := c.w.GetResults(unitid, startPos, doneChan)
+
+		resultChan, err := c.w.GetResults(ctx, unitid, startPos)
 		if err != nil {
 			return nil, err
 		}
@@ -423,6 +435,7 @@ func (c *workceptorCommand) ControlFunc(nc *netceptor.Netceptor, cfo controlsvc.
 		if err != nil {
 			return nil, err
 		}
+
 		err = cfo.Close()
 		if err != nil {
 			return nil, err

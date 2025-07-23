@@ -1,1 +1,3 @@
-include requirements.txt # Needs manual inclusion due to PBR bug
+recursive-include receptorctl *.py
+exclude .gitignore
+exclude noxfile.py

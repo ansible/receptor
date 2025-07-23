@@ -7,6 +7,9 @@ import (
 
 // RandomString returns a random string of a given length.
 func RandomString(length int) string {
+	if length < 0 {
+		return ""
+	}
 	charset := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	randbytes := make([]byte, 0, length)
 	for i := 0; i < length; i++ {

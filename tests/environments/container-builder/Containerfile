@@ -1,7 +1,7 @@
-FROM centos:8
+FROM quay.io/centos/centos:stream9
 
-# Python options = [3.8, 3.9]
-ARG PYTHON_VERSION=3.8
+# Python options = [3.9, 3.11, 3.12]
+ARG PYTHON_VERSION=3.12
 
 ENV PATH=${PATH}:/usr/local/go/bin
 
@@ -10,13 +10,20 @@ RUN set -x \
     && dnf update -y \
     # Receptor build tools
     && dnf install -y \
-        git wget make iproute openssl findutils virtualenv \
+        findutils \
+        git \
+        iproute \
+        make \
+        openssl \
+        wget  \
     # Install specific python version
-    && export PYTHON_PKG_NAME=python$(echo ${PYTHON_VERSION} | sed 's/\.//g') \
-    && dnf module install -y ${PYTHON_PKG_NAME} \
-    && alternatives --set python /usr/bin/python${PYTHON_VERSION} \
+    && dnf install -y \
+        python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-pip \
+    && pip${PYTHON_VERSION} install virtualenv \
     # Install specific golang version
-    && dnf install -y golang \
+    && dnf install -y \
+        golang \
     && dnf clean all
 
 # --- ALL IMAGE MUST BE THE SAME UNTIL NOW ---
@@ -25,9 +32,7 @@ RUN set -x \
 WORKDIR /dependencies
 ADD ./go.mod \
     ./go.sum \
-    ./receptorctl/requirements.txt \
-    ./receptorctl/test-requirements.txt \
-    ./receptorctl/build-requirements.txt ./
+    ../receptorctl/requirements/requirements.txt ./
 RUN set -x \
     # Go
     && go get -u golang.org/x/lint/golint \
@@ -35,9 +40,9 @@ RUN set -x \
     # Python
     && virtualenv -p python${PYTHON_VERSION} /opt/venv \
     && source /opt/venv/bin/activate \
-    && pip3 install -r requirements.txt \
-    && pip3 install -r test-requirements.txt \
-    && pip3 install --upgrade -r build-requirements.txt
+    && pip${PYTHON_VERSION} install \
+        --upgrade \
+        -r requirements.txt
 
 ADD ./tests/environments/container-builder/build-artifacts.sh /
 

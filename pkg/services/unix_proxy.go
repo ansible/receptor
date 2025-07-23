@@ -1,24 +1,22 @@
-//go:build !no_proxies && !no_services
-// +build !no_proxies,!no_services
-
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"os"
 	"runtime"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/tls"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // UnixProxyServiceInbound listens on a Unix socket and forwards connections over the Receptor network.
 func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permissions os.FileMode,
-	node string, rservice string, tlscfg *tls.Config) error {
+	node string, rservice string, tlscfg *tls.Config,
+) error {
 	uli, lock, err := utils.UnixSocketListen(filename, permissions)
 	if err != nil {
 		return fmt.Errorf("error opening Unix socket: %s", err)
@@ -28,18 +26,18 @@ func UnixProxyServiceInbound(s *netceptor.Netceptor, filename string, permission
 		for {
 			uc, err := uli.Accept()
 			if err != nil {
-				logger.Error("Error accepting Unix socket connection: %s", err)
+				s.Logger.Error("Error accepting Unix socket connection: %s", err)
 
 				return
 			}
 			go func() {
 				qc, err := s.Dial(node, rservice, tlscfg)
 				if err != nil {
-					logger.Error("Error connecting on Receptor network: %s", err)
+					s.Logger.Error("Error connecting on Receptor network: %s", err)
 
 					return
 				}
-				utils.BridgeConns(uc, "unix socket service", qc, "receptor connection")
+				utils.BridgeConns(uc, "unix socket service", qc, "receptor connection", s.Logger)
 			}()
 		}
 	}()
@@ -60,17 +58,17 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 		for {
 			qc, err := qli.Accept()
 			if err != nil {
-				logger.Error("Error accepting connection on Receptor network: %s\n", err)
+				s.Logger.Error("Error accepting connection on Receptor network: %s\n", err)
 
 				return
 			}
 			uc, err := net.Dial("unix", filename)
 			if err != nil {
-				logger.Error("Error connecting via Unix socket: %s\n", err)
+				s.Logger.Error("Error connecting via Unix socket: %s\n", err)
 
 				continue
 			}
-			go utils.BridgeConns(qc, "receptor service", uc, "unix socket connection")
+			go utils.BridgeConns(qc, "receptor service", uc, "unix socket connection", s.Logger)
 		}
 	}()
 
@@ -78,7 +76,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 }
 
 // unixProxyInboundCfg is the cmdline configuration object for a Unix socket inbound proxy.
-type unixProxyInboundCfg struct {
+type UnixProxyInboundCfg struct {
 	Filename      string `required:"true" description:"Socket filename, which will be overwritten"`
 	Permissions   int    `description:"Socket file permissions" default:"0600"`
 	RemoteNode    string `required:"true" description:"Receptor node to connect to"`
@@ -87,27 +85,27 @@ type unixProxyInboundCfg struct {
 }
 
 // Run runs the action.
-func (cfg unixProxyInboundCfg) Run() error {
-	logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
-	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, "receptor")
+func (cfg UnixProxyInboundCfg) Run() error {
+	netceptor.MainInstance.Logger.Debug("Running Unix socket inbound proxy service %v\n", cfg)
+	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, cfg.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
 		return err
 	}
 
-	return UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, os.FileMode(cfg.Permissions),
+	return UnixProxyServiceInbound(netceptor.MainInstance, cfg.Filename, os.FileMode(cfg.Permissions), //nolint:gosec
 		cfg.RemoteNode, cfg.RemoteService, tlscfg)
 }
 
 // unixProxyOutboundCfg is the cmdline configuration object for a Unix socket outbound proxy.
-type unixProxyOutboundCfg struct {
+type UnixProxyOutboundCfg struct {
 	Service  string `required:"true" description:"Receptor service name to bind to"`
 	Filename string `required:"true" description:"Socket filename, which must already exist"`
 	TLS      string `description:"Name of TLS server config for the Receptor connection"`
 }
 
 // Run runs the action.
-func (cfg unixProxyOutboundCfg) Run() error {
-	logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
+func (cfg UnixProxyOutboundCfg) Run() error {
+	netceptor.MainInstance.Logger.Debug("Running Unix socket inbound proxy service %s\n", cfg)
 	tlscfg, err := netceptor.MainInstance.GetServerTLSConfig(cfg.TLS)
 	if err != nil {
 		return err
@@ -117,66 +115,14 @@ func (cfg unixProxyOutboundCfg) Run() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	if runtime.GOOS != "windows" {
 		cmdline.RegisterConfigTypeForApp("receptor-proxies",
-			"unix-socket-server", "Listen on a Unix socket and forward via Receptor", unixProxyInboundCfg{}, cmdline.Section(servicesSection))
+			"unix-socket-server", "Listen on a Unix socket and forward via Receptor", UnixProxyInboundCfg{}, cmdline.Section(servicesSection))
 		cmdline.RegisterConfigTypeForApp("receptor-proxies",
-			"unix-socket-client", "Listen via Receptor and forward to a Unix socket", unixProxyOutboundCfg{}, cmdline.Section(servicesSection))
+			"unix-socket-client", "Listen via Receptor and forward to a Unix socket", UnixProxyOutboundCfg{}, cmdline.Section(servicesSection))
 	}
-}
-
-// UnixInProxy exposes an exported unix socket.
-type UnixInProxy struct {
-	// Socket filename, which will be overwritten.
-	File string `mapstructure:"file"`
-	// Socket file permissions.
-	Permissions *int `mapstructure:"permissions"`
-	// Receptor node to connect to.
-	RemoteNode string `mapstructure:"remote-node"`
-	// Receptor service name to connect to.
-	RemoteService string `mapstructure:"remote-service"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	TLS tls.ClientConf `mapstructure:"tls"`
-}
-
-func (p *UnixInProxy) setup(nc *netceptor.Netceptor) error {
-	perms := 0o600
-	if p.Permissions != nil {
-		perms = *p.Permissions
-	}
-
-	t, err := p.TLS.TLSConfig()
-	if err != nil {
-		return fmt.Errorf("could not create tls config for unix inbound proxy %s: %w", p.File, err)
-	}
-
-	return UnixProxyServiceInbound(
-		nc,
-		p.File,
-		os.FileMode(perms),
-		p.RemoteNode,
-		p.RemoteService,
-		t,
-	)
-}
-
-// UnixOutProxy exports a local unix socket.
-type UnixOutProxy struct {
-	// Receptor service name to bind to.
-	Service string `mapstructure:"service"`
-	// Socket filename, which must already exist.
-	File string `mapstructure:"file"`
-	// TLS config to use for the transport within receptor.
-	// Leave empty for no TLS.
-	TLS tls.ServerConf `mapstructure:"tls"`
-}
-
-func (p *UnixOutProxy) setup(nc *netceptor.Netceptor) error {
-	t, err := p.TLS.TLSConfig()
-	if err != nil {
-		return fmt.Errorf("could not create tls config for unix outbound proxy %s: %w", p.File, err)
-	}
-
-	return UnixProxyServiceOutbound(nc, p.Service, t, p.File)
 }

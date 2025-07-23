@@ -1,9 +1,13 @@
 ---
 name: CI
 
-on:
-  pull_request:
-  push:
+on:  # yamllint disable-line rule:truthy
+  pull_request:  # yamllint disable-line rule:empty-values
+
+env:
+  DESIRED_GO_VERSION: '1.23'
+  DESIRED_GOLANGCI_LINT_VERSION: 'v1.60'
+  DESIRED_PYTHON_VERSION: '3.12'
 
 jobs:
   lint-receptor:
@@ -11,97 +15,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.DESIRED_GO_VERSION }}
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.39
-  lint-receptorctl:
-    name: lint-receptorctl
+          version: ${{ env.DESIRED_GOLANGCI_LINT_VERSION }}
+
+  receptor:
+    name: receptor (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.22","1.23"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Setup up python
-        uses: actions/setup-python@v2
-
-      - name: Install tox
-        run:  sudo apt-get install tox
-
-      - name: Run receptorctl linters
-        run: make receptorctl-lint
-  build:
-    name: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/checkout@v4
         with:
-          go-version: 1.16
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: build-all target
-        run: make build-all
-
-      - name: Archive binary
-        uses: actions/upload-artifact@v2
-        with:
-          name: receptor
-          path: receptor
-  test:
-    name: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+          fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.16
+          go-version: ${{ matrix.go-version }}
 
-      - name: Setup up python
-        uses: actions/setup-python@v2
-
-      - name: Install tox (for python tests)
-        run:  sudo apt-get install tox
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: install receptor
-        run: go build -o $GOROOT/bin/receptor ./cmd/receptor-cl
+      - name: build and install receptor
+        run: |
+          make build-all
+          sudo cp ./receptor /usr/local/bin/receptor
 
       - name: Download kind binary
-        run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.1/kind-linux-amd64 && chmod +x ./kind
+        run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind
 
       - name: Create k8s cluster
         run: ./kind create cluster
 
       - name: Interact with the cluster
         run: kubectl get nodes
-
-      - name: Run receptorctl tests
-        run: make receptorctl-test
 
       - name: Run receptor tests
         run: make test
@@ -110,9 +67,150 @@ jobs:
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh
 
-      - name: Artifact receptor data
-        uses: actions/upload-artifact@v2
+      - name: remove sockets before archiving logs
+        if: ${{ failure() }}
+        run: find /tmp/receptor-testing -name controlsock -delete
+
+      - name: Artifact receptor data for ${{ matrix.go-version }}
+        uses: actions/upload-artifact@v4.4.3
         if: ${{ failure() }}
         with:
-          name: test-logs
+          name: test-logs-${{ matrix.go-version }}
           path: /tmp/receptor-testing
+
+      - name: Archive receptor binary for ${{ matrix.go-version }}
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          name: receptor-${{ matrix.go-version }}
+          path: /usr/local/bin/receptor
+
+  receptorctl:
+    name: Run receptorctl tests${{ '' }}  # Nest jobs under the same sidebar category
+    needs: receptor
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          # NOTE: The highest and the lowest versions come
+          # NOTE: first as their statuses are most likely to
+          # NOTE: signal problems early:
+          - 3.12
+          - 3.8
+          - 3.11
+          - "3.10"
+          - 3.9
+    uses: ./.github/workflows/reusable-nox.yml
+    with:
+      python-version: ${{ matrix.python-version }}
+      session: tests-${{ matrix.python-version }}
+      download-receptor: true
+      go-version: '1.23'
+
+  lint-receptorctl:
+    name: Lint receptorctl${{ '' }}  # Nest jobs under the same sidebar category
+    strategy:
+      fail-fast: false
+      matrix:
+        session:
+          - check_style
+          - check_format
+    uses: ./.github/workflows/reusable-nox.yml
+    with:
+      python-version: '3.12'
+      session: ${{ matrix.session }}
+
+  container:
+    name: container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Install python dependencies
+        run: pip install build
+
+      - name: Build container
+        run: make container REPO=receptor LATEST=yes
+
+      - name: Write out basic config
+        run: |
+          cat << EOF > test.cfg
+          ---
+          - local-only:
+
+          - control-service:
+              service: control
+              filename: /tmp/receptor.sock
+
+          - work-command:
+              worktype: cat
+              command: cat
+          EOF
+
+      - name: Run receptor (and wait a few seconds for it to boot)
+        run: |
+          podman run --name receptor -d -v $PWD/test.cfg:/etc/receptor/receptor.conf:Z localhost/receptor
+          sleep 3
+          podman logs receptor
+
+      - name: Submit work and assert the output we expect
+        run: |
+          output=$(podman exec -i receptor receptorctl work submit cat -l 'hello world' -f)
+          echo $output
+          if [[ "$output" != "hello world" ]]; then
+            echo "Output did not contain expected value"
+            exit 1
+          fi
+
+  receptorctl-test-coverage:
+    name: Receptorctl test coverage
+    needs: receptor
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        session:
+          - coverage
+    steps:
+      - name: Download the `receptor` binary
+        uses: actions/download-artifact@v4
+        with:
+          name: receptor-${{ env.DESIRED_GO_VERSION }}
+          path: /usr/local/bin/
+
+      - name: Set executable bit on the `receptor` binary
+        run: sudo chmod a+x /usr/local/bin/receptor
+
+      - name: Set up nox
+        uses: wntrblm/nox@2025.05.01
+        with:
+          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Check out the source code from Git
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for the automation in Nox to find the last tag
+
+      - name: Provision nox environment for ${{ matrix.session }}
+        run: nox --install-only --session ${{ matrix.session }}
+        working-directory: ./receptorctl
+
+      - name: Run `receptorctl` nox ${{ matrix.session }} session
+        run: nox --no-install --session ${{ matrix.session }}
+        working-directory: ./receptorctl
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          directory: receptorctl
+          files: receptorctl_coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

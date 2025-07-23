@@ -17,8 +17,14 @@ const (
 type dialerFunc func(chan struct{}) (netceptor.BackendSession, error)
 
 // dialerSession is a convenience function for backends that use dial/retry logic.
-func dialerSession(ctx context.Context, wg *sync.WaitGroup, redial bool, redialDelay time.Duration,
-	df dialerFunc) (chan netceptor.BackendSession, error) {
+func dialerSession(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	redial bool,
+	redialDelay time.Duration,
+	logger *logger.ReceptorLogger,
+	df dialerFunc,
+) (chan netceptor.BackendSession, error) {
 	sessChan := make(chan netceptor.BackendSession)
 	wg.Add(1)
 	go func() {
@@ -42,8 +48,6 @@ func dialerSession(ctx context.Context, wg *sync.WaitGroup, redial bool, redialD
 				case <-closeChan:
 					// continue
 				case <-ctx.Done():
-					_ = sess.Close()
-
 					return
 				}
 			}
@@ -81,7 +85,14 @@ type (
 )
 
 // listenerSession is a convenience function for backends that use listen/accept logic.
-func listenerSession(ctx context.Context, wg *sync.WaitGroup, lf listenFunc, af acceptFunc, lcf listenerCancelFunc) (chan netceptor.BackendSession, error) {
+func listenerSession(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	logger *logger.ReceptorLogger,
+	lf listenFunc,
+	af acceptFunc,
+	lcf listenerCancelFunc,
+) (chan netceptor.BackendSession, error) {
 	if err := lf(); err != nil {
 		return nil, err
 	}

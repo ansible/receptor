@@ -1,3 +1,4 @@
+//go:build !no_workceptor
 // +build !no_workceptor
 
 package workceptor
@@ -5,7 +6,6 @@ package workceptor
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -19,7 +19,7 @@ func TestStatusFileLock(t *testing.T) {
 	numReaderThreads := 8
 	baseWaitTime := 200 * time.Millisecond
 
-	tmpdir, err := ioutil.TempDir(os.TempDir(), "receptor-test-*")
+	tmpdir, err := os.MkdirTemp(os.TempDir(), "receptor-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestStatusFileLock(t *testing.T) {
 		totalWaitTime += waitTime
 		go func(iter int, waitTime time.Duration) {
 			sfd := StatusFileData{}
-			err = sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
+			sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
 				time.Sleep(waitTime)
 				status.State = iter
 				status.StdoutSize = int64(iter)
@@ -62,11 +62,11 @@ func TestStatusFileLock(t *testing.T) {
 				}
 				fileHasExisted = true
 				if err != nil {
-					t.Fatal(fmt.Sprintf("Error loading status file: %s", err))
+					t.Fatalf("Error loading status file: %s", err)
 				}
 				detailIter, err := strconv.Atoi(sfd.Detail)
 				if err != nil {
-					t.Fatal(fmt.Sprintf("Error converting status detail to int: %s", err))
+					t.Fatalf("Error converting status detail to int: %s", err)
 				}
 				if detailIter >= 0 {
 					if int64(sfd.State) != sfd.StdoutSize || sfd.State != detailIter {

@@ -9,7 +9,7 @@ import json
 import yaml
 from click.testing import CliRunner
 
-from lib import create_certificate
+from .lib import create_certificate
 
 
 @pytest.fixture(scope="session")
@@ -73,7 +73,7 @@ def receptor_mesh(base_tmp_dir):
                     self.config_files.append(os.path.join(self.config_files_dir, f))
 
         def __create_certificates(self):
-            self.certificate_files = create_certificate(self.get_mesh_tmp_dir())
+            self.certificate_files = create_certificate(self.get_mesh_tmp_dir(), "node1")
 
         def get_mesh_name(self):
             return self.config_files_dir.split("/")[-1]
@@ -91,10 +91,7 @@ def receptor_mesh(base_tmp_dir):
             try:
                 subprocess.check_output(["openssl", "version"])
             except FileNotFoundError:
-                raise Exception(
-                    "openssl binary not found\n"
-                    'Consider run "sudo dnf install openssl"'
-                )
+                raise Exception('openssl binary not found\nConsider run "sudo dnf install openssl"')
 
         def __create_tmp_dir(self):
             mesh_tmp_dir_path = self.get_mesh_tmp_dir()
@@ -147,14 +144,22 @@ def receptor_bin_path():
         subprocess.check_output(["receptor", "--version"])
         return "receptor"
     except subprocess.CalledProcessError:
-        raise Exception(
-            "Receptor binary not found in $PATH or in '../../tests/artifacts-output'"
-        )
+        raise Exception("Receptor binary not found in $PATH or in '../../tests/artifacts-output'")
 
 
 @pytest.fixture(scope="class")
 def default_socket_tcp():
     return "tcp://localhost:11112"
+
+
+@pytest.fixture(scope="class")
+def default_socket_file(receptor_mesh):
+    return receptor_mesh.get_mesh_tmp_dir() + "/node1.sock"
+
+
+@pytest.fixture(scope="class")
+def default_receptor_controller_socket_file(default_socket_file):
+    return receptorctl.ReceptorControl(default_socket_file)
 
 
 @pytest.fixture(scope="class")
@@ -243,9 +248,7 @@ def default_receptor_controller_unix(receptor_mesh):
 
 def start_nodes(receptor_mesh, receptor_nodes, receptor_bin_path):
     for i, config_file in enumerate(receptor_mesh.config_files):
-        log_file_name = (
-            config_file.split("/")[-1].replace(".yaml", ".log").replace(".yml", ".log")
-        )
+        log_file_name = config_file.split("/")[-1].replace(".yaml", ".log").replace(".yml", ".log")
         receptor_nodes.log_files.append(
             open(
                 os.path.join(receptor_mesh.get_mesh_tmp_dir(), log_file_name),
@@ -356,7 +359,8 @@ def invoke(receptor_control_args):
                     arg_list.append(str(v))
             return arg_list
 
-        runner = CliRunner()
+        # Since we may log errors/warnings on stderr we want to split stdout and stderr
+        runner = CliRunner(mix_stderr=False)
 
         out = runner.invoke(
             receptorctl.cli.cli,
@@ -381,7 +385,8 @@ def invoke_as_json(invoke):
         """
         result = invoke(command, ["--json"] + args)
         try:
-            json_output = json.loads(result.output)
+            # JSON data should only be on stdout
+            json_output = json.loads(result.stdout)
         except json.decoder.JSONDecodeError:
             pytest.fail("The command is not in json format")
         return result, json_output

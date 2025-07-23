@@ -1,3 +1,4 @@
+//go:build !no_cert_auth
 // +build !no_cert_auth
 
 package certificates
@@ -11,30 +12,33 @@ import (
 	"time"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
-func InitCA(opts *CertOptions, certOut, keyOut string) error {
-	ca, err := CreateCA(opts)
+// InitCA Initialize Certificate Authority.
+func InitCA(opts *CertOptions, certOut, keyOut string, osWrapper Oser) error {
+	ca, err := CreateCA(opts, &RsaWrapper{})
 	if err == nil {
-		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate})
+		err = SaveToPEMFile(certOut, []interface{}{ca.Certificate}, osWrapper)
 	}
 	if err == nil {
-		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey})
+		err = SaveToPEMFile(keyOut, []interface{}{ca.PrivateKey}, osWrapper)
 	}
 
 	return err
 }
 
-type initCA struct {
+type InitCAConfig struct {
 	CommonName string `description:"Common name to assign to the certificate" required:"Yes"`
 	Bits       int    `description:"Bit length of the encryption keys of the certificate" required:"Yes"`
 	NotBefore  string `description:"Effective (NotBefore) date/time, in RFC3339 format"`
 	NotAfter   string `description:"Expiration (NotAfter) date/time, in RFC3339 format"`
 	OutCert    string `description:"File to save the CA certificate to" required:"Yes"`
 	OutKey     string `description:"File to save the CA private key to" required:"Yes"`
+	Osw        Oser   `description:"OS wrapper for file operations"`
 }
 
-func (ica initCA) Run() (err error) {
+func (ica InitCAConfig) Run() (err error) {
 	opts := &CertOptions{
 		CommonName: ica.CommonName,
 		Bits:       ica.Bits,
@@ -51,15 +55,19 @@ func (ica initCA) Run() (err error) {
 			return
 		}
 	}
+	if ica.Osw == nil {
+		ica.Osw = &OsWrapper{}
+	}
 
-	return InitCA(opts, ica.OutCert, ica.OutKey)
+	return InitCA(opts, ica.OutCert, ica.OutKey, ica.Osw)
 }
 
-func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
+// MakeReq Create Certificate Request.
+func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string, osWrapper Oser) error {
 	var req *x509.CertificateRequest
 	var key *rsa.PrivateKey
 	if keyIn != "" {
-		data, err := LoadFromPEMFile(keyIn)
+		data, err := LoadFromPEMFile(keyIn, osWrapper)
 		if err != nil {
 			return err
 		}
@@ -69,12 +77,12 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 				continue
 			}
 			if key != nil {
-				return fmt.Errorf("multiple private keys in file %s", keyIn)
+				return fmt.Errorf("multiple keys in file %s", keyIn)
 			}
 			key = ckey
 		}
 		if key == nil {
-			return fmt.Errorf("no private keys in file %s", keyIn)
+			return fmt.Errorf("no keys in file %s", keyIn)
 		}
 		req, err = CreateCertReq(opts, key)
 		if err != nil {
@@ -87,12 +95,12 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 			return err
 		}
 	}
-	err := SaveToPEMFile(reqOut, []interface{}{req})
+	err := SaveToPEMFile(reqOut, []interface{}{req}, osWrapper)
 	if err != nil {
 		return err
 	}
 	if keyOut != "" {
-		err = SaveToPEMFile(keyOut, []interface{}{key})
+		err = SaveToPEMFile(keyOut, []interface{}{key}, osWrapper)
 		if err != nil {
 			return err
 		}
@@ -101,7 +109,7 @@ func MakeReq(opts *CertOptions, keyIn, keyOut, reqOut string) error {
 	return nil
 }
 
-type makeReq struct {
+type MakeReqConfig struct {
 	CommonName string   `description:"Common name to assign to the certificate" required:"Yes"`
 	Bits       int      `description:"Bit length of the encryption keys of the certificate"`
 	DNSName    []string `description:"DNS names to add to the certificate"`
@@ -110,9 +118,10 @@ type makeReq struct {
 	OutReq     string   `description:"File to save the certificate request to" required:"Yes"`
 	InKey      string   `description:"Private key to use for the request"`
 	OutKey     string   `description:"File to save the private key to (new key will be generated)"`
+	Osw        Oser     `description:"OS wrapper for file operations"`
 }
 
-func (mr makeReq) Prepare() error {
+func (mr MakeReqConfig) Prepare() error {
 	if mr.InKey == "" && mr.OutKey == "" {
 		return fmt.Errorf("must provide either InKey or OutKey")
 	}
@@ -129,7 +138,7 @@ func (mr makeReq) Prepare() error {
 	return nil
 }
 
-func (mr makeReq) Run() error {
+func (mr MakeReqConfig) Run() error {
 	opts := &CertOptions{
 		CommonName: mr.CommonName,
 		Bits:       mr.Bits,
@@ -147,22 +156,33 @@ func (mr makeReq) Run() error {
 		opts.IPAddresses = append(opts.IPAddresses, ip)
 	}
 
-	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq)
+	if mr.Osw == nil {
+		mr.Osw = &OsWrapper{}
+	}
+
+	return MakeReq(opts, mr.InKey, mr.OutKey, mr.OutReq, mr.Osw)
 }
 
-func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool) error {
+type SignReqFunc interface {
+	SignReq(opts *CertOptions, caCert, caKey, req, outCert string, verify bool, osWrapper Oser) error
+}
+
+type SignerReqImpl struct{}
+
+// SignReq Sign Certificate Request.
+func (s *SignerReqImpl) SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, verify bool, osWrapper Oser) error {
 	ca := &CA{}
 	var err error
-	ca.Certificate, err = LoadCertificate(caCrtPath)
+	ca.Certificate, err = LoadCertificate(caCrtPath, osWrapper)
 	if err != nil {
 		return err
 	}
-	ca.PrivateKey, err = LoadPrivateKey(caKeyPath)
+	ca.PrivateKey, err = LoadPrivateKey(caKeyPath, osWrapper)
 	if err != nil {
 		return err
 	}
 	var req *x509.CertificateRequest
-	req, err = LoadRequest(reqPath)
+	req, err = LoadRequest(reqPath, osWrapper)
 	if err != nil {
 		return err
 	}
@@ -211,10 +231,10 @@ func SignReq(opts *CertOptions, caCrtPath, caKeyPath, reqPath, certOut string, v
 		return err
 	}
 
-	return SaveToPEMFile(certOut, []interface{}{cert})
+	return SaveToPEMFile(certOut, []interface{}{cert}, osWrapper)
 }
 
-type signReq struct {
+type SignReqConfig struct {
 	Req       string `description:"Certificate Request PEM filename" required:"Yes"`
 	CACert    string `description:"CA certificate PEM filename" required:"Yes"`
 	CAKey     string `description:"CA private key PEM filename" required:"Yes"`
@@ -224,7 +244,7 @@ type signReq struct {
 	Verify    bool   `description:"If true, do not prompt the user for verification" default:"False"`
 }
 
-func (sr signReq) Run() error {
+func (sr SignReqConfig) ValidateAndSign(signReqFunc SignReqFunc) error {
 	opts := &CertOptions{}
 	if sr.NotBefore != "" {
 		t, err := time.Parse(time.RFC3339, sr.NotBefore)
@@ -241,14 +261,22 @@ func (sr signReq) Run() error {
 		opts.NotAfter = t
 	}
 
-	return SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify)
+	return signReqFunc.SignReq(opts, sr.CACert, sr.CAKey, sr.Req, sr.OutCert, sr.Verify, &OsWrapper{})
+}
+
+func (sr SignReqConfig) Run() error {
+	return sr.ValidateAndSign(&SignerReqImpl{})
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
-		"cert-init", "Initialize PKI CA", initCA{}, cmdline.Exclusive, cmdline.Section(certSection))
+		"cert-init", "Initialize PKI CA", InitCAConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
-		"cert-makereq", "Create certificate request", makeReq{}, cmdline.Exclusive, cmdline.Section(certSection))
+		"cert-makereq", "Create certificate request", MakeReqConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 	cmdline.RegisterConfigTypeForApp("receptor-certificates",
-		"cert-signreq", "Sign request and produce certificate", signReq{}, cmdline.Exclusive, cmdline.Section(certSection))
+		"cert-signreq", "Sign request and produce certificate", SignReqConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 }

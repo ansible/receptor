@@ -85,9 +85,9 @@ class ReceptorControl:
     def connect(self):
         if self._socket is not None:
             return
-        m = re.compile(
-            "(tcp|tls):(//)?([a-zA-Z0-9-.:]+):([0-9]+)|(unix:(//)?)?([^:]+)"
-        ).fullmatch(self._socketaddress)
+        m = re.compile("(tcp|tls):(//)?([a-zA-Z0-9-.:]+):([0-9]+)|(unix:(//)?)?([^:]+)").fullmatch(
+            self._socketaddress
+        )
         if m:
             unixsocket = m[7]
             host = m[3]
@@ -125,15 +125,16 @@ class ReceptorControl:
                                 purpose=ssl.Purpose.SERVER_AUTH,
                                 cafile=self._rootcas,
                             )
+                            context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+
                             if self._key and self._cert:
-                                context.load_cert_chain(
-                                    certfile=self._cert, keyfile=self._key
-                                )
-                            if self._insecureskipverify:
+                                context.load_cert_chain(certfile=self._cert, keyfile=self._key)
+                            if not self._insecureskipverify:
+                                context.check_hostname = True
+                            else:
                                 context.check_hostname = False
-                            self._socket = context.wrap_socket(
-                                self._socket, server_hostname=host
-                            )
+
+                            self._socket = context.wrap_socket(self._socket, server_hostname=host)
                         self._socket.connect(sockaddr)
                     except OSError:
                         self._socket.close()
@@ -218,9 +219,7 @@ class ReceptorControl:
         command = f"{commandJson}\n"
         self.writestr(command)
         text = self.readstr()
-        m = re.compile(
-            "Work unit created with ID (.+). Send stdin data and EOF."
-        ).fullmatch(text)
+        m = re.compile("Work unit created with ID (.+). Send stdin data and EOF.").fullmatch(text)
         if not m:
             errmsg = "Failed to start work unit"
             if str.startswith(text, "ERROR: "):
@@ -243,9 +242,9 @@ class ReceptorControl:
         result = json.loads(text)
         return result
 
-    def get_work_results(self, unit_id, return_socket=False, return_sockfile=True):
+    def get_work_results(self, unit_id, startpos=0, return_socket=False, return_sockfile=True):
         self.connect()
-        self.writestr(f"work results {unit_id}\n")
+        self.writestr(f"work results {unit_id} {startpos}\n")
         text = self.readstr()
         m = re.compile("Streaming results for work unit (.+)").fullmatch(text)
         if not m:
@@ -265,7 +264,7 @@ class ReceptorControl:
             if not return_socket:
                 self._socket.close()
             if not return_sockfile:
-                self.sockfile.close()
+                self._sockfile.close()
         finally:
             self._socket = None
             self._sockfile = None

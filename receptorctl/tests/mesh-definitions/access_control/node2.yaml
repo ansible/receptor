@@ -1,3 +1,4 @@
+---
 - node:
     id: node2
 
@@ -11,3 +12,4 @@
 
 - control-service:
     filename: /tmp/receptorctltest/access_control/node2.sock
+...

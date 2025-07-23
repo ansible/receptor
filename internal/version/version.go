@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // Version is receptor app version.
@@ -14,16 +15,25 @@ type cmdlineCfg struct{}
 
 // Run runs the action.
 func (cfg cmdlineCfg) Run() error {
-	if Version == "" {
-		fmt.Printf("Version unknown\n")
-	} else {
-		fmt.Printf("%s\n", Version)
-	}
+	validateVersion()
+	fmt.Printf("%s\n", Version)
 
 	return nil
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-version",
-		"version", "Show the Receptor version", cmdlineCfg{}, cmdline.Exclusive)
+		"version", "Displays the Receptor version.", cmdlineCfg{}, cmdline.Exclusive)
+}
+
+func validateVersion() string {
+	if Version == "" {
+		return "Version unknown"
+	} else {
+		return Version
+	}
 }

@@ -4,29 +4,27 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type (
-	tracerouteCommandType struct{}
-	tracerouteCommand     struct {
+	TracerouteCommandType struct{}
+	TracerouteCommand     struct {
 		target string
 	}
 )
 
-func (t *tracerouteCommandType) InitFromString(params string) (ControlCommand, error) {
+func (t *TracerouteCommandType) InitFromString(params string) (ControlCommand, error) {
 	if params == "" {
 		return nil, fmt.Errorf("no traceroute target")
 	}
-	c := &tracerouteCommand{
+	c := &TracerouteCommand{
 		target: params,
 	}
 
 	return c, nil
 }
 
-func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
+func (t *TracerouteCommandType) InitFromJSON(config map[string]interface{}) (ControlCommand, error) {
 	target, ok := config["target"]
 	if !ok {
 		return nil, fmt.Errorf("no traceroute target")
@@ -35,28 +33,27 @@ func (t *tracerouteCommandType) InitFromJSON(config map[string]interface{}) (Con
 	if !ok {
 		return nil, fmt.Errorf("traceroute target must be string")
 	}
-	c := &tracerouteCommand{
+	c := &TracerouteCommand{
 		target: targetStr,
 	}
 
 	return c, nil
 }
 
-func (c *tracerouteCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo ControlFuncOperations) (map[string]interface{}, error) {
+func (c *TracerouteCommand) ControlFunc(ctx context.Context, nc NetceptorForControlCommand, _ ControlFuncOperations) (map[string]interface{}, error) {
 	cfr := make(map[string]interface{})
-	for i := 0; i <= int(nc.MaxForwardingHops()); i++ {
+	results := nc.Traceroute(ctx, c.target)
+	i := 0
+	for res := range results {
 		thisResult := make(map[string]interface{})
-		pingTime, pingRemote, err := ping(nc, c.target, byte(i))
-		thisResult["From"] = pingRemote
-		thisResult["Time"] = pingTime
-		thisResult["TimeStr"] = fmt.Sprint(pingTime)
-		if err != nil && err.Error() != netceptor.ProblemExpiredInTransit {
-			thisResult["Error"] = err.Error()
+		thisResult["From"] = res.From
+		thisResult["Time"] = res.Time
+		thisResult["TimeStr"] = fmt.Sprint(res.Time)
+		if res.Err != nil {
+			thisResult["Error"] = res.Err.Error()
 		}
 		cfr[strconv.Itoa(i)] = thisResult
-		if err == nil || err.Error() != netceptor.ProblemExpiredInTransit {
-			break
-		}
+		i++
 	}
 
 	return cfr, nil

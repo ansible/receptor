@@ -1,20 +1,40 @@
+.. _dev_guide:
+
+===============
 Developer guide
-================
+===============
 
-Receptor is an open source project that lives at https://github.com/ansible/receptor
+Receptor is an open source project that lives at `ansible/receptor repository <https://github.com/ansible/receptor/>`
 
-Testing
-^^^^^^^
+.. contents::
+   :local:
 
-Pull requests must pass a suite of integration tests before being merged into ``devel``.
+See the :ref:`contributing:contributing` for more general details.
 
-``make test`` will run the full test suite locally. Some of the tests require access to a Kubernetes cluster; these tests will load in the kubeconfig file located at ``$HOME/.kube/config``. One simple way to make these tests work is to start minikube locally before running ``make test``. See https://minikube.sigs.k8s.io/docs/start/ for more information about minikube.
+---------
+Debugging
+---------
 
-To skip tests that depend on Kubernetes, set environment variable ``export SKIP_KUBE=1``.
+^^^^^^^^^^^
+Unix Socket
+^^^^^^^^^^^
+If you don't want to use receptorctl to control nodes, `socat <https://www.redhat.com/en/blog/getting-started-socat>` can be used to interact with unix sockets directly.
 
-Additionally, all code must pass a suite of Go linters. There is a pre-commit yaml file in the receptor repository that points to the linter suite. It is best practice to install the pre-commit yaml so that the linters run locally on each commit.
+Example:
 
-.. code::
+.. code-block:: bash
+
+   echo -e '{"command": "work", "subcommand": "submit", "node": "execution", "worktype": "cat", }\n"Hi"' | socat - UNIX-CONNECT:/tmp/control.sock
+
+-------
+Linters
+-------
+
+All code must pass a suite of Go linters.
+There is a pre-commit yaml file in the Receptor repository that points to the linter suite.
+It is strongly recommmended to install the pre-commit yaml so that the linters run locally on each commit.
+
+.. code-block:: bash
 
     cd $HOME
     go get github.com/golangci/golangci-lint/cmd/golangci-lint
@@ -22,16 +42,81 @@ Additionally, all code must pass a suite of Go linters. There is a pre-commit ya
     cd receptor
     pre-commit install
 
-See https://pre-commit.com/ and https://golangci-lint.run/ for more details on installing and using these tools.
+See `Pre commit <https://pre-commit.com/>`_ and `Golangci-lint <https://golangci-lint.run/>`_ for more details on installing and using these tools.
 
+-------
+Testing
+-------
 
-Source code
+^^^^^^^^^^^
+Development
 ^^^^^^^^^^^
 
-The next couple of sections are aimed to orient developers to the receptor codebase and provide a starting point for understanding how receptor works.
+Write unit tests for new features or functionality.
+Add/Update tests for bug fixes.
 
+^^^^^^^
+Mocking
+^^^^^^^
+
+We are using mockgen to generate mocks for our unit tests. The mocks are living inside of a package under the real implementation, prefixed by ``mock_``. An example is the package mock_workceptor under pkg/workceptor.
+
+We use go generate to generate our mocks. To generate all the mocks in receptor:
+
+.. code-block:: bash
+
+    make generate
+
+To add a mock to go generate you will need to add a line to the `generate.go` file in the root of the repository.
+
+In order to genenerate a mock for a particular file, run:
+
+.. code-block:: bash
+
+    mockgen -source=pkg/filename.go -destination=pkg/mock_pkg/mock_filename.go
+
+For example, to create/update mocks for Workceptor, we can run:
+
+.. code-block:: bash
+
+    mockgen -source=pkg/workceptor/workceptor.go -destination=pkg/workceptor/mock_workceptor/workceptor.go
+
+After validating the mockgen command generates the mocks correctly you can add this command to the `generate.go` file.
+
+To remove a mock you will need to remove the associated line in the `generate.go` file.
+
+Then the following commands to generate a fresh set of mocks:
+
+.. code-block:: bash
+
+    make generate-clean
+    make generate
+
+^^^^^^^^^^
+Kubernetes
+^^^^^^^^^^
+
+Some of the tests require access to a Kubernetes cluster; these tests will load in the kubeconfig file located at ``$HOME/.kube/config``. One simple way to make these tests work is to start minikube locally before running ``make test``. See https://minikube.sigs.k8s.io/docs/start/ for more information about minikube.
+
+To skip tests that depend on Kubernetes, set environment variable ``export SKIP_KUBE=1``.
+
+^^^^^^^^^
+Execution
+^^^^^^^^^
+
+Pull requests must pass a suite of unit and integration tests before being merged into ``devel``.
+
+``make test`` will run the full test suite locally.
+
+-----------
+Source code
+-----------
+
+The following sections help orient developers to the Receptor code base and provide a starting point for understanding how Receptor works.
+
+^^^^^^^^^^^^^^^^^^^^^
 Parsing receptor.conf
-"""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^
 
 Let's see how items in the config file are mapped to Golang internals.
 
@@ -40,82 +125,84 @@ As an example, in tcp.go
 .. code-block:: go
 
     cmdline.RegisterConfigTypeForApp("receptor-backends",
-      "tcp-peer", "Make an outbound backend connection to a TCP peer", tcpDialerCfg{}, cmdline.Section(backendSection))
+      "tcp-peer", "Make an outbound backend connection to a TCP peer", TCPDialerCfg{}, cmdline.Section(backendSection))
 
 
 "tcp-peer" is a top-level key (action item) in receptor.conf
 
 .. code-block:: yaml
 
-    - tcp-peer:
-        address: localhost:2222
+    tcp-peers:
+      - address: localhost:2222
 
-``RegisterConfigTypeForApp`` tells the cmdline parser that "tcp-peer" is mapped to the ``tcpDialerCfg{}`` structure.
+``RegisterConfigTypeForApp`` tells the cmdline parser that "tcp-peer" is mapped to the ``TCPDialerCfg{}`` structure.
 
-``main()`` in receptor.go is the entry point for a running receptor process.
+``main()`` in ``receptor.go`` is the entry point for a running Receptor process.
 
-In receptor.go (modified for clarity):
+In ``receptor.go`` (modified for clarity):
 
 .. code-block:: go
 
     cl.ParseAndRun("receptor.conf", []string{"Init", "Prepare", "Run"})
 
-A receptor config file has many action items, such as "node", "work-command", and "tcp-peer". ParseAndRun is how each of these items are instantiated when receptor starts.
+A Receptor config file has many action items, such as ```node``, ``work-command``, and ``tcp-peer``. ``ParseAndRun`` is how each of these items are instantiated when Receptor starts.
 
 Specifically, ParseAndRun will run the Init, Prepare, and Run methods associated with each action item.
 
-Here is the Prepare method for ``tcpDialerCfg``. By the time this code executes, the cfg structure has already been populated with the data provided in the config file.
+Here is the Prepare method for ``TCPDialerCfg``. By the time this code executes, the cfg structure has already been populated with the data provided in the config file.
 
 .. code-block:: go
 
     // Prepare verifies the parameters are correct.
-    func (cfg tcpDialerCfg) Prepare() error {
-    	if cfg.Cost <= 0.0 {
-    		return fmt.Errorf("connection cost must be positive")
-    	}
+    func (cfg TCPDialerCfg) Prepare() error {
+        if cfg.Cost <= 0.0 {
+            return fmt.Errorf("connection cost must be positive")
+        }
 
-    	return nil
+        return nil
     }
 
 This simply does a check to make sure the provided Cost is valid.
 
-The Run method for the ``tcpDialerCfg`` object:
+The Run method for the ``TCPDialerCfg`` object:
 
 .. code-block:: go
 
     // Run runs the action.
-    func (cfg tcpDialerCfg) Run() error {
-    	logger.Debug("Running TCP peer connection %s\n", cfg.Address)
-    	host, _, err := net.SplitHostPort(cfg.Address)
-    	if err != nil {
-    		return err
-    	}
-    	tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host, "dns")
-    	if err != nil {
-    		return err
-    	}
-    	b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
-    	if err != nil {
-    		logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
+    func (cfg TCPDialerCfg) Run() error {
+        logger.Debug("Running TCP peer connection %s\n", cfg.Address)
+        host, _, err := net.SplitHostPort(cfg.Address)
+        if err != nil {
+            return err
+        }
+        tlscfg, err := netceptor.MainInstance.GetClientTLSConfig(cfg.TLS, host, "dns")
+        if err != nil {
+            return err
+        }
+        b, err := NewTCPDialer(cfg.Address, cfg.Redial, tlscfg)
+        if err != nil {
+            logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 
-    		return err
-    	}
-    	err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
-    	if err != nil {
-    		return err
-    	}
+            return err
+        }
+        err = netceptor.MainInstance.AddBackend(b, cfg.Cost, nil)
+        if err != nil {
+            return err
+        }
 
-    	return nil
+        return nil
     }
 
-This gets a new TCP dialer object and passes it to the netceptor AddBackend method, so that it can be processed further. AddBackend will start proper Go routines that periodically dial the address defined in the TCP dialer structure, which will lead to a proper TCP connection to another receptor node.
+This gets a new TCP dialer object and passes it to the netceptor ``AddBackend`` method, so that it can be processed further.
+``AddBackend`` will start proper Go routines that periodically dial the address defined in the TCP dialer structure, which will lead to a proper TCP connection to another Receptor node.
 
-In general, when studying how the start up process works in receptor, take a look at the Init, Prepare, and Run methods throughout the code, as these are the entry points to running those specific components of receptor.
+In general, when studying how the start up process works in Receptor, take a look at the ``Init``, ``Prepare``, and ``Run`` methods throughout the code, as these are the entry points to running those specific components of Receptor.
 
+^^^^
 Ping
-""""
+^^^^
 
-Studying how pings work in receptor will provide a useful glimpse into the internal workings of netceptor -- the main component of receptor that handles connections and data traffic over the mesh.
+Studying how pings work in Receptor will provide a useful glimpse into the internal workings of netceptor -- the main component of Receptor that handles connections and data traffic over the mesh.
 
 ``receptorctl --socket /tmp/foo.sock ping bar``
 
@@ -126,7 +213,7 @@ The control-service on `foo` will receive this command and subsequently call the
 .. code-block:: go
 
     func ping(nc *netceptor.Netceptor, target string, hopsToLive byte) (time.Duration, string, error) {
-    	pc, err := nc.ListenPacket("")
+        pc, err := nc.ListenPacket("")
 
 ``target`` is the target node, "bar" in this case.
 
@@ -137,13 +224,13 @@ The control-service on `foo` will receive this command and subsequently call the
 .. code-block:: go
 
     pc := &PacketConn{
-    	s:            s,
-    	localService: service,
-    	recvChan:     make(chan *messageData),
-    	advertise:    false,
-    	adTags:       nil,
-    	connType:     ConnTypeDatagram,
-    	hopsToLive:   s.maxForwardingHops,
+        s:            s,
+        localService: service,
+        recvChan:     make(chan *messageData),
+        advertise:    false,
+        adTags:       nil,
+        connType:     ConnTypeDatagram,
+        hopsToLive:   s.maxForwardingHops,
     }
 
     s.listenerRegistry[service] = pc
@@ -161,19 +248,19 @@ The control-service on `foo` will receive this command and subsequently call the
 
 Sends an empty message to the address "bar:ping" on the mesh. Recall that nodes are analogous to DNS names, and services are like port numbers.
 
-``ToWrite`` calls ``sendMessageWithHopsToLive``
+``WriteTo`` calls ``sendMessageWithHopsToLive``
 
 **netceptor.go::sendMessageWithHopsToLive**
 
 .. code-block:: go
 
     md := &messageData{
-    	FromNode:    s.nodeID,
-    	FromService: fromService,
-    	ToNode:      toNode,
-    	ToService:   toService,
-    	HopsToLive:  hopsToLive,
-    	Data:        data,
+        FromNode:    s.nodeID,
+        FromService: fromService,
+        ToNode:      toNode,
+        ToService:   toService,
+        HopsToLive:  hopsToLive,
+        Data:        data,
     }
 
     return s.handleMessageData(md)
@@ -218,8 +305,8 @@ So before the "ping" command was issued, this protoWriter Go routine was already
 .. code-block:: go
 
     func (ns *TCPSession) Send(data []byte) error {
-    	buf := ns.framer.SendData(data)
-    	n, err := ns.conn.Write(buf)
+        buf := ns.framer.SendData(data)
+        n, err := ns.conn.Write(buf)
 
 ``ns.conn`` is net.Conn object, which is part of the Golang standard library.
 
@@ -285,16 +372,16 @@ This checks whether the destination node indicated in the message is the current
 .. code-block:: go
 
     func (s *Netceptor) handlePing(md *messageData) error {
-    	return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
+        return s.sendMessage("ping", md.FromNode, md.FromService, []byte{})
     }
 
 This is the ping reply handler. It sends an empty message to the FromNode (`foo`).
 
 The FromService here is not "ping", but rather the ephemeral service that was created from ``ListenPacket("")`` in ping.go on `foo`.
 
-With ``trace`` enabled in the receptor configuration, the following log statements show the reply from `bar`,
+With ``trace`` enabled in the Receptor configuration, the following log statements show the reply from ``bar``,
 
-.. code::
+.. code-block:: bash
 
     TRACE --- Received data length 0 from foo:h73opPEh to bar:ping via foo
     TRACE --- Sending data length 0 from bar:ping to foo:h73opPEh

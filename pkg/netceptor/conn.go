@@ -204,13 +204,19 @@ func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags 
 }
 
 func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
+	// Check cancellation first
 	select {
 	case <-ctx.Done():
 		return
-	case li.AcceptChan <- &AcceptResult{
-		Conn: conn,
-		Err:  err,
-	}:
+	case <-li.DoneChan:
+		return
+	default:
+	}
+
+	// Then try to send
+	select {
+	case li.AcceptChan <- &AcceptResult{Conn: conn, Err: err}:
+	case <-ctx.Done():
 	case <-li.DoneChan:
 	}
 }

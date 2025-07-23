@@ -1,0 +1,6 @@
+[allowlist]
+  description = "Global Allowlist"
+  paths = [
+    '''pkg/certificates/ca_test.go''',
+    '''pkg/netceptor/tlsconfig_test.go''',
+  ]

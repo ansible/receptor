@@ -62,9 +62,7 @@ def wait_for_workunit_state():
 
 @pytest.fixture(scope="function")
 def wait_for_work_finished(wait_for_workunit_state):
-    def _wait_for_work_finished(
-        node_controller, unitid: str, timeout_seconds: int = 30
-    ) -> bool:
+    def _wait_for_work_finished(node_controller, unitid: str, timeout_seconds: int = 30) -> bool:
         """Wait for a workunit to finish
 
         Args:
@@ -106,16 +104,11 @@ class TestWorkUnit:
         state_unitid = work.pop("unitid")
 
         assert state_result == "Job Started"
-        assert wait_for_work_finished(
-            node1_controller, state_unitid, wait_for
-        ), "Workunit timed out and never finished"
-
-        work_result = (
-            node1_controller.get_work_results(state_unitid)
-            .read()
-            .decode("utf-8")
-            .strip()
+        assert wait_for_work_finished(node1_controller, state_unitid, wait_for), (
+            "Workunit timed out and never finished"
         )
+
+        work_result = node1_controller.get_work_results(state_unitid).read().decode("utf-8").strip()
 
         assert payload.upper() == work_result, (
             f"Workunit did not report the expected result:\n - payload: {payload}"

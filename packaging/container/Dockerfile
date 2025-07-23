@@ -1,14 +1,15 @@
-FROM quay.io/centos/centos:stream9 as builder
+FROM registry.access.redhat.com/ubi9/ubi:9.5 AS builder
 ARG VERSION
 
-RUN dnf -y update && dnf install -y golang make python3 python3-pip git
-RUN pip install wheel
+RUN dnf -y update && \
+    dnf install -y golang make python3.12 python3.12-pip git
+RUN pip3.12 install wheel
 
 ADD source.tar.gz /source
 WORKDIR /source
 RUN make VERSION=${VERSION}
 
-FROM quay.io/centos/centos:stream9
+FROM registry.access.redhat.com/ubi9/ubi:9.5
 ARG VERSION
 
 LABEL license="ASL2"
@@ -21,10 +22,12 @@ COPY receptor_python_worker-${VERSION}-py3-none-any.whl /tmp
 COPY receptor.conf /etc/receptor/receptor.conf
 
 RUN dnf -y update && \
-    dnf -y install python3-pip && \
+    dnf -y install python3.12-pip && \
     dnf clean all && \
-    pip install --no-cache-dir wheel dumb-init && \
-    pip install --no-cache-dir /tmp/*.whl && \
+    pip3.12 install --no-cache-dir wheel && \
+    pip3.12 install --no-cache-dir dumb-init && \
+    pip3.12 install --no-cache-dir ansible-runner && \
+    pip3.12 install --no-cache-dir /tmp/*.whl && \
     rm /tmp/*.whl
 
 COPY --from=builder /source/receptor /usr/bin/receptor

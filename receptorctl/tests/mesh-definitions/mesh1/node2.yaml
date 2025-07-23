@@ -1,3 +1,4 @@
+---
 - node:
     id: node2
 
@@ -9,3 +10,4 @@
 
 - control-service:
     filename: /tmp/receptorctltest/mesh1/node2.sock
+...

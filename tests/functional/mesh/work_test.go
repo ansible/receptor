@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,13 +33,19 @@ func TestWorkSubmitWithTLSClient(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.DataDir)
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel1()
+
+			err = controllers["node1"].AssertWorkSucceeded(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err, m.DataDir)
 			}
 
 			err = controllers["node1"].AssertWorkResults(unitID, expectedResults)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
+			err = controllers["node2"].AssertWorkResults(unitID, expectedResults)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -50,7 +55,7 @@ func TestWorkSubmitWithTLSClient(t *testing.T) {
 
 // Tests that submitting work with wrong cert CN immediately fails the job
 // also tests that releasing a job that has not been started on remote
-// will not attempt to connect to remote
+// will not attempt to connect to remote.
 func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 	t.Parallel()
 
@@ -63,34 +68,35 @@ func TestWorkSubmitWithIncorrectTLSClient(t *testing.T) {
 
 			command := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","tlsclient":"tlsclientwrongCN","node":"node2","params":""}`
 			unitID, err := controllers["node1"].WorkSubmitJSON(command)
-
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkFailed(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
 
+			err = controllers["node1"].AssertWorkFailed(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			_, err = controllers["node1"].WorkRelease(unitID)
-
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
 
+			err = controllers["node1"].AssertWorkReleased(ctx2, unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node1"].GetDataDir(), "node1", unitID)
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel3()
 
+			err = assertFilesReleased(ctx3, nodes["node1"].GetDataDir(), "node1", unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -121,8 +127,10 @@ func TestStartRemoteWorkWithTTL(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-			err = controllers["node1"].AssertWorkTimedOut(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel1()
+
+			err = controllers["node1"].AssertWorkTimedOut(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,13 +138,17 @@ func TestStartRemoteWorkWithTTL(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
-			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel2()
+
+			err = controllers["node1"].AssertWorkReleased(ctx2, unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
-			err = assertFilesReleased(ctx, nodes["node1"].GetDataDir(), "node1", unitID)
+
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel3()
+			err = assertFilesReleased(ctx3, nodes["node1"].GetDataDir(), "node1", unitID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -164,8 +176,10 @@ func TestCancelThenReleaseRemoteWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
+
+			err = controllers["node1"].AssertWorkRunning(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -173,8 +187,11 @@ func TestCancelThenReleaseRemoteWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkCancelled(ctx, unitID)
+
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
+
+			err = controllers["node1"].AssertWorkCancelled(ctx2, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -191,8 +208,10 @@ func TestCancelThenReleaseRemoteWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
+
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel3()
+			err = m.WaitForReady(ctx3)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -208,18 +227,26 @@ func TestCancelThenReleaseRemoteWork(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+			ctx4, cancel4 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel4()
+
+			err = controllers["node1"].AssertWorkReleased(ctx4, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node1"].GetDataDir(), "node1", unitID)
+
+			ctx5, cancel5 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel5()
+
+			err = assertFilesReleased(ctx5, nodes["node1"].GetDataDir(), "node1", unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertFilesReleased(ctx, nodes["node3"].GetDataDir(), "node3", remoteUnitID)
+
+			ctx6, cancel6 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel6()
+
+			err = assertFilesReleased(ctx6, nodes["node3"].GetDataDir(), "node3", remoteUnitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -240,35 +267,36 @@ func TestWorkSubmitWhileRemoteNodeIsDown(t *testing.T) {
 
 			nodes["node3"].Shutdown()
 			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleepshort")
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkPending(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
 
+			err = controllers["node1"].AssertWorkPending(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
 			err = nodes["node3"].Start()
-
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
 			// Wait for node3 to join the mesh again
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
 
+			err = m.WaitForReady(ctx2)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel3()
 
+			err = controllers["node1"].AssertWorkSucceeded(ctx3, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -296,13 +324,17 @@ func TestWorkStreamingResumesWhenRelayNodeRestarts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
+
+			err = controllers["node1"].AssertWorkRunning(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertStdoutFizeSize(ctx, nodes["node1"].GetDataDir(), "node1", unitID, 1)
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
+
+			err = assertStdoutFizeSize(ctx2, nodes["node1"].GetDataDir(), "node1", unitID, 1)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -313,19 +345,25 @@ func TestWorkStreamingResumesWhenRelayNodeRestarts(t *testing.T) {
 			nodes["node2"].Shutdown()
 			nodes["node2"].Start()
 			// Wait for node2 to join the mesh again
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel3()
+
+			err = m.WaitForReady(ctx3)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+			ctx4, cancel4 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel4()
+
+			err = controllers["node1"].AssertWorkSucceeded(ctx4, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = assertStdoutFizeSize(ctx, nodes["node1"].GetDataDir(), "node1", unitID, 10)
+			ctx5, cancel5 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel5()
+
+			err = assertStdoutFizeSize(ctx5, nodes["node1"].GetDataDir(), "node1", unitID, 10)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -352,8 +390,9 @@ func TestResultsOnRestartedNode(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkRunning(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
+			err = controllers["node1"].AssertWorkRunning(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -364,14 +403,18 @@ func TestResultsOnRestartedNode(t *testing.T) {
 				t.Fatal(err, m.GetDataDir())
 			}
 			// Wait for node3 to join the mesh again
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
+
+			err = m.WaitForReady(ctx2)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
 
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel3()
+
+			err = controllers["node1"].AssertWorkSucceeded(ctx3, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -402,8 +445,10 @@ func TestWorkSubmitAndReleaseToNonexistentNode(t *testing.T) {
 			}
 
 			// wait for 10 seconds, and check if the work is in pending state
-			ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkPending(ctx, unitID)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
+
+			err = controllers["node1"].AssertWorkPending(ctx1, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -413,8 +458,11 @@ func TestWorkSubmitAndReleaseToNonexistentNode(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = m.WaitForReady(ctx)
+
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
+
+			err = m.WaitForReady(ctx2)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -432,8 +480,11 @@ func TestWorkSubmitAndReleaseToNonexistentNode(t *testing.T) {
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
-			ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-			err = controllers["node1"].AssertWorkReleased(ctx, unitID)
+
+			ctx3, cancel3 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel3()
+
+			err = controllers["node1"].AssertWorkReleased(ctx3, unitID)
 			if err != nil {
 				t.Fatal(err, m.GetDataDir())
 			}
@@ -453,14 +504,13 @@ func TestRuntimeParams(t *testing.T) {
 	}
 
 	err := m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err = m.WaitForReady(ctx)
-
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel1()
+	err = m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -469,26 +519,22 @@ func TestRuntimeParams(t *testing.T) {
 	controllers := make(map[string]*ReceptorControl)
 	controllers["node1"] = NewReceptorControl()
 	err = controllers["node1"].Connect(nodes["node1"].GetControlSocket())
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
 	command := `{"command":"work","subcommand":"submit","worktype":"echo","node":"localhost","params":"it worked!"}`
 	unitID, err := controllers["node1"].WorkSubmitJSON(command)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
-	err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
-
+	err = controllers["node1"].AssertWorkSucceeded(ctx1, unitID)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
 	err = controllers["node1"].AssertWorkResults(unitID, []byte("it worked!"))
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -511,8 +557,10 @@ func TestKubeRuntimeParams(t *testing.T) {
 
 	m.Start(t.Name())
 
-	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err := m.WaitForReady(ctx)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel1()
+
+	err := m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -524,7 +572,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
-	var submitJSON = new(bytes.Buffer)
+	submitJSON := new(bytes.Buffer)
 	err = json.Compact(submitJSON, []byte(`{
 		"command": "work",
 		"subcommand": "submit",
@@ -533,13 +581,11 @@ func TestKubeRuntimeParams(t *testing.T) {
 		"secret_kube_pod": "%s",
 		"secret_kube_config": "%s"
     }`))
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kubeConfigBytes, err := ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config"))
-
+	kubeConfigBytes, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -547,8 +593,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 	// is there a better way to do this?
 	kubeConfig := strings.ReplaceAll(string(kubeConfigBytes), "\n", "\\n")
 
-	echoPodBytes, err := ioutil.ReadFile("testdata/echo-pod.yml")
-
+	echoPodBytes, err := os.ReadFile("testdata/echo-pod.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -559,19 +604,16 @@ func TestKubeRuntimeParams(t *testing.T) {
 	command := fmt.Sprintf(submitJSON.String(), echoPod, kubeConfig)
 
 	unitID, err := controllers["node1"].WorkSubmitJSON(command)
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
-	err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
-
+	err = controllers["node1"].AssertWorkSucceeded(ctx1, unitID)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
 	err = controllers["node1"].AssertWorkResults(unitID, []byte("1\n2\n3\n4\n5\n"))
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -589,13 +631,14 @@ func TestRuntimeParamsNotAllowed(t *testing.T) {
 	}
 
 	err := m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err = m.WaitForReady(ctx)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel1()
+
+	err = m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -636,9 +679,10 @@ func TestKubeContainerFailure(t *testing.T) {
 
 	m.Start(t.Name())
 
-	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err := m.WaitForReady(ctx)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel1()
 
+	err := m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -654,14 +698,15 @@ func TestKubeContainerFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
-	ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-	err = controllers["node1"].AssertWorkFailed(ctx, unitID)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel2()
+
+	err = controllers["node1"].AssertWorkFailed(ctx2, unitID)
 	if err != nil {
 		t.Fatal("Expected work to fail but it succeeded")
 	}
 
 	status, err := controllers["node1"].GetWorkStatus(unitID)
-
 	if err != nil {
 		t.Fatal("Could not check status")
 	}
@@ -726,13 +771,14 @@ func TestSignedWorkVerification(t *testing.T) {
 	}
 
 	err = m.Start(t.Name())
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-	err = m.WaitForReady(ctx)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel1()
+
+	err = m.WaitForReady(ctx1)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
@@ -749,13 +795,15 @@ func TestSignedWorkVerification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
-	ctx, _ = context.WithTimeout(context.Background(), 120*time.Second)
-	err = controllers["node1"].AssertWorkSucceeded(ctx, unitID)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel2()
+
+	err = controllers["node1"].AssertWorkSucceeded(ctx2, unitID)
 	if err != nil {
 		t.Fatal(err, m.GetDataDir())
 	}
 
-	// node2 has the wrong public key to verify work signatures, so the work submission should fail
+	// node3 has the wrong public key to verify work signatures, so the work submission should fail
 	job = `{"command":"work","subcommand":"submit","worktype":"echo","node":"node3", "signwork":"true"}`
 	_, err = controllers["node1"].WorkSubmitJSON(job)
 	if err == nil {

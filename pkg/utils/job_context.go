@@ -18,43 +18,43 @@ import (
 // A single JobContext can only run one job at a time.  If JobContext.NewJob() is called while a job
 // is already running, that job will be cancelled and waited on prior to starting the new job.
 type JobContext struct {
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          *sync.WaitGroup
-	running     bool
-	runningLock *sync.Mutex
+	Ctx         context.Context
+	JcCancel    context.CancelFunc
+	Wg          *sync.WaitGroup
+	JcRunning   bool
+	RunningLock *sync.Mutex
 }
 
 // NewJob starts a new job with a defined number of workers.  If a prior job is running, it is cancelled.
 func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning bool) bool {
-	if mw.runningLock == nil {
-		mw.runningLock = &sync.Mutex{}
+	if mw.RunningLock == nil {
+		mw.RunningLock = &sync.Mutex{}
 	}
 
-	mw.runningLock.Lock()
-	for mw.running {
+	mw.RunningLock.Lock()
+	for mw.JcRunning {
 		if returnIfRunning {
-			mw.runningLock.Unlock()
+			mw.RunningLock.Unlock()
 
 			return false
 		}
-		mw.cancel()
-		mw.runningLock.Unlock()
+		mw.JcCancel()
+		mw.RunningLock.Unlock()
 		mw.Wait()
-		mw.runningLock.Lock()
+		mw.RunningLock.Lock()
 	}
 
-	mw.running = true
-	mw.ctx, mw.cancel = context.WithCancel(ctx)
-	mw.wg = &sync.WaitGroup{}
-	mw.wg.Add(workers)
-	mw.runningLock.Unlock()
+	mw.JcRunning = true
+	mw.Ctx, mw.JcCancel = context.WithCancel(ctx)
+	mw.Wg = &sync.WaitGroup{}
+	mw.Wg.Add(workers)
+	mw.RunningLock.Unlock()
 	go func() {
-		mw.wg.Wait()
-		mw.runningLock.Lock()
-		mw.running = false
-		mw.cancel()
-		mw.runningLock.Unlock()
+		mw.Wg.Wait()
+		mw.RunningLock.Lock()
+		mw.JcRunning = false
+		mw.JcCancel()
+		mw.RunningLock.Unlock()
 	}()
 
 	return true
@@ -62,48 +62,48 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 
 // WorkerDone signals that a worker is finished, like sync.WaitGroup.Done().
 func (mw *JobContext) WorkerDone() {
-	mw.wg.Done()
+	mw.Wg.Done()
 }
 
 // Wait waits for the current job to complete, like sync.WaitGroup.Wait().
 // If no job has been started, always just returns.
 func (mw *JobContext) Wait() {
-	if mw.wg != nil {
-		mw.wg.Wait()
+	if mw.Wg != nil {
+		mw.Wg.Wait()
 	}
 }
 
 // Done implements Context.Done().
 func (mw *JobContext) Done() <-chan struct{} {
-	return mw.ctx.Done()
+	return mw.Ctx.Done()
 }
 
 // Err implements Context.Err().
 func (mw *JobContext) Err() error {
-	return mw.ctx.Err()
+	return mw.Ctx.Err()
 }
 
 // Deadline implements Context.Deadline().
 func (mw *JobContext) Deadline() (time time.Time, ok bool) {
-	return mw.ctx.Deadline()
+	return mw.Ctx.Deadline()
 }
 
 // Value implements Context.Value().
 func (mw *JobContext) Value(key interface{}) interface{} {
-	return mw.ctx.Value(key)
+	return mw.Ctx.Value(key)
 }
 
 // Cancel cancels the JobContext's context.  If no job has been started, this does nothing.
 func (mw *JobContext) Cancel() {
-	if mw.cancel != nil {
-		mw.cancel()
+	if mw.JcCancel != nil {
+		mw.JcCancel()
 	}
 }
 
 // Running returns true if a job is currently running.
 func (mw *JobContext) Running() bool {
-	mw.runningLock.Lock()
-	defer mw.runningLock.Unlock()
+	mw.RunningLock.Lock()
+	defer mw.RunningLock.Unlock()
 
-	return mw.running
+	return mw.JcRunning
 }

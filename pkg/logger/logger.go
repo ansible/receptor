@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -46,6 +47,7 @@ func GetLogLevelByName(logName string) (int, error) {
 	return 0, err
 }
 
+// This doesn't seem to be used anywhere.
 // GetLogLevel returns current log level.
 func GetLogLevel() int {
 	return logLevel
@@ -82,10 +84,16 @@ func RegisterLogger(msgFunc MessageFunc) {
 	logger = msgFunc
 }
 
+// GetRegisteredLogger returns the current registered logger function.
+func GetRegisteredLogger() MessageFunc {
+	return logger
+}
+
 type ReceptorLogger struct {
 	log.Logger
 	Prefix string
 	m      sync.Mutex
+	Suffix map[string]string
 }
 
 // NewReceptorLogger to instantiate a new logger object.
@@ -93,6 +101,36 @@ func NewReceptorLogger(prefix string) *ReceptorLogger {
 	return &ReceptorLogger{
 		Logger: *log.New(os.Stdout, prefix, log.LstdFlags),
 		Prefix: prefix,
+	}
+}
+
+// NewReceptorLoggerWithSuffix to instantiate a new logger object with a new Suffix.
+func NewReceptorLoggerWithSuffix(prefix string, suffix map[string]string) *ReceptorLogger {
+	logger := NewReceptorLogger(prefix)
+	logger.SetSuffix(suffix)
+
+	return logger
+}
+
+// SetSuffix sets the suffix for the logger, overwriting any existing suffix.
+func (rl *ReceptorLogger) SetSuffix(suffix map[string]string) {
+	rl.m.Lock()
+	defer rl.m.Unlock()
+	rl.Suffix = suffix
+}
+
+// UpdateSuffix allows adding suffix key/value pairs to an existing suffix.
+// If the key already exists, the value will be overwritten.
+// If the suffix is nil, it will be initialized.
+// This is useful for adding additional context to log messages when you want to keep the existing suffix key/value pairs.
+func (rl *ReceptorLogger) UpdateSuffix(suffix map[string]string) {
+	rl.m.Lock()
+	defer rl.m.Unlock()
+	if rl.Suffix == nil {
+		rl.Suffix = make(map[string]string)
+	}
+	for k, v := range suffix {
+		rl.Suffix[k] = v
 	}
 }
 
@@ -146,6 +184,33 @@ func (rl *ReceptorLogger) Debug(format string, v ...interface{}) {
 	rl.Log(DebugLevel, format, v...)
 }
 
+// Debug payload data.
+func (rl *ReceptorLogger) DebugPayload(payloadDebug int, payload string, workUnitID string, connectionType string) {
+	var payloadMessage string
+	var workunitIDMessage string
+	var connectionTypeMessage string
+	switch payloadDebug {
+	case 3:
+		payloadMessage = fmt.Sprintf(" with a payload of: %s", payload)
+
+		fallthrough
+	case 2:
+		if workUnitID != "" {
+			workunitIDMessage = fmt.Sprintf(" with work unit %s", workUnitID)
+		} else {
+			workunitIDMessage = ", work unit not created yet"
+		}
+
+		fallthrough
+	case 1:
+		if connectionType != "" {
+			connectionTypeMessage = fmt.Sprintf("Reading from %s", connectionType)
+		}
+	default:
+	}
+	rl.Debug(fmt.Sprintf("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage)) //nolint:govet
+}
+
 // SanitizedDebug contains extra information helpful to developers.
 func (rl *ReceptorLogger) SanitizedDebug(format string, v ...interface{}) {
 	rl.SanitizedLog(DebugLevel, format, v...)
@@ -189,8 +254,37 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 
 	if logLevel >= level {
 		rl.Logger.SetPrefix(prefix)
+		format, v = rl.appendSuffix(format, v)
 		rl.Logger.Printf(format, v...)
 	}
+}
+
+func (rl *ReceptorLogger) appendSuffix(format string, v []interface{}) (string, []interface{}) {
+	if rl.Suffix != nil {
+		rl.m.Lock()
+		defer rl.m.Unlock()
+
+		var b strings.Builder
+		b.WriteString("{")
+		first := true
+		for k, val := range rl.Suffix {
+			if !first {
+				b.WriteString(",")
+			}
+			first = false
+			b.WriteString(`"`)
+			b.WriteString(k)
+			b.WriteString(`":"`)
+			b.WriteString(val)
+			b.WriteString(`"`)
+		}
+		b.WriteString("}")
+
+		format = strings.ReplaceAll(format, "\n", "") + " %s"
+		v = append(v, b.String())
+	}
+
+	return format, v
 }
 
 // SanitizedLog adds a prefix and prints a given log message.
@@ -216,7 +310,8 @@ func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{
 	}
 
 	if logLevel >= level {
-		message := fmt.Sprintf(format, v...)
+		message, v := rl.appendSuffix(format, v)
+		message = fmt.Sprintf(message, v...)
 		sanMessage := strings.ReplaceAll(message, "\n", "")
 		rl.Logger.SetPrefix(prefix)
 		rl.Logger.Print(sanMessage)
@@ -261,11 +356,11 @@ func (rl *ReceptorLogger) LogLevelToName(logLevel int) (string, error) {
 	return "", err
 }
 
-type loglevelCfg struct {
+type LoglevelCfg struct {
 	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
 }
 
-func (cfg loglevelCfg) Init() error {
+func (cfg LoglevelCfg) Init() error {
 	var err error
 	val, err := GetLogLevelByName(cfg.Level)
 	if err != nil {
@@ -276,20 +371,24 @@ func (cfg loglevelCfg) Init() error {
 	return nil
 }
 
-type traceCfg struct{}
+type TraceCfg struct{}
 
-func (cfg traceCfg) Prepare() error {
+func (cfg TraceCfg) Prepare() error {
 	return nil
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	logLevel = InfoLevel
 	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+		"log-level", "Specifies the verbosity level for command output", LoglevelCfg{}, cmdline.Singleton)
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+		"trace", "Enables packet tracing output", TraceCfg{}, cmdline.Singleton)
 }

@@ -354,7 +354,8 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	s.clientTLSConfigs["default"] = &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	s.addNameHash(nodeID)
+	s.AddNameHash(nodeID)
+	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -444,6 +445,31 @@ func (s *Netceptor) MaxForwardingHops() byte {
 // MaxConnectionIdleTime returns the configured MaxConnectionIdleTime of this Netceptor instance.
 func (s *Netceptor) MaxConnectionIdleTime() time.Duration {
 	return s.maxConnectionIdleTime
+}
+
+// GetLogger returns the logger of this Netceptor instance.
+func (s *Netceptor) GetLogger() *logger.ReceptorLogger {
+	return s.Logger
+}
+
+// GetListenerRegistry returns listener registry map.
+func (s *Netceptor) GetListenerRegistry() map[string]*PacketConn {
+	return s.listenerRegistry
+}
+
+// GetNetworkName returns networkName.
+func (s *Netceptor) GetNetworkName() string {
+	return s.networkName
+}
+
+// GetListenerLock returns listenerLock.
+func (s *Netceptor) GetListenerLock() *sync.RWMutex {
+	return s.listenerLock
+}
+
+// GetUnreachableBroker returns unreachableBroker.
+func (s *Netceptor) GetUnreachableBroker() *utils.Broker {
+	return s.unreachableBroker
 }
 
 // Sets the MaxConnectionIdleTime object on the Netceptor instance.
@@ -654,7 +680,7 @@ func (s *Netceptor) AddFirewallRules(rules []FirewallRuleFunc, clearExisting boo
 	return nil
 }
 
-func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
+func (s *Netceptor) AddLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
 	s.serviceAdsLock.Lock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
 	if !ok {
@@ -677,7 +703,7 @@ func (s *Netceptor) addLocalServiceAdvertisement(service string, connType byte, 
 	}
 }
 
-func (s *Netceptor) removeLocalServiceAdvertisement(service string) error {
+func (s *Netceptor) RemoveLocalServiceAdvertisement(service string) error {
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[s.nodeID]
@@ -759,20 +785,20 @@ func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			timedOut := make([]context.CancelFunc, 0)
+			timedOut := make(map[string]context.CancelFunc, 0)
 			s.connLock.RLock()
-			for i := range s.connections {
-				conn := s.connections[i]
-				conn.lastReceivedLock.RLock()
-				if time.Since(conn.lastReceivedData) > s.maxConnectionIdleTime {
-					timedOut = append(timedOut, s.connections[i].CancelFunc)
+			for conn := range s.connections {
+				connInfo := s.connections[conn]
+				connInfo.lastReceivedLock.RLock()
+				if time.Since(connInfo.lastReceivedData) > s.maxConnectionIdleTime {
+					timedOut[conn] = s.connections[conn].CancelFunc
 				}
-				conn.lastReceivedLock.RUnlock()
+				connInfo.lastReceivedLock.RUnlock()
 			}
 			s.connLock.RUnlock()
-			for i := range timedOut {
-				s.Logger.Warning("Timing out connection, idle for the past %s\n", s.maxConnectionIdleTime)
-				timedOut[i]()
+			for conn := range timedOut {
+				s.Logger.Warning("Timing out connection %s, idle for the past %s\n", conn, s.maxConnectionIdleTime)
+				timedOut[conn]()
 			}
 		case <-s.context.Done():
 			return
@@ -897,13 +923,13 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 	defer s.connLock.RUnlock()
 	for conn, ci := range s.connections {
 		if conn != excludeConn {
-			go func(ci *connInfo) {
+			go func(conn string, ci *connInfo) {
 				select {
 				case ci.WriteChan <- message:
 				case <-ci.Context.Done():
-					s.Logger.Debug("connInfo cancelled during flood write")
+					s.Logger.Debug("connInfo for connection %s cancelled during flood write", conn)
 				}
-			}(ci)
+			}(conn, ci)
 		}
 	}
 }
@@ -1000,7 +1026,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 			if err != nil {
 				logger.Error("RVF failed to parse: %s", err)
 
-				return fmt.Errorf("failed to parse certificate from server: " + err.Error())
+				return fmt.Errorf("failed to parse certificate from server: " + err.Error()) //nolint:govet
 			}
 			certs[i] = cert
 		}
@@ -1094,8 +1120,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		for _, cert := range certs[1:] {
 			opts.Intermediates.AddCert(cert)
 		}
-		var err error
-		_, err = certs[0].Verify(opts)
+		_, err := certs[0].Verify(opts)
 		if err != nil {
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 
@@ -1162,7 +1187,7 @@ func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config, pinnedFi
 var zerokey = make([]byte, 32)
 
 // Hash a name and add it to the lookup table.
-func (s *Netceptor) addNameHash(name string) uint64 {
+func (s *Netceptor) AddNameHash(name string) uint64 {
 	if strings.EqualFold(name, "localhost") {
 		name = s.nodeID
 	}
@@ -1180,7 +1205,7 @@ func (s *Netceptor) addNameHash(name string) uint64 {
 }
 
 // Looks up a name given a hash received from the network.
-func (s *Netceptor) getNameFromHash(namehash uint64) (string, error) {
+func (s *Netceptor) GetNameFromHash(namehash uint64) (string, error) {
 	s.hashLock.RLock()
 	defer s.hashLock.RUnlock()
 	name, ok := s.nameHashes[namehash]
@@ -1217,11 +1242,11 @@ func (s *Netceptor) translateDataToMessage(data []byte) (*MessageData, error) {
 	if len(data) < 36 {
 		return nil, fmt.Errorf("data too short to be a valid message")
 	}
-	fromNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[4:12]))
+	fromNode, err := s.GetNameFromHash(binary.BigEndian.Uint64(data[4:12]))
 	if err != nil {
 		return nil, err
 	}
-	toNode, err := s.getNameFromHash(binary.BigEndian.Uint64(data[12:20]))
+	toNode, err := s.GetNameFromHash(binary.BigEndian.Uint64(data[12:20]))
 	if err != nil {
 		return nil, err
 	}
@@ -1244,8 +1269,8 @@ func (s *Netceptor) translateDataFromMessage(msg *MessageData) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	buf.Write([]byte{MsgTypeData, msg.HopsToLive, 0, 0})
 
-	binary.Write(buf, binary.BigEndian, s.addNameHash(msg.FromNode))
-	binary.Write(buf, binary.BigEndian, s.addNameHash(msg.ToNode))
+	binary.Write(buf, binary.BigEndian, s.AddNameHash(msg.FromNode))
+	binary.Write(buf, binary.BigEndian, s.AddNameHash(msg.ToNode))
 
 	buf.Write(fixedLenBytesFromString(msg.FromService, 8))
 	buf.Write(fixedLenBytesFromString(msg.ToService, 8))
@@ -1298,7 +1323,7 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 }
 
 // Generates and sends a message over the Receptor network, specifying HopsToLive.
-func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
+func (s *Netceptor) SendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error {
 	if len(fromService) > 8 || len(toService) > 8 {
 		return fmt.Errorf("service name too long")
 	}
@@ -1321,11 +1346,11 @@ func (s *Netceptor) sendMessageWithHopsToLive(fromService string, toNode string,
 
 // Generates and sends a message over the Receptor network.
 func (s *Netceptor) sendMessage(fromService string, toNode string, toService string, data []byte) error {
-	return s.sendMessageWithHopsToLive(fromService, toNode, toService, data, s.maxForwardingHops)
+	return s.SendMessageWithHopsToLive(fromService, toNode, toService, data, s.maxForwardingHops)
 }
 
 // Returns an unused random service name to use as the equivalent of a TCP/IP ephemeral port number.
-func (s *Netceptor) getEphemeralService() string {
+func (s *Netceptor) GetEphemeralService() string {
 	s.listenerLock.RLock()
 	defer s.listenerLock.RUnlock()
 	for {
@@ -1358,7 +1383,7 @@ func (s *Netceptor) printRoutingTable() {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
 		_, _ = fmt.Fprintf(sb, "\n")
-		s.Logger.Log(logLevel, sb.String())
+		s.Logger.Log(logLevel, sb.String()) //nolint:govet
 	}
 	s.Logger.Log(logLevel, "Routing Table:\n")
 	for node := range s.routingTable {
@@ -1506,7 +1531,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		_, ok = s.knownNodeInfo[ri.NodeID]
 		if !ok {
-			_ = s.addNameHash(ri.NodeID)
+			_ = s.AddNameHash(ri.NodeID)
 		}
 		s.knownNodeInfo[ri.NodeID] = ni
 		if changed {
@@ -1557,7 +1582,13 @@ func (s *Netceptor) handleUnreachable(md *MessageData) error {
 		UnreachableMessage: unrMsg,
 		ReceivedFromNode:   md.FromNode,
 	}
-	s.Logger.Warning("Received unreachable message from %s", md.FromNode)
+	s.Logger.Warning("Received unreachable message from %s (service %s) to %s (service %s): ttl %v, data %s",
+		md.FromNode,
+		md.FromService,
+		md.ToNode,
+		md.ToService,
+		md.HopsToLive,
+		unrMsg.Problem)
 
 	return s.unreachableBroker.Publish(unrData)
 }
@@ -1631,7 +1662,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		if !ok || pc.context.Err() != nil {
 			s.listenerLock.RUnlock()
 			if md.FromNode == s.nodeID {
-				return fmt.Errorf(ProblemServiceUnknown)
+				return fmt.Errorf(ProblemServiceUnknown) //nolint:staticcheck
 			}
 			_ = s.sendUnreachable(md.FromNode, &UnreachableMessage{
 				FromNode:    md.FromNode,
@@ -1819,6 +1850,24 @@ func (s *Netceptor) sendAndLogConnectionRejection(remoteNodeID string, ci *connI
 	return fmt.Errorf("%s: rejected connection with node %s because %s", s.nodeID, remoteNodeID, reason)
 }
 
+func (s *Netceptor) removeConnection(remoteNodeID string) {
+	if remoteNodeID != "" {
+		s.connLock.Lock()
+		delete(s.connections, remoteNodeID)
+		s.connLock.Unlock()
+		s.knownNodeLock.Lock()
+		_, ok := s.knownConnectionCosts[remoteNodeID]
+		if ok {
+			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
+		}
+		_, ok = s.knownConnectionCosts[s.nodeID]
+		if ok {
+			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
+		}
+		s.knownNodeLock.Unlock()
+	}
+}
+
 // Main Netceptor protocol loop.
 func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *BackendInfo) error {
 	if bi.connectionCost <= 0.0 {
@@ -1831,14 +1880,6 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 	defer func() {
 		_ = sess.Close()
 		if established {
-			s.connLock.Lock()
-			delete(s.connections, remoteNodeID)
-			s.connLock.Unlock()
-			s.knownNodeLock.Lock()
-			delete(s.knownConnectionCosts[remoteNodeID], s.nodeID)
-			delete(s.knownConnectionCosts[s.nodeID], remoteNodeID)
-			s.knownNodeLock.Unlock()
-
 			select {
 			case s.sendRouteFloodChan <- 0:
 			case <-ctx.Done(): // ctx is a child of s.context
@@ -1891,6 +1932,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						continue
 					}
 					if ri.ForwardingNode != remoteNodeID {
+						s.removeConnection(remoteNodeID)
+
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci,
 							fmt.Sprintf("remote node ID changed unexpectedly from %s to %s",
 								remoteNodeID, ri.NodeID))
@@ -1900,14 +1943,17 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						remoteCost, ok := ri.Connections[s.nodeID]
 						if !ok {
 							if remoteEstablished {
+								s.removeConnection(remoteNodeID)
+
 								return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
 							}
 							// This is a late initialization request from the remote node, so don't process it as a routing update.
 							continue
-						} else {
-							remoteEstablished = true
 						}
+						remoteEstablished = true
 						if ok && remoteCost != connectionCost {
+							s.removeConnection(remoteNodeID)
+
 							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
 						}
 					}
@@ -1921,6 +1967,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					}
 				case MsgTypeReject:
 					s.Logger.Warning("Received a rejection message from peer.")
+					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
 				default:
@@ -1941,6 +1988,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					if remoteNodeID == s.nodeID {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
+					suffix := map[string]string{"remote_id": remoteNodeID}
+					s.GetLogger().UpdateSuffix(suffix)
 					remoteNodeAccepted := true
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
@@ -1956,19 +2005,36 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
 					}
 
+					// Check if there is connection cost for this remoteNodeID
+					// Check if there is connection cost for this remoteNodeID
 					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
 					if ok {
 						ci.Cost = remoteNodeCost
 						connectionCost = remoteNodeCost
 					}
 					s.connLock.Lock()
-					for conn := range s.connections {
-						if remoteNodeID == conn {
-							remoteNodeAccepted = false
 
-							break
-						}
+					// Check if there is already connInfo for this remoteNodeID
+					existingConn, ok := s.connections[remoteNodeID]
+					if ok {
+						remoteNodeAccepted = false
 					}
+					var connError error
+					connError = nil
+
+					// Verify that the existing connection is valid
+					if ok && existingConn != nil {
+						connError = existingConn.Context.Err()
+					}
+					if ok && connError != nil {
+						s.Logger.Error("Context for existing connection error: %s", connError)
+						s.connLock.Unlock()
+						// Remove the canceled connection to prevent resource leak
+						s.removeConnection(remoteNodeID)
+						s.connLock.Lock()
+						remoteNodeAccepted = true // Allow the new connection to proceed
+					}
+
 					if !remoteNodeAccepted {
 						s.connLock.Unlock()
 
@@ -1981,12 +2047,16 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					select {
 					case initDoneChan <- true:
 					case <-ctx.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					case <-ci.Context.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					}
 					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
-					s.addNameHash(remoteNodeID)
+					s.AddNameHash(remoteNodeID)
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]
 					if !ok {
@@ -2002,8 +2072,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					select {
 					case s.sendRouteFloodChan <- 0:
 					case <-ctx.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					case <-ci.Context.Done():
+						s.removeConnection(remoteNodeID)
+
 						return nil
 					}
 					select {
@@ -2016,11 +2090,14 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					established = true
 				} else if msgType == MsgTypeReject {
 					s.Logger.Warning("Received a rejection message from peer.")
+					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
 				}
 			}
 		case <-ci.Context.Done():
+			s.removeConnection(remoteNodeID)
+
 			return nil
 		}
 	}

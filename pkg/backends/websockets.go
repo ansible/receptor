@@ -1,6 +1,3 @@
-//go:build !no_websocket_backend && !no_backends
-// +build !no_websocket_backend,!no_backends
-
 package backends
 
 import (
@@ -18,6 +15,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ghjm/cmdline"
 	"github.com/gorilla/websocket"
+	"github.com/spf13/viper"
 )
 
 // WebsocketDialer implements Backend for outbound Websocket.
@@ -28,6 +26,20 @@ type WebsocketDialer struct {
 	tlscfg      *tls.Config
 	extraHeader string
 	logger      *logger.ReceptorLogger
+	dialer      GorillaWebsocketDialerForDialer
+}
+
+type GorillaWebsocketDialerForDialer interface {
+	DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (Conner, *http.Response, error)
+}
+
+// GorillaDialWrapper represents the real library.
+type GorillaDialWrapper struct {
+	dialer *websocket.Dialer
+}
+
+func (g GorillaDialWrapper) DialContext(ctx context.Context, urlStr string, requestHeader http.Header) (Conner, *http.Response, error) {
+	return g.dialer.DialContext(ctx, urlStr, requestHeader)
 }
 
 func (b *WebsocketDialer) GetAddr() string {
@@ -39,7 +51,7 @@ func (b *WebsocketDialer) GetTLS() *tls.Config {
 }
 
 // NewWebsocketDialer instantiates a new WebsocketDialer backend.
-func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, redial bool, logger *logger.ReceptorLogger) (*WebsocketDialer, error) {
+func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, redial bool, logger *logger.ReceptorLogger, dialer GorillaWebsocketDialerForDialer) (*WebsocketDialer, error) {
 	addrURL, err := url.Parse(address)
 	if err != nil {
 		return nil, err
@@ -56,25 +68,34 @@ func NewWebsocketDialer(address string, tlscfg *tls.Config, extraHeader string, 
 		extraHeader: extraHeader,
 		logger:      logger,
 	}
+	if dialer != nil {
+		wd.dialer = dialer
+	} else {
+		d := &websocket.Dialer{
+			TLSClientConfig: tlscfg,
+			Proxy:           http.ProxyFromEnvironment,
+		}
+		wd.dialer = GorillaDialWrapper{dialer: d}
+	}
 
 	return &wd, nil
+}
+
+func (b *WebsocketDialer) Dialer(dialer GorillaWebsocketDialerForDialer) GorillaWebsocketDialerForDialer {
+	return dialer
 }
 
 // Start runs the given session function over this backend service.
 func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	return dialerSession(ctx, wg, b.redial, 5*time.Second, b.logger,
 		func(closeChan chan struct{}) (netceptor.BackendSession, error) {
-			dialer := websocket.Dialer{
-				TLSClientConfig: b.tlscfg,
-				Proxy:           http.ProxyFromEnvironment,
-			}
 			header := make(http.Header)
 			if b.extraHeader != "" {
 				extraHeaderParts := strings.SplitN(b.extraHeader, ":", 2)
 				header.Add(extraHeaderParts[0], extraHeaderParts[1])
 			}
 			header.Add("origin", b.origin)
-			conn, resp, err := dialer.DialContext(ctx, b.address, header)
+			conn, resp, err := b.dialer.DialContext(ctx, b.address, header)
 			if err != nil {
 				return nil, err
 			}
@@ -87,14 +108,69 @@ func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan n
 		})
 }
 
+type WebsocketListenerForWebsocket interface {
+	Addr() net.Addr
+	GetAddr() string
+	GetTLS() *tls.Config
+	Path() string
+	SetPath(path string)
+	Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error)
+}
+
+type GorillaWebsocketUpgraderForListener interface {
+	Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (Conner, error)
+}
+
+// GorillaDialWrapper represents the real library.
+type GorillaUpgradeWrapper struct {
+	upgrader *websocket.Upgrader
+}
+
+func (g GorillaUpgradeWrapper) Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (Conner, error) {
+	return g.upgrader.Upgrade(w, r, responseHeader)
+}
+
+type HTTPServerForListener interface {
+	Serve(l net.Listener) error
+	ServeTLS(l net.Listener, certFile string, keyFile string) error
+	Close() error
+	SetTLSConfig(tlscfg *tls.Config)
+	SetHandeler(mux *http.ServeMux)
+}
+
+type HTTPServerWrapper struct {
+	server *http.Server
+}
+
+func (s HTTPServerWrapper) Serve(l net.Listener) error {
+	return s.server.Serve(l)
+}
+
+func (s HTTPServerWrapper) ServeTLS(l net.Listener, certFile string, keyFile string) error {
+	return s.server.ServeTLS(l, certFile, keyFile)
+}
+
+func (s HTTPServerWrapper) Close() error {
+	return s.server.Close()
+}
+
+func (s HTTPServerWrapper) SetTLSConfig(tlscfg *tls.Config) {
+	s.server.TLSConfig = tlscfg
+}
+
+func (s HTTPServerWrapper) SetHandeler(mux *http.ServeMux) {
+	s.server.Handler = mux
+}
+
 // WebsocketListener implements Backend for inbound Websocket.
 type WebsocketListener struct {
-	address string
-	path    string
-	tlscfg  *tls.Config
-	li      net.Listener
-	server  *http.Server
-	logger  *logger.ReceptorLogger
+	address  string
+	path     string
+	tlscfg   *tls.Config
+	li       net.Listener
+	server   HTTPServerForListener
+	logger   *logger.ReceptorLogger
+	upgrader GorillaWebsocketUpgraderForListener
 }
 
 func (b *WebsocketListener) GetAddr() string {
@@ -106,13 +182,29 @@ func (b *WebsocketListener) GetTLS() *tls.Config {
 }
 
 // NewWebsocketListener instantiates a new WebsocketListener backend.
-func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.ReceptorLogger) (*WebsocketListener, error) {
+func NewWebsocketListener(address string, tlscfg *tls.Config, logger *logger.ReceptorLogger, upgrader GorillaWebsocketUpgraderForListener, server HTTPServerForListener) (*WebsocketListener, error) {
 	ul := WebsocketListener{
 		address: address,
 		path:    "/",
 		tlscfg:  tlscfg,
 		li:      nil,
 		logger:  logger,
+	}
+	if upgrader != nil {
+		ul.upgrader = upgrader
+	} else {
+		u := &websocket.Upgrader{}
+		ul.upgrader = GorillaUpgradeWrapper{upgrader: u}
+	}
+
+	if server != nil {
+		ul.server = server
+	} else {
+		ser := &http.Server{
+			Addr:              address,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		ul.server = HTTPServerWrapper{server: ser}
 	}
 
 	return &ul, nil
@@ -144,8 +236,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 	sessChan := make(chan netceptor.BackendSession)
 	mux := http.NewServeMux()
 	mux.HandleFunc(b.path, func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{}
-		conn, err := upgrader.Upgrade(w, r, nil)
+		conn, err := b.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			b.logger.Error("Error upgrading websocket connection: %s\n", err)
 
@@ -159,18 +250,15 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 		return nil, err
 	}
 	wg.Add(1)
-	b.server = &http.Server{
-		Addr:              b.address,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	b.server.SetHandeler(mux)
+
 	go func() {
 		defer wg.Done()
 		var err error
 		if b.tlscfg == nil {
 			err = b.server.Serve(b.li)
 		} else {
-			b.server.TLSConfig = b.tlscfg
+			b.server.SetTLSConfig(b.tlscfg)
 			err = b.server.ServeTLS(b.li, "", "")
 		}
 		if err != nil && err != http.ErrServerClosed {
@@ -188,7 +276,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener.
 type WebsocketSession struct {
-	conn            *websocket.Conn
+	conn            Conner
 	context         context.Context
 	recvChan        chan *recvResult
 	closeChan       chan struct{}
@@ -200,7 +288,13 @@ type recvResult struct {
 	err  error
 }
 
-func newWebsocketSession(ctx context.Context, conn *websocket.Conn, closeChan chan struct{}) *WebsocketSession {
+type Conner interface {
+	Close() error
+	ReadMessage() (messageType int, p []byte, err error)
+	WriteMessage(messageType int, data []byte) error
+}
+
+func newWebsocketSession(ctx context.Context, conn Conner, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
 		context:         ctx,
@@ -320,7 +414,7 @@ func (cfg WebsocketListenerCfg) Run() error {
 	if tlscfg != nil && len(tlscfg.CipherSuites) > 0 {
 		tlscfg.CipherSuites = append([]uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}, tlscfg.CipherSuites...)
 	}
-	b, err := NewWebsocketListener(address, tlscfg, netceptor.MainInstance.Logger)
+	b, err := NewWebsocketListener(address, tlscfg, netceptor.MainInstance.Logger, nil, nil)
 	if err != nil {
 		b.logger.Error("Error creating listener %s: %s\n", address, err)
 
@@ -339,7 +433,7 @@ func (cfg WebsocketListenerCfg) Run() error {
 }
 
 // websocketDialerCfg is the cmdline configuration object for a Websocket listener.
-type websocketDialerCfg struct {
+type WebsocketDialerCfg struct {
 	Address      string   `description:"URL to connect to" barevalue:"yes" required:"yes"`
 	Redial       bool     `description:"Keep redialing on lost connection" default:"true"`
 	ExtraHeader  string   `description:"Sends extra HTTP header on initial connection"`
@@ -349,7 +443,7 @@ type websocketDialerCfg struct {
 }
 
 // Prepare verifies that we are reasonably ready to go.
-func (cfg websocketDialerCfg) Prepare() error {
+func (cfg WebsocketDialerCfg) Prepare() error {
 	if cfg.Cost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -364,7 +458,7 @@ func (cfg websocketDialerCfg) Prepare() error {
 }
 
 // Run runs the action.
-func (cfg websocketDialerCfg) Run() error {
+func (cfg WebsocketDialerCfg) Run() error {
 	netceptor.MainInstance.Logger.Debug("Running Websocket peer connection %s\n", cfg.Address)
 	u, err := url.Parse(cfg.Address)
 	if err != nil {
@@ -378,7 +472,7 @@ func (cfg websocketDialerCfg) Run() error {
 	if err != nil {
 		return err
 	}
-	b, err := NewWebsocketDialer(cfg.Address, tlscfg, cfg.ExtraHeader, cfg.Redial, netceptor.MainInstance.Logger)
+	b, err := NewWebsocketDialer(cfg.Address, tlscfg, cfg.ExtraHeader, cfg.Redial, netceptor.MainInstance.Logger, nil)
 	if err != nil {
 		b.logger.Error("Error creating peer %s: %s\n", cfg.Address, err)
 
@@ -394,7 +488,7 @@ func (cfg websocketDialerCfg) Run() error {
 	return nil
 }
 
-func (cfg websocketDialerCfg) PreReload() error {
+func (cfg WebsocketDialerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
@@ -402,7 +496,7 @@ func (cfg WebsocketListenerCfg) PreReload() error {
 	return cfg.Prepare()
 }
 
-func (cfg websocketDialerCfg) Reload() error {
+func (cfg WebsocketDialerCfg) Reload() error {
 	return cfg.Run()
 }
 
@@ -411,8 +505,12 @@ func (cfg WebsocketListenerCfg) Reload() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"ws-listener", "Run an http server that accepts websocket connections", WebsocketListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
-		"ws-peer", "Connect outbound to a websocket peer", websocketDialerCfg{}, cmdline.Section(backendSection))
+		"ws-peer", "Connect outbound to a websocket peer", WebsocketDialerCfg{}, cmdline.Section(backendSection))
 }

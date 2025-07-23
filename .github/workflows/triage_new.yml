@@ -1,6 +1,7 @@
+---
 name: Triage
 
-on:
+on:  # yamllint disable-line rule:truthy
   issues:
     types:
       - opened
@@ -12,7 +13,7 @@ jobs:
 
     steps:
       - name: Label issues
-        uses: github/issue-labeler@v2.4.1
+        uses: github/issue-labeler@v3.4
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           not-before: 2021-12-07T07:00:00Z

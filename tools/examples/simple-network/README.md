@@ -6,7 +6,7 @@ This example creates two receptor nodes, called `arceus` and `celebi`.
 
 The `ctl.sh` script (equivalent to `receptorctl`) sends the message to Celebi through an unix domain socket `socks/celebi.sock`, then Celebi forwards that message to Arceus through the docker-compose network.
 
-![Receptor simple network diagram](./simple-network-diagram.png)
+![Receptor simple network diagram](./simple-network-diagram.drawio.png)
 
 ## Commands
 

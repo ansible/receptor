@@ -5,10 +5,12 @@ package workceptor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // pythonUnit implements the WorkUnit interface.
@@ -19,14 +21,27 @@ type pythonUnit struct {
 	config   map[string]interface{}
 }
 
+// NewPythonUnit creates a new pythonUnit using the given parameters.
+func NewPythonUnit(baseWorkUnit BaseWorkUnitForWorkUnit, plugin string, function string, config map[string]any) *pythonUnit {
+	return &pythonUnit{
+		commandUnit: commandUnit{
+			BaseWorkUnitForWorkUnit: baseWorkUnit,
+		},
+		plugin:   plugin,
+		function: function,
+		config:   config,
+	}
+}
+
 // Start launches a job with given parameters.
 func (pw *pythonUnit) Start() error {
+	pw.UpdateBasicStatus(WorkStatePending, "[DEPRECATION WARNING] '--work-python' option is not currently being used. This feature will be removed from receptor in a future release.", 0)
 	pw.UpdateBasicStatus(WorkStatePending, "Launching Python runner", 0)
 	config := make(map[string]interface{})
 	for k, v := range pw.config {
 		config[k] = v
 	}
-	config["params"] = pw.Status().ExtraData.(*commandExtraData).Params
+	config["params"] = pw.Status().ExtraData.(*CommandExtraData).Params
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return err
@@ -42,7 +57,7 @@ func (pw *pythonUnit) Start() error {
 // **************************************************************************
 
 // workPythonCfg is the cmdline configuration object for a Python worker plugin.
-type workPythonCfg struct {
+type WorkPythonCfg struct {
 	WorkType string                 `required:"true" description:"Name for this worker type"`
 	Plugin   string                 `required:"true" description:"Python module name of the worker plugin"`
 	Function string                 `required:"true" description:"Receptor-exported function to call"`
@@ -50,12 +65,12 @@ type workPythonCfg struct {
 }
 
 // NewWorker is a factory to produce worker instances.
-func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
+func (cfg WorkPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
 	cw := &pythonUnit{
 		commandUnit: commandUnit{
-			BaseWorkUnit: BaseWorkUnit{
+			BaseWorkUnitForWorkUnit: &BaseWorkUnit{
 				status: StatusFileData{
-					ExtraData: &commandExtraData{},
+					ExtraData: &CommandExtraData{},
 				},
 			},
 		},
@@ -63,19 +78,25 @@ func (cfg workPythonCfg) NewWorker(w *Workceptor, unitID string, workType string
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType)
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }
 
 // Run runs the action.
-func (cfg workPythonCfg) Run() error {
+func (cfg WorkPythonCfg) Run() error {
 	err := MainInstance.RegisterWorker(cfg.WorkType, cfg.NewWorker, false)
 
-	return err
+	errWithDeprecation := errors.Join(err, errors.New("[DEPRECATION WARNING] 'work-python' option is not currently being used. This feature will be removed from receptor in a future release"))
+
+	return errWithDeprecation
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
-		"work-python", "Run a worker using a Python plugin", workPythonCfg{}, cmdline.Section(workersSection))
+		"work-python", "Run a worker using a Python plugin\n[DEPRECATION WARNING] This option is not currently being used. This feature will be removed from receptor in a future release.", WorkPythonCfg{}, cmdline.Section(workersSection))
 }

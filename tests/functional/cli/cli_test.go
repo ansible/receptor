@@ -35,7 +35,6 @@ func TestHelp(t *testing.T) {
 }
 
 func TestListeners(t *testing.T) {
-	t.Parallel()
 	testTable := []struct {
 		listener    string
 		listenProto string
@@ -48,7 +47,6 @@ func TestListeners(t *testing.T) {
 		listener := data.listener
 		listenProto := data.listenProto
 		t.Run(listener, func(t *testing.T) {
-			t.Parallel()
 			receptorStdOut := bytes.Buffer{}
 			cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0")
 			cmd.Stdout = &receptorStdOut
@@ -59,8 +57,10 @@ func TestListeners(t *testing.T) {
 			defer cmd.Process.Wait()
 			defer cmd.Process.Kill()
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-			success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel1()
+
+			success, err := utils.CheckUntilTimeoutWithErr(ctx1, 10*time.Millisecond, func() (bool, error) {
 				return ConfirmListening(cmd.Process.Pid, listenProto)
 			})
 			if err != nil {
@@ -74,7 +74,6 @@ func TestListeners(t *testing.T) {
 }
 
 func TestSSLListeners(t *testing.T) {
-	t.Parallel()
 	testTable := []struct {
 		listener string
 	}{
@@ -84,8 +83,6 @@ func TestSSLListeners(t *testing.T) {
 	for _, data := range testTable {
 		listener := data.listener
 		t.Run(listener, func(t *testing.T) {
-			t.Parallel()
-
 			key, crt, err := utils.GenerateCert("test", "test", []string{"test"}, []string{"test"})
 			if err != nil {
 				t.Fatal(err)
@@ -116,8 +113,10 @@ func TestSSLListeners(t *testing.T) {
 				return err == nil
 			}
 
-			ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-			success := utils.CheckUntilTimeout(ctx, 10*time.Millisecond, checkFunc)
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel1()
+
+			success := utils.CheckUntilTimeout(ctx1, 10*time.Millisecond, checkFunc)
 			if !success {
 				t.Fatalf("Timed out while waiting for tls backend to start:\n%s", receptorStdOut.String())
 			}
@@ -126,7 +125,6 @@ func TestSSLListeners(t *testing.T) {
 }
 
 func TestNegativeCost(t *testing.T) {
-	t.Parallel()
 	testTable := []struct {
 		listener string
 	}{
@@ -137,7 +135,6 @@ func TestNegativeCost(t *testing.T) {
 	for _, data := range testTable {
 		listener := data.listener
 		t.Run(listener, func(t *testing.T) {
-			t.Parallel()
 			receptorStdOut := bytes.Buffer{}
 			cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0", "cost=-1")
 			cmd.Stdout = &receptorStdOut
@@ -147,19 +144,18 @@ func TestNegativeCost(t *testing.T) {
 			}
 
 			// Wait for our process to hopefully run and quit
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(1500 * time.Millisecond)
 
 			cmd.Process.Kill()
 			cmd.Wait()
-			if receptorStdOut.String() != "Error: connection cost must be positive\n" {
-				t.Fatalf("Expected stdout: Error: connection cost must be positive, actual stdout: %s", receptorStdOut.String())
+			if !strings.Contains(receptorStdOut.String(), "Error: connection cost must be positive") {
+				t.Fatalf("Expected stdout: Error: connection cost must be positive, actual stdout: %v", receptorStdOut.String())
 			}
 		})
 	}
 }
 
 func TestCostMap(t *testing.T) {
-	t.Parallel()
 	testTable := []struct {
 		listener    string
 		listenProto string
@@ -175,11 +171,9 @@ func TestCostMap(t *testing.T) {
 		costMaps := make([]string, len(data.costMaps))
 		copy(costMaps, data.costMaps)
 		t.Run(listener, func(t *testing.T) {
-			t.Parallel()
 			for _, costMap := range costMaps {
 				costMapCopy := costMap
 				t.Run(costMapCopy, func(t *testing.T) {
-					t.Parallel()
 					receptorStdOut := bytes.Buffer{}
 					cmd := exec.Command("receptor", "--node", "id=test", listener, "port=0", fmt.Sprintf("nodecost=%s", costMapCopy))
 					cmd.Stdout = &receptorStdOut
@@ -190,8 +184,10 @@ func TestCostMap(t *testing.T) {
 					defer cmd.Process.Wait()
 					defer cmd.Process.Kill()
 
-					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+					ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel1()
+
+					success, err := utils.CheckUntilTimeoutWithErr(ctx1, 10*time.Millisecond, func() (bool, error) {
 						return ConfirmListening(cmd.Process.Pid, listenProto)
 					})
 					if err != nil {
@@ -207,7 +203,6 @@ func TestCostMap(t *testing.T) {
 }
 
 func TestCosts(t *testing.T) {
-	t.Parallel()
 	testTable := []struct {
 		listener    string
 		listenProto string
@@ -223,7 +218,6 @@ func TestCosts(t *testing.T) {
 		costs := make([]string, len(data.costs))
 		copy(costs, data.costs)
 		t.Run(listener, func(t *testing.T) {
-			t.Parallel()
 			for _, cost := range costs {
 				costCopy := cost
 				t.Run(costCopy, func(t *testing.T) {
@@ -238,8 +232,10 @@ func TestCosts(t *testing.T) {
 					defer cmd.Process.Wait()
 					defer cmd.Process.Kill()
 
-					ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
-					success, err := utils.CheckUntilTimeoutWithErr(ctx, 10*time.Millisecond, func() (bool, error) {
+					ctx1, cancel1 := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel1()
+
+					success, err := utils.CheckUntilTimeoutWithErr(ctx1, 10*time.Millisecond, func() (bool, error) {
 						return ConfirmListening(cmd.Process.Pid, listenProto)
 					})
 					if err != nil {

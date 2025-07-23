@@ -23,15 +23,15 @@ func GenerateCA(name, commonName string) (string, string, error) {
 	crtPath := filepath.Join(dir, name+".crt")
 
 	// Create our certificate and private key
-	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: commonName, Bits: 2048})
+	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: commonName, Bits: 2048}, &certificates.RsaWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(crtPath, []interface{}{CA.Certificate})
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{CA.Certificate}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(keyPath, []interface{}{CA.PrivateKey})
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{CA.PrivateKey}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -49,7 +49,7 @@ func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, 
 	crtPath := filepath.Join(dir, name+".crt")
 
 	// Create a temporary CA to sign this certificate
-	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: "temp ca", Bits: 2048})
+	CA, err := certificates.CreateCA(&certificates.CertOptions{CommonName: "temp ca", Bits: 2048}, &certificates.RsaWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -71,11 +71,11 @@ func GenerateCert(name, commonName string, dnsNames, nodeIDs []string) (string, 
 		return "", "", err
 	}
 	// Save cert and key to files
-	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert})
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(keyPath, []interface{}{key})
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{key}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -91,11 +91,11 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 		return "", "", err
 	}
 	CA := &certificates.CA{}
-	CA.Certificate, err = certificates.LoadCertificate(caCrtPath)
+	CA.Certificate, err = certificates.LoadCertificate(caCrtPath, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	CA.PrivateKey, err = certificates.LoadPrivateKey(caKeyPath)
+	CA.PrivateKey, err = certificates.LoadPrivateKey(caKeyPath, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -119,11 +119,11 @@ func GenerateCertWithCA(name, caKeyPath, caCrtPath, commonName string, dnsNames,
 		return "", "", err
 	}
 	// Save cert and key to files
-	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert})
+	err = certificates.SaveToPEMFile(crtPath, []interface{}{cert}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
-	err = certificates.SaveToPEMFile(keyPath, []interface{}{key})
+	err = certificates.SaveToPEMFile(keyPath, []interface{}{key}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
@@ -143,13 +143,13 @@ func GenerateRSAPair() (string, string, error) {
 	publicKey := &privateKey.PublicKey
 
 	privateKeyPath := filepath.Join(dir, "private.pem")
-	err = certificates.SaveToPEMFile(privateKeyPath, []interface{}{privateKey})
+	err = certificates.SaveToPEMFile(privateKeyPath, []interface{}{privateKey}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}
 
 	publicKeyPath := filepath.Join(dir, "public.pem")
-	err = certificates.SaveToPEMFile(publicKeyPath, []interface{}{publicKey})
+	err = certificates.SaveToPEMFile(publicKeyPath, []interface{}{publicKey}, &certificates.OsWrapper{})
 	if err != nil {
 		return "", "", err
 	}

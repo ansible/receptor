@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {
@@ -212,7 +211,7 @@ func (c *workceptorCommand) processSignature(workType, signature string, connIsU
 }
 
 func getSignWorkFromStatus(status *StatusFileData) bool {
-	red, ok := status.ExtraData.(*remoteExtraData)
+	red, ok := status.ExtraData.(*RemoteExtraData)
 	if ok {
 		return red.SignWork
 	}
@@ -221,7 +220,7 @@ func getSignWorkFromStatus(status *StatusFileData) bool {
 }
 
 // Worker function called by the control service to process a "work" command.
-func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netceptor, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.NetceptorForControlCommand, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	addr := cfo.RemoteAddr()
 	connIsUnix := false
 	if addr.Network() == "unix" {
@@ -252,6 +251,10 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 		signature, err := strFromMap(c.params, "signature")
 		if err != nil {
 			signature = ""
+		}
+		workUnitID, err := strFromMap(c.params, "workUnitID")
+		if err != nil {
+			workUnitID = ""
 		}
 		workParams := make(map[string]string)
 		nonParams := []string{"command", "subcommand", "node", "worktype", "tlsclient", "ttl", "signwork", "signature"}
@@ -284,9 +287,9 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 			if ttl != "" {
 				return nil, fmt.Errorf("ttl option is intended for remote work only")
 			}
-			worker, err = c.w.AllocateUnit(workType, workParams)
+			worker, err = c.w.AllocateUnit(workType, workUnitID, workParams)
 		} else {
-			worker, err = c.w.AllocateRemoteUnit(workNode, workType, tlsClient, ttl, signWork, workParams)
+			worker, err = c.w.AllocateRemoteUnit(workNode, workType, workUnitID, tlsClient, ttl, signWork, workParams)
 		}
 		if err != nil {
 			return nil, err
@@ -298,7 +301,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc *netceptor.Netce
 			return nil, err
 		}
 		worker.UpdateBasicStatus(WorkStatePending, "Waiting for Input Data", 0)
-		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin)
+		err = cfo.ReadFromConn(fmt.Sprintf("Work unit created with ID %s. Send stdin data and EOF.\n", worker.ID()), stdin, &controlsvc.SocketConnIO{})
 		if err != nil {
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading input data: %s", err), 0)
 

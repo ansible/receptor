@@ -1,3 +1,4 @@
+---
 - node:
     id: node1
 
@@ -9,7 +10,7 @@
 - control-service:
     filename: /tmp/receptorctltest/access_control/node1.sock
 
-- work-signing: 
+- work-signing:
     privatekey: /tmp/receptorctltest/access_control/signwork_key
     tokenexpiration: 10h30m
 
@@ -26,3 +27,4 @@
     workType: unsigned-echo
     command: bash
     params: "-c \"for w in {1..4}; do echo ${line^^}; sleep 1; done\""
+...

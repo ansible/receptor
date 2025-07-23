@@ -4,31 +4,64 @@
 package workceptor
 
 import (
+	"bufio"
+	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.com/spf13/viper"
 )
+
+type BaseWorkUnitForWorkUnit interface {
+	CancelContext()
+	ID() string
+	Init(w *Workceptor, unitID string, workType string, fs FileSystemer)
+	LastUpdateError() error
+	Load() error
+	MonitorLocalStatus()
+	Release(force bool) error
+	Save() error
+	SetFromParams(_ map[string]string) error
+	Status() *StatusFileData
+	StatusFileName() string
+	StdoutFileName() string
+	UnitDir() string
+	UnredactedStatus() *StatusFileData
+	UpdateBasicStatus(state int, detail string, stdoutSize int64)
+	UpdateFullStatus(statusFunc func(*StatusFileData))
+	GetStatusCopy() StatusFileData
+	GetStatusWithoutExtraData() *StatusFileData
+	SetStatusExtraData(interface{})
+	GetStatusLock() *sync.RWMutex
+	GetWorkceptor() *Workceptor
+	SetWorkceptor(*Workceptor)
+	GetContext() context.Context
+	GetCancel() context.CancelFunc
+}
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.
 type commandUnit struct {
-	BaseWorkUnit
+	BaseWorkUnitForWorkUnit
 	command            string
 	baseParams         string
 	allowRuntimeParams bool
 	done               bool
 }
 
-// commandExtraData is the content of the ExtraData JSON field for a command worker.
-type commandExtraData struct {
+// CommandExtraData is the content of the ExtraData JSON field for a command worker.
+type CommandExtraData struct {
 	Pid    int
 	Params string
 }
@@ -37,16 +70,22 @@ func termThenKill(cmd *exec.Cmd, doneChan chan bool) {
 	if cmd.Process == nil {
 		return
 	}
-	_ = cmd.Process.Signal(os.Interrupt)
+	pserr := cmd.Process.Signal(os.Interrupt)
+	if pserr != nil {
+		MainInstance.nc.GetLogger().Warning("Error processing Interrupt Signal: %+v", pserr)
+	}
 	select {
 	case <-doneChan:
 		return
 	case <-time.After(10 * time.Second):
-		MainInstance.nc.Logger.Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
+		MainInstance.nc.GetLogger().Warning("timed out waiting for pid %d to terminate with SIGINT", cmd.Process.Pid)
 	}
 	if cmd.Process != nil {
-		MainInstance.nc.Logger.Info("sending SIGKILL to pid %d", cmd.Process.Pid)
-		_ = cmd.Process.Kill()
+		MainInstance.nc.GetLogger().Info("sending SIGKILL to pid %d", cmd.Process.Pid)
+		pkerr := cmd.Process.Kill()
+		if pkerr != nil {
+			MainInstance.nc.GetLogger().Warning("Error killing pid %d: %+v", cmd.Process.Pid, pkerr)
+		}
 	}
 }
 
@@ -60,11 +99,11 @@ func cmdWaiter(cmd *exec.Cmd, doneChan chan bool) {
 // commandRunner is run in a separate process, to monitor the subprocess and report back metadata.
 func commandRunner(command string, params string, unitdir string) error {
 	status := StatusFileData{}
-	status.ExtraData = &commandExtraData{}
+	status.ExtraData = &CommandExtraData{}
 	statusFilename := path.Join(unitdir, "status")
 	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
 	if err != nil {
-		MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+		MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 	}
 	var cmd *exec.Cmd
 	if params == "" {
@@ -82,13 +121,43 @@ func commandRunner(command string, params string, unitdir string) error {
 	if err != nil {
 		return err
 	}
-	cmd.Stdin = stdin
+	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
+
+	if payloadDebug != 0 {
+		splitUnitDir := strings.Split(unitdir, "/")
+		workUnitID := splitUnitDir[len(splitUnitDir)-1]
+		stdinStream, err := cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+		var payload string
+		reader := bufio.NewReader(stdin)
+
+		for {
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				if err.Error() != "EOF" {
+					MainInstance.nc.GetLogger().Error("Error reading work unit %v stdin: %v\n", workUnitID, err)
+				}
+
+				break
+			}
+			payload += response
+		}
+
+		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "stdin")
+		io.WriteString(stdinStream, payload)
+		stdinStream.Close()
+	} else {
+		cmd.Stdin = stdin
+	}
 	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
 	if err != nil {
 		return err
 	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stdout
+
 	err = cmd.Start()
 	if err != nil {
 		return err
@@ -105,16 +174,16 @@ loop:
 			termThenKill(cmd, doneChan)
 			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
 			if err != nil {
-				MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 			}
 			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
-				MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 				writeStatusFailures++
 				if writeStatusFailures > 3 {
-					MainInstance.nc.Logger.Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
+					MainInstance.nc.GetLogger().Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
 					os.Exit(-1)
 				}
 			} else {
@@ -125,7 +194,7 @@ loop:
 	if err != nil {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
 
 		return err
@@ -133,13 +202,21 @@ loop:
 	if cmd.ProcessState.Success() {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
 	} else {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
 		}
+	}
+	err = stdin.Close()
+	if err != nil {
+		MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(unitdir, "stdin"), err)
+	}
+	err = stdout.Close()
+	if err != nil {
+		MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(unitdir, "stdout"), err)
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
 
@@ -169,7 +246,7 @@ func (cw *commandUnit) SetFromParams(params map[string]string) error {
 	if cmdParams != "" && !cw.allowRuntimeParams {
 		return fmt.Errorf("extra params provided but not allowed")
 	}
-	cw.status.ExtraData.(*commandExtraData).Params = combineParams(cw.baseParams, cmdParams)
+	cw.GetStatusCopy().ExtraData.(*CommandExtraData).Params = combineParams(cw.baseParams, cmdParams)
 
 	return nil
 }
@@ -181,14 +258,14 @@ func (cw *commandUnit) Status() *StatusFileData {
 
 // UnredactedStatus returns a copy of the status currently loaded in memory, including secrets.
 func (cw *commandUnit) UnredactedStatus() *StatusFileData {
-	cw.statusLock.RLock()
-	defer cw.statusLock.RUnlock()
-	status := cw.getStatus()
-	ed, ok := cw.status.ExtraData.(*commandExtraData)
+	cw.GetStatusLock().RLock()
+	status := cw.GetStatusWithoutExtraData()
+	ed, ok := cw.GetStatusCopy().ExtraData.(*CommandExtraData)
 	if ok {
 		edCopy := *ed
 		status.ExtraData = &edCopy
 	}
+	cw.GetStatusLock().RUnlock()
 
 	return status
 }
@@ -199,6 +276,7 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	cw.done = false
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	if err := cmd.Start(); err != nil {
 		cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to start command runner: %s", err), 0)
 
@@ -206,9 +284,9 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 	}
 	cw.UpdateFullStatus(func(status *StatusFileData) {
 		if status.ExtraData == nil {
-			status.ExtraData = &commandExtraData{}
+			status.ExtraData = &CommandExtraData{}
 		}
-		status.ExtraData.(*commandExtraData).Pid = cmd.Process.Pid
+		status.ExtraData.(*CommandExtraData).Pid = cmd.Process.Pid
 	})
 	doneChan := make(chan bool)
 	go func() {
@@ -219,15 +297,15 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 		})
 	}()
 	go cmdWaiter(cmd, doneChan)
-	go cw.monitorLocalStatus()
+	go cw.MonitorLocalStatus()
 
 	return nil
 }
 
 // Start launches a job with given parameters.
 func (cw *commandUnit) Start() error {
-	level := cw.w.nc.Logger.GetLogLevel()
-	levelName, _ := cw.w.nc.Logger.LogLevelToName(level)
+	level := cw.GetWorkceptor().nc.GetLogger().GetLogLevel()
+	levelName, _ := cw.GetWorkceptor().nc.GetLogger().LogLevelToName(level)
 	cw.UpdateBasicStatus(WorkStatePending, "Launching command runner", 0)
 
 	// TODO: This is another place where we rely on a pre-built binary for testing.
@@ -243,7 +321,7 @@ func (cw *commandUnit) Start() error {
 		"--log-level", levelName,
 		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
-		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*commandExtraData).Params),
+		fmt.Sprintf("params=%s", cw.Status().ExtraData.(*CommandExtraData).Params),
 		fmt.Sprintf("unitdir=%s", cw.UnitDir()))
 
 	return cw.runCommand(cmd)
@@ -263,16 +341,16 @@ func (cw *commandUnit) Restart() error {
 		// Job never started - mark it failed
 		cw.UpdateBasicStatus(WorkStateFailed, "Pending at restart", stdoutSize(cw.UnitDir()))
 	}
-	go cw.monitorLocalStatus()
+	go cw.MonitorLocalStatus()
 
 	return nil
 }
 
 // Cancel stops a running job.
 func (cw *commandUnit) Cancel() error {
-	cw.cancel()
+	cw.CancelContext()
 	status := cw.Status()
-	ced, ok := status.ExtraData.(*commandExtraData)
+	ced, ok := status.ExtraData.(*CommandExtraData)
 	if !ok || ced.Pid <= 0 {
 		return nil
 	}
@@ -304,7 +382,7 @@ func (cw *commandUnit) Release(force bool) error {
 		return err
 	}
 
-	return cw.BaseWorkUnit.Release(force)
+	return cw.BaseWorkUnitForWorkUnit.Release(force)
 }
 
 // **************************************************************************
@@ -320,18 +398,22 @@ type CommandWorkerCfg struct {
 	VerifySignature    bool   `description:"Verify a signed work submission" default:"false"`
 }
 
-func (cfg CommandWorkerCfg) NewWorker(w *Workceptor, unitID string, workType string) WorkUnit {
-	cw := &commandUnit{
-		BaseWorkUnit: BaseWorkUnit{
+func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+	if bwu == nil {
+		bwu = &BaseWorkUnit{
 			status: StatusFileData{
-				ExtraData: &commandExtraData{},
+				ExtraData: &CommandExtraData{},
 			},
-		},
-		command:            cfg.Command,
-		baseParams:         cfg.Params,
-		allowRuntimeParams: cfg.AllowRuntimeParams,
+		}
 	}
-	cw.BaseWorkUnit.Init(w, unitID, workType)
+
+	cw := &commandUnit{
+		BaseWorkUnitForWorkUnit: bwu,
+		command:                 cfg.Command,
+		baseParams:              cfg.Params,
+		allowRuntimeParams:      cfg.AllowRuntimeParams,
+	}
+	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }
@@ -366,15 +448,14 @@ func (cfg commandRunnerCfg) Run() error {
 	err := commandRunner(cfg.Command, cfg.Params, cfg.UnitDir)
 	if err != nil {
 		statusFilename := path.Join(cfg.UnitDir, "status")
-		err = (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
-		if err != nil {
-			MainInstance.nc.Logger.Error("Error updating status file %s: %s", statusFilename, err)
+		err2 := (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
+		if err2 != nil {
+			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err2)
 		}
-		MainInstance.nc.Logger.Error("Command runner exited with error: %s\n", err)
+		MainInstance.nc.GetLogger().Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)
-	} else {
-		os.Exit(0)
 	}
+	os.Exit(0)
 
 	return nil
 }
@@ -402,9 +483,8 @@ func filenameExists(filename string) error {
 
 func (cfg SigningKeyPrivateCfg) Prepare() error {
 	duration, err := cfg.PrepareSigningKeyPrivateCfg()
-
 	if err != nil {
-		return fmt.Errorf(err.Error())
+		return fmt.Errorf(err.Error()) //nolint:govet,staticcheck
 	}
 
 	MainInstance.SigningExpiration = *duration
@@ -415,7 +495,6 @@ func (cfg SigningKeyPrivateCfg) Prepare() error {
 
 func (cfg SigningKeyPrivateCfg) PrepareSigningKeyPrivateCfg() (*time.Duration, error) {
 	err := filenameExists(cfg.PrivateKey)
-
 	if err != nil {
 		return nil, err
 	}
@@ -425,6 +504,7 @@ func (cfg SigningKeyPrivateCfg) PrepareSigningKeyPrivateCfg() (*time.Duration, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse TokenExpiration -- valid examples include '1.5h', '30m', '30m10s'")
 		}
+
 		return &duration, nil
 	}
 
@@ -451,6 +531,10 @@ func (cfg VerifyingKeyPublicCfg) PrepareVerifyingKeyPublicCfg() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-signing", "Private key to sign work submissions", SigningKeyPrivateCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
 	cmdline.RegisterConfigTypeForApp("receptor-workers",

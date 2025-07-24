@@ -106,7 +106,8 @@ type NetcForTraceroute interface {
 //   - NewConn constructor (conn.go:333)
 //
 // Tests:
-//   - conn_test.go - TestRead, TestWrite, TestClose, TestCancelRead, TestSet*Deadline
+//   - conn_test.go - TestRead, TestCancelRead, TestWrite, TestClose, TestSetDeadline, TestSetReadDeadline,
+//     TestSetWriteDeadline
 type QuicStreamForConn interface {
 	quic.Stream
 }
@@ -197,7 +198,9 @@ type Backend interface {
 //   - runProtocol (netceptor.go:1857)
 //
 // Tests:
-//   - backends/utils_test.go - TestDialerSessionScenarios, TestListenerSessionScenarios, etc.
+//   - backends/utils_test.go - TestDialerSessionScenarios, TestContextBehavior, TestListenerSessionScenarios,
+//     TestListenerSessionContextCancellation, TestMaxRedialDelayConstant, TestDialerSessionConnectionCloseImmediate,
+//     TestDialerSessionRedialDelayReset
 //   - netceptor/netceptor_test.go - TestRunProtocol* functions with mockBackendSession
 //   - backends/tcp_test.go - TestTCPListenerStart, TestTCPDialerStart
 //   - backends/udp_test.go - TestUDPListenerStart, TestUDPDialerStart
@@ -253,8 +256,11 @@ type MessageConn interface {
 //   - Various network services (UDP proxy, IP router, etc.)
 //
 // Tests:
-//   - conn_test.go - TestCloseConnection, TestNewListener, TestListenerAddr, etc.
-//   - udp_proxy_test.go - TestUDPProxyService*, TestProcess*Packet, TestRun*
+//   - conn_test.go - TestCloseConnection, TestNewListener, TestListenerAddr, TestListenerAccept,
+//     TestListenerAcceptEdgeCases, TestListenerAcceptWithContextCancellation, TestListenerClose,
+//     TestListenerCloseErrorPrecedence
+//   - udp_proxy_test.go - TestUDPProxyServiceInbound, TestUDPProxyServiceOutbound, TestProcessInboundPacket,
+//     TestProcessOutboundPacket, TestRunUDPProxyServiceInbound, TestRunUDPProxyServiceOutbound
 type PacketConner interface {
 	SetHopsToLive(hopsToLive byte)
 	GetHopsToLive() byte

@@ -7,14 +7,6 @@ import (
 	"time"
 )
 
-// NetcForPing should include all methods of Netceptor needed by the Ping function.
-type NetcForPing interface {
-	ListenPacket(service string) (PacketConner, error)
-	NewAddr(target string, service string) Addr
-	NodeID() string
-	Context() context.Context
-}
-
 // Ping calls SendPing to sends a single test packet and waits for a reply or error.
 func (s *Netceptor) Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
 	return SendPing(ctx, s, target, hopsToLive)
@@ -91,12 +83,6 @@ func SendPing(ctx context.Context, s NetcForPing, target string, hopsToLive byte
 	case <-s.Context().Done():
 		return time.Since(startTime), "", fmt.Errorf("netceptor shutdown")
 	}
-}
-
-type NetcForTraceroute interface {
-	MaxForwardingHops() byte
-	Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error)
-	Context() context.Context
 }
 
 // TracerouteResult is the result of one hop of a traceroute.

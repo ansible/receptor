@@ -30,20 +30,6 @@ var MaxIdleTimeoutForQuicConnections = 30 * time.Second
 // Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
 var KeepAliveForQuicConnections = true
 
-type QuicStreamForConn interface {
-	quic.Stream
-}
-
-type QuicConnectionForConn interface {
-	quic.Connection
-}
-
-type QuicListenerForListener interface {
-	Accept(ctx context.Context) (quic.Connection, error)
-	Addr() net.Addr
-	Close() error
-}
-
 type AcceptResult struct {
 	Conn net.Conn
 	Err  error

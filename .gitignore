@@ -31,3 +31,4 @@ pkg/services/.lock
 pkg/workceptor/status
 pkg/workceptor/status.lock
 **/__debug_*
+.history/

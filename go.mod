@@ -53,7 +53,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241101162523-b92577c0c142 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/grafana/pyroscope-go v1.2.0
+	github.com/grafana/pyroscope-go v1.2.4
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect

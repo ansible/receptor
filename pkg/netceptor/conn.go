@@ -283,7 +283,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			}
 			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
-				go monitorUnreachable(li.pc, doneChan, rAddr, ccancel)
+				go MonitorUnreachable(li.pc, doneChan, rAddr, ccancel)
 			}
 			go func() {
 				select {
@@ -409,7 +409,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		}
 	}()
 	doneChan := make(chan struct{}, 1)
-	go monitorUnreachable(pc, doneChan, rAddr, ccancel)
+	go MonitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
 	statelessResetKey := make([]byte, 32)
 	rand.Read(statelessResetKey)
@@ -470,7 +470,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 
 // monitorUnreachable receives unreachable messages from the underlying PacketConn, and ends the connection
 // if the remote service has gone away.
-func monitorUnreachable(pc PacketConner, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
+func MonitorUnreachable(pc PacketConner, doneChan chan struct{}, remoteAddr Addr, cancel context.CancelFunc) {
 	msgCh := pc.SubscribeUnreachable(doneChan)
 	if msgCh == nil {
 		cancel()

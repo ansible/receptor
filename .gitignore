@@ -24,7 +24,7 @@ receptorctl-test-venv/
 /docs/build
 /dist
 /test-configs
-coverage.txt
+coverage.*
 venv
 /vendor
 pkg/services/.lock
@@ -32,3 +32,6 @@ pkg/workceptor/status
 pkg/workceptor/status.lock
 **/__debug_*
 .history/
+.claude/
+CLAUDE*
+claude_*

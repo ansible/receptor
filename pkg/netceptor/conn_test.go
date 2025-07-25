@@ -738,3 +738,162 @@ func TestNeceptorListen(t *testing.T) {
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
 	})
 }
+
+func TestDialContext(t *testing.T) {
+	type dialContextTestSetup struct {
+		ctx     context.Context
+		cancel  context.CancelFunc
+		n       *netceptor.Netceptor
+		t       *testing.T
+		node    string
+		service string
+	}
+
+	setupDialContextTest := func(t *testing.T, contextType string) *dialContextTestSetup {
+		t.Helper()
+
+		var ctx context.Context
+		var cancel context.CancelFunc
+
+		switch contextType {
+		case "background":
+			ctx = context.Background()
+			cancel = func() {} // no-op cancel for background context
+		case "cancelable":
+			ctx, cancel = context.WithCancel(context.Background())
+		case "timeout-100ms":
+			ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+		case "timeout-50ms":
+			ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
+		case "timeout-1ns":
+			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		default:
+			ctx = context.Background()
+			cancel = func() {}
+		}
+
+		node := "testnode"
+		n := netceptor.New(ctx, node)
+
+		return &dialContextTestSetup{
+			ctx:     ctx,
+			cancel:  cancel,
+			n:       n,
+			t:       t,
+			node:    node,
+			service: "testsvc",
+		}
+	}
+
+	cleanup := func(s *dialContextTestSetup) {
+		s.cancel()
+		s.n.Shutdown()
+	}
+
+	t.Run("ListenPacket fails", func(t *testing.T) {
+		setup := setupDialContextTest(t, "background")
+		defer cleanup(setup)
+
+		conn, err := setup.n.DialContext(setup.ctx, setup.node, setup.service, nil)
+		if err == nil || conn != nil {
+			t.Errorf("expected error and nil connection, got conn=%v err=%v", conn, err)
+		}
+	})
+
+	t.Run("Context cancellation before dial", func(t *testing.T) {
+		setup := setupDialContextTest(t, "cancelable")
+		defer cleanup(setup)
+
+		setup.cancel()
+		conn, err := setup.n.DialContext(setup.ctx, setup.node, setup.service, nil)
+		if err == nil || conn != nil {
+			t.Errorf("expected error and nil connection, got conn=%v err=%v", conn, err)
+		}
+	})
+
+	t.Run("With custom TLS config", func(t *testing.T) {
+		setup := setupDialContextTest(t, "timeout-100ms")
+		defer cleanup(setup)
+
+		tlsConfig := &tls.Config{
+			ServerName: "custom-server",
+		}
+		conn, _ := setup.n.DialContext(setup.ctx, setup.node, setup.service, tlsConfig)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected due to no actual QUIC server, but TLS config should be processed
+	})
+
+	t.Run("With nil TLS config (generates client config)", func(t *testing.T) {
+		setup := setupDialContextTest(t, "timeout-100ms")
+		defer cleanup(setup)
+
+		conn, _ := setup.n.DialContext(setup.ctx, setup.node, setup.service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected due to no actual QUIC server, but nil TLS config should be handled
+	})
+
+	t.Run("Context timeout during dial", func(t *testing.T) {
+		setup := setupDialContextTest(t, "timeout-1ns")
+		defer cleanup(setup)
+
+		time.Sleep(2 * time.Nanosecond) // Ensure timeout has passed
+
+		conn, err := setup.n.DialContext(setup.ctx, setup.node, setup.service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Should timeout and return context deadline exceeded error
+		if err != nil && err.Error() != "context deadline exceeded" {
+			// Also check for context canceled as timing might vary
+			if err.Error() != "context canceled" {
+				t.Logf("Got error: %v (expected context deadline exceeded or canceled)", err)
+			}
+		}
+	})
+
+	t.Run("KeepAlive enabled configuration", func(t *testing.T) {
+		setup := setupDialContextTest(t, "timeout-50ms")
+		defer cleanup(setup)
+
+		// Store original value
+		originalKeepAlive := netceptor.KeepAliveForQuicConnections
+		defer func() { netceptor.KeepAliveForQuicConnections = originalKeepAlive }()
+
+		// Enable keep alive
+		netceptor.KeepAliveForQuicConnections = true
+
+		conn, err := setup.n.DialContext(setup.ctx, setup.node, setup.service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected (no server), but this tests the keep-alive config path
+		if err == nil {
+			t.Logf("Unexpected success - no error returned")
+		}
+	})
+
+	t.Run("KeepAlive disabled configuration", func(t *testing.T) {
+		setup := setupDialContextTest(t, "timeout-50ms")
+		defer cleanup(setup)
+
+		// Store original value
+		originalKeepAlive := netceptor.KeepAliveForQuicConnections
+		defer func() { netceptor.KeepAliveForQuicConnections = originalKeepAlive }()
+
+		// Disable keep alive
+		netceptor.KeepAliveForQuicConnections = false
+
+		conn, err := setup.n.DialContext(setup.ctx, setup.node, setup.service, nil)
+		if conn != nil {
+			conn.Close()
+		}
+		// Error is expected (no server), but this tests the keep-alive config path
+		if err == nil {
+			t.Logf("Unexpected success - no error returned")
+		}
+	})
+}

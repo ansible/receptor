@@ -738,3 +738,156 @@ func TestNeceptorListen(t *testing.T) {
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
 	})
 }
+
+func TestMonitorUnreachable(t *testing.T) {
+	testSetup := func(t *testing.T) (*gomock.Controller, *mock_netceptor.MockPacketConner, chan struct{}, *netceptor.Netceptor, netceptor.Addr, context.Context, context.CancelFunc) {
+		ctrl := gomock.NewController(t)
+		mockPC := mock_netceptor.NewMockPacketConner(ctrl)
+		doneChan := make(chan struct{})
+		n := netceptor.New(context.Background(), "test")
+		remoteAddr := n.NewAddr("testnode", "testsvc")
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Setup cleanup for this test
+		t.Cleanup(func() {
+			cancel()
+			ctrl.Finish()
+			n.Shutdown()
+		})
+
+		return ctrl, mockPC, doneChan, n, remoteAddr, ctx, cancel
+	}
+
+	t.Run("SubscribeUnreachable returns nil channel", func(t *testing.T) {
+		_, mockPC, doneChan, _, remoteAddr, ctx, cancel := testSetup(t)
+
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(nil).Times(1)
+		netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+
+		// Check if context was cancelled
+		select {
+		case <-ctx.Done():
+			// Cancel was called as expected
+		default:
+			t.Error("Expected cancel to be called when SubscribeUnreachable returns nil")
+		}
+	})
+
+	t.Run("Message matches and triggers cancellation", func(t *testing.T) {
+		_, mockPC, doneChan, n, remoteAddr, ctx, cancel := testSetup(t)
+
+		msgCh := make(chan netceptor.UnreachableNotification, 1)
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(msgCh).Times(1)
+		mockPC.EXPECT().GetLogger().Return(n.GetLogger()).Times(1)
+
+		go func() {
+			matchingMsg := netceptor.UnreachableNotification{
+				UnreachableMessage: netceptor.UnreachableMessage{
+					FromNode:    "sourcenode",
+					ToNode:      "testnode",
+					FromService: "sourcesvc",
+					ToService:   "testsvc",
+					Problem:     netceptor.ProblemServiceUnknown,
+				},
+				ReceivedFromNode: "sourcenode",
+			}
+			msgCh <- matchingMsg
+			close(msgCh)
+		}()
+
+		go netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+
+		select {
+		case <-ctx.Done():
+			// Cancel was called as expected
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Expected cancel to be called when matching message is received")
+		}
+	})
+
+	t.Run("Non-matching messages do not trigger cancellation", func(t *testing.T) {
+		_, mockPC, doneChan, _, remoteAddr, ctx, cancel := testSetup(t)
+
+		msgCh := make(chan netceptor.UnreachableNotification, 3)
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(msgCh).Times(1)
+
+		go func() {
+			// Wrong node
+			msgCh <- netceptor.UnreachableNotification{
+				UnreachableMessage: netceptor.UnreachableMessage{
+					ToNode:    "wrongnode",
+					ToService: "testsvc",
+					Problem:   netceptor.ProblemServiceUnknown,
+				},
+			}
+
+			// Wrong service
+			msgCh <- netceptor.UnreachableNotification{
+				UnreachableMessage: netceptor.UnreachableMessage{
+					ToNode:    "testnode",
+					ToService: "wrongsvc",
+					Problem:   netceptor.ProblemServiceUnknown,
+				},
+			}
+
+			// Wrong problem type
+			msgCh <- netceptor.UnreachableNotification{
+				UnreachableMessage: netceptor.UnreachableMessage{
+					ToNode:    "testnode",
+					ToService: "testsvc",
+					Problem:   "different problem",
+				},
+			}
+
+			close(msgCh)
+		}()
+
+		go netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+		time.Sleep(10 * time.Millisecond)
+
+		// Check that context was NOT cancelled
+		select {
+		case <-ctx.Done():
+			t.Error("Expected cancel NOT to be called for non-matching messages")
+		default:
+			// Expected - context should not be cancelled
+		}
+	})
+
+	t.Run("Channel closure terminates monitoring normally", func(t *testing.T) {
+		_, mockPC, doneChan, _, remoteAddr, ctx, cancel := testSetup(t)
+
+		msgCh := make(chan netceptor.UnreachableNotification)
+		mockPC.EXPECT().SubscribeUnreachable(doneChan).Return(msgCh).Times(1)
+
+		go func() {
+			close(msgCh)
+		}()
+
+		go func() {
+			netceptor.MonitorUnreachable(mockPC, doneChan, remoteAddr, cancel)
+			// Signal completion by closing doneChan
+			select {
+			case <-doneChan:
+				// doneChan already closed, don't close again
+			default:
+				close(doneChan)
+			}
+		}()
+
+		select {
+		case <-doneChan:
+			// Function returned normally - verify context was NOT cancelled
+			select {
+			case <-ctx.Done():
+				t.Error("Expected cancel NOT to be called on normal completion")
+			default:
+				// Expected - context should not be cancelled
+			}
+		case <-ctx.Done():
+			t.Error("Context was cancelled unexpectedly during normal completion")
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Function did not return after channel closure")
+		}
+	})
+}

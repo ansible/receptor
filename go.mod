@@ -25,7 +25,7 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.2
 	golang.org/x/net v0.41.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/sys v0.34.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
@@ -53,7 +53,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241101162523-b92577c0c142 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/grafana/pyroscope-go v1.2.0
+	github.com/grafana/pyroscope-go v1.2.4
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect

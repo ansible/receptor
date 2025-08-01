@@ -13,6 +13,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
+	"github.com/ansible/receptor/pkg/utils/mock_utils"
 	"github.com/quic-go/quic-go"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -1245,5 +1246,254 @@ func TestMonitorUnreachable(t *testing.T) {
 		case <-time.After(100 * time.Millisecond):
 			t.Error("Function did not return after channel closure")
 		}
+	})
+}
+
+func TestGetConfigForClientOverride(t *testing.T) {
+	testSetup := func(t *testing.T) (*netceptor.Netceptor, *tls.ClientHelloInfo, *tls.Config, *mock_utils.MockNetConn, *mock_utils.MockNetAddr) {
+		ctrl := gomock.NewController(t)
+		n := netceptor.New(context.Background(), "test-node")
+		mockConn := mock_utils.NewMockNetConn(ctrl)
+		mockAddr := mock_utils.NewMockNetAddr(ctrl)
+
+		// Create common objects - no expectations set here, tests can set their own
+		clientHello := &tls.ClientHelloInfo{
+			Conn: mockConn,
+		}
+
+		baseConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+
+		// Setup cleanup for this test
+		t.Cleanup(func() {
+			ctrl.Finish()
+			n.Shutdown()
+		})
+
+		return n, clientHello, baseConfig, mockConn, mockAddr
+	}
+
+	t.Run("successful config override with valid IPv4 address", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("127.0.0.1:8080")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		// Customize config for this test
+		originalConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			MinVersion: tls.VersionTLS12,
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if resultConfig == nil {
+			t.Fatal("Expected non-nil config")
+		}
+		if resultConfig.VerifyPeerCertificate == nil {
+			t.Error("Expected VerifyPeerCertificate to be set")
+		}
+		if resultConfig.ClientAuth != tls.RequireAndVerifyClientCert {
+			t.Error("Expected ClientAuth to be preserved")
+		}
+		if resultConfig.MinVersion != tls.VersionTLS12 {
+			t.Error("Expected MinVersion to be preserved")
+		}
+	})
+
+	t.Run("successful config override with IPv6 address", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("[::1]:8080")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		originalConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			MinVersion: tls.VersionTLS13,
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if resultConfig == nil {
+			t.Fatal("Expected non-nil config")
+		}
+		if resultConfig.MinVersion != tls.VersionTLS13 {
+			t.Error("Expected MinVersion to be preserved from original config")
+		}
+	})
+
+	t.Run("successful config with hostname", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("hostname.example.com:443")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		originalConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if resultConfig == nil {
+			t.Error("Expected non-nil config")
+		}
+	})
+
+	t.Run("config cloning preserves all original properties", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("192.168.1.1:9090")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		originalConfig := &tls.Config{
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS12,
+			MaxVersion:   tls.VersionTLS13,
+			ServerName:   "original-server",
+			NextProtos:   []string{"h2", "http/1.1"},
+			CipherSuites: []uint16{tls.TLS_AES_128_GCM_SHA256},
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if resultConfig == nil {
+			t.Fatal("Expected non-nil config")
+		}
+
+		// Verify all original properties are preserved
+		if resultConfig.MinVersion != tls.VersionTLS12 {
+			t.Error("Expected MinVersion to be preserved")
+		}
+		if resultConfig.MaxVersion != tls.VersionTLS13 {
+			t.Error("Expected MaxVersion to be preserved")
+		}
+		if resultConfig.ServerName != "original-server" {
+			t.Error("Expected ServerName to be preserved")
+		}
+		if !reflect.DeepEqual(resultConfig.NextProtos, []string{"h2", "http/1.1"}) {
+			t.Error("Expected NextProtos to be preserved")
+		}
+		if !reflect.DeepEqual(resultConfig.CipherSuites, []uint16{tls.TLS_AES_128_GCM_SHA256}) {
+			t.Error("Expected CipherSuites to be preserved")
+		}
+	})
+
+	t.Run("error when AddressToHostPort fails with invalid address", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("invalid-address-format")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		originalConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+
+		if err == nil {
+			t.Error("Expected error for invalid address format")
+		}
+		if resultConfig != nil {
+			t.Error("Expected nil config on error")
+		}
+	})
+
+	t.Run("error with empty remote address", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		originalConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+
+		if err == nil {
+			t.Error("Expected error for empty address")
+		}
+		if resultConfig != nil {
+			t.Error("Expected nil config on error")
+		}
+	})
+
+	t.Run("returned function is not nil", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "test-node")
+		t.Cleanup(func() {
+			n.Shutdown()
+		})
+
+		originalConfig := &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+
+		if overrideFunc == nil {
+			t.Error("GetConfigForClientOverride should not return nil function")
+		}
+	})
+
+	t.Run("cloned config is independent of original", func(t *testing.T) {
+		n, clientHello, _, mockConn, mockAddr := testSetup(t)
+		mockAddr.EXPECT().String().Return("127.0.0.1:8080")
+		mockConn.EXPECT().RemoteAddr().Return(mockAddr)
+
+		originalConfig := &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ServerName: "original",
+		}
+
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+		resultConfig, err := overrideFunc(clientHello)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if resultConfig == nil {
+			t.Fatal("Expected non-nil config")
+		}
+
+		// Modify the result config and ensure original is unchanged
+		resultConfig.ServerName = "modified"
+		if originalConfig.ServerName != "original" {
+			t.Error("Original config should not be modified")
+		}
+	})
+
+	t.Run("nil client hello info causes panic", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "test-node")
+		t.Cleanup(func() {
+			n.Shutdown()
+		})
+
+		originalConfig := &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert}
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+
+		assert.Panics(t, func() {
+			overrideFunc(nil)
+		})
+	})
+
+	t.Run("client hello with nil connection causes panic", func(t *testing.T) {
+		n := netceptor.New(context.Background(), "test-node")
+		t.Cleanup(func() {
+			n.Shutdown()
+		})
+
+		originalConfig := &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert}
+		clientHello := &tls.ClientHelloInfo{Conn: nil}
+		overrideFunc := n.GetConfigForClientOverride(originalConfig)
+
+		assert.Panics(t, func() {
+			overrideFunc(clientHello)
+		})
 	})
 }

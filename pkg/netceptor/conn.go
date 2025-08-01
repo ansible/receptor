@@ -81,7 +81,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
 		if tlscfg.ClientAuth == tls.RequireAndVerifyClientCert {
-			tlscfg.GetConfigForClient = s.getConfigForClient(tlscfg)
+			tlscfg.GetConfigForClient = s.GetConfigForClientOverride(tlscfg)
 		}
 	}
 	pc := &PacketConn{
@@ -137,7 +137,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	return li, nil
 }
 
-func (s *Netceptor) getConfigForClient(tlscfg *tls.Config) func(*tls.ClientHelloInfo) (*tls.Config, error) {
+func (s *Netceptor) GetConfigForClientOverride(tlscfg *tls.Config) func(*tls.ClientHelloInfo) (*tls.Config, error) {
 	return func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 		clientTLSCfg := tlscfg.Clone()
 		remoteAdrr := hi.Conn.RemoteAddr().String()

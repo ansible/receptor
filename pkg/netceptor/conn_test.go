@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
 	"sync"
@@ -894,6 +895,202 @@ func TestDialContext(t *testing.T) {
 		// Error is expected (no server), but this tests the keep-alive config path
 		if err == nil {
 			t.Logf("Unexpected success - no error returned")
+		}
+	})
+}
+
+func TestListenerSendResult(t *testing.T) {
+	createListener := func() (*netceptor.Listener, chan *netceptor.AcceptResult) {
+		mockNetC := &netceptor.Netceptor{}
+		ql := &quic.Listener{}
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult, 1)
+		syncOnce := &sync.Once{}
+
+		return netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce), acceptChan
+	}
+
+	t.Run("successful send to AcceptChan", func(t *testing.T) {
+		listener, acceptChan := createListener()
+		ctx := context.Background()
+		conn := &netceptor.Conn{}
+
+		go listener.SendResult(ctx, conn, nil)
+
+		select {
+		case result := <-acceptChan:
+			if result.Conn == nil {
+				t.Error("Expected connection, got nil")
+			}
+			if result.Err != nil {
+				t.Errorf("Expected no error, got %v", result.Err)
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Timed out waiting for AcceptResult")
+		}
+	})
+
+	t.Run("successful send with error", func(t *testing.T) {
+		listener, acceptChan := createListener()
+		ctx := context.Background()
+		testErr := fmt.Errorf("test error")
+
+		go listener.SendResult(ctx, nil, testErr)
+
+		select {
+		case result := <-acceptChan:
+			if result.Conn != nil {
+				t.Error("Expected nil connection, got non-nil")
+			}
+			if result.Err == nil {
+				t.Error("Expected error, got nil")
+			} else if result.Err.Error() != testErr.Error() {
+				t.Errorf("Expected error %q, got %q", testErr, result.Err)
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Timed out waiting for AcceptResult")
+		}
+	})
+
+	t.Run("context cancelled - sends nil conn and err", func(t *testing.T) {
+		listener, acceptChan := createListener()
+		cancelledCtx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		go listener.SendResult(cancelledCtx, nil, nil)
+
+		select {
+		case result := <-acceptChan:
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
+		case <-time.After(50 * time.Millisecond):
+			// Expected - no result received
+		}
+	})
+
+	t.Run("done channel closed - sends nil conn and err", func(t *testing.T) {
+		listener, acceptChan := createListener()
+		ctx := context.Background()
+		close(listener.DoneChan) // Close the done channel
+
+		go listener.SendResult(ctx, nil, nil)
+
+		select {
+		case result := <-acceptChan:
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
+		case <-time.After(50 * time.Millisecond):
+			// Expected - no result received
+		}
+	})
+
+	t.Run("context timeout - sends nil conn and err", func(t *testing.T) {
+		listener, acceptChan := createListener()
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+		defer cancel()
+		time.Sleep(5 * time.Millisecond) // Wait for timeout
+
+		go listener.SendResult(timeoutCtx, nil, nil)
+
+		select {
+		case result := <-acceptChan:
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
+		case <-time.After(50 * time.Millisecond):
+			// Expected - no result received
+		}
+	})
+
+	t.Run("context cancelled during send - should be interrupted - sends nil conn and err", func(t *testing.T) {
+		mockNetC := &netceptor.Netceptor{}
+		ql := &quic.Listener{}
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult) // Unbuffered to block send
+		syncOnce := &sync.Once{}
+
+		listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+		cancelCtx, cancel := context.WithCancel(context.Background())
+
+		// Start SendResult in a goroutine
+		go listener.SendResult(cancelCtx, nil, nil)
+
+		// Cancel immediately to test the context cancellation path
+		cancel()
+
+		// Verify no result was sent to acceptChan due to cancellation
+		select {
+		case result := <-acceptChan:
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
+		case <-time.After(50 * time.Millisecond):
+			// Expected - no result received due to cancellation
+		}
+	})
+
+	t.Run("both done channel and context cancelled - sends nil conn and err", func(t *testing.T) {
+		listener, acceptChan := createListener()
+		cancelledCtx, cancel := context.WithCancel(context.Background())
+
+		// Cancel context and close done channel
+		cancel()
+		close(listener.DoneChan)
+
+		go listener.SendResult(cancelledCtx, nil, nil)
+
+		select {
+		case result := <-acceptChan:
+			t.Errorf("Expected no result due to cancelled context but got: %+v", result)
+		case <-time.After(50 * time.Millisecond):
+			// Expected - no result received
+		}
+	})
+
+	t.Run("concurrent SendResult calls", func(t *testing.T) {
+		mockNetC := &netceptor.Netceptor{}
+		ql := &quic.Listener{}
+		doneChan := make(chan struct{})
+		acceptChan := make(chan *netceptor.AcceptResult, 10) // Large buffer for concurrent sends
+		syncOnce := &sync.Once{}
+
+		listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+		ctx := context.Background()
+
+		const numGoroutines = 5
+		var wg sync.WaitGroup
+
+		// Send multiple results concurrently
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+				testErr := fmt.Errorf("error-%d", index)
+				listener.SendResult(ctx, nil, testErr)
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Verify all results were received
+		results := make([]*netceptor.AcceptResult, 0, numGoroutines)
+		for i := 0; i < numGoroutines; i++ {
+			select {
+			case result := <-acceptChan:
+				results = append(results, result)
+			case <-time.After(100 * time.Millisecond):
+				t.Errorf("Only received %d results out of %d expected", len(results), numGoroutines)
+
+				return
+			}
+		}
+
+		if len(results) != numGoroutines {
+			t.Errorf("Expected %d results, got %d", numGoroutines, len(results))
+		}
+
+		// Verify all results have errors and no connections
+		for i, result := range results {
+			if result.Conn != nil {
+				t.Errorf("Result %d: expected nil connection, got %v", i, result.Conn)
+			}
+			if result.Err == nil {
+				t.Errorf("Result %d: expected error, got nil", i)
+			}
 		}
 	})
 }

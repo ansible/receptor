@@ -12,40 +12,6 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 )
 
-type PacketConner interface {
-	SetHopsToLive(hopsToLive byte)
-	GetHopsToLive() byte
-	SubscribeUnreachable(doneChan chan struct{}) chan UnreachableNotification
-	ReadFrom(p []byte) (int, net.Addr, error)
-	WriteTo(p []byte, addr net.Addr) (n int, err error)
-	LocalAddr() net.Addr
-	Close() error
-	SetDeadline(t time.Time) error
-	SetReadDeadline(t time.Time) error
-	GetReadDeadline() time.Time
-	SetWriteDeadline(t time.Time) error
-	Cancel() *context.CancelFunc
-	LocalService() string
-	GetLogger() *logger.ReceptorLogger
-	StartUnreachable()
-}
-
-type NetcForPacketConn interface {
-	GetEphemeralService() string
-	AddNameHash(name string) uint64
-	AddLocalServiceAdvertisement(service string, connType byte, tags map[string]string)
-	SendMessageWithHopsToLive(fromService string, toNode string, toService string, data []byte, hopsToLive byte) error
-	RemoveLocalServiceAdvertisement(service string) error
-	GetLogger() *logger.ReceptorLogger
-	NodeID() string
-	GetNetworkName() string
-	GetListenerLock() *sync.RWMutex
-	GetListenerRegistry() map[string]*PacketConn
-	GetUnreachableBroker() *utils.Broker
-	MaxForwardingHops() byte
-	Context() context.Context
-}
-
 // PacketConn implements the net.PacketConn interface via the Receptor network.
 type PacketConn struct {
 	s                 NetcForPacketConn

@@ -7,11 +7,7 @@ package main
 //go:generate mockgen -source=pkg/controlsvc/controlsvc.go -destination=pkg/controlsvc/mock_controlsvc/controlsvc.go
 //go:generate mockgen -source=pkg/controlsvc/interfaces.go -destination=pkg/controlsvc/mock_controlsvc/interfaces.go
 //go:generate mockgen -source=pkg/framer/framer.go -destination=pkg/framer/mock_framer/framer.go
-//go:generate mockgen -source=pkg/netceptor/conn.go -destination=pkg/netceptor/mock_netceptor/conn.go
-//go:generate mockgen -source=pkg/netceptor/external_backend.go -destination=pkg/netceptor/mock_netceptor/external_backend.go
-//go:generate mockgen -source=pkg/netceptor/netceptor.go -destination=pkg/netceptor/mock_netceptor/netceptor.go
-//go:generate mockgen -source=pkg/netceptor/packetconn.go -destination=pkg/netceptor/mock_netceptor/packetconn.go
-//go:generate mockgen -source=pkg/netceptor/ping.go -destination=pkg/netceptor/mock_netceptor/ping.go
+//go:generate mockgen -source=pkg/netceptor/interfaces.go -destination=pkg/netceptor/mock_netceptor/interfaces.go
 //go:generate mockgen -source=pkg/services/interfaces/net_interfaces.go -destination=pkg/services/interfaces/mock_interfaces/net_interfaces.go
 //go:generate mockgen -source=pkg/services/command.go -destination=pkg/services/mock_services/command.go
 //go:generate mockgen -source=pkg/services/tcp_proxy.go -destination=pkg/services/mock_services/tcp_proxy.go

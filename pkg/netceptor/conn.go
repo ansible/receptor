@@ -30,20 +30,6 @@ var MaxIdleTimeoutForQuicConnections = 30 * time.Second
 // Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
 var KeepAliveForQuicConnections = true
 
-type QuicStreamForConn interface {
-	quic.Stream
-}
-
-type QuicConnectionForConn interface {
-	quic.Connection
-}
-
-type QuicListenerForListener interface {
-	Accept(ctx context.Context) (quic.Connection, error)
-	Addr() net.Addr
-	Close() error
-}
-
 type AcceptResult struct {
 	Conn net.Conn
 	Err  error
@@ -203,14 +189,20 @@ func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags 
 	return s.listen(s.context, service, tlscfg, true, tags)
 }
 
-func (li *Listener) sendResult(ctx context.Context, conn net.Conn, err error) {
+func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
+	// Check cancellation first
 	select {
 	case <-ctx.Done():
 		return
-	case li.AcceptChan <- &AcceptResult{
-		Conn: conn,
-		Err:  err,
-	}:
+	case <-li.DoneChan:
+		return
+	default:
+	}
+
+	// Then try to send
+	select {
+	case li.AcceptChan <- &AcceptResult{Conn: conn, Err: err}:
+	case <-ctx.Done():
 	case <-li.DoneChan:
 	}
 }
@@ -231,7 +223,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 		default:
 		}
 		if err != nil {
-			li.sendResult(ctx, nil, err)
+			li.SendResult(ctx, nil, err)
 
 			continue
 		}
@@ -252,7 +244,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 				return
 			} else if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("AcceptStream Error: %s", err.Error()))
-				li.sendResult(ctx, nil, err)
+				li.SendResult(ctx, nil, err)
 
 				return
 			}
@@ -260,13 +252,13 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 			n, err := qs.Read(buf)
 			if err != nil {
 				_ = qc.CloseWithError(500, fmt.Sprintf("Read Error: %s", err.Error()))
-				li.sendResult(ctx, nil, err)
+				li.SendResult(ctx, nil, err)
 
 				return
 			}
 			if n != 1 || buf[0] != 0 {
 				_ = qc.CloseWithError(500, "Read Data Error")
-				li.sendResult(ctx, nil, fmt.Errorf("stream failed to initialize"))
+				li.SendResult(ctx, nil, fmt.Errorf("stream failed to initialize"))
 
 				return
 			}
@@ -295,7 +287,7 @@ func (li *Listener) acceptLoop(ctx context.Context) {
 					return
 				}
 			}()
-			li.sendResult(ctx, conn, err)
+			li.SendResult(ctx, conn, err)
 		}()
 	}
 }

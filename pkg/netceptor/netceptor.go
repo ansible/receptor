@@ -67,21 +67,6 @@ func (e *TimeoutError) Timeout() bool { return true }
 // Temporary returns true if a retry is likely a good idea.
 func (e *TimeoutError) Temporary() bool { return true }
 
-// Backend is the interface for back-ends that the Receptor network can run over.
-type Backend interface {
-	Start(context.Context, *sync.WaitGroup) (chan BackendSession, error)
-}
-
-// BackendSession is the interface for a single session of a back-end.
-// Backends must be DATAGRAM ORIENTED, meaning that Recv() must return
-// whole packets sent by Send(). If the underlying protocol is stream
-// oriented, then the backend must deal with any required buffering.
-type BackendSession interface {
-	Send([]byte) error
-	Recv(time.Duration) ([]byte, error) // Must return netceptor.ErrTimeout if the timeout is exceeded
-	Close() error
-}
-
 // FirewallRuleFunc is a function that takes a message and returns a firewall decision.
 type FirewallRuleFunc func(*MessageData) FirewallResult
 

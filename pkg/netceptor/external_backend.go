@@ -19,14 +19,6 @@ type ExternalBackend struct {
 	sessChan chan BackendSession
 }
 
-// MessageConn is an abstract connection that sends and receives whole messages (datagrams).
-type MessageConn interface {
-	WriteMessage(ctx context.Context, data []byte) error
-	ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error)
-	SetReadDeadline(t time.Time) error
-	Close() error
-}
-
 // netMessageConn implements MessageConn for Go net.Conn.
 type netMessageConn struct {
 	conn   net.Conn

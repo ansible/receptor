@@ -931,6 +931,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
 			expectedStdoutErr: false, // Connection error causes function to return early, not set stdoutErr
@@ -977,6 +978,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
 			expectedStdoutErr: false,
@@ -1016,6 +1018,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
 			expectedStdoutErr: false,
@@ -1072,6 +1075,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
 			expectedStdoutErr: false, // Connection error causes function to return early
@@ -1131,6 +1135,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
 			expectedStdoutErr: false,
@@ -1169,11 +1174,12 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
-			expectedStdoutErr:    true, // Should set stdoutErr from Write failure
-			timeoutSeconds:       2,
-			mockWriteFailure:     true, // Special flag to indicate this test should mock Write to fail
+			expectedStdoutErr: true, // Should set stdoutErr from Write failure
+			timeoutSeconds:    2,
+			mockWriteFailure:  true, // Special flag to indicate this test should mock Write to fail
 		},
 	}
 

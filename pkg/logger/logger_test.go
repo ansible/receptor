@@ -93,7 +93,7 @@ func TestLoglevelCfgInit(t *testing.T) {
 			t.Cleanup(func() {
 				logger.SetGlobalLogLevel(origLogLevel)
 			})
-			
+
 			cfg := logger.LoglevelCfg{Level: tt.level}
 			err := cfg.Init()
 			if tt.wantErr {
@@ -227,7 +227,7 @@ func TestDebugPayload(t *testing.T) {
 	t.Cleanup(func() {
 		logger.SetGlobalLogLevel(origLogLevel)
 	})
-	
+
 	var logBuffer bytes.Buffer
 	logger.SetGlobalLogLevel(4)
 	receptorLogger := logger.NewReceptorLogger("testDebugPayload")
@@ -283,7 +283,7 @@ func TestGetLoggerWithSuffix(t *testing.T) {
 	t.Cleanup(func() {
 		logger.SetGlobalLogLevel(origLogLevel)
 	})
-	
+
 	logger.SetGlobalLogLevel(4)
 
 	t.Run("initial suffix", func(t *testing.T) {

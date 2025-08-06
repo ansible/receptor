@@ -88,6 +88,12 @@ func TestLoglevelCfgInit(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore global log level for test isolation
+			origLogLevel := logger.GetLogLevel()
+			t.Cleanup(func() {
+				logger.SetGlobalLogLevel(origLogLevel)
+			})
+			
 			cfg := logger.LoglevelCfg{Level: tt.level}
 			err := cfg.Init()
 			if tt.wantErr {
@@ -104,7 +110,6 @@ func TestLoglevelCfgInit(t *testing.T) {
 			if got != tt.wantLevel {
 				t.Errorf("expected log level %d, got %d", tt.wantLevel, got)
 			}
-			logger.SetGlobalLogLevel(logger.InfoLevel) // Reset to default after test
 		})
 	}
 }
@@ -217,6 +222,12 @@ func TestSanitizedLog(t *testing.T) {
 }
 
 func TestDebugPayload(t *testing.T) {
+	// Save and restore global log level for test isolation
+	origLogLevel := logger.GetLogLevel()
+	t.Cleanup(func() {
+		logger.SetGlobalLogLevel(origLogLevel)
+	})
+	
 	var logBuffer bytes.Buffer
 	logger.SetGlobalLogLevel(4)
 	receptorLogger := logger.NewReceptorLogger("testDebugPayload")
@@ -267,6 +278,12 @@ func assertSuffixFieldsPresent(t *testing.T, logLine string, expected map[string
 }
 
 func TestGetLoggerWithSuffix(t *testing.T) {
+	// Save and restore global log level for test isolation
+	origLogLevel := logger.GetLogLevel()
+	t.Cleanup(func() {
+		logger.SetGlobalLogLevel(origLogLevel)
+	})
+	
 	logger.SetGlobalLogLevel(4)
 
 	t.Run("initial suffix", func(t *testing.T) {

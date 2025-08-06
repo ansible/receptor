@@ -531,27 +531,6 @@ func (e *eofReadCloser) Close() error {
 	return nil
 }
 
-// errorReadCloser simulates network errors after a few reads to trigger non-EOF error paths
-type errorReadCloser struct {
-	readCount int
-	maxReads  int
-}
-
-func (e *errorReadCloser) Read(p []byte) (int, error) {
-	e.readCount++
-	if e.readCount <= e.maxReads {
-		// Return some data for the first few reads
-		content := "2024-12-09T00:31:19.123456789Z Log line\n"
-		return copy(p, []byte(content)), nil
-	}
-	// After maxReads, return a network error (not EOF)
-	return 0, errors.New("network connection reset")
-}
-
-func (e *errorReadCloser) Close() error {
-	return nil
-}
-
 func TestKubeLoggingWithReconnect(t *testing.T) {
 	type testCase struct {
 		name              string

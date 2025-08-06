@@ -320,7 +320,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 	retries := 5
 	successfulWrite := false
-	remainingRetries := retries // resets on each successful read from pod stdout
+	var remainingRetries int
 
 	for {
 		if *stdinErr != nil {
@@ -357,6 +357,9 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			// fail to get log stream, no need to continue
 			return
 		}
+
+		// reset retry counter for each new connection attempt
+		remainingRetries = retries
 
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)

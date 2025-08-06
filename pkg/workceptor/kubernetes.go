@@ -365,6 +365,9 @@ mainLoop:
 		}
 		defer logStream.Close()
 
+		// reset retry counter for each new connection attempt
+		remainingRetries = retries
+
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)
 		// TODO: removed stdinErr, not set in the loop, doesn't change after first check above

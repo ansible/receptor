@@ -85,18 +85,11 @@ func TestIsPending(t *testing.T) {
 }
 
 func setUp(t *testing.T) (*gomock.Controller, workceptor.BaseWorkUnit, *workceptor.Workceptor, *mock_workceptor.MockNetceptorForWorkceptor, *logger.ReceptorLogger) {
-	// Save original log level and restore after test completes
-	origLogLevel := logger.GetLogLevel()
-	t.Cleanup(func() {
-		logger.SetGlobalLogLevel(origLogLevel)
-	})
-	
 	ctrl := gomock.NewController(t)
 
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 
-	// Set log level for this test only
-	logger.SetGlobalLogLevel(4)
+	// Create isolated logger instance for this test - no global state modification needed
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 	mockNetceptor.EXPECT().NodeID().Return("NodeID")

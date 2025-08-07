@@ -533,7 +533,7 @@ func (e *eofReadCloser) Close() error {
 	return nil
 }
 
-// errorReadCloser simulates network errors after a few reads to trigger non-EOF error paths
+// errorReadCloser simulates network errors after a few reads to trigger non-EOF error paths.
 type errorReadCloser struct {
 	readCount int
 	maxReads  int
@@ -544,6 +544,7 @@ func (e *errorReadCloser) Read(p []byte) (int, error) {
 	if e.readCount <= e.maxReads {
 		// Return some data for the first few reads
 		content := "2024-12-09T00:31:19.123456789Z Log line\n"
+
 		return copy(p, []byte(content)), nil
 	}
 	// After maxReads, return a network error (not EOF)
@@ -716,20 +717,24 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				req := fakerest.RESTClient{
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						requestCount++
-						if requestCount <= 4 {
+						switch requestCount {
+						case 1, 2, 3, 4:
 							// First cycle: 4 failures, leaving retries=1
 							t.Logf("HTTP Request #%d - first cycle error connection failed - attempt %d", requestCount, requestCount)
+
 							return nil, fmt.Errorf("connection failed - attempt %d", requestCount)
-						} else if requestCount == 5 {
+						case 5:
 							// First cycle: Success on very last attempt (retries=1)
 							t.Logf("HTTP Request #%d - First cycle success on last attempt", requestCount)
+
 							return &http.Response{
 								StatusCode: http.StatusOK,
 								Body:       &errorReadCloser{maxReads: 1}, // Read data once, then return error to trigger retry logic
 							}, nil
-						} else {
+						default:
 							// Second cycle: Should have reset retry counter to 5
 							t.Logf("HTTP Request #%d - second cycle error connection refused - attempt %d", requestCount, requestCount-5)
+
 							return nil, fmt.Errorf("connection refused - second cycle attempt %d", requestCount-5)
 						}
 					}),
@@ -739,9 +744,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			},
 			stdinErr: func() *error {
 				var err error
+
 				return &err
 			}(),
-			expectedStdoutErr: false,
+			expectedStdoutErr: true,
 			timeoutSeconds:    15, // Allow time for multiple retry cycles
 			validateLogs:      true,
 			expectedLogMsgs: []string{

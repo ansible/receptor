@@ -471,12 +471,13 @@ mainLoop:
 						// TODO: do we break or return here?
 						break
 					}
+
 					return // EOF means we're done, no need for new connection cycle
 				}
 
-				// Non-EOF error - break to outer loop for new connection cycle
 				*stdoutErr = err
-				break
+
+				break // Non-EOF error - break to outer loop for new connection cycle
 			}
 
 			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)

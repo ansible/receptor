@@ -425,6 +425,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				retryGetLogStream--
 				if retryGetLogStream > 0 {
 					time.Sleep(1 * time.Second)
+
 					continue // Continue reading from same stream instead of breaking to outer loop
 				}
 
@@ -448,12 +449,13 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 							}
 						}
 					}
+
 					return // EOF means we're done, no need for new connection cycle
 				}
 
-				// Non-EOF error - break to outer loop for new connection cycle
 				*stdoutErr = err
-				break
+
+				break // Non-EOF error - break to outer loop for new connection cycle
 			}
 
 			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
@@ -3505,117 +3506,107 @@ func TestKubeWorkerCfg_Run(t *testing.T) {
 	}
 }
 
-// TestRunWorkUsingLogger_EOFCausesFinished tests the specific scenario where
-// KubeLoggingWithReconnect receives EOF from Kubernetes API stream and
-// RunWorkUsingLogger subsequently sets the status to "Finished".
-//
-// This test demonstrates that RunWorkUsingLogger can set status to "Finished" 
-// because KubeLoggingWithReconnect got an EOF from the Kubernetes API stream.
-// 
-// Flow tested:
-// 1. RunWorkUsingLogger starts with existing pod (skipStdin=true)
-// 2. KubeLoggingWithReconnect gets log stream from Kubernetes API
-// 3. Stream returns EOF when pod is not ready (pod finished)
-// 4. KubeLoggingWithReconnect exits cleanly 
-// 5. RunWorkUsingLogger continues and sets status to "Finished"
-func TestRunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
-	// Test the scenario by directly calling KubeLoggingWithReconnect to demonstrate
-	// that it can receive EOF and exit, which would allow RunWorkUsingLogger 
-	// to continue to its final status check and set status to "Finished"
-	
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+// TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished tests the scenario where:
+// 1. A pod already exists and is in Running state with Ready condition
+// 2. KubeLoggingWithReconnect is called to stream logs from the pod
+// 3. The Kubernetes API log stream returns EOF after providing some log content
+// 4. The EOF causes KubeLoggingWithReconnect to exit cleanly
+// 5. RunWorkUsingLogger detects the clean exit and sets the work status to "Finished"
+// This demonstrates that EOF from the log stream is handled as a successful completion
+// rather than an error, allowing the work unit to finish properly.
+func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
+	const (
+		testPodName    = "new-pod-123"
+		testNamespace  = "default"
+		testUnitDir    = "/tmp/taskpod/new-pod-123/"
+		testLogContent = "2024-12-09T00:31:18.823849250Z Final log before EOF"
+	)
 
-	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
-	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+	t.Run("Successful pod retrieval with EOF handling", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+		os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", "enabled")
 
-	ctx := context.Background()
-	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
-	if err != nil {
-		t.Fatalf("Error creating Workceptor: %v", err)
-	}
+		mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+		mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+		mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+		mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
+		mockFileWC := mock_workceptor.NewMockFileWriteCloser(ctrl)
 
-	// Create KubeUnit
-	kubeConfig := workceptor.KubeWorkerCfg{
-		AuthMethod:   "incluster",
-		StreamMethod: "logger",
-	}
+		mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+		mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
 
-	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
-	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+		ctx := context.Background()
+		w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+		if err != nil {
+			t.Fatalf("Error creating Workceptor: %v", err)
+		}
 
-	// Setup pod
-	existingPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "existing-pod-123",
-			Namespace: "default",
-		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
-		},
-	}
-	kubeUnit.Pod = existingPod
+		statusLock := &sync.RWMutex{}
+		statusData := &workceptor.StatusFileData{State: 1, ExtraData: &workceptor.KubeExtraData{}}
+		statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+			KubeNamespace: testNamespace,
+			PodName:       testPodName,
+		}}
 
-	// Mock workceptor and logger calls
-	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-	logger := logger.NewReceptorLogger("test")
-	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+		mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir)
+		mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, gomock.Any(), gomock.Any())
+		mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateSucceeded, "Finished", gomock.Any())
 
-	// Setup mocks for KubeLoggingWithReconnect that will receive EOF
-	// First Get() call in main loop  
-	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "existing-pod-123", gomock.Any()).Return(existingPod, nil)
+		err = os.MkdirAll(testUnitDir, 0755)
+		if err != nil {
+			t.Logf("Failed to create unit dir for %s: %v", testUnitDir, err)
+		}
 
-	// Create a fake REST client that returns EOF to simulate stream ending
-	req := fakerest.RESTClient{
-		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Final log before EOF", hasRead: false},
-			}, nil
-		}),
-		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
-	}
-	mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request())
+		kubeConfig := workceptor.KubeWorkerCfg{
+			AuthMethod:   "incluster",
+			StreamMethod: "logger",
+		}
 
-	// Second Get() call after EOF for pod readiness check
-	notReadyPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "existing-pod-123", Namespace: "default"},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
-			Conditions: []corev1.PodCondition{
-				{Type: corev1.PodReady, Status: corev1.ConditionFalse}, // Pod not ready
+		kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+		existingPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testPodName,
+				Namespace: testNamespace,
 			},
-		},
-	}
-	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "existing-pod-123", gomock.Any()).Return(notReadyPod, nil)
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+				},
+			},
+		}
+		fakeClient := fake.NewSimpleClientset(existingPod)
+		kubeUnit.SetClientset(fakeClient)
 
-	// Create mock stdout writer
-	mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
-	mockfilesystemer.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil)
-	stdout, _ := workceptor.NewStdoutWriter(mockfilesystemer, "")
-	mockFileWC := mock_workceptor.NewMockFileWriteCloser(ctrl)
-	stdout.SetWriter(mockFileWC)
-	mockFileWC.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
+		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(existingPod, nil).AnyTimes()
 
-	// Test KubeLoggingWithReconnect directly
-	var stdinErr error
-	var stdoutErr error
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+		req := fakerest.RESTClient{
+			Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       &eofReadCloser{content: testLogContent, hasRead: false},
+				}, nil
+			}),
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		}
+		mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
 
-	// Run KubeLoggingWithReconnect and verify it handles EOF correctly
-	kubeUnit.KubeLoggingWithReconnect(wg, stdout, &stdinErr, &stdoutErr)
+		mockFileSystem.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil)
+		stdout, _ := workceptor.NewStdoutWriter(mockFileSystem, "")
+		stdout.SetWriter(mockFileWC)
+		mockFileWC.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
 
-	// Verify that no stdout error occurred (EOF was handled cleanly)
-	if stdoutErr != nil {
-		t.Errorf("Expected no stdout error, but got: %v", stdoutErr)
-	}
-
-	t.Log("KubeLoggingWithReconnect completed successfully after receiving EOF")
-	t.Log("This demonstrates that RunWorkUsingLogger can proceed to set status to 'Finished'")
-	t.Log("because KubeLoggingWithReconnect received EOF from the Kubernetes API stream and exited cleanly")
+		t.Log("Testing successful pod retrieval and EOF from log stream")
+		kubeUnit.RunWorkUsingLogger()
+		t.Log("Function completed successfully")
+	})
 }

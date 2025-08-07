@@ -378,6 +378,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				if kubeErr != nil {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s'", kubeErr)
 				}
+
 				for _, condition := range erroredPod.Status.Conditions {
 					if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
 						podConditionReady = true

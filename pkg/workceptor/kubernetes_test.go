@@ -3506,7 +3506,6 @@ func TestKubeWorkerCfg_Run(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 // TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished tests the scenario where:
 // 1. A pod already exists and is in Running state with Ready condition
 // 2. KubeLoggingWithReconnect is called to stream logs from the pod
@@ -3522,28 +3521,6 @@ func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 		testUnitDir    = "/tmp/taskpod/new-pod-123/"
 		testLogContent = "2024-12-09T00:31:18.823849250Z Final log before EOF"
 	)
-=======
-// TestRunWorkUsingLogger_EOFCausesFinished tests the specific scenario where
-// KubeLoggingWithReconnect receives EOF from Kubernetes API stream and
-// RunWorkUsingLogger subsequently sets the status to "Finished".
-//
-// This test demonstrates that RunWorkUsingLogger can set status to "Finished"
-// because KubeLoggingWithReconnect got an EOF from the Kubernetes API stream.
-//
-// Flow tested:
-// 1. RunWorkUsingLogger starts with existing pod (skipStdin=true)
-// 2. KubeLoggingWithReconnect gets log stream from Kubernetes API
-// 3. Stream returns EOF when pod is not ready (pod finished)
-// 4. KubeLoggingWithReconnect exits cleanly
-// 5. RunWorkUsingLogger continues and sets status to "Finished"
-func TestRunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
-	// Test the scenario by directly calling KubeLoggingWithReconnect to demonstrate
-	// that it can receive EOF and exit, which would allow RunWorkUsingLogger
-	// to continue to its final status check and set status to "Finished"
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
->>>>>>> b02fc84 (Add check for stdin error in the test)
 
 	t.Run("Successful pod retrieval with EOF handling", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -3583,17 +3560,11 @@ func TestRunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 		mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateSucceeded, "Finished", gomock.Any())
 
-<<<<<<< HEAD
-		err = os.MkdirAll(testUnitDir, 0755)
+		err = os.MkdirAll(testUnitDir, 0o700)
+
 		if err != nil {
 			t.Logf("Failed to create unit dir for %s: %v", testUnitDir, err)
 		}
-=======
-	// Setup mocks for KubeLoggingWithReconnect that will receive EOF
-	// First Get() call in main loop
-	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "existing-pod-123", gomock.Any()).Return(existingPod, nil)
->>>>>>> b02fc84 (Add check for stdin error in the test)
-
 		kubeConfig := workceptor.KubeWorkerCfg{
 			AuthMethod:   "incluster",
 			StreamMethod: "logger",
@@ -3634,24 +3605,8 @@ func TestRunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 		stdout.SetWriter(mockFileWC)
 		mockFileWC.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
 
-<<<<<<< HEAD
 		t.Log("Testing successful pod retrieval and EOF from log stream")
 		kubeUnit.RunWorkUsingLogger()
 		t.Log("Function completed successfully")
 	})
-=======
-	// Verify that no stdout error occurred (EOF was handled cleanly)
-	if stdoutErr != nil {
-		t.Errorf("Expected no stdout error, but got: %v", stdoutErr)
-	}
-	// Verify that no stdinErr error occurred (EOF was handled cleanly)
-	if stdinErr != nil {
-		t.Errorf("Expected no stdout error, but got: %v", stdinErr)
-	}
-	wg.Wait()
-
-	t.Log("KubeLoggingWithReconnect completed successfully after receiving EOF")
-	t.Log("This demonstrates that RunWorkUsingLogger can proceed to set status to 'Finished'")
-	t.Log("because KubeLoggingWithReconnect received EOF from the Kubernetes API stream and exited cleanly")
->>>>>>> b02fc84 (Add check for stdin error in the test)
 }

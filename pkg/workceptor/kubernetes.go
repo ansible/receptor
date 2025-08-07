@@ -358,15 +358,15 @@ mainLoop:
 		}
 		prevPodDelay, curPodDelay = 1, 1
 
+		// reset retry counter for each new connection attempt
+		retryGetLogStream = retries
+
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			// fail to get log stream, no need to continue
 			return
 		}
 		defer logStream.Close()
-
-		// reset retry counter for each new connection attempt
-		remainingRetries = retries
 
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)

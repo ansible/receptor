@@ -358,6 +358,12 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			return
 		}
 
+		// Reset retry counter for new connection cycle only if we had successful reads
+		// This ensures genuine reconnection scenarios get full retry capability
+		if successfulWrite {
+			retryGetLogStream = retries
+		}
+
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)
 		for *stdinErr == nil { // check between every line read to see if we need to stop reading
@@ -378,9 +384,11 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				if kubeErr != nil {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s'", kubeErr)
 				}
-				for _, condition := range erroredPod.Status.Conditions {
-					if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-						podConditionReady = true
+				if erroredPod != nil {
+					for _, condition := range erroredPod.Status.Conditions {
+						if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+							podConditionReady = true
+						}
 					}
 				}
 
@@ -417,32 +425,35 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				retryGetLogStream--
 				if retryGetLogStream > 0 {
 					time.Sleep(1 * time.Second)
-
-					break
+					continue // Continue reading from same stream instead of breaking to outer loop
 				}
 
+				// Retries exhausted - log error and handle EOF logic before breaking/returning
 				kw.GetWorkceptor().nc.GetLogger().Error("Error reading from pod %s/%s: %s", podNamespace, podName, err)
 
 				// At this point we exausted all retries, every retry we either failed to read OR we read but did not get newer msg
 				// If we got a EOF on the last retry we assume that we read everything and we can stop the loop
 				// we ASSUME this is the happy path.
 				// If kube api returned an error there is a missing new line and that line never gets read.
-				if err != io.EOF {
-					*stdoutErr = err
-				} else if line != "" && err == io.EOF {
-					msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
-					if msg != "" {
-						_, err = stdout.Write([]byte(msg + "\n"))
-						if err != nil {
-							*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
-							kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
+				if err == io.EOF {
+					if line != "" {
+						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
+						if msg != "" {
+							_, err = stdout.Write([]byte(msg + "\n"))
+							if err != nil {
+								*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
+								kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
 
-							return
+								return
+							}
 						}
 					}
+					return // EOF means we're done, no need for new connection cycle
 				}
 
-				return
+				// Non-EOF error - break to outer loop for new connection cycle
+				*stdoutErr = err
+				break
 			}
 
 			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)

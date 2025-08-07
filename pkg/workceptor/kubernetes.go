@@ -365,6 +365,12 @@ mainLoop:
 		}
 		defer logStream.Close()
 
+		// Reset retry counter for new connection cycle only if we had successful reads
+		// This ensures genuine reconnection scenarios get full retry capability
+		if successfulWrite {
+			retryGetLogStream = retries
+		}
+
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)
 		// TODO: removed stdinErr, not set in the loop, doesn't change after first check above
@@ -465,9 +471,12 @@ mainLoop:
 						// TODO: do we break or return here?
 						break
 					}
+					return // EOF means we're done, no need for new connection cycle
 				}
 
-				return
+				// Non-EOF error - break to outer loop for new connection cycle
+				*stdoutErr = err
+				break
 			}
 
 			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)

@@ -533,6 +533,27 @@ func (e *eofReadCloser) Close() error {
 	return nil
 }
 
+// errorReadCloser simulates network errors after a few reads to trigger non-EOF error paths
+type errorReadCloser struct {
+	readCount int
+	maxReads  int
+}
+
+func (e *errorReadCloser) Read(p []byte) (int, error) {
+	e.readCount++
+	if e.readCount <= e.maxReads {
+		// Return some data for the first few reads
+		content := "2024-12-09T00:31:19.123456789Z Log line\n"
+		return copy(p, []byte(content)), nil
+	}
+	// After maxReads, return a network error (not EOF)
+	return 0, errors.New("network connection reset")
+}
+
+func (e *errorReadCloser) Close() error {
+	return nil
+}
+
 func TestKubeLoggingWithReconnect(t *testing.T) {
 	type testCase struct {
 		name              string
@@ -660,6 +681,83 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    30, // Allow time for retries
 			validateLogs:      true,
 			expectedLogMsgs: []string{
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Error:",
+			},
+		},
+		{
+			// Write succeeds on last retry attempt and triggers second retry cycle with fresh reset counter
+			name: "retry_counter_resets_after_write_succeeds",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				readyPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+						},
+					},
+				}
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(readyPod, nil).AnyTimes()
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(readyPod, nil).AnyTimes()
+
+				var requestCount int
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						requestCount++
+						if requestCount <= 4 {
+							// First cycle: 4 failures, leaving retries=1
+							t.Logf("HTTP Request #%d - first cycle error connection failed - attempt %d", requestCount, requestCount)
+							return nil, fmt.Errorf("connection failed - attempt %d", requestCount)
+						} else if requestCount == 5 {
+							// First cycle: Success on very last attempt (retries=1)
+							t.Logf("HTTP Request #%d - First cycle success on last attempt", requestCount)
+							return &http.Response{
+								StatusCode: http.StatusOK,
+								Body:       &errorReadCloser{maxReads: 1}, // Read data once, then return error to trigger retry logic
+							}, nil
+						} else {
+							// Second cycle: Should have reset retry counter to 5
+							t.Logf("HTTP Request #%d - second cycle error connection refused - attempt %d", requestCount, requestCount-5)
+							return nil, fmt.Errorf("connection refused - second cycle attempt %d", requestCount-5)
+						}
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    15, // Allow time for multiple retry cycles
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				// First cycle: Nearly exhaust retries (5->4->3->2), then succeed
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times",
+				// Network error detected, retry 5 times (tests retryGetLogStream)
+				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 5 more times.",
+				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 4 more times.",
+				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 3 more times.",
+				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 2 more times.",
+				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 1 more times.",
+				"Error reading from pod Test_Namespace/Test_Name: network connection reset",
+				// Second cycle: Fresh retry counter reset to 5 (validates counter reset)
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",

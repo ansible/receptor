@@ -352,9 +352,6 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			return
 		}
 
-		// reset retry counter for each new connection attempt
-		retryGetLogStream = retries
-
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			// fail to get log stream, no need to continue

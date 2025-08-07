@@ -4,6 +4,7 @@
 package workceptor_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -538,6 +539,8 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		stdinErr          *error
 		expectedStdoutErr bool
 		timeoutSeconds    int
+		validateLogs      bool
+		expectedLogMsgs   []string
 	}
 
 	tests := []testCase{
@@ -598,8 +601,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-				logger := logger.NewReceptorLogger("")
-				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, errors.New("pod not found")).Times(5)
@@ -613,14 +614,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    10, // Allow time for 5 retries with 1 second delays
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times. Error: pod not found",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 4 more times. Error: pod not found",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times. Error: pod not found",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times. Error: pod not found",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 1 more times. Error: pod not found",
+				"Error getting pod Test_Namespace/Test_Name. Error: pod not found",
+			},
 		},
 		{
 			name: "log_stream_connection_failure",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-				logger := logger.NewReceptorLogger("")
-				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -630,9 +638,13 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				}
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).AnyTimes()
 
+				// Counter to track retry attempts and fail consistently
+				var attemptCount int
 				failReq := fakerest.RESTClient{
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
-						return nil, errors.New("connection refused")
+						attemptCount++
+						// Always fail to trigger the retry loop in kubeLoggingConnectionHandler
+						return nil, fmt.Errorf("dial tcp: connection refused (attempt %d)", attemptCount)
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				}
@@ -645,6 +657,15 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    30, // Allow time for retries
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Error:",
+			},
 		},
 		{
 			name: "eof_with_pod_not_ready_exits_immediately",
@@ -698,8 +719,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-				logger := logger.NewReceptorLogger("")
-				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -740,6 +759,15 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			}(),
 			expectedStdoutErr: false,
 			timeoutSeconds:    5,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Will retry 5 more times",
+				"Will retry 4 more times",
+				"Will retry 3 more times",
+				"Will retry 2 more times",
+				"Will retry 1 more times",
+				"Error reading from pod Test_Namespace/Test_Name",
+			},
 		},
 		{
 			name: "successful_log_reading_with_timestamps",
@@ -906,6 +934,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				Pod:                     pod,
 			}
 
+			// Set up logger - capture output only if validation is enabled
+			var logBuffer bytes.Buffer
+			logger := logger.NewReceptorLogger("")
+			if tt.validateLogs {
+				logger.SetOutput(&logBuffer)
+			}
+			mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
 			tt.setupMocks(mockBaseWorkUnit, mockNetceptor, mockKubeAPI, w, ctx)
 
 			mockfilesystemer := mock_workceptor.NewMockFileSystemer(ctrl)
@@ -963,6 +999,16 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					}
 					if hasTimestampLeak {
 						t.Errorf("Did not expect a timestamp leak but one was found in written data")
+					}
+				}
+			}
+
+			// Validate log messages if enabled
+			if tt.validateLogs {
+				logOutput := logBuffer.String()
+				for _, expectedMsg := range tt.expectedLogMsgs {
+					if !strings.Contains(logOutput, expectedMsg) {
+						t.Errorf("Missing expected log message: %s", expectedMsg)
 					}
 				}
 			}

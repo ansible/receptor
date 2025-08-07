@@ -320,7 +320,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 	retries := 5
 	successfulWrite := false
-	var remainingRetries int
+	retryGetLogStream := retries // initialized to 5 for first iteration
 
 	for {
 		if *stdinErr != nil {
@@ -329,7 +329,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 		}
 
 		// get pod, with retry
-		for retries := 5; retries > 0; retries-- {
+		for retryGetPod := retries; retryGetPod > 0; retryGetPod-- {
 			kw.Pod, err = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 			if err == nil {
 				break
@@ -338,7 +338,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				"Error getting pod %s/%s. Will retry %d more times. Error: %s",
 				podNamespace,
 				podName,
-				retries,
+				retryGetPod,
 				err,
 			)
 			time.Sleep(time.Second)
@@ -352,14 +352,14 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			return
 		}
 
+		// reset retry counter for each new connection attempt
+		retryGetLogStream = retries
+
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			// fail to get log stream, no need to continue
 			return
 		}
-
-		// reset retry counter for each new connection attempt
-		remainingRetries = retries
 
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)
@@ -413,13 +413,13 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					err,
 					podNamespace,
 					podName,
-					remainingRetries,
+					retryGetLogStream,
 				)
 
 				successfulWrite = false
-				remainingRetries--
-				if remainingRetries > 0 {
-					time.Sleep(200 * time.Millisecond)
+				retryGetLogStream--
+				if retryGetLogStream > 0 {
+					time.Sleep(1 * time.Second)
 
 					break
 				}
@@ -461,7 +461,6 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 				return
 			}
-			remainingRetries = retries // each time we read successfully, reset this counter
 			successfulWrite = true
 		}
 		logStream.Close()

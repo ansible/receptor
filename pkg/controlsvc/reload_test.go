@@ -85,6 +85,7 @@ func setupMockFileReader(t *testing.T) (*gomock.Controller, *mock_certificates.M
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	mockReader := mock_certificates.NewMockOser(ctrl)
+
 	return ctrl, mockReader
 }
 

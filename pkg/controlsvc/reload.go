@@ -58,7 +58,7 @@ func getActionKeyword(cfg string) string {
 	return action
 }
 
-// parseConfigForReloadWithReader allows dependency injection for testing
+// parseConfigForReloadWithReader allows dependency injection for testing.
 func parseConfigForReloadWithReader(filename string, checkReload bool, fileReader certificates.Oser) error {
 	// cfgNotReloadable is a map, each key being the full configuration item
 	// e.g. "work-command: worktype: echosleep command: bash params:..."
@@ -125,7 +125,7 @@ func cfgAbsent() error {
 	return nil
 }
 
-// parseConfigForReload is the original function that uses real filesystem
+// parseConfigForReload is the original function that uses real filesystem..
 func parseConfigForReload(filename string, checkReload bool) error {
 	return parseConfigForReloadWithReader(filename, checkReload, &certificates.OsWrapper{})
 }

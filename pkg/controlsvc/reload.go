@@ -3,9 +3,9 @@ package controlsvc
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
+	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/logger"
 	"gopkg.in/yaml.v2"
 )
@@ -58,7 +58,8 @@ func getActionKeyword(cfg string) string {
 	return action
 }
 
-func parseConfigForReload(filename string, checkReload bool) error {
+// parseConfigForReloadWithReader allows dependency injection for testing
+func parseConfigForReloadWithReader(filename string, checkReload bool, fileReader certificates.Oser) error {
 	// cfgNotReloadable is a map, each key being the full configuration item
 	// e.g. "work-command: worktype: echosleep command: bash params:..."
 	// Initially all values of map are set to false,
@@ -72,7 +73,7 @@ func parseConfigForReload(filename string, checkReload bool) error {
 	// Finally, cfgAbsent() will loop through the map and check for any remaining
 	// items that are still false. This means the original item is missing from
 	// the config, and an error will be thrown
-	data, err := os.ReadFile(filename)
+	data, err := fileReader.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -122,6 +123,11 @@ func cfgAbsent() error {
 	}
 
 	return nil
+}
+
+// parseConfigForReload is the original function that uses real filesystem
+func parseConfigForReload(filename string, checkReload bool) error {
+	return parseConfigForReloadWithReader(filename, checkReload, &certificates.OsWrapper{})
 }
 
 // InitReload initializes objects required before reload commands are issued.

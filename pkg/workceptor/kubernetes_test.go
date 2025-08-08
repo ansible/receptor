@@ -1112,7 +1112,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				logOutput := logBuffer.String()
 				for _, expectedMsg := range tt.expectedLogMsgs {
 					if !strings.Contains(logOutput, expectedMsg) {
-						t.Errorf("Missing expected log message: %s", expectedMsg)
+						t.Errorf("Missing expected log message: %s got:\n%s", expectedMsg, logOutput)
 					}
 				}
 			}

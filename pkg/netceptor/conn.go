@@ -409,7 +409,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		Conn:              pc,
 		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
 	}
-	qc, err := tr.Dial(cctx, rAddr, tlscfg, cfg)
+	qc, err := tr.Dial(cctx, rAddr, tlscfg, cfg) // TODO: Figure out how to get receptors TLS config functions to fail here
 	if err != nil {
 		close(okChan)
 		pcClose()

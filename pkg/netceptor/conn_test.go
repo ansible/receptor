@@ -1520,16 +1520,9 @@ func createLargeTLSConfig() *tls.Config {
 			Locality:      []string{"Test City"},
 			StreetAddress: []string{"123 Test Street"},
 			PostalCode:    []string{"12345"},
-			// Add many organizational units to increase certificate size
+			// Add minimal organizational units to find threshold
 			OrganizationalUnit: []string{
-				strings.Repeat("Large OU ", 500), // Create much larger OU fields to exceed QUIC buffer
-				strings.Repeat("Another Large OU ", 500),
-				strings.Repeat("Yet Another Large OU ", 500),
-				strings.Repeat("Extra Large OU ", 500),
-				strings.Repeat("Massive OU ", 500),
-				strings.Repeat("Enormous OU ", 500),
-				strings.Repeat("Gigantic OU ", 500),
-				strings.Repeat("Colossal OU ", 500),
+				strings.Repeat("OU ", 10), // Much smaller
 			},
 		},
 		NotBefore:   time.Now(),
@@ -1539,9 +1532,9 @@ func createLargeTLSConfig() *tls.Config {
 		IsCA:        true,
 		IPAddresses: nil,
 		DNSNames:    []string{"localhost"},
-		// Add many Subject Alternative Names to increase size and exceed QUIC buffer
+		// Add email addresses to find threshold
 		EmailAddresses: func() []string {
-			emails := make([]string, 1000) // Create 1000 email addresses
+			emails := make([]string, 110) // 110 emails is threshold, 109 emails returns a different TLS error
 			for i := range emails {
 				emails[i] = fmt.Sprintf("very-long-email-address-to-increase-certificate-size-%d@extremely-long-domain-name-to-exceed-quic-crypto-buffer-limits.example.com", i)
 			}
@@ -1550,7 +1543,7 @@ func createLargeTLSConfig() *tls.Config {
 	}
 
 	// Generate private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 4096) // Large key size
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048) // Reduce key size from 4096 to 2048
 	if err != nil {
 		panic(err)
 	}
@@ -1567,9 +1560,9 @@ func createLargeTLSConfig() *tls.Config {
 		panic(err)
 	}
 
-	// Create certificate pool with multiple large certificates to exceed QUIC buffer
+	// Create certificate pool with minimal certificates to find threshold
 	certPool := x509.NewCertPool()
-	for i := 0; i < 200; i++ { // Add many more certificates to exceed 16384 buffer limit
+	for i := 0; i < 5; i++ { // Reduce to just 5
 		certPool.AddCert(cert)
 	}
 
@@ -1624,7 +1617,7 @@ func TestListenAndAdvertiseWithLargeTLSConfig(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		n := netceptor.New(ctx, "test-node")
+		n := netceptor.New(ctx, "node1")
 		defer n.Shutdown()
 
 		// ListenAndAdvertise with large TLS config
@@ -1636,16 +1629,16 @@ func TestListenAndAdvertiseWithLargeTLSConfig(t *testing.T) {
 			t.Errorf("ListenAndAdvertise failed with large TLS config: %v", err)
 			return
 		}
-		
+
 		defer listener.Close()
-		
+
 		t.Logf("ListenAndAdvertise succeeded - now setting up Receptor network connection")
 		t.Logf("Large certificate size: %d bytes exceeds buffer limit %d bytes", len(largeTLSConfig.Certificates[0].Certificate[0]), maxBufferSize)
-		
+
 		// Create second Netceptor instance for client
-		client := netceptor.New(ctx, "test-client")
+		client := netceptor.New(ctx, "node2")
 		defer client.Shutdown()
-		
+
 		// Set up TCP backends to establish network connection (following mesh/conn_test.go pattern)
 		b1, err := backends.NewTCPListener("localhost:0", nil, n.Logger) // Use port 0 for auto-assign
 		if err != nil {
@@ -1657,11 +1650,11 @@ func TestListenAndAdvertiseWithLargeTLSConfig(t *testing.T) {
 			t.Errorf("Error adding backend to server: %v", err)
 			return
 		}
-		
+
 		// Get the actual port that was assigned
 		tcpAddr := b1.GetAddr()
 		t.Logf("Server listening on: %s", tcpAddr)
-		
+
 		// Set up TCP dialer on client to connect to the listener
 		b2, err := backends.NewTCPDialer(tcpAddr, false, nil, client.Logger)
 		if err != nil {
@@ -1673,31 +1666,31 @@ func TestListenAndAdvertiseWithLargeTLSConfig(t *testing.T) {
 			t.Errorf("Error adding backend to client: %v", err)
 			return
 		}
-		
+
 		// Give time for backends to establish connection
 		time.Sleep(2 * time.Second)
-		
+
 		// Now attempt to dial the service with large TLS config
 		// This should trigger CRYPTO_BUFFER_EXCEEDED when QUIC tries to send large cert data
 		t.Logf("Client attempting to dial service with large TLS config...")
-		conn, err := client.Dial("test-node", "testlrg", largeTLSConfig)
+		conn, err := client.Dial("node1", "testlrg", largeTLSConfig)
 		if err != nil {
 			t.Errorf("Dial failed with large TLS config: %v", err)
 			return
 		}
-		
+
 		if conn != nil {
 			defer conn.Close()
 			t.Logf("Connection succeeded - attempting to write data to trigger full TLS handshake")
-			
+
 			// Try to write data through the connection - this should trigger CRYPTO_BUFFER_EXCEEDED
 			_, writeErr := conn.Write([]byte("test data to trigger TLS handshake"))
 			if writeErr != nil {
 				t.Errorf("Write failed during TLS handshake: %v", writeErr)
 				return
 			}
-			
-			t.Logf("Write succeeded - CRYPTO_BUFFER_EXCEEDED should have occurred with cert size %d > %d", 
+
+			t.Logf("Write succeeded - CRYPTO_BUFFER_EXCEEDED should have occurred with cert size %d > %d",
 				len(largeTLSConfig.Certificates[0].Certificate[0]), maxBufferSize)
 		}
 

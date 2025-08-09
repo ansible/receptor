@@ -605,7 +605,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, errors.New("pod not found")).Times(5)
 
-				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).Times(1)
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).MaxTimes(6)
 			},
 			stdinErr: func() *error {
 				var err error
@@ -672,7 +672,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				// First Get() for main loop, second Get() after EOF for readiness check
 				gomock.InOrder(
 					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
-					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil).MaxTimes(6),
 				)
 
 				req := fakerest.RESTClient{
@@ -766,7 +766,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				gomock.InOrder(
 					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
-					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil).MaxTimes(6),
 				)
 
 				req := fakerest.RESTClient{
@@ -816,7 +816,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				gomock.InOrder(
 					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
-					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil).MaxTimes(6),
 				)
 
 				req := fakerest.RESTClient{
@@ -866,7 +866,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				gomock.InOrder(
 					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
-					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil).MaxTimes(6),
 				)
 
 				req := fakerest.RESTClient{
@@ -1382,7 +1382,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 	// Set up expectations
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(2)
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(6)
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 

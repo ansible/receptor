@@ -320,9 +320,9 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	podName := kw.Pod.Name
 
 	retries := 5
-	pervDelay, curDelay := 0, 1
-	pervPodDelay, curPodDelay := 0, 1
-	pervContDelay, curContDelay := 0, 1
+	prevDelay, curDelay := 0, 1
+	prevPodDelay, curPodDelay := 0, 1
+	prevContDelay, curContDelay := 0, 1
 	successfulWrite := false
 
 	for {
@@ -345,7 +345,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				err,
 			)
 			time.Sleep(time.Second * time.Duration(curPodDelay))
-			pervPodDelay, curPodDelay = curPodDelay, pervPodDelay+curPodDelay
+			prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -402,7 +402,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 								kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is in waiting state, with waiting reason: %s", containerStatus.Name, containerStatus.State.Waiting.Reason)
 
 								time.Sleep(time.Second * time.Duration(curContDelay))
-								pervContDelay, curContDelay = curContDelay, pervContDelay+curContDelay
+								prevContDelay, curContDelay = curContDelay, prevContDelay+curContDelay
 
 								break streamLoop
 							case containerStatus.State.Terminated != nil:
@@ -433,7 +433,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					if retryGetLogStream > 1 {
 						retryGetLogStream--
 						time.Sleep(time.Second * time.Duration(curDelay))
-						pervDelay, curDelay = curDelay, pervDelay+curDelay
+						prevDelay, curDelay = curDelay, prevDelay+curDelay
 
 						continue
 					}
@@ -451,7 +451,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				retryGetLogStream--
 				if retryGetLogStream > 0 {
 					time.Sleep(time.Second * time.Duration(curDelay))
-					pervDelay, curDelay = curDelay, pervDelay+curDelay
+					prevDelay, curDelay = curDelay, prevDelay+curDelay
 
 					continue
 				}

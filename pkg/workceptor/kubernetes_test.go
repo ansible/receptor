@@ -3506,23 +3506,22 @@ func TestKubeWorkerCfg_Run(t *testing.T) {
 	}
 }
 
-// TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished tests the scenario where:
-// 1. A pod already exists and is in Running state with Ready condition
-// 2. KubeLoggingWithReconnect is called to stream logs from the pod
-// 3. The Kubernetes API log stream returns EOF after providing some log content
-// 4. The EOF causes KubeLoggingWithReconnect to exit cleanly
-// 5. RunWorkUsingLogger detects the clean exit and sets the work status to "Finished"
-// This demonstrates that EOF from the log stream is handled as a successful completion
-// rather than an error, allowing the work unit to finish properly.
-func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
+// TestKubeUnit_RunWorkUsingLogger_ExitCode1DoesNotSetFinished tests that when a container.
+// exits with exit code 1, RunWorkUsingLogger does not set the status to "Finished" but instead
+// handles it as an error condition. This test modifies the existing test to verify that:
+// 1. A pod exists and is retrieved successfully.
+// 2. The container has terminated with exit code 1.
+// 3. The test verifies that no "Finished" status is set.
+// 4. The job should fail rather than complete successfully.
+func TestKubeUnit_RunWorkUsingLogger_ExitCode1DoesNotSetFinished(t *testing.T) {
 	const (
-		testPodName    = "new-pod-123"
+		testPodName    = "failed-pod-123"
 		testNamespace  = "default"
-		testUnitDir    = "/tmp/taskpod/new-pod-123/"
-		testLogContent = "2024-12-09T00:31:18.823849250Z Final log before EOF"
+		testUnitDir    = "/tmp/taskpod/failed-pod-123/"
+		testLogContent = "2024-12-09T00:31:18.823849250Z Process failed with exit code 1"
 	)
 
-	t.Run("Successful pod retrieval with EOF handling", func(t *testing.T) {
+	t.Run("Container with exit code 1 should not set status to finished", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -3558,7 +3557,7 @@ func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 		mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, gomock.Any(), gomock.Any())
 		mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
-		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateSucceeded, "Finished", gomock.Any())
+		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 
 		err = os.MkdirAll(testUnitDir, 0o700)
 
@@ -3572,6 +3571,7 @@ func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 
 		kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
 
+		// Create a pod with container that has terminated with exit code 1
 		existingPod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testPodName,
@@ -3581,6 +3581,18 @@ func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+				},
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name: workceptor.WorkerContainerName,
+						State: corev1.ContainerState{
+							Terminated: &corev1.ContainerStateTerminated{
+								ExitCode: 1,
+								Reason:   "Error",
+								Message:  "Process completed with errors",
+							},
+						},
+					},
 				},
 			},
 		}
@@ -3605,8 +3617,8 @@ func TestKubeUnit_RunWorkUsingLogger_EOFCausesFinished(t *testing.T) {
 		stdout.SetWriter(mockFileWC)
 		mockFileWC.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
 
-		t.Log("Testing successful pod retrieval and EOF from log stream")
+		t.Log("Testing that container with exit code 1 does not set status to finished")
 		kubeUnit.RunWorkUsingLogger()
-		t.Log("Function completed successfully")
+		t.Log("Successfully verified that exit code 1 results in failed status, not finished")
 	})
 }

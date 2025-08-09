@@ -315,12 +315,15 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	defer streamWait.Done()
 	var sinceTime time.Time
 	var err error
+	var retryGetLogStream int
 	podNamespace := kw.Pod.Namespace
 	podName := kw.Pod.Name
 
 	retries := 5
+	pervDelay, curDelay := 0, 1
+	pervPodDelay, curPodDelay := 0, 1
+	pervContDelay, curContDelay := 0, 1
 	successfulWrite := false
-	remainingRetries := retries // resets on each successful read from pod stdout
 
 	for {
 		if *stdinErr != nil {
@@ -329,7 +332,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 		}
 
 		// get pod, with retry
-		for retries := 5; retries > 0; retries-- {
+		for retryGetPod := retries; retryGetPod > 0; retryGetPod-- {
 			kw.Pod, err = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 			if err == nil {
 				break
@@ -338,10 +341,11 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 				"Error getting pod %s/%s. Will retry %d more times. Error: %s",
 				podNamespace,
 				podName,
-				retries,
+				retryGetPod,
 				err,
 			)
-			time.Sleep(time.Second)
+			time.Sleep(time.Second * time.Duration(curPodDelay))
+			pervPodDelay, curPodDelay = curPodDelay, pervPodDelay+curPodDelay
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -352,6 +356,8 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 			return
 		}
 
+		retryGetLogStream = retries // reset retry counter for each new connection attempt
+
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			// fail to get log stream, no need to continue
@@ -360,6 +366,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)
+	streamLoop:
 		for *stdinErr == nil { // check between every line read to see if we need to stop reading
 			line, err := streamReader.ReadString('\n')
 			if err != nil {
@@ -379,31 +386,57 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s'", kubeErr)
 				}
 
-				for _, condition := range erroredPod.Status.Conditions {
-					if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-						podConditionReady = true
+				if erroredPod != nil {
+					for _, condition := range erroredPod.Status.Conditions {
+						if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+							podConditionReady = true
+						}
+					}
+
+					for _, containerStatus := range erroredPod.Status.ContainerStatuses {
+						if containerStatus.Name == WorkerContainerName {
+							switch {
+							case containerStatus.State.Running != nil:
+								break
+							case containerStatus.State.Waiting != nil:
+								kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is in waiting state, with waiting reason: %s", containerStatus.Name, containerStatus.State.Waiting.Reason)
+
+								time.Sleep(time.Second * time.Duration(curContDelay))
+								pervContDelay, curContDelay = curContDelay, pervContDelay+curContDelay
+
+								break streamLoop
+							case containerStatus.State.Terminated != nil:
+								if containerStatus.State.Terminated.ExitCode != 0 {
+									kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod has terminated, with terminated exit code: %v", containerStatus.Name, containerStatus.State.Terminated.ExitCode)
+									*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod has terminated, with terminated exit code: %v", err,
+										podNamespace,
+										podName,
+										containerStatus.State.Terminated.ExitCode,
+									)
+
+									return
+								}
+							default:
+								kw.GetWorkceptor().nc.GetLogger().Info("%s pod could not get container state", podNamespace)
+							}
+
+							break
+						}
 					}
 				}
 
 				if err == io.EOF && !podConditionReady {
-					if line != "" {
-						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
-						if msg != "" {
-							_, err = stdout.Write([]byte(msg + "\n"))
-							if err != nil {
-								*stdoutErr = fmt.Errorf("writing final line to stdout: %s", err)
-								kw.GetWorkceptor().nc.GetLogger().Error("Error writing final line to stdout: %s", err)
-
-								return
-							}
-						}
-					}
 					kw.GetWorkceptor().nc.GetLogger().Info("Detected EOF for pod %s/%s.",
 						podNamespace,
 						podName,
 					)
+					if retryGetLogStream > 1 {
+						retryGetLogStream--
+						time.Sleep(time.Second * time.Duration(curDelay))
+						pervDelay, curDelay = curDelay, pervDelay+curDelay
 
-					return
+						continue
+					}
 				}
 
 				kw.GetWorkceptor().nc.GetLogger().Info(
@@ -411,15 +444,16 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 					err,
 					podNamespace,
 					podName,
-					remainingRetries,
+					retryGetLogStream,
 				)
 
 				successfulWrite = false
-				remainingRetries--
-				if remainingRetries > 0 {
-					time.Sleep(200 * time.Millisecond)
+				retryGetLogStream--
+				if retryGetLogStream > 0 {
+					time.Sleep(time.Second * time.Duration(curDelay))
+					pervDelay, curDelay = curDelay, pervDelay+curDelay
 
-					break
+					continue
 				}
 
 				kw.GetWorkceptor().nc.GetLogger().Error("Error reading from pod %s/%s: %s", podNamespace, podName, err)
@@ -459,7 +493,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 
 				return
 			}
-			remainingRetries = retries // each time we read successfully, reset this counter
+
 			successfulWrite = true
 		}
 		logStream.Close()

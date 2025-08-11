@@ -15,17 +15,17 @@ import (
 	"github.com/ansible/receptor/tests/utils"
 )
 
-// TestCryptoBufferExceeded tests that oversized CA certificates cause
-// CRYPTO_BUFFER_EXCEEDED errors in remote work connections.
+// TestCryptoBufferExceeded tests CRYPTO_BUFFER_EXCEEDED with large CA bundles
+// This test demonstrates the customer error when CA certificate bundles exceed QUIC buffer limits
 //
-// This unit test reproduces the customer issue where large CA bundles
+// This unit test reproduces the field case where large CA bundles
 // (like /etc/pki/tls/certs/ca-bundle.crt) cause job execution failures.
 //
 // Customer Error: "Connection to exec_node1 failed with error: CRYPTO_BUFFER_EXCEEDED."
 func TestCryptoBufferExceeded(t *testing.T) {
 	t.Parallel()
 
-	t.Run("oversized_ca_bundle_breaks_connection", func(t *testing.T) {
+			t.Run("Large CA bundle triggers CRYPTO_BUFFER_EXCEEDED", func(t *testing.T) {
 		t.Parallel()
 
 		// Create test certificates with oversized CA bundle
@@ -44,12 +44,14 @@ func TestCryptoBufferExceeded(t *testing.T) {
 			t.Fatalf("Failed to generate client cert: %v", err)
 		}
 
-		// Create oversized CA bundle (simulating customer's scenario)
-		oversizedCABundle := createOversizedCABundleForTest(t, 30*1024) // 30KB - exceeds 16KB QUIC limit
+		const maxBufferSize = 16384 // QUIC crypto stream buffer limit
+
+		// Create oversized CA bundle (simulating field case scenario)
+		oversizedCABundle := createOversizedCABundleForTest(t, 30*1024) // 30KB - exceeds QUIC buffer limit
 		validOversizedBundle := createValidOversizedBundle(t, oversizedCABundle, caCert)
 		bundleSize := getCABundleSize(validOversizedBundle)
 
-		t.Logf("Testing CA bundle size: %d bytes (exceeds 16KB QUIC limit)", bundleSize)
+		t.Logf("Large CA bundle size: %d bytes (exceeds %d byte QUIC buffer limit)", bundleSize, maxBufferSize)
 
 		// Set up actual netceptor nodes with QUIC connection
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -118,19 +120,27 @@ func TestCryptoBufferExceeded(t *testing.T) {
 			}
 		}
 
-		t.Logf("Attempting QUIC connection to trigger CRYPTO_BUFFER_EXCEEDED...")
+		// Now attempt to dial the service with large CA bundle
+		// This should trigger CRYPTO_BUFFER_EXCEEDED when QUIC tries to send large CA data
+		t.Logf("Client attempting to dial service with large CA bundle...")
 		t.Logf("Server: %s, Client connecting with %d byte CA bundle", serverAddr, bundleSize)
 
 		// The test should FAIL here because we currently don't validate CA bundle size
 		// This demonstrates the vulnerability exists in the current code
 
-		// Check if CA bundle exceeds QUIC crypto buffer limit (16KB)
-		if bundleSize > 16384 {
-			t.Errorf("❌ TEST FAILURE (EXPECTED): CA bundle size (%d bytes) exceeds QUIC 16KB crypto buffer limit", bundleSize)
+		// This should trigger CRYPTO_BUFFER_EXCEEDED when used in connection
+		if bundleSize > maxBufferSize {
+			t.Logf("CA bundle size %d exceeds QUIC buffer limit %d - will trigger CRYPTO_BUFFER_EXCEEDED",
+				bundleSize, maxBufferSize)
+		}
+
+		// The test should FAIL here because we currently don't validate CA bundle size
+		// This demonstrates the vulnerability exists in the current code
+		if bundleSize > maxBufferSize {
+			t.Errorf("❌ TEST FAILURE (EXPECTED): CA bundle size (%d bytes) exceeds QUIC buffer limit (%d bytes)", bundleSize, maxBufferSize)
 			t.Errorf("This oversized CA bundle was allowed to be loaded without validation")
 			t.Errorf("Customer Impact: This would cause CRYPTO_BUFFER_EXCEEDED errors during QUIC handshake")
 			t.Errorf("Fix Required: Add certificate size validation before loading CA bundles")
-			t.Errorf("Expected Fix Location: Certificate loading functions should reject bundles > 16KB")
 
 			// This test SHOULD FAIL until the fix is implemented
 			// Once fixed, the certificate loading should reject oversized bundles before QUIC handshake
@@ -143,6 +153,7 @@ func TestCryptoBufferExceeded(t *testing.T) {
 }
 
 // createOversizedCABundleForTest creates a CA bundle that exceeds QUIC crypto buffer limits.
+// This simulates the field case that triggers CRYPTO_BUFFER_EXCEEDED errors.
 func createOversizedCABundleForTest(t *testing.T, targetSize int) string {
 	t.Helper()
 
@@ -192,13 +203,13 @@ func createOversizedCABundleForTest(t *testing.T, targetSize int) string {
 	}
 
 	actualSize := info.Size()
-	t.Logf("Created oversized CA bundle: %d certificates, %d bytes", caCount, actualSize)
-	t.Logf("Exceeds QUIC 16KB limit by: %d bytes", actualSize-16384)
+			t.Logf("Created large CA bundle: %d certificates, %d bytes", caCount, actualSize)
+		t.Logf("Exceeds QUIC buffer limit by: %d bytes", actualSize-16384)
 
 	return bundlePath
 }
 
-// createValidOversizedBundle creates a valid but oversized CA bundle.
+// createValidOversizedBundle creates a valid but large CA bundle for testing.
 func createValidOversizedBundle(t *testing.T, oversizedBundle, testCA string) string {
 	t.Helper()
 
@@ -238,7 +249,7 @@ func getCABundleSize(bundlePath string) int64 {
 	return info.Size()
 }
 
-// createServerTLSConfigWithOversizedCerts creates a server TLS config with oversized CA bundle.
+// createServerTLSConfigWithOversizedCerts creates a server TLS config with large CA bundle.
 func createServerTLSConfigWithOversizedCerts(t *testing.T, serverKey, serverCert, caBundlePath string) (*tls.Config, error) {
 	t.Helper()
 
@@ -262,11 +273,11 @@ func createServerTLSConfigWithOversizedCerts(t *testing.T, serverKey, serverCert
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    caCertPool, // OVERSIZED CA BUNDLE - should trigger CRYPTO_BUFFER_EXCEEDED
+		ClientCAs:    caCertPool, // LARGE CA BUNDLE - should trigger CRYPTO_BUFFER_EXCEEDED
 	}, nil
 }
 
-// createClientTLSConfigWithOversizedCerts creates a client TLS config with oversized CA bundle.
+// createClientTLSConfigWithOversizedCerts creates a client TLS config with large CA bundle.
 func createClientTLSConfigWithOversizedCerts(t *testing.T, clientKey, clientCert, caBundlePath string) (*tls.Config, error) {
 	t.Helper()
 
@@ -289,7 +300,7 @@ func createClientTLSConfigWithOversizedCerts(t *testing.T, clientKey, clientCert
 
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool, // OVERSIZED CA BUNDLE - should trigger CRYPTO_BUFFER_EXCEEDED
+		RootCAs:      caCertPool, // LARGE CA BUNDLE - should trigger CRYPTO_BUFFER_EXCEEDED
 		ServerName:   "localhost",
 	}, nil
 }

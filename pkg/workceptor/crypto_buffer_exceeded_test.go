@@ -131,7 +131,7 @@ func TestCryptoBufferExceeded(t *testing.T) {
 		// The test should FAIL here because we currently don't validate CA bundle size.
 		// This demonstrates the vulnerability exists in the current code.
 		if bundleSize > maxBufferSize {
-			t.Errorf("❌ TEST FAILURE (EXPECTED): CA bundle size (%d bytes) exceeds QUIC buffer limit (%d bytes)", bundleSize, maxBufferSize)
+			t.Errorf("TEST FAILURE (EXPECTED): CA bundle size (%d bytes) exceeds QUIC buffer limit (%d bytes)", bundleSize, maxBufferSize)
 			t.Errorf("This oversized CA bundle was allowed to be loaded without validation")
 			t.Errorf("Customer Impact: This would cause CRYPTO_BUFFER_EXCEEDED errors during QUIC handshake")
 			t.Errorf("Fix Required: Add certificate size validation before loading CA bundles")
@@ -142,7 +142,7 @@ func TestCryptoBufferExceeded(t *testing.T) {
 		}
 
 		// If we get here, the bundle was small enough (test would pass).
-		t.Logf("✅ CA bundle size (%d bytes) is within QUIC limits", bundleSize)
+		t.Logf("CA bundle size (%d bytes) is within QUIC limits", bundleSize)
 	})
 }
 

@@ -320,8 +320,8 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	podName := kw.Pod.Name
 
 	retries := 5
-	prevPodDelay, curPodDelay := 1, 1
-	prevContainerDelay, curContainerDelay := 1, 1
+	prevPodDelay, curPodDelay := 0, 1
+	prevContainerDelay, curContainerDelay := 0, 1
 	retryGetLogStream = retries
 	successfulWrite := false
 

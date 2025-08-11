@@ -751,7 +751,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    15, // Allow time for multiple retry cycles
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				// First cycle: Nearly exhaust retries (5->4->3->2), then succeed
+				// First cycle: Nearly exhaust retries (5->4->3->2), then succeed (tests kubeLoggingConnectionHandler)
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
@@ -763,7 +763,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 2 more times.",
 				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 1 more times.",
 				"Error reading from pod Test_Namespace/Test_Name: network connection reset",
-				// Second cycle: Fresh retry counter reset to 5 (validates counter reset)
+				// Second cycle: Fresh retry counter reset to 5 (validates counter reset and tests kubeLoggingConnectionHandler again)
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",

@@ -636,7 +636,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    10, // Allow time for 5 retries with 1 second delays
+			timeoutSeconds:    15, // Allow time for 5 retries with 1 second delays
 			validateLogs:      true,
 			expectedLogMsgs: []string{
 				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times.",

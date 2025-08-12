@@ -351,7 +351,7 @@ mainLoop:
 		}
 		if err != nil {
 			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg.Error())
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg.Error())
 			*stdoutErr = errMsg
 
 			// fail to get pod, no need to continue

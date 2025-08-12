@@ -316,6 +316,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	var sinceTime time.Time
 	var err error
 	var retryGetLogStream int
+	var successfulWrite bool
 	podNamespace := kw.Pod.Namespace
 	podName := kw.Pod.Name
 
@@ -324,7 +325,6 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	prevPodDelay, curPodDelay := 0, 1
 	prevContainerDelay, curContainerDelay := 0, 1
 	retryGetLogStream = retries
-	successfulWrite := false
 
 mainLoop:
 	for {
@@ -361,7 +361,7 @@ mainLoop:
 
 		// Reset successfulWrite on each reconnection attempt to ensure proper duplicate detection
 		successfulWrite = false
-		
+
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			// fail to get log stream, no need to continue
@@ -432,7 +432,7 @@ mainLoop:
 
 				if !foundContainer {
 					kw.GetWorkceptor().nc.GetLogger().Error("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
-					*stdoutErr = fmt.Errorf("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
+					*stdoutErr = fmt.Errorf("unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
 
 					return
 				}
@@ -501,8 +501,8 @@ mainLoop:
 				// At this stage something has gone very wrong with our interactions with the container.
 				// We will fail, and mark the job as failed due to an unknown kube container state.
 
-				kw.GetWorkceptor().nc.GetLogger().Error("Recieved EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
-				*stdoutErr = fmt.Errorf("Recieved EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
+				kw.GetWorkceptor().nc.GetLogger().Error("received EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
+				*stdoutErr = fmt.Errorf("received EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
 
 				return
 			}

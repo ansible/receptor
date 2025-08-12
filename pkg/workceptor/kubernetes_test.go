@@ -769,7 +769,6 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				// Network error detected(1)
 				"Detected Error: network connection reset for pod Test_Namespace/Test_Name that is in a running state. Will retry 4 more times.",
 			},
-
 		},
 		{
 			name: "eof_with_pod_not_ready_exits_immediately",
@@ -827,6 +826,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 							return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
 						default:
 						}
+
 						return &http.Response{
 							StatusCode: http.StatusOK,
 							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Final log", hasRead: false},
@@ -1119,7 +1119,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdoutErr error
 			_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx := createKubernetesTestSetup(t)
-			
+
 			// Create a test-specific context that we can cancel to ensure goroutine cleanup
 			testCtx, testCancel := context.WithCancel(ctx)
 			defer testCancel() // Cancel context before ctrl.Finish()
@@ -1165,7 +1165,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			done := make(chan bool, 1)
 			timeout := time.NewTimer(time.Duration(tt.timeoutSeconds) * time.Second)
 			defer timeout.Stop()
-			
+
 			go func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -1182,7 +1182,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			case <-timeout.C:
 				t.Logf("Test timed out after %d seconds, cancelling context", tt.timeoutSeconds)
 				testCancel() // Cancel the context to stop the goroutine
-				
+
 				// Wait for goroutine to finish after context cancellation
 				select {
 				case <-done:
@@ -1192,20 +1192,20 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					if tt.name == "eof_with_pod_not_ready_exits_immediately" || tt.name == "timestamp_remove_on_eof_with_final_line" {
 						t.Logf("Test %s: Known issue with goroutine not responding to context cancellation, skipping cleanup check", tt.name)
 						// Force early return without ctrl.Finish() to prevent panic
-						return 
+						return
 					}
 					t.Errorf("Goroutine did not finish within 3 seconds after context cancellation")
 					// Don't proceed with ctrl.Finish() in this case as it's unsafe
 					return
 				}
 			}
-			
+
 			// Ensure the test context is cancelled before ctrl.Finish()
 			testCancel()
-			
+
 			// Give a small grace period for the goroutine to fully clean up
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// Now it's safe to finish the controller
 			ctrl.Finish()
 
@@ -1659,7 +1659,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 			},
 		},
 	}
-	
+
 	terminatedPod := &corev1.Pod{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -1724,7 +1724,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 	assert.NoError(t, stdoutErr)
 }
 
-// TestKubeLoggingWithReconnectDuplicateDetection tests that reconnection properly handles duplicate lines
+// TestKubeLoggingWithReconnectDuplicateDetection tests that reconnection properly handles duplicate lines.
 func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 	var stdinErr error
 	var stdoutErr error
@@ -1751,7 +1751,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 			},
 		},
 	}
-	
+
 	terminatedPod := &corev1.Pod{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -1781,26 +1781,26 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	
-	// Simulate reconnection: first call returns running ready pod to trigger EOF retry, 
+
+	// Simulate reconnection: first call returns running ready pod to trigger EOF retry,
 	// eventually return terminated pod to end the test
 	gomock.InOrder(
 		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningReadyPod, nil).Times(1),
 		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningReadyPod, nil).Times(5), // Allow for retry attempts
 		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(terminatedPod, nil).AnyTimes(),
 	)
-	
+
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 	// Track how many times GetLogs is called to verify reconnection
 	getLogsCallCount := 0
-	
+
 	// Set up the fake REST client that simulates duplicate lines on reconnection
 	mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(interface{}, interface{}, interface{}, interface{}) *rest.Request {
 			getLogsCallCount++
-			
+
 			var responseBody string
 			if getLogsCallCount == 1 {
 				// First connection: return some logs
@@ -1809,7 +1809,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 				// Reconnection: return overlapping logs (duplicate detection should handle this)
 				responseBody = "2024-12-09T10:00:02Z Second line\n2024-12-09T10:00:03Z Third line\n"
 			}
-			
+
 			req := fakerest.RESTClient{
 				Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 					if getLogsCallCount == 1 {
@@ -1828,6 +1828,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 				}),
 				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 			}
+
 			return req.Request()
 		}).AnyTimes()
 
@@ -1838,11 +1839,12 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 	stdout, _ := workceptor.NewStdoutWriter(mockfilesystemer, "")
 	mockFileWC := mock_workceptor.NewMockFileWriteCloser(ctrl)
 	stdout.SetWriter(mockFileWC)
-	
+
 	// Capture all written data
 	var writtenData []string
 	mockFileWC.EXPECT().Write(gomock.Any()).DoAndReturn(func(data []byte) (int, error) {
 		writtenData = append(writtenData, string(data))
+
 		return len(data), nil
 	}).AnyTimes()
 
@@ -1850,7 +1852,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 
 	assert.NoError(t, stdoutErr)
 	assert.GreaterOrEqual(t, getLogsCallCount, 2, "Should have triggered reconnection")
-	
+
 	// Verify no duplicate lines were written
 	expectedLines := []string{"First line\n", "Second line\n", "Third line\n"}
 	assert.Equal(t, expectedLines, writtenData, "Should have no duplicate lines")

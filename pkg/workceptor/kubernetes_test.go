@@ -4004,7 +4004,6 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1DoesNotSetFinished(t *testing.T) {
 		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 
 		err = os.MkdirAll(testUnitDir, 0o700)
-
 		if err != nil {
 			t.Logf("Failed to create unit dir for %s: %v", testUnitDir, err)
 		}

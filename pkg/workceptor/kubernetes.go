@@ -350,16 +350,18 @@ mainLoop:
 			prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
 		}
 		if err != nil {
-			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
-			//TODO: set stdoutErr instead of setting status
-			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
+			kw.GetWorkceptor().nc.GetLogger().Error(errMsg.Error())
+			*stdoutErr = errMsg
 
 			// fail to get pod, no need to continue
 			return
 		}
 		prevPodDelay, curPodDelay = 1, 1
 
+		// Reset successfulWrite on each reconnection attempt to ensure proper duplicate detection
+		successfulWrite = false
+		
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
 			// fail to get log stream, no need to continue
@@ -521,7 +523,7 @@ mainLoop:
 				return
 			}
 
-			// TODO: understand how successfulWrite is used in ProcessLogLine and see if it needs to be set in running or termanated
+			// Set successfulWrite = true after writing to stdout to track that we've successfully written during this connection session
 			successfulWrite = true
 		}
 	}

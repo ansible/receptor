@@ -352,6 +352,7 @@ mainLoop:
 		if err != nil {
 			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
 			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			//TODO: set stdoutErr instead of setting status
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 			// fail to get pod, no need to continue
@@ -368,7 +369,6 @@ mainLoop:
 
 		// read from logstream
 		streamReader := bufio.NewReader(logStream)
-		// TODO: removed stdinErr, not set in the loop, doesn't change after first check above
 		for { // check between every line read to see if we need to stop reading
 			line, err := streamReader.ReadString('\n')
 			if err != nil {
@@ -411,78 +411,96 @@ mainLoop:
 
 				podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 				if kubeErr != nil {
-					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s'", kubeErr)
-					// TODO: is it possible to get the pod again? Do we retry or exit early?
+					// Their are many reasons why the kube api might not be able to get the pod,
+					// This does not mean their is a problem just yet.
+					// Lets try to get the pod again, max 5 times, and decide.
+					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s' , continuing try to get pod up to 5 more times.", kubeErr)
+
+					continue mainLoop
 				}
 
-				// TODO: do we need to check if podDetails is nil? if we retry or exit on kubeErr we don't need to
+				var containerState corev1.ContainerState
+				foundContainer := false
 				for _, containerStatus := range podDetails.Status.ContainerStatuses {
 					if containerStatus.Name == WorkerContainerName {
-						switch {
-						case containerStatus.State.Running != nil:
-							// We got EOF but pod is running, is this because we checked too fast? Will it turn into a terminated state soon or are we hitting the 4 hour log stream kube error. We will attempt to reconnect a max of 5 times in order to cover both cases
-							// If we can't get reconnect without an EOF we will error and mark the job as failed.
-							retryGetLogStream--
-							if retryGetLogStream > 0 {
-								kw.GetWorkceptor().nc.GetLogger().Info(
-									"Detected Error: %s for pod %s/%s. Will retry %d more times.",
-									err,
-									podNamespace,
-									podName,
-									retryGetLogStream,
-								)
+						containerState = containerStatus.State
+						foundContainer = true
+					}
+				}
 
-								time.Sleep(time.Second * time.Duration(curContainerDelay))
-								prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+				if !foundContainer {
+					kw.GetWorkceptor().nc.GetLogger().Error("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
+					*stdoutErr = fmt.Errorf("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
 
-								continue mainLoop
-							}
-							// Retrying hasn't worked we will error and mark the job as failed
-							kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is running but unable to attach to the log stream", containerStatus.Name)
-							*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but unable to attach to the log stream", err,
-								podNamespace,
-								podName,
-							)
+					return
+				}
 
-							return
-						case containerStatus.State.Terminated != nil:
-							// We got EOF and the pod terminated in a bad state, we will return the error and mark the job as failed.
-							if containerStatus.State.Terminated.ExitCode != 0 {
-								kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod has terminated, with terminated exit code: %v", containerStatus.Name, containerStatus.State.Terminated.ExitCode)
-								*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod has terminated, with terminated exit code: %v", err,
-									podNamespace,
-									podName,
-									containerStatus.State.Terminated.ExitCode,
-								)
+				switch {
+				case containerState.Running != nil:
+					// We got EOF but pod is running, is this because we checked too fast? Will it turn into a terminated state soon or are we hitting the 4 hour log stream kube error. We will attempt to reconnect a max of 5 times in order to cover both cases
+					// If we can't get reconnect without an EOF we will error and mark the job as failed.
+					retryGetLogStream--
+					if retryGetLogStream > 0 {
+						kw.GetWorkceptor().nc.GetLogger().Info(
+							"Detected Error: %s for pod %s/%s. Will retry %d more times.",
+							err,
+							podNamespace,
+							podName,
+							retryGetLogStream,
+						)
+
+						time.Sleep(time.Second * time.Duration(curContainerDelay))
+						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+
+						continue mainLoop
+					}
+					// Retrying hasn't worked we will error and mark the job as failed
+					kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is running but unable to attach to the log stream", WorkerContainerName)
+					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but unable to attach to the log stream", err,
+						podNamespace,
+						podName,
+					)
+
+					return
+				case containerState.Terminated != nil:
+					// We got EOF and the pod terminated in a bad state, we will return the error and mark the job as failed.
+					if containerState.Terminated.ExitCode != 0 {
+						kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod has terminated, with terminated exit code: %v", WorkerContainerName, containerState.Terminated.ExitCode)
+						*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod has terminated, with terminated exit code: %v", err,
+							podNamespace,
+							podName,
+							containerState.Terminated.ExitCode,
+						)
+
+						return
+					}
+
+					// EOF and exit code is 0, this is a good state, we need to check if last line has data
+					if line != "" {
+						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
+						if msg != "" {
+							_, err = stdout.Write([]byte(msg + "\n"))
+							if err != nil {
+								*stdoutErr = fmt.Errorf("error writing last line to stdout: %s", err)
+								kw.GetWorkceptor().nc.GetLogger().Error("Error writing last line to stdout: %s", err)
 
 								return
 							}
-
-							// EOF and exit code is 0, this is a good state, we need to check if last line has data
-							if line != "" {
-								msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
-								if msg != "" {
-									_, err = stdout.Write([]byte(msg + "\n"))
-									if err != nil {
-										*stdoutErr = fmt.Errorf("error writing last line to stdout: %s", err)
-										kw.GetWorkceptor().nc.GetLogger().Error("Error writing last line to stdout: %s", err)
-
-										return
-									}
-								}
-							}
-							// Got EOF, terminaled code 0 and ensured we captured last line then return
-							return
-						default:
-							// Perhaps we waited too long between back offs?
-							// TODO, need a clean exit
-							kw.GetWorkceptor().nc.GetLogger().Info("%s pod could not get container state", podNamespace)
 						}
-
-						// TODO: do we break or return here?
-						break
 					}
+					// Got EOF, terminaled code 0 and ensured we captured last line then return
+					return
+				default:
+					// We dont expect to ever get here, However, beinging in an unknown state will not have a negative effect so we will log and ignore.
+					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. We will continue.", podName, containerState)
 				}
+
+				// Something has gone very wrong if we are here. EOF is true and we can get the container state, but it is not running or terminated.
+				// At this stage something has gone very wrong with our interactions with the container.
+				// We will fail, and mark the job as failed due to an unknown kube container state.
+
+				kw.GetWorkceptor().nc.GetLogger().Error("Recieved EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
+				*stdoutErr = fmt.Errorf("Recieved EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
 
 				return
 			}

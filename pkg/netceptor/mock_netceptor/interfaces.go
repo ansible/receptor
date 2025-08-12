@@ -23,359 +23,6 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockNetcForPacketConn is a mock of NetcForPacketConn interface.
-type MockNetcForPacketConn struct {
-	ctrl     *gomock.Controller
-	recorder *MockNetcForPacketConnMockRecorder
-	isgomock struct{}
-}
-
-// MockNetcForPacketConnMockRecorder is the mock recorder for MockNetcForPacketConn.
-type MockNetcForPacketConnMockRecorder struct {
-	mock *MockNetcForPacketConn
-}
-
-// NewMockNetcForPacketConn creates a new mock instance.
-func NewMockNetcForPacketConn(ctrl *gomock.Controller) *MockNetcForPacketConn {
-	mock := &MockNetcForPacketConn{ctrl: ctrl}
-	mock.recorder = &MockNetcForPacketConnMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNetcForPacketConn) EXPECT() *MockNetcForPacketConnMockRecorder {
-	return m.recorder
-}
-
-// AddLocalServiceAdvertisement mocks base method.
-func (m *MockNetcForPacketConn) AddLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddLocalServiceAdvertisement", service, connType, tags)
-}
-
-// AddLocalServiceAdvertisement indicates an expected call of AddLocalServiceAdvertisement.
-func (mr *MockNetcForPacketConnMockRecorder) AddLocalServiceAdvertisement(service, connType, tags any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddLocalServiceAdvertisement", reflect.TypeOf((*MockNetcForPacketConn)(nil).AddLocalServiceAdvertisement), service, connType, tags)
-}
-
-// AddNameHash mocks base method.
-func (m *MockNetcForPacketConn) AddNameHash(name string) uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddNameHash", name)
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// AddNameHash indicates an expected call of AddNameHash.
-func (mr *MockNetcForPacketConnMockRecorder) AddNameHash(name any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNameHash", reflect.TypeOf((*MockNetcForPacketConn)(nil).AddNameHash), name)
-}
-
-// Context mocks base method.
-func (m *MockNetcForPacketConn) Context() context.Context {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Context")
-	ret0, _ := ret[0].(context.Context)
-	return ret0
-}
-
-// Context indicates an expected call of Context.
-func (mr *MockNetcForPacketConnMockRecorder) Context() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockNetcForPacketConn)(nil).Context))
-}
-
-// GetEphemeralService mocks base method.
-func (m *MockNetcForPacketConn) GetEphemeralService() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEphemeralService")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetEphemeralService indicates an expected call of GetEphemeralService.
-func (mr *MockNetcForPacketConnMockRecorder) GetEphemeralService() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEphemeralService", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetEphemeralService))
-}
-
-// GetListenerLock mocks base method.
-func (m *MockNetcForPacketConn) GetListenerLock() *sync.RWMutex {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetListenerLock")
-	ret0, _ := ret[0].(*sync.RWMutex)
-	return ret0
-}
-
-// GetListenerLock indicates an expected call of GetListenerLock.
-func (mr *MockNetcForPacketConnMockRecorder) GetListenerLock() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerLock", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerLock))
-}
-
-// GetListenerRegistry mocks base method.
-func (m *MockNetcForPacketConn) GetListenerRegistry() map[string]*netceptor.PacketConn {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetListenerRegistry")
-	ret0, _ := ret[0].(map[string]*netceptor.PacketConn)
-	return ret0
-}
-
-// GetListenerRegistry indicates an expected call of GetListenerRegistry.
-func (mr *MockNetcForPacketConnMockRecorder) GetListenerRegistry() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerRegistry", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerRegistry))
-}
-
-// GetLogger mocks base method.
-func (m *MockNetcForPacketConn) GetLogger() *logger.ReceptorLogger {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogger")
-	ret0, _ := ret[0].(*logger.ReceptorLogger)
-	return ret0
-}
-
-// GetLogger indicates an expected call of GetLogger.
-func (mr *MockNetcForPacketConnMockRecorder) GetLogger() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogger", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetLogger))
-}
-
-// GetNetworkName mocks base method.
-func (m *MockNetcForPacketConn) GetNetworkName() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNetworkName")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetNetworkName indicates an expected call of GetNetworkName.
-func (mr *MockNetcForPacketConnMockRecorder) GetNetworkName() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetworkName", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetNetworkName))
-}
-
-// GetUnreachableBroker mocks base method.
-func (m *MockNetcForPacketConn) GetUnreachableBroker() *utils.Broker {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnreachableBroker")
-	ret0, _ := ret[0].(*utils.Broker)
-	return ret0
-}
-
-// GetUnreachableBroker indicates an expected call of GetUnreachableBroker.
-func (mr *MockNetcForPacketConnMockRecorder) GetUnreachableBroker() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnreachableBroker", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetUnreachableBroker))
-}
-
-// MaxForwardingHops mocks base method.
-func (m *MockNetcForPacketConn) MaxForwardingHops() byte {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MaxForwardingHops")
-	ret0, _ := ret[0].(byte)
-	return ret0
-}
-
-// MaxForwardingHops indicates an expected call of MaxForwardingHops.
-func (mr *MockNetcForPacketConnMockRecorder) MaxForwardingHops() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxForwardingHops", reflect.TypeOf((*MockNetcForPacketConn)(nil).MaxForwardingHops))
-}
-
-// NodeID mocks base method.
-func (m *MockNetcForPacketConn) NodeID() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NodeID")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// NodeID indicates an expected call of NodeID.
-func (mr *MockNetcForPacketConnMockRecorder) NodeID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockNetcForPacketConn)(nil).NodeID))
-}
-
-// RemoveLocalServiceAdvertisement mocks base method.
-func (m *MockNetcForPacketConn) RemoveLocalServiceAdvertisement(service string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveLocalServiceAdvertisement", service)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RemoveLocalServiceAdvertisement indicates an expected call of RemoveLocalServiceAdvertisement.
-func (mr *MockNetcForPacketConnMockRecorder) RemoveLocalServiceAdvertisement(service any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveLocalServiceAdvertisement", reflect.TypeOf((*MockNetcForPacketConn)(nil).RemoveLocalServiceAdvertisement), service)
-}
-
-// SendMessageWithHopsToLive mocks base method.
-func (m *MockNetcForPacketConn) SendMessageWithHopsToLive(fromService, toNode, toService string, data []byte, hopsToLive byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendMessageWithHopsToLive", fromService, toNode, toService, data, hopsToLive)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SendMessageWithHopsToLive indicates an expected call of SendMessageWithHopsToLive.
-func (mr *MockNetcForPacketConnMockRecorder) SendMessageWithHopsToLive(fromService, toNode, toService, data, hopsToLive any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessageWithHopsToLive", reflect.TypeOf((*MockNetcForPacketConn)(nil).SendMessageWithHopsToLive), fromService, toNode, toService, data, hopsToLive)
-}
-
-// MockNetcForPing is a mock of NetcForPing interface.
-type MockNetcForPing struct {
-	ctrl     *gomock.Controller
-	recorder *MockNetcForPingMockRecorder
-	isgomock struct{}
-}
-
-// MockNetcForPingMockRecorder is the mock recorder for MockNetcForPing.
-type MockNetcForPingMockRecorder struct {
-	mock *MockNetcForPing
-}
-
-// NewMockNetcForPing creates a new mock instance.
-func NewMockNetcForPing(ctrl *gomock.Controller) *MockNetcForPing {
-	mock := &MockNetcForPing{ctrl: ctrl}
-	mock.recorder = &MockNetcForPingMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNetcForPing) EXPECT() *MockNetcForPingMockRecorder {
-	return m.recorder
-}
-
-// Context mocks base method.
-func (m *MockNetcForPing) Context() context.Context {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Context")
-	ret0, _ := ret[0].(context.Context)
-	return ret0
-}
-
-// Context indicates an expected call of Context.
-func (mr *MockNetcForPingMockRecorder) Context() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockNetcForPing)(nil).Context))
-}
-
-// ListenPacket mocks base method.
-func (m *MockNetcForPing) ListenPacket(service string) (netceptor.PacketConner, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListenPacket", service)
-	ret0, _ := ret[0].(netceptor.PacketConner)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListenPacket indicates an expected call of ListenPacket.
-func (mr *MockNetcForPingMockRecorder) ListenPacket(service any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListenPacket", reflect.TypeOf((*MockNetcForPing)(nil).ListenPacket), service)
-}
-
-// NewAddr mocks base method.
-func (m *MockNetcForPing) NewAddr(target, service string) netceptor.Addr {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewAddr", target, service)
-	ret0, _ := ret[0].(netceptor.Addr)
-	return ret0
-}
-
-// NewAddr indicates an expected call of NewAddr.
-func (mr *MockNetcForPingMockRecorder) NewAddr(target, service any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddr", reflect.TypeOf((*MockNetcForPing)(nil).NewAddr), target, service)
-}
-
-// NodeID mocks base method.
-func (m *MockNetcForPing) NodeID() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NodeID")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// NodeID indicates an expected call of NodeID.
-func (mr *MockNetcForPingMockRecorder) NodeID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockNetcForPing)(nil).NodeID))
-}
-
-// MockNetcForTraceroute is a mock of NetcForTraceroute interface.
-type MockNetcForTraceroute struct {
-	ctrl     *gomock.Controller
-	recorder *MockNetcForTracerouteMockRecorder
-	isgomock struct{}
-}
-
-// MockNetcForTracerouteMockRecorder is the mock recorder for MockNetcForTraceroute.
-type MockNetcForTracerouteMockRecorder struct {
-	mock *MockNetcForTraceroute
-}
-
-// NewMockNetcForTraceroute creates a new mock instance.
-func NewMockNetcForTraceroute(ctrl *gomock.Controller) *MockNetcForTraceroute {
-	mock := &MockNetcForTraceroute{ctrl: ctrl}
-	mock.recorder = &MockNetcForTracerouteMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNetcForTraceroute) EXPECT() *MockNetcForTracerouteMockRecorder {
-	return m.recorder
-}
-
-// Context mocks base method.
-func (m *MockNetcForTraceroute) Context() context.Context {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Context")
-	ret0, _ := ret[0].(context.Context)
-	return ret0
-}
-
-// Context indicates an expected call of Context.
-func (mr *MockNetcForTracerouteMockRecorder) Context() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockNetcForTraceroute)(nil).Context))
-}
-
-// MaxForwardingHops mocks base method.
-func (m *MockNetcForTraceroute) MaxForwardingHops() byte {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MaxForwardingHops")
-	ret0, _ := ret[0].(byte)
-	return ret0
-}
-
-// MaxForwardingHops indicates an expected call of MaxForwardingHops.
-func (mr *MockNetcForTracerouteMockRecorder) MaxForwardingHops() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxForwardingHops", reflect.TypeOf((*MockNetcForTraceroute)(nil).MaxForwardingHops))
-}
-
-// Ping mocks base method.
-func (m *MockNetcForTraceroute) Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ping", ctx, target, hopsToLive)
-	ret0, _ := ret[0].(time.Duration)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// Ping indicates an expected call of Ping.
-func (mr *MockNetcForTracerouteMockRecorder) Ping(ctx, target, hopsToLive any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockNetcForTraceroute)(nil).Ping), ctx, target, hopsToLive)
-}
-
 // MockQuicStreamForConn is a mock of QuicStreamForConn interface.
 type MockQuicStreamForConn struct {
 	ctrl     *gomock.Controller
@@ -818,6 +465,87 @@ func (mr *MockQuicListenerForListenerMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockQuicListenerForListener)(nil).Close))
 }
 
+// MockMessageConn is a mock of MessageConn interface.
+type MockMessageConn struct {
+	ctrl     *gomock.Controller
+	recorder *MockMessageConnMockRecorder
+	isgomock struct{}
+}
+
+// MockMessageConnMockRecorder is the mock recorder for MockMessageConn.
+type MockMessageConnMockRecorder struct {
+	mock *MockMessageConn
+}
+
+// NewMockMessageConn creates a new mock instance.
+func NewMockMessageConn(ctrl *gomock.Controller) *MockMessageConn {
+	mock := &MockMessageConn{ctrl: ctrl}
+	mock.recorder = &MockMessageConnMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockMessageConn) EXPECT() *MockMessageConnMockRecorder {
+	return m.recorder
+}
+
+// Close mocks base method.
+func (m *MockMessageConn) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockMessageConnMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockMessageConn)(nil).Close))
+}
+
+// ReadMessage mocks base method.
+func (m *MockMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadMessage", ctx, timeout)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadMessage indicates an expected call of ReadMessage.
+func (mr *MockMessageConnMockRecorder) ReadMessage(ctx, timeout any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadMessage", reflect.TypeOf((*MockMessageConn)(nil).ReadMessage), ctx, timeout)
+}
+
+// SetReadDeadline mocks base method.
+func (m *MockMessageConn) SetReadDeadline(t time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetReadDeadline", t)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetReadDeadline indicates an expected call of SetReadDeadline.
+func (mr *MockMessageConnMockRecorder) SetReadDeadline(t any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetReadDeadline", reflect.TypeOf((*MockMessageConn)(nil).SetReadDeadline), t)
+}
+
+// WriteMessage mocks base method.
+func (m *MockMessageConn) WriteMessage(ctx context.Context, data []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WriteMessage", ctx, data)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WriteMessage indicates an expected call of WriteMessage.
+func (mr *MockMessageConnMockRecorder) WriteMessage(ctx, data any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteMessage", reflect.TypeOf((*MockMessageConn)(nil).WriteMessage), ctx, data)
+}
+
 // MockBackend is a mock of Backend interface.
 type MockBackend struct {
 	ctrl     *gomock.Controller
@@ -922,87 +650,6 @@ func (m *MockBackendSession) Send(arg0 []byte) error {
 func (mr *MockBackendSessionMockRecorder) Send(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockBackendSession)(nil).Send), arg0)
-}
-
-// MockMessageConn is a mock of MessageConn interface.
-type MockMessageConn struct {
-	ctrl     *gomock.Controller
-	recorder *MockMessageConnMockRecorder
-	isgomock struct{}
-}
-
-// MockMessageConnMockRecorder is the mock recorder for MockMessageConn.
-type MockMessageConnMockRecorder struct {
-	mock *MockMessageConn
-}
-
-// NewMockMessageConn creates a new mock instance.
-func NewMockMessageConn(ctrl *gomock.Controller) *MockMessageConn {
-	mock := &MockMessageConn{ctrl: ctrl}
-	mock.recorder = &MockMessageConnMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockMessageConn) EXPECT() *MockMessageConnMockRecorder {
-	return m.recorder
-}
-
-// Close mocks base method.
-func (m *MockMessageConn) Close() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Close indicates an expected call of Close.
-func (mr *MockMessageConnMockRecorder) Close() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockMessageConn)(nil).Close))
-}
-
-// ReadMessage mocks base method.
-func (m *MockMessageConn) ReadMessage(ctx context.Context, timeout time.Duration) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadMessage", ctx, timeout)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ReadMessage indicates an expected call of ReadMessage.
-func (mr *MockMessageConnMockRecorder) ReadMessage(ctx, timeout any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadMessage", reflect.TypeOf((*MockMessageConn)(nil).ReadMessage), ctx, timeout)
-}
-
-// SetReadDeadline mocks base method.
-func (m *MockMessageConn) SetReadDeadline(t time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetReadDeadline", t)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetReadDeadline indicates an expected call of SetReadDeadline.
-func (mr *MockMessageConnMockRecorder) SetReadDeadline(t any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetReadDeadline", reflect.TypeOf((*MockMessageConn)(nil).SetReadDeadline), t)
-}
-
-// WriteMessage mocks base method.
-func (m *MockMessageConn) WriteMessage(ctx context.Context, data []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteMessage", ctx, data)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WriteMessage indicates an expected call of WriteMessage.
-func (mr *MockMessageConnMockRecorder) WriteMessage(ctx, data any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteMessage", reflect.TypeOf((*MockMessageConn)(nil).WriteMessage), ctx, data)
 }
 
 // MockPacketConner is a mock of PacketConner interface.
@@ -1236,4 +883,357 @@ func (m *MockPacketConner) WriteTo(p []byte, addr net.Addr) (int, error) {
 func (mr *MockPacketConnerMockRecorder) WriteTo(p, addr any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteTo", reflect.TypeOf((*MockPacketConner)(nil).WriteTo), p, addr)
+}
+
+// MockNetcForPacketConn is a mock of NetcForPacketConn interface.
+type MockNetcForPacketConn struct {
+	ctrl     *gomock.Controller
+	recorder *MockNetcForPacketConnMockRecorder
+	isgomock struct{}
+}
+
+// MockNetcForPacketConnMockRecorder is the mock recorder for MockNetcForPacketConn.
+type MockNetcForPacketConnMockRecorder struct {
+	mock *MockNetcForPacketConn
+}
+
+// NewMockNetcForPacketConn creates a new mock instance.
+func NewMockNetcForPacketConn(ctrl *gomock.Controller) *MockNetcForPacketConn {
+	mock := &MockNetcForPacketConn{ctrl: ctrl}
+	mock.recorder = &MockNetcForPacketConnMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNetcForPacketConn) EXPECT() *MockNetcForPacketConnMockRecorder {
+	return m.recorder
+}
+
+// AddLocalServiceAdvertisement mocks base method.
+func (m *MockNetcForPacketConn) AddLocalServiceAdvertisement(service string, connType byte, tags map[string]string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddLocalServiceAdvertisement", service, connType, tags)
+}
+
+// AddLocalServiceAdvertisement indicates an expected call of AddLocalServiceAdvertisement.
+func (mr *MockNetcForPacketConnMockRecorder) AddLocalServiceAdvertisement(service, connType, tags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddLocalServiceAdvertisement", reflect.TypeOf((*MockNetcForPacketConn)(nil).AddLocalServiceAdvertisement), service, connType, tags)
+}
+
+// AddNameHash mocks base method.
+func (m *MockNetcForPacketConn) AddNameHash(name string) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddNameHash", name)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// AddNameHash indicates an expected call of AddNameHash.
+func (mr *MockNetcForPacketConnMockRecorder) AddNameHash(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNameHash", reflect.TypeOf((*MockNetcForPacketConn)(nil).AddNameHash), name)
+}
+
+// Context mocks base method.
+func (m *MockNetcForPacketConn) Context() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Context")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// Context indicates an expected call of Context.
+func (mr *MockNetcForPacketConnMockRecorder) Context() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockNetcForPacketConn)(nil).Context))
+}
+
+// GetEphemeralService mocks base method.
+func (m *MockNetcForPacketConn) GetEphemeralService() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEphemeralService")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetEphemeralService indicates an expected call of GetEphemeralService.
+func (mr *MockNetcForPacketConnMockRecorder) GetEphemeralService() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEphemeralService", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetEphemeralService))
+}
+
+// GetListenerLock mocks base method.
+func (m *MockNetcForPacketConn) GetListenerLock() *sync.RWMutex {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetListenerLock")
+	ret0, _ := ret[0].(*sync.RWMutex)
+	return ret0
+}
+
+// GetListenerLock indicates an expected call of GetListenerLock.
+func (mr *MockNetcForPacketConnMockRecorder) GetListenerLock() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerLock", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerLock))
+}
+
+// GetListenerRegistry mocks base method.
+func (m *MockNetcForPacketConn) GetListenerRegistry() map[string]*netceptor.PacketConn {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetListenerRegistry")
+	ret0, _ := ret[0].(map[string]*netceptor.PacketConn)
+	return ret0
+}
+
+// GetListenerRegistry indicates an expected call of GetListenerRegistry.
+func (mr *MockNetcForPacketConnMockRecorder) GetListenerRegistry() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetListenerRegistry", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetListenerRegistry))
+}
+
+// GetLogger mocks base method.
+func (m *MockNetcForPacketConn) GetLogger() *logger.ReceptorLogger {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogger")
+	ret0, _ := ret[0].(*logger.ReceptorLogger)
+	return ret0
+}
+
+// GetLogger indicates an expected call of GetLogger.
+func (mr *MockNetcForPacketConnMockRecorder) GetLogger() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogger", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetLogger))
+}
+
+// GetNetworkName mocks base method.
+func (m *MockNetcForPacketConn) GetNetworkName() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNetworkName")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNetworkName indicates an expected call of GetNetworkName.
+func (mr *MockNetcForPacketConnMockRecorder) GetNetworkName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetworkName", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetNetworkName))
+}
+
+// GetUnreachableBroker mocks base method.
+func (m *MockNetcForPacketConn) GetUnreachableBroker() *utils.Broker {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUnreachableBroker")
+	ret0, _ := ret[0].(*utils.Broker)
+	return ret0
+}
+
+// GetUnreachableBroker indicates an expected call of GetUnreachableBroker.
+func (mr *MockNetcForPacketConnMockRecorder) GetUnreachableBroker() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnreachableBroker", reflect.TypeOf((*MockNetcForPacketConn)(nil).GetUnreachableBroker))
+}
+
+// MaxForwardingHops mocks base method.
+func (m *MockNetcForPacketConn) MaxForwardingHops() byte {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MaxForwardingHops")
+	ret0, _ := ret[0].(byte)
+	return ret0
+}
+
+// MaxForwardingHops indicates an expected call of MaxForwardingHops.
+func (mr *MockNetcForPacketConnMockRecorder) MaxForwardingHops() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxForwardingHops", reflect.TypeOf((*MockNetcForPacketConn)(nil).MaxForwardingHops))
+}
+
+// NodeID mocks base method.
+func (m *MockNetcForPacketConn) NodeID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NodeID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// NodeID indicates an expected call of NodeID.
+func (mr *MockNetcForPacketConnMockRecorder) NodeID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockNetcForPacketConn)(nil).NodeID))
+}
+
+// RemoveLocalServiceAdvertisement mocks base method.
+func (m *MockNetcForPacketConn) RemoveLocalServiceAdvertisement(service string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveLocalServiceAdvertisement", service)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveLocalServiceAdvertisement indicates an expected call of RemoveLocalServiceAdvertisement.
+func (mr *MockNetcForPacketConnMockRecorder) RemoveLocalServiceAdvertisement(service any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveLocalServiceAdvertisement", reflect.TypeOf((*MockNetcForPacketConn)(nil).RemoveLocalServiceAdvertisement), service)
+}
+
+// SendMessageWithHopsToLive mocks base method.
+func (m *MockNetcForPacketConn) SendMessageWithHopsToLive(fromService, toNode, toService string, data []byte, hopsToLive byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendMessageWithHopsToLive", fromService, toNode, toService, data, hopsToLive)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendMessageWithHopsToLive indicates an expected call of SendMessageWithHopsToLive.
+func (mr *MockNetcForPacketConnMockRecorder) SendMessageWithHopsToLive(fromService, toNode, toService, data, hopsToLive any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessageWithHopsToLive", reflect.TypeOf((*MockNetcForPacketConn)(nil).SendMessageWithHopsToLive), fromService, toNode, toService, data, hopsToLive)
+}
+
+// MockNetcForPing is a mock of NetcForPing interface.
+type MockNetcForPing struct {
+	ctrl     *gomock.Controller
+	recorder *MockNetcForPingMockRecorder
+	isgomock struct{}
+}
+
+// MockNetcForPingMockRecorder is the mock recorder for MockNetcForPing.
+type MockNetcForPingMockRecorder struct {
+	mock *MockNetcForPing
+}
+
+// NewMockNetcForPing creates a new mock instance.
+func NewMockNetcForPing(ctrl *gomock.Controller) *MockNetcForPing {
+	mock := &MockNetcForPing{ctrl: ctrl}
+	mock.recorder = &MockNetcForPingMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNetcForPing) EXPECT() *MockNetcForPingMockRecorder {
+	return m.recorder
+}
+
+// Context mocks base method.
+func (m *MockNetcForPing) Context() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Context")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// Context indicates an expected call of Context.
+func (mr *MockNetcForPingMockRecorder) Context() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockNetcForPing)(nil).Context))
+}
+
+// ListenPacket mocks base method.
+func (m *MockNetcForPing) ListenPacket(service string) (netceptor.PacketConner, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListenPacket", service)
+	ret0, _ := ret[0].(netceptor.PacketConner)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListenPacket indicates an expected call of ListenPacket.
+func (mr *MockNetcForPingMockRecorder) ListenPacket(service any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListenPacket", reflect.TypeOf((*MockNetcForPing)(nil).ListenPacket), service)
+}
+
+// NewAddr mocks base method.
+func (m *MockNetcForPing) NewAddr(target, service string) netceptor.Addr {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewAddr", target, service)
+	ret0, _ := ret[0].(netceptor.Addr)
+	return ret0
+}
+
+// NewAddr indicates an expected call of NewAddr.
+func (mr *MockNetcForPingMockRecorder) NewAddr(target, service any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddr", reflect.TypeOf((*MockNetcForPing)(nil).NewAddr), target, service)
+}
+
+// NodeID mocks base method.
+func (m *MockNetcForPing) NodeID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NodeID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// NodeID indicates an expected call of NodeID.
+func (mr *MockNetcForPingMockRecorder) NodeID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockNetcForPing)(nil).NodeID))
+}
+
+// MockNetcForTraceroute is a mock of NetcForTraceroute interface.
+type MockNetcForTraceroute struct {
+	ctrl     *gomock.Controller
+	recorder *MockNetcForTracerouteMockRecorder
+	isgomock struct{}
+}
+
+// MockNetcForTracerouteMockRecorder is the mock recorder for MockNetcForTraceroute.
+type MockNetcForTracerouteMockRecorder struct {
+	mock *MockNetcForTraceroute
+}
+
+// NewMockNetcForTraceroute creates a new mock instance.
+func NewMockNetcForTraceroute(ctrl *gomock.Controller) *MockNetcForTraceroute {
+	mock := &MockNetcForTraceroute{ctrl: ctrl}
+	mock.recorder = &MockNetcForTracerouteMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNetcForTraceroute) EXPECT() *MockNetcForTracerouteMockRecorder {
+	return m.recorder
+}
+
+// Context mocks base method.
+func (m *MockNetcForTraceroute) Context() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Context")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// Context indicates an expected call of Context.
+func (mr *MockNetcForTracerouteMockRecorder) Context() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockNetcForTraceroute)(nil).Context))
+}
+
+// MaxForwardingHops mocks base method.
+func (m *MockNetcForTraceroute) MaxForwardingHops() byte {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MaxForwardingHops")
+	ret0, _ := ret[0].(byte)
+	return ret0
+}
+
+// MaxForwardingHops indicates an expected call of MaxForwardingHops.
+func (mr *MockNetcForTracerouteMockRecorder) MaxForwardingHops() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxForwardingHops", reflect.TypeOf((*MockNetcForTraceroute)(nil).MaxForwardingHops))
+}
+
+// Ping mocks base method.
+func (m *MockNetcForTraceroute) Ping(ctx context.Context, target string, hopsToLive byte) (time.Duration, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ping", ctx, target, hopsToLive)
+	ret0, _ := ret[0].(time.Duration)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Ping indicates an expected call of Ping.
+func (mr *MockNetcForTracerouteMockRecorder) Ping(ctx, target, hopsToLive any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockNetcForTraceroute)(nil).Ping), ctx, target, hopsToLive)
 }

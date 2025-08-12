@@ -86,11 +86,7 @@ func TestIsPending(t *testing.T) {
 
 func setUp(t *testing.T) (*gomock.Controller, workceptor.BaseWorkUnit, *workceptor.Workceptor, *mock_workceptor.MockNetceptorForWorkceptor, *logger.ReceptorLogger) {
 	ctrl := gomock.NewController(t)
-
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-
-	// attach logger to the mock netceptor and return any number of times
-	logger.SetGlobalLogLevel(4)
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 	mockNetceptor.EXPECT().NodeID().Return("NodeID")

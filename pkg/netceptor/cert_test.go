@@ -8,29 +8,35 @@ import (
 	"github.com/ansible/receptor/pkg/certificates"
 )
 
-func TestIsCertificateInPool(t *testing.T) {
-	// Use Receptor's certificate creation functions
-	rsaWrapper := &certificates.RsaWrapper{}
-
-	// Create a test CA certificate
-	caOpts := &certificates.CertOptions{
+// Standard CA options used across tests.
+var (
+	caOpts = &certificates.CertOptions{
 		CommonName: "Test CA",
 		Bits:       2048,
 		NotBefore:  time.Now(),
 		NotAfter:   time.Now().Add(365 * 24 * time.Hour),
 	}
 
-	ca, err := certificates.CreateCA(caOpts, rsaWrapper)
-	if err != nil {
-		t.Fatalf("Failed to create CA: %v", err)
-	}
-
-	// Create a different CA certificate
-	otherCAOpts := &certificates.CertOptions{
+	otherCAOpts = &certificates.CertOptions{
 		CommonName: "Other Test CA",
 		Bits:       2048,
 		NotBefore:  time.Now(),
 		NotAfter:   time.Now().Add(365 * 24 * time.Hour),
+	}
+)
+
+// testCASetup creates test CA certificates for testing.
+type testCASetup struct {
+	ca      *certificates.CA
+	otherCA *certificates.CA
+}
+
+func setupTestCAs(t *testing.T) *testCASetup {
+	rsaWrapper := &certificates.RsaWrapper{}
+
+	ca, err := certificates.CreateCA(caOpts, rsaWrapper)
+	if err != nil {
+		t.Fatalf("Failed to create CA: %v", err)
 	}
 
 	otherCA, err := certificates.CreateCA(otherCAOpts, rsaWrapper)
@@ -38,46 +44,45 @@ func TestIsCertificateInPool(t *testing.T) {
 		t.Fatalf("Failed to create other CA: %v", err)
 	}
 
+	return &testCASetup{
+		ca:      ca,
+		otherCA: otherCA,
+	}
+}
+
+// setupTestPool creates certificate pools with given certificates.
+func setupTestPool(certs ...*x509.Certificate) *x509.CertPool {
+	pool := x509.NewCertPool()
+	for _, cert := range certs {
+		if cert != nil {
+			pool.AddCert(cert)
+		}
+	}
+
+	return pool
+}
+
+func TestIsCertificateInPool(t *testing.T) {
+	setup := setupTestCAs(t)
+
 	tests := []struct {
 		name     string
 		pool     *x509.CertPool
 		expected bool
 	}{
+		{"nil pool", nil, false},
+		{"empty pool", setupTestPool(), false},
+		{"certificate in pool", setupTestPool(setup.ca.Certificate), true},
+		{"certificate not in pool", setupTestPool(setup.otherCA.Certificate), false},
 		{
-			name:     "nil pool",
-			pool:     nil,
-			expected: false,
-		},
-		{
-			name:     "empty pool",
-			pool:     x509.NewCertPool(),
-			expected: false,
-		},
-		{
-			name: "certificate in pool",
-			pool: func() *x509.CertPool {
-				pool := x509.NewCertPool()
-				pool.AddCert(ca.Certificate)
-
-				return pool
-			}(),
-			expected: true,
-		},
-		{
-			name: "certificate not in pool",
-			pool: func() *x509.CertPool {
-				pool := x509.NewCertPool()
-				pool.AddCert(otherCA.Certificate)
-
-				return pool
-			}(),
-			expected: false,
+			"certificate in pool with multiple certs",
+			setupTestPool(setup.otherCA.Certificate, setup.ca.Certificate), true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isCertificateInPool(ca.Certificate, tt.pool)
+			result := isCertificateInPool(setup.ca.Certificate, tt.pool)
 			if result != tt.expected {
 				t.Errorf("isCertificateInPool() = %v, expected %v", result, tt.expected)
 			}
@@ -85,19 +90,9 @@ func TestIsCertificateInPool(t *testing.T) {
 	}
 }
 
-func TestReceptorVerifyFuncWithDuplicates(t *testing.T) {
-	// This test verifies that ReceptorVerifyFunc properly handles duplicate certificates
-	// and logs the appropriate debug messages when skipping duplicates
-
+// setupCAAndServerCert creates a CA and a server certificate signed by that CA.
+func setupCAAndServerCert(t *testing.T) (*certificates.CA, *x509.Certificate) {
 	rsaWrapper := &certificates.RsaWrapper{}
-
-	// Create a CA certificate
-	caOpts := &certificates.CertOptions{
-		CommonName: "Test CA",
-		Bits:       2048,
-		NotBefore:  time.Now(),
-		NotAfter:   time.Now().Add(365 * 24 * time.Hour),
-	}
 
 	ca, err := certificates.CreateCA(caOpts, rsaWrapper)
 	if err != nil {
@@ -131,46 +126,47 @@ func TestReceptorVerifyFuncWithDuplicates(t *testing.T) {
 		t.Fatalf("Failed to sign server certificate: %v", err)
 	}
 
-	// Test that when CA cert is already in RootCAs pool,
-	// it doesn't get added again as an intermediate
-	t.Run("duplicate CA certificate handling", func(t *testing.T) {
-		// Create a certificate pool with the CA cert
-		rootPool := x509.NewCertPool()
-		rootPool.AddCert(ca.Certificate)
+	return ca, serverCert
+}
 
-		// Verify that our CA cert is considered to be in the pool
-		if !isCertificateInPool(ca.Certificate, rootPool) {
-			t.Error("CA certificate should be detected as already in pool")
-		}
+func TestReceptorVerifyFuncWithDuplicates(t *testing.T) {
+	// This test verifies that ReceptorVerifyFunc properly handles duplicate certificates
+	// and logs the appropriate debug messages when skipping duplicates
 
-		// Verify that the server cert (which is different) is not in the pool
-		if isCertificateInPool(serverCert, rootPool) {
-			t.Error("Server certificate should not be detected as in CA pool")
-		}
-	})
+	ca, serverCert := setupCAAndServerCert(t)
+	setup := setupTestCAs(t)
 
-	// Test that intermediate certificates that are duplicates of root CAs are skipped
-	t.Run("intermediate duplicate detection", func(t *testing.T) {
-		// This test simulates the scenario where a peer sends a certificate chain
-		// that includes intermediate certificates already present in our root CA pool
+	tests := []struct {
+		name               string
+		testCert           *x509.Certificate
+		pool               *x509.CertPool
+		expectedCAInPool   bool
+		expectedServerInCA bool
+	}{
+		{"CA cert already in pool", ca.Certificate, setupTestPool(ca.Certificate), true, false},
+		{"CA cert not in empty pool", ca.Certificate, setupTestPool(), false, false},
+		{"CA cert not in different pool", ca.Certificate, setupTestPool(setup.otherCA.Certificate), false, false},
+		{"server cert never in CA pool", serverCert, setupTestPool(ca.Certificate), false, false},
+		{
+			"duplicate detection in multi-cert pool", ca.Certificate,
+			setupTestPool(setup.otherCA.Certificate, ca.Certificate), true, false,
+		},
+	}
 
-		rootPool := x509.NewCertPool()
-		rootPool.AddCert(ca.Certificate)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the certificate we're checking
+			certInPool := isCertificateInPool(tt.testCert, tt.pool)
+			if certInPool != tt.expectedCAInPool {
+				t.Errorf("Certificate in pool: got %v, expected %v", certInPool, tt.expectedCAInPool)
+			}
 
-		// Simulate what happens in ReceptorVerifyFunc when we have:
-		// certs[0] = server certificate
-		// certs[1] = CA certificate (already in our root pool)
-
-		// The CA certificate should be detected as already present in the root pool
-		isDuplicate := isCertificateInPool(ca.Certificate, rootPool)
-		if !isDuplicate {
-			t.Error("CA certificate should be detected as duplicate when already in root pool")
-		}
-
-		// The server certificate should not be detected as duplicate
-		isServerDuplicate := isCertificateInPool(serverCert, rootPool)
-		if isServerDuplicate {
-			t.Error("Server certificate should not be detected as duplicate")
-		}
-	})
+			// Always test that server cert is not detected as in CA pool (server certs are not CAs)
+			serverInPool := isCertificateInPool(serverCert, tt.pool)
+			if serverInPool != tt.expectedServerInCA {
+				t.Errorf("Server certificate should never be in CA pool: got %v, expected %v",
+					serverInPool, tt.expectedServerInCA)
+			}
+		})
+	}
 }

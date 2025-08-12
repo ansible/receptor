@@ -2,713 +2,670 @@ package mesh
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/ansible/receptor/pkg/backends"
+	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-// TestQuicCryptoBufferExceededLargeCert tests CRYPTO_BUFFER_EXCEEDED with large server certificates
-// This test demonstrates the customer error when individual server certificates exceed QUIC buffer limits
-func TestQuicCryptoBufferExceededLargeCert(t *testing.T) {
-	t.Run("Large server certificate triggers CRYPTO_BUFFER_EXCEEDED", func(t *testing.T) {
-		const maxBufferSize = 16384 // QUIC crypto stream buffer limit
-
-		// Create large TLS configuration with oversized certificate
-		largeTLSConfig := createLargeTLSConfig()
-
-		// Analyze the certificate size
-		if len(largeTLSConfig.Certificates) > 0 {
-			certSize := len(largeTLSConfig.Certificates[0].Certificate[0])
-			t.Logf("Large certificate size: %d bytes", certSize)
-		}
-
-		// Check client CA pool size
-		if largeTLSConfig.ClientCAs != nil {
-			subjects := largeTLSConfig.ClientCAs.Subjects()
-			t.Logf("Number of CA certificates: %d", len(subjects))
-			totalSize := 0
-			for _, subject := range subjects {
-				totalSize += len(subject)
-			}
-			t.Logf("Total CA subjects size: %d bytes", totalSize)
-		}
-
-		// Create Netceptor instance
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		n := netceptor.New(ctx, "test-node")
-		defer n.Shutdown()
-
-		// ListenAndAdvertise with large TLS config
-		listener, err := n.ListenAndAdvertise("testlrg", largeTLSConfig, map[string]string{
-			"type": "large-tls-test",
-		})
-
-		if err != nil {
-			t.Errorf("ListenAndAdvertise failed with large TLS config: %v", err)
-			return
-		}
-		defer listener.Close()
-
-		t.Logf("ListenAndAdvertise succeeded - now setting up Receptor network connection")
-		t.Logf("Large certificate size: %d bytes exceeds buffer limit %d bytes", len(largeTLSConfig.Certificates[0].Certificate[0]), maxBufferSize)
-
-		// Create second Netceptor instance for client
-		client := netceptor.New(ctx, "test-client")
-		defer client.Shutdown()
-
-		// Set up TCP backends to establish network connection
-		b1, err := backends.NewTCPListener("localhost:0", nil, n.Logger)
-		if err != nil {
-			t.Errorf("Error creating TCP listener: %v", err)
-			return
-		}
-		err = n.AddBackend(b1)
-		if err != nil {
-			t.Errorf("Error adding backend to server: %v", err)
-			return
-		}
-
-		// Get the actual port that was assigned
-		tcpAddr := b1.GetAddr()
-		t.Logf("Server listening on: %s", tcpAddr)
-
-		// Set up TCP dialer on client to connect to the listener
-		b2, err := backends.NewTCPDialer(tcpAddr, false, nil, client.Logger)
-		if err != nil {
-			t.Errorf("Error creating TCP dialer: %v", err)
-			return
-		}
-		err = client.AddBackend(b2)
-		if err != nil {
-			t.Errorf("Error adding backend to client: %v", err)
-			return
-		}
-
-		// Give time for backends to establish connection
-		time.Sleep(2 * time.Second)
-
-		// Now attempt to dial the service with large TLS config
-		// This should trigger CRYPTO_BUFFER_EXCEEDED when QUIC tries to send large cert data
-		t.Logf("Client attempting to dial service with large TLS config...")
-		conn, err := client.Dial("test-node", "testlrg", largeTLSConfig)
-		if err != nil {
-			t.Errorf("Dial failed with large TLS config: %v", err)
-			return
-		}
-
-		if conn != nil {
-			defer conn.Close()
-			t.Logf("Connection succeeded - attempting to write data to trigger full TLS handshake")
-
-			// Try to write data through the connection - this should trigger CRYPTO_BUFFER_EXCEEDED
-			_, writeErr := conn.Write([]byte("test data to trigger TLS handshake"))
-			if writeErr != nil {
-				t.Errorf("Write failed during TLS handshake: %v", writeErr)
-				return
-			}
-
-			t.Errorf("Write succeeded - CRYPTO_BUFFER_EXCEEDED should have occurred with cert size %d > %d",
-				len(largeTLSConfig.Certificates[0].Certificate[0]), maxBufferSize)
-		}
-	})
+// setupTest creates and configures Netceptor instances with backends for testing
+// If filesystemCerts is provided, uses those certificates; otherwise generates new ones
+type filesystemCerts struct {
+	serverCert string
+	serverKey  string
+	clientCAs  string
+	rootCAs    string
 }
 
-// TestQuicCryptoBufferExceededReceptorTLSConfig tests CRYPTO_BUFFER_EXCEEDED using Receptor's TLS config functions
-// This test uses PrepareTLSServerConfig/PrepareTLSClientConfig instead of manual certificate creation
-func TestQuicCryptoBufferExceededReceptorTLSConfig(t *testing.T) {
-	t.Run("Receptor TLS config with large certificates", func(t *testing.T) {
-		// Create temporary directory for test certificates
+func setupTest(t *testing.T, serverName, clientName string, fsCerts *filesystemCerts, dnsNameCount, nodeIDCount, caCount int) (*netceptor.Netceptor, *netceptor.Netceptor, *tls.Config, *tls.Config, func()) {
+	// Create Netceptor instances with fresh background contexts
+	serverNode := netceptor.New(context.Background(), serverName)
+	clientNode := netceptor.New(context.Background(), clientName)
+
+	// Set up TCP backends to establish network connection
+	b1, err := backends.NewTCPListener("localhost:0", nil, serverNode.Logger)
+	if err != nil {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+		t.Fatalf("Error creating TCP listener: %v", err)
+	}
+	err = serverNode.AddBackend(b1)
+	if err != nil {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+		t.Fatalf("Error adding backend to server: %v", err)
+	}
+
+	// Get the actual port that was assigned
+	tcpAddr := b1.GetAddr()
+	t.Logf("Server listening on: %s", tcpAddr)
+
+	// Set up TCP dialer on client to connect to the listener
+	b2, err := backends.NewTCPDialer(tcpAddr, false, nil, clientNode.Logger)
+	if err != nil {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+		t.Fatalf("Error creating TCP dialer: %v", err)
+	}
+	err = clientNode.AddBackend(b2)
+	if err != nil {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+		t.Fatalf("Error adding backend to client: %v", err)
+	}
+
+	// Give time for backends to establish connection and routing to stabilize
+	time.Sleep(3 * time.Second)
+
+	var serverCertFile, serverKeyFile, clientCAsFile, rootCAsFile string
+
+	if fsCerts != nil {
+		// Use filesystem certificates
+		serverCertFile = fsCerts.serverCert
+		serverKeyFile = fsCerts.serverKey
+		clientCAsFile = fsCerts.clientCAs
+		rootCAsFile = fsCerts.rootCAs
+	} else {
+		// Generate certificates
 		tempDir := t.TempDir()
-
-		// Create large certificate and key files similar to createLargeTLSConfig
-		serverCertFile := filepath.Join(tempDir, "server.crt")
-		serverKeyFile := filepath.Join(tempDir, "server.key")
-		clientCAsFile := filepath.Join(tempDir, "client-cas.crt")
-
-		// Create server certificate with threshold size that triggers CRYPTO_BUFFER_EXCEEDED
-		serverCertTemplate := x509.Certificate{
-			SerialNumber: big.NewInt(1),
-			Subject: pkix.Name{
-				Organization:       []string{"Large Server Cert"},
-				Country:            []string{"US"},
-				Province:           []string{"CA"},
-				Locality:           []string{"SF"},
-				StreetAddress:      []string{"123 Main St"},
-				PostalCode:         []string{"94102"},
-				OrganizationalUnit: []string{"IT"},
-			},
-			NotBefore:   time.Now(),
-			NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-			KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-			ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-			IsCA:        true,
-			IPAddresses: nil,
-			DNSNames:    []string{"localhost"},
-			// Add email addresses to reach threshold that triggers CRYPTO_BUFFER_EXCEEDED
-			EmailAddresses: func() []string {
-				emails := make([]string, 111) // 111 emails triggers CRYPTO_BUFFER_EXCEEDED
-				for i := range emails {
-					emails[i] = fmt.Sprintf("very-long-email-address-to-increase-certificate-size-%d@extremely-long-domain-name-to-exceed-quic-crypto-buffer-limits.example.com", i)
-				}
-				return emails
-			}(),
-		}
-
-		// Generate private key
-		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		var err error
+		serverCertFile, serverKeyFile, clientCAsFile, err = createReceptorCertificateAndCA(tempDir, dnsNameCount, nodeIDCount, caCount, serverName, clientName)
 		if err != nil {
-			t.Fatalf("Failed to generate private key: %v", err)
+			serverNode.Shutdown()
+			clientNode.Shutdown()
+			t.Fatalf("Error creating cert and CA: %v", err)
 		}
+		rootCAsFile = clientCAsFile // Use same CA bundle for RootCAs when generating
+	}
 
-		// Create certificate
-		certDER, err := x509.CreateCertificate(rand.Reader, &serverCertTemplate, &serverCertTemplate, &privateKey.PublicKey, privateKey)
-		if err != nil {
-			t.Fatalf("Failed to create certificate: %v", err)
-		}
+	// Create TLS server configuration using Receptor's PrepareTLSServerConfig
+	serverConfig := netceptor.TLSServerConfig{
+		Name:                   serverName,
+		Cert:                   serverCertFile,
+		Key:                    serverKeyFile,
+		RequireClientCert:      true,
+		ClientCAs:              clientCAsFile,
+		SkipReceptorNamesCheck: true,
+		MinTLS13:               false,
+	}
 
-		// Convert to PEM
-		certPEM := pem.EncodeToMemory(&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: certDER,
-		})
+	// Create client TLS config
+	clientConfig := netceptor.TLSClientConfig{
+		Name:                   clientName,
+		Cert:                   serverCertFile, // Reuse server cert for client
+		Key:                    serverKeyFile,  // Reuse server key for client
+		RootCAs:                rootCAsFile,
+		InsecureSkipVerify:     true,
+		SkipReceptorNamesCheck: true,
+		MinTLS13:               false,
+	}
 
-		privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-		if err != nil {
-			t.Fatalf("Failed to marshal private key: %v", err)
-		}
-		keyPEM := pem.EncodeToMemory(&pem.Block{
-			Type:  "PRIVATE KEY",
-			Bytes: privateKeyBytes,
-		})
+	serverTLSConfig, err := serverConfig.PrepareTLSServerConfig(serverNode)
+	if err != nil {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+		t.Fatalf("Failed to prepare TLS server config: %v", err)
+	}
 
-		// Write certificate and key files
-		err = os.WriteFile(serverCertFile, certPEM, 0644)
-		if err != nil {
-			t.Fatalf("Failed to write server certificate: %v", err)
-		}
-		err = os.WriteFile(serverKeyFile, keyPEM, 0600)
-		if err != nil {
-			t.Fatalf("Failed to write server key: %v", err)
-		}
+	clientTLSConfig, _, err := clientConfig.PrepareTLSClientConfig(clientNode)
+	if err != nil {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+		t.Fatalf("Failed to prepare TLS client config: %v", err)
+	}
 
-		// Create large CA bundle
-		largeTLSConfig := createLargeTLSConfig()
-		largeCert := largeTLSConfig.Certificates[0]
-		largeCertPEM := pem.EncodeToMemory(&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: largeCert.Certificate[0],
-		})
+	// Return cleanup function
+	cleanup := func() {
+		serverNode.Shutdown()
+		clientNode.Shutdown()
+	}
 
-		// Create client CAs file with large certificates
-		var clientCAsPEM []byte
-		for i := 0; i < 50; i++ {
-			clientCAsPEM = append(clientCAsPEM, largeCertPEM...)
-		}
-		err = os.WriteFile(clientCAsFile, clientCAsPEM, 0644)
-		if err != nil {
-			t.Fatalf("Failed to write client CAs: %v", err)
-		}
-
-		t.Logf("Created test certificates:")
-		t.Logf("  Server cert: %s (%d bytes)", serverCertFile, len(certPEM))
-		t.Logf("  Server key: %s (%d bytes)", serverKeyFile, len(keyPEM))
-		t.Logf("  Client CAs: %s (%d bytes)", clientCAsFile, len(clientCAsPEM))
-
-		// Create Netceptor instance
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		n := netceptor.New(ctx, "test-node-tls")
-		defer n.Shutdown()
-
-		// Create TLS server configuration using Receptor's PrepareTLSServerConfig
-		serverConfig := netceptor.TLSServerConfig{
-			Name:                   "test-server",
-			Cert:                   serverCertFile,
-			Key:                    serverKeyFile,
-			RequireClientCert:      true,
-			ClientCAs:              clientCAsFile,
-			SkipReceptorNamesCheck: true,
-			MinTLS13:               false,
-		}
-
-		serverTLSConfig, err := serverConfig.PrepareTLSServerConfig(n)
-		if err != nil {
-			t.Fatalf("Failed to prepare TLS server config: %v", err)
-		}
-
-		// Log server TLS config details
-		serverCertSize := len(serverTLSConfig.Certificates[0].Certificate[0])
-		t.Logf("Server TLS config prepared:")
-		t.Logf("  Server certificate size: %d bytes", serverCertSize)
-		if serverTLSConfig.ClientCAs != nil {
-			subjects := serverTLSConfig.ClientCAs.Subjects()
-			t.Logf("  Client CAs count: %d", len(subjects))
-		}
-
-		// This should trigger CRYPTO_BUFFER_EXCEEDED when used in connection
-		const maxBufferSize = 16384
-		if serverCertSize > maxBufferSize {
-			t.Logf("Certificate size %d exceeds QUIC buffer limit %d - will trigger CRYPTO_BUFFER_EXCEEDED",
-				serverCertSize, maxBufferSize)
-		}
-
-		// Now test ListenAndAdvertise with this TLS configuration
-		listener, err := n.ListenAndAdvertise("testtls", serverTLSConfig, map[string]string{
-			"type": "receptor-tls-test",
-		})
-
-		if err != nil {
-			t.Errorf("ListenAndAdvertise failed with Receptor TLS config: %v", err)
-			return
-		}
-		defer listener.Close()
-
-		t.Logf("ListenAndAdvertise succeeded with Receptor TLS config")
-
-		// Create client Netceptor
-		client := netceptor.New(ctx, "test-client-tls")
-		defer client.Shutdown()
-
-		// Set up TCP backends for network connection
-		b1, err := backends.NewTCPListener("localhost:0", nil, n.Logger)
-		if err != nil {
-			t.Errorf("Error creating TCP listener: %v", err)
-			return
-		}
-		err = n.AddBackend(b1)
-		if err != nil {
-			t.Errorf("Error adding backend to server: %v", err)
-			return
-		}
-
-		tcpAddr := b1.GetAddr()
-		t.Logf("Server listening on: %s", tcpAddr)
-
-		b2, err := backends.NewTCPDialer(tcpAddr, false, nil, client.Logger)
-		if err != nil {
-			t.Errorf("Error creating TCP dialer: %v", err)
-			return
-		}
-		err = client.AddBackend(b2)
-		if err != nil {
-			t.Errorf("Error adding backend to client: %v", err)
-			return
-		}
-
-		// Wait for backend connection
-		time.Sleep(2 * time.Second)
-
-		// Create client TLS config
-		clientConfig := netceptor.TLSClientConfig{
-			Name:                   "test-client",
-			Cert:                   serverCertFile,
-			Key:                    serverKeyFile,
-			RootCAs:                clientCAsFile,
-			InsecureSkipVerify:     true,
-			SkipReceptorNamesCheck: true,
-			MinTLS13:               false,
-		}
-
-		clientTLSConfig, _, err := clientConfig.PrepareTLSClientConfig(client)
-		if err != nil {
-			t.Errorf("Failed to prepare TLS client config: %v", err)
-			return
-		}
-
-		// Log client TLS config details
-		if len(clientTLSConfig.Certificates) > 0 {
-			clientCertSize := len(clientTLSConfig.Certificates[0].Certificate[0])
-			t.Logf("Client certificate size: %d bytes", clientCertSize)
-		}
-		if clientTLSConfig.RootCAs != nil {
-			subjects := clientTLSConfig.RootCAs.Subjects()
-			t.Logf("Client root CAs count: %d", len(subjects))
-		}
-
-		// Attempt to dial - this should trigger CRYPTO_BUFFER_EXCEEDED and FAIL the test
-		t.Logf("Client attempting to dial with Receptor TLS config (large certificates)...")
-		conn, err := client.Dial("test-node-tls", "testtls", clientTLSConfig)
-		if err != nil {
-			t.Errorf("Dial failed with Receptor TLS config: %v", err)
-			return
-		} else {
-			defer conn.Close()
-			t.Logf("Connection succeeded - attempting write to trigger full handshake")
-
-			_, writeErr := conn.Write([]byte("test data"))
-			if writeErr != nil {
-				t.Errorf("Write failed during handshake: %v", writeErr)
-				return
-			} else {
-				t.Errorf("Write succeeded - CRYPTO_BUFFER_EXCEEDED should have occurred with certificate size %d bytes",
-					len(serverTLSConfig.Certificates[0].Certificate[0]))
-				return
-			}
-		}
-	})
+	return serverNode, clientNode, serverTLSConfig, clientTLSConfig, cleanup
 }
 
-// TestQuicCryptoBufferExceededLargeCABundle tests CRYPTO_BUFFER_EXCEEDED with only large CA bundle
-// This test uses a small server certificate but an extremely large CA bundle to trigger the error
-func TestQuicCryptoBufferExceededLargeCABundle(t *testing.T) {
-	t.Run("Large CA bundle with small server certificate", func(t *testing.T) {
-		// Create temporary directory for test certificates
-		tempDir := t.TempDir()
+// TestQuicCryptoBufferExceeded tests CRYPTO_BUFFER_EXCEEDED scenarios with large TLS configurations
+// This test demonstrates various customer errors when TLS configurations exceed QUIC buffer limits.
+func TestQuicCryptoBufferExceeded(t *testing.T) {
 
-		// Create certificate and key files
-		serverCertFile := filepath.Join(tempDir, "server.crt")
-		serverKeyFile := filepath.Join(tempDir, "server.key")
-		clientCAsFile := filepath.Join(tempDir, "client-cas.crt")
-
-		// Create MINIMAL server certificate (very small)
-		minimalistCertTemplate := x509.Certificate{
-			SerialNumber: big.NewInt(1),
-			Subject: pkix.Name{
-				Organization: []string{"Minimal Cert"},
-				Country:      []string{"US"},
-			},
-			NotBefore:   time.Now(),
-			NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-			KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-			ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-			IsCA:        true,
-			DNSNames:    []string{"localhost"},
-			// Minimal fields - just one email
-			EmailAddresses: []string{"test@example.com"},
-		}
-
-		// Generate minimal private key
-		minimalPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			t.Fatalf("Failed to generate minimal private key: %v", err)
-		}
-
-		// Create minimal certificate
-		minimalCertDER, err := x509.CreateCertificate(rand.Reader, &minimalistCertTemplate, &minimalistCertTemplate, &minimalPrivateKey.PublicKey, minimalPrivateKey)
-		if err != nil {
-			t.Fatalf("Failed to create minimal certificate: %v", err)
-		}
-
-		// Convert to PEM
-		minimalCertPEM := pem.EncodeToMemory(&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: minimalCertDER,
-		})
-
-		minimalPrivateKeyBytes, err := x509.MarshalPKCS8PrivateKey(minimalPrivateKey)
-		if err != nil {
-			t.Fatalf("Failed to marshal minimal private key: %v", err)
-		}
-		minimalKeyPEM := pem.EncodeToMemory(&pem.Block{
-			Type:  "PRIVATE KEY",
-			Bytes: minimalPrivateKeyBytes,
-		})
-
-		// Write MINIMAL server certificate and key
-		err = os.WriteFile(serverCertFile, minimalCertPEM, 0644)
-		if err != nil {
-			t.Fatalf("Failed to write minimal server certificate: %v", err)
-		}
-		err = os.WriteFile(serverKeyFile, minimalKeyPEM, 0600)
-		if err != nil {
-			t.Fatalf("Failed to write minimal server key: %v", err)
-		}
-
-		// Create EXTREMELY LARGE CA bundle with many different large certificates
-		// This simulates the field case where CA bundle causes CRYPTO_BUFFER_EXCEEDED
-		var massiveCABundle []byte
-
-		// Create several different large CA certificates to add to the bundle
-		for caIndex := 0; caIndex < 10; caIndex++ {
-			// Create a unique large CA certificate for each iteration
-			largeCACertTemplate := x509.Certificate{
-				SerialNumber: big.NewInt(int64(100 + caIndex)),
-				Subject: pkix.Name{
-					Organization:  []string{fmt.Sprintf("Large CA Organization %d", caIndex)},
-					Country:       []string{"US"},
-					Province:      []string{"CA"},
-					Locality:      []string{"SF"},
-					StreetAddress: []string{fmt.Sprintf("123 CA Street %d", caIndex)},
-					PostalCode:    []string{"94102"},
-					// Large organizational units for each CA
-					OrganizationalUnit: []string{
-						fmt.Sprintf("Large CA OU %d: %s", caIndex, strings.Repeat("Large OU Data ", 50)),
-						fmt.Sprintf("Another Large CA OU %d: %s", caIndex, strings.Repeat("More OU Data ", 50)),
-					},
-				},
-				NotBefore:   time.Now(),
-				NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-				KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-				ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-				IsCA:        true,
-				IPAddresses: nil,
-				DNSNames:    []string{fmt.Sprintf("ca%d.example.com", caIndex)},
-				// Large number of email addresses for each CA certificate
-				EmailAddresses: func() []string {
-					emails := make([]string, 100) // 100 emails per CA cert
-					for i := range emails {
-						emails[i] = fmt.Sprintf("ca%d-very-long-email-address-to-increase-certificate-size-%d@extremely-long-domain-name-to-exceed-quic-crypto-buffer-limits-for-ca-bundle.example.com", caIndex, i)
-					}
-					return emails
-				}(),
-			}
-
-			// Generate private key for this CA
-			caPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-			if err != nil {
-				t.Fatalf("Failed to generate CA private key %d: %v", caIndex, err)
-			}
-
-			// Create CA certificate
-			caCertDER, err := x509.CreateCertificate(rand.Reader, &largeCACertTemplate, &largeCACertTemplate, &caPrivateKey.PublicKey, caPrivateKey)
-			if err != nil {
-				t.Fatalf("Failed to create CA certificate %d: %v", caIndex, err)
-			}
-
-			// Convert to PEM and add to bundle
-			caCertPEM := pem.EncodeToMemory(&pem.Block{
-				Type:  "CERTIFICATE",
-				Bytes: caCertDER,
-			})
-
-			// Add this CA certificate to the bundle multiple times to increase size
-			for repeat := 0; repeat < 20; repeat++ { // 20 copies of each CA cert
-				massiveCABundle = append(massiveCABundle, caCertPEM...)
-			}
-		}
-
-		// Write the MASSIVE CA bundle file
-		err = os.WriteFile(clientCAsFile, massiveCABundle, 0644)
-		if err != nil {
-			t.Fatalf("Failed to write massive CA bundle: %v", err)
-		}
-
-		t.Logf("Created field-case test certificates:")
-		t.Logf("  MINIMAL Server cert: %s (%d bytes)", serverCertFile, len(minimalCertPEM))
-		t.Logf("  MINIMAL Server key: %s (%d bytes)", serverKeyFile, len(minimalKeyPEM))
-		t.Logf("  MASSIVE CA bundle: %s (%d bytes)", clientCAsFile, len(massiveCABundle))
-
-		// Create Netceptor instance
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		n := netceptor.New(ctx, "test-node-ca")
-		defer n.Shutdown()
-
-		// Create TLS server configuration with minimal server cert but massive CA bundle
-		serverConfig := netceptor.TLSServerConfig{
-			Name:                   "test-server-ca",
-			Cert:                   serverCertFile,
-			Key:                    serverKeyFile,
-			RequireClientCert:      true,
-			ClientCAs:              clientCAsFile, // This is the massive CA bundle that should trigger error
-			SkipReceptorNamesCheck: true,
-			MinTLS13:               false,
-		}
-
-		serverTLSConfig, err := serverConfig.PrepareTLSServerConfig(n)
-		if err != nil {
-			t.Fatalf("Failed to prepare TLS server config with massive CA bundle: %v", err)
-		}
-
-		// Log the configuration details
-		serverCertSize := len(serverTLSConfig.Certificates[0].Certificate[0])
-		t.Logf("Server TLS config prepared:")
-		t.Logf("  MINIMAL server certificate size: %d bytes", serverCertSize)
-		if serverTLSConfig.ClientCAs != nil {
-			subjects := serverTLSConfig.ClientCAs.Subjects()
-			t.Logf("  MASSIVE CA bundle - CA count: %d", len(subjects))
-			t.Logf("  MASSIVE CA bundle - file size: %d bytes", len(massiveCABundle))
-		}
-
-		const maxBufferSize = 16384
-		t.Logf("CA bundle size %d bytes should exceed QUIC buffer limit %d bytes during TLS handshake",
-			len(massiveCABundle), maxBufferSize)
-
-		// Test ListenAndAdvertise with massive CA bundle
-		listener, err := n.ListenAndAdvertise("testca", serverTLSConfig, map[string]string{
-			"type": "massive-ca-test",
-		})
-
-		if err != nil {
-			t.Errorf("ListenAndAdvertise failed with massive CA bundle: %v", err)
-			return
-		}
-		defer listener.Close()
-
-		t.Logf("ListenAndAdvertise succeeded with massive CA bundle")
-
-		// Create client Netceptor
-		client := netceptor.New(ctx, "test-client-ca")
-		defer client.Shutdown()
-
-		// Set up TCP backends
-		b1, err := backends.NewTCPListener("localhost:0", nil, n.Logger)
-		if err != nil {
-			t.Errorf("Error creating TCP listener: %v", err)
-			return
-		}
-		err = n.AddBackend(b1)
-		if err != nil {
-			t.Errorf("Error adding backend to server: %v", err)
-			return
-		}
-
-		tcpAddr := b1.GetAddr()
-		t.Logf("Server listening on: %s", tcpAddr)
-
-		b2, err := backends.NewTCPDialer(tcpAddr, false, nil, client.Logger)
-		if err != nil {
-			t.Errorf("Error creating TCP dialer: %v", err)
-			return
-		}
-		err = client.AddBackend(b2)
-		if err != nil {
-			t.Errorf("Error adding backend to client: %v", err)
-			return
-		}
-
-		// Wait for backend connection
-		time.Sleep(2 * time.Second)
-
-		// Create client TLS config that will also use the massive CA bundle
-		clientConfig := netceptor.TLSClientConfig{
-			Name:                   "test-client-ca",
-			Cert:                   serverCertFile, // Reuse minimal cert for client
-			Key:                    serverKeyFile,  // Reuse minimal key for client
-			RootCAs:                clientCAsFile,  // Use the same massive CA bundle
-			InsecureSkipVerify:     true,
-			SkipReceptorNamesCheck: true,
-			MinTLS13:               false,
-		}
-
-		clientTLSConfig, _, err := clientConfig.PrepareTLSClientConfig(client)
-		if err != nil {
-			t.Errorf("Failed to prepare TLS client config: %v", err)
-			return
-		}
-
-		// Log client config details
-		if len(clientTLSConfig.Certificates) > 0 {
-			clientCertSize := len(clientTLSConfig.Certificates[0].Certificate[0])
-			t.Logf("Client certificate size: %d bytes", clientCertSize)
-		}
-		if clientTLSConfig.RootCAs != nil {
-			subjects := clientTLSConfig.RootCAs.Subjects()
-			t.Logf("Client root CAs count: %d", len(subjects))
-		}
-
-		// Attempt to dial - this should trigger CRYPTO_BUFFER_EXCEEDED due to massive CA bundle
-		t.Logf("Client attempting to dial with massive CA bundle (field case reproduction)...")
-		conn, err := client.Dial("test-node-ca", "testca", clientTLSConfig)
-		if err != nil {
-			t.Errorf("Dial failed with massive CA bundle: %v", err)
-			return
-		} else {
-			defer conn.Close()
-			t.Logf("Connection succeeded - attempting write to trigger full TLS handshake")
-
-			_, writeErr := conn.Write([]byte("test data with massive CA bundle"))
-			if writeErr != nil {
-				t.Errorf("Write failed during TLS handshake with massive CA bundle: %v", writeErr)
-				return
-			} else {
-				t.Errorf("Write succeeded - CRYPTO_BUFFER_EXCEEDED should have occurred with massive CA bundle (%d bytes)",
-					len(massiveCABundle))
-				return
-			}
-		}
-	})
-}
-
-// createLargeTLSConfig creates a TLS config with large client CA certificates
-// This simulates the scenario that triggers CRYPTO_BUFFER_EXCEEDED errors
-func createLargeTLSConfig() *tls.Config {
-	// Create a large certificate with many extensions and large fields
-	// This will cause the TLS handshake to exceed crypto buffer limits
-
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Large Test CA Organization"},
-			Country:       []string{"US"},
-			Province:      []string{"Test State"},
-			Locality:      []string{"Test City"},
-			StreetAddress: []string{"123 Test Street"},
-			PostalCode:    []string{"12345"},
-			// Add fewer organizational units to find threshold
-			OrganizationalUnit: []string{
-				strings.Repeat("OU ", 10), // Much smaller
-			},
+	tests := []struct {
+		name         string
+		dnsNameCount int
+		nodeIDCount  int
+		caCount      int
+		serverName   string
+		clientName   string
+	}{
+		{
+			name:         "large server certificate with small CA",
+			dnsNameCount: 380,
+			nodeIDCount:  190,
+			caCount:      1,
+			serverName:   "node1",
+			clientName:   "node2",
 		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-		IsCA:        true,
-		IPAddresses: nil,
-		DNSNames:    []string{"localhost"},
-		// Add email addresses to find threshold
-		EmailAddresses: func() []string {
-			emails := make([]string, 110) // 110 emails is threshold, 109 emails returns a different TLS error
-			for i := range emails {
-				emails[i] = fmt.Sprintf("very-long-email-address-to-increase-certificate-size-%d@extremely-long-domain-name-to-exceed-quic-crypto-buffer-limits.example.com", i)
+		{
+			name:         "small server certificate with large CA",
+			dnsNameCount: 1,
+			nodeIDCount:  1,
+			caCount:      5, // Test with slightly larger CAs to find exact threshold
+			serverName:   "node1",
+			clientName:   "node2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const serviceName = "test"
+
+			// Set up test infrastructure using generated certificates
+			serverNode, clientNode, serverTLSConfig, clientTLSConfig, cleanup := setupTest(t, tt.serverName, tt.clientName, nil, tt.dnsNameCount, tt.nodeIDCount, tt.caCount)
+			defer cleanup()
+
+			// Log combined TLS config sizes for analysis (what actually gets sent during handshake)
+			logCombinedTLSConfigSizes(t, "TLS Handshake", serverTLSConfig, clientTLSConfig)
+
+			// ListenAndAdvertise with TLS config
+			listener, err := serverNode.ListenAndAdvertise(serviceName, serverTLSConfig, map[string]string{
+				"type": "crypto-buffer-test",
+			})
+			if err != nil {
+				t.Fatalf("ListenAndAdvertise failed: %v", err)
 			}
-			return emails
-		}(),
+			defer listener.Close()
+
+			t.Logf("ListenAndAdvertise succeeded")
+
+			// Give time for service advertisement to propagate through the mesh
+			time.Sleep(2 * time.Second)
+
+			// Now attempt to dial the service with TLS config
+			// This should trigger CRYPTO_BUFFER_EXCEEDED when QUIC tries to send large cert data
+			t.Logf("Client attempting to dial service with TLS config...")
+			conn, err := clientNode.Dial(tt.serverName, serviceName, clientTLSConfig)
+			if err != nil {
+				// Fail the test to show the CRYPTO_BUFFER_EXCEEDED error
+				t.Fatalf("CRYPTO_BUFFER_EXCEEDED error: %v", err)
+			}
+
+			if conn != nil {
+				defer conn.Close()
+				t.Logf("Connection succeeded - attempting to write data to trigger full TLS handshake")
+
+				// Try to write data through the connection - this should trigger CRYPTO_BUFFER_EXCEEDED
+				_, writeErr := conn.Write([]byte("test data to trigger TLS handshake"))
+				if writeErr != nil {
+					// Fail the test to show the CRYPTO_BUFFER_EXCEEDED error
+					t.Fatalf("CRYPTO_BUFFER_EXCEEDED error during write: %v", writeErr)
+				}
+
+				// If we reach here, fail because CRYPTO_BUFFER_EXCEEDED should have occurred
+				t.Fatalf("Unexpected success - CRYPTO_BUFFER_EXCEEDED should have occurred with large TLS config")
+			}
+		})
+	}
+}
+
+// TestQuicCryptoBufferExceededFilesystem tests CRYPTO_BUFFER_EXCEEDED with real filesystem certificates
+// This test uses certificates from the filesystem via environment variables, skips if not set
+func TestQuicCryptoBufferExceededFilesystem(t *testing.T) {
+	// Check for required environment variables
+	serverCertFile := os.Getenv("RECEPTOR_TEST_SERVER_CERT")
+	serverKeyFile := os.Getenv("RECEPTOR_TEST_SERVER_KEY")
+	clientCAsFile := os.Getenv("RECEPTOR_TEST_CLIENT_CAS")
+	rootCAsFile := os.Getenv("RECEPTOR_TEST_ROOT_CAS")
+
+	if serverCertFile == "" || serverKeyFile == "" || clientCAsFile == "" || rootCAsFile == "" {
+		t.Skip("Skipping filesystem test - required environment variables not set (RECEPTOR_TEST_SERVER_CERT, RECEPTOR_TEST_SERVER_KEY, RECEPTOR_TEST_CLIENT_CAS, RECEPTOR_TEST_ROOT_CAS)")
 	}
 
-	// Generate private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048) // Reduce key size from 4096 to 2048
+	t.Logf("Using filesystem certificate files:")
+	t.Logf("  Server cert: %s", serverCertFile)
+	t.Logf("  Server key: %s", serverKeyFile)
+	t.Logf("  Client CAs: %s", clientCAsFile)
+	t.Logf("  Root CAs: %s", rootCAsFile)
+
+	// Check if files exist
+	if _, err := os.Stat(serverCertFile); os.IsNotExist(err) {
+		t.Skipf("Skipping filesystem test - server cert file not found: %s", serverCertFile)
+	}
+	if _, err := os.Stat(serverKeyFile); os.IsNotExist(err) {
+		t.Skipf("Skipping filesystem test - server key file not found: %s", serverKeyFile)
+	}
+	if _, err := os.Stat(clientCAsFile); os.IsNotExist(err) {
+		t.Skipf("Skipping filesystem test - client CAs file not found: %s", clientCAsFile)
+	}
+	if _, err := os.Stat(rootCAsFile); os.IsNotExist(err) {
+		t.Skipf("Skipping filesystem test - root CAs file not found: %s", rootCAsFile)
+	}
+
+	const serviceName = "testfs"
+	serverName := "fsnode1"
+	clientName := "fsnode2"
+
+	// Set up test infrastructure using filesystem certificates
+	fsCerts := &filesystemCerts{
+		serverCert: serverCertFile,
+		serverKey:  serverKeyFile,
+		clientCAs:  clientCAsFile,
+		rootCAs:    rootCAsFile,
+	}
+
+	serverNode, clientNode, serverTLSConfig, clientTLSConfig, cleanup := setupTest(t, serverName, clientName, fsCerts, 0, 0, 0)
+	defer cleanup()
+
+	// Log filesystem certificate details
+	if len(serverTLSConfig.Certificates) > 0 {
+		serverCertSize := len(serverTLSConfig.Certificates[0].Certificate[0])
+		t.Logf("Filesystem server certificate size: %d bytes", serverCertSize)
+	}
+
+	if serverTLSConfig.ClientCAs != nil {
+		subjects := serverTLSConfig.ClientCAs.Subjects()
+		t.Logf("Filesystem client CAs count: %d", len(subjects))
+	}
+
+	if clientTLSConfig.RootCAs != nil {
+		subjects := clientTLSConfig.RootCAs.Subjects()
+		t.Logf("Filesystem root CAs count: %d", len(subjects))
+	}
+
+	// Log combined TLS config sizes for analysis
+	logCombinedTLSConfigSizes(t, "Filesystem TLS Handshake", serverTLSConfig, clientTLSConfig)
+
+	// ListenAndAdvertise with TLS config
+	listener, err := serverNode.ListenAndAdvertise(serviceName, serverTLSConfig, map[string]string{
+		"type": "filesystem-crypto-buffer-test",
+	})
 	if err != nil {
-		panic(err)
+		t.Fatalf("ListenAndAdvertise failed: %v", err)
 	}
+	defer listener.Close()
 
-	// Create certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	t.Logf("ListenAndAdvertise succeeded")
+
+	// Give time for service advertisement to propagate through the mesh
+	time.Sleep(2 * time.Second)
+
+	// Attempt to dial the service with filesystem TLS config
+	t.Logf("Client attempting to dial service with filesystem TLS config...")
+	conn, err := clientNode.Dial(serverName, serviceName, clientTLSConfig)
 	if err != nil {
-		panic(err)
+		// Fail the test to show the CRYPTO_BUFFER_EXCEEDED error
+		t.Fatalf("CRYPTO_BUFFER_EXCEEDED error: %v", err)
 	}
 
-	// Parse certificate
-	cert, err := x509.ParseCertificate(certDER)
+	if conn != nil {
+		defer conn.Close()
+		t.Logf("Connection succeeded - attempting to write data to trigger full TLS handshake")
+
+		// Try to write data through the connection - this should trigger CRYPTO_BUFFER_EXCEEDED
+		_, writeErr := conn.Write([]byte("test data to trigger TLS handshake"))
+		if writeErr != nil {
+			// Fail the test to show the CRYPTO_BUFFER_EXCEEDED error
+			t.Fatalf("CRYPTO_BUFFER_EXCEEDED error during write: %v", writeErr)
+		}
+
+		// If we reach here, fail because CRYPTO_BUFFER_EXCEEDED should have occurred
+		t.Fatalf("Unexpected success - CRYPTO_BUFFER_EXCEEDED should have occurred with large filesystem TLS config")
+	}
+}
+
+// logCombinedTLSConfigSizes logs detailed size information for both server and client TLS configurations
+// This shows the actual total size that gets transmitted during the TLS handshake
+func logCombinedTLSConfigSizes(t *testing.T, name string, serverConfig *tls.Config, clientConfig *tls.Config) {
+	t.Logf("=== %s Combined TLS Config Sizes ===", name)
+
+	if serverConfig == nil && clientConfig == nil {
+		t.Logf("  Both TLS Configs: nil")
+		return
+	}
+
+	totalHandshakeSize := 0
+
+	// Server Certificate information (sent to client during handshake)
+	if serverConfig != nil && len(serverConfig.Certificates) > 0 {
+		t.Logf("  Server Certificates (%d) [sent to client]:", len(serverConfig.Certificates))
+		serverCertSize := 0
+		for i, cert := range serverConfig.Certificates {
+			certSize := 0
+			if len(cert.Certificate) > 0 {
+				for _, certDER := range cert.Certificate {
+					certSize += len(certDER)
+				}
+			}
+			serverCertSize += certSize
+			t.Logf("    Total for Server Cert[%d]: %d bytes", i, certSize)
+		}
+		totalHandshakeSize += serverCertSize
+	} else {
+		t.Logf("  Server Certificates: 0")
+	}
+
+	// Client Certificate information (sent to server during handshake, if required)
+	if clientConfig != nil && len(clientConfig.Certificates) > 0 {
+		t.Logf("  Client Certificates (%d) [sent to server]:", len(clientConfig.Certificates))
+		clientCertSize := 0
+		for i, cert := range clientConfig.Certificates {
+			certSize := 0
+			if len(cert.Certificate) > 0 {
+				for _, certDER := range cert.Certificate {
+					certSize += len(certDER)
+				}
+			}
+			clientCertSize += certSize
+			t.Logf("    Total for Client Cert[%d]: %d bytes", i, certSize)
+		}
+		totalHandshakeSize += clientCertSize
+	} else {
+		t.Logf("  Client Certificates: 0")
+	}
+
+	// Server's Client CAs (sent to client to indicate acceptable client cert authorities)
+	if serverConfig != nil && serverConfig.ClientCAs != nil {
+		subjects := serverConfig.ClientCAs.Subjects()
+		caSize := 0
+		t.Logf("  Server's ClientCAs (%d subjects) [sent to client]:", len(subjects))
+
+		if len(subjects) <= 5 {
+			// Show detailed breakdown for small numbers of CAs
+			for i, subject := range subjects {
+				subjectSize := len(subject)
+				caSize += subjectSize
+				t.Logf("    ClientCA[%d] subject: %d bytes", i, subjectSize)
+			}
+		} else {
+			// Show summary for large numbers of CAs
+			minSize, maxSize := 0, 0
+			for i, subject := range subjects {
+				subjectSize := len(subject)
+				caSize += subjectSize
+				if i == 0 || subjectSize < minSize {
+					minSize = subjectSize
+				}
+				if subjectSize > maxSize {
+					maxSize = subjectSize
+				}
+			}
+			avgSize := caSize / len(subjects)
+			t.Logf("    ClientCA subject sizes: min=%d, max=%d, avg=%d bytes", minSize, maxSize, avgSize)
+		}
+
+		totalHandshakeSize += caSize
+		t.Logf("    Total Server ClientCAs size: %d bytes", caSize)
+	} else {
+		t.Logf("  Server's ClientCAs: nil")
+	}
+
+	// Client's Root CAs (used for validation, not sent over wire but affects handshake)
+	if clientConfig != nil && clientConfig.RootCAs != nil {
+		subjects := clientConfig.RootCAs.Subjects()
+		rootCASize := 0
+		t.Logf("  Client's RootCAs (%d subjects) [for validation, affects handshake size]:", len(subjects))
+
+		if len(subjects) <= 5 {
+			// Show detailed breakdown for small numbers of CAs
+			for i, subject := range subjects {
+				subjectSize := len(subject)
+				rootCASize += subjectSize
+				t.Logf("    RootCA[%d] subject: %d bytes", i, subjectSize)
+			}
+		} else {
+			// Show summary for large numbers of CAs
+			minSize, maxSize := 0, 0
+			for i, subject := range subjects {
+				subjectSize := len(subject)
+				rootCASize += subjectSize
+				if i == 0 || subjectSize < minSize {
+					minSize = subjectSize
+				}
+				if subjectSize > maxSize {
+					maxSize = subjectSize
+				}
+			}
+			avgSize := rootCASize / len(subjects)
+			t.Logf("    RootCA subject sizes: min=%d, max=%d, avg=%d bytes", minSize, maxSize, avgSize)
+		}
+
+		// Note: RootCAs are not sent over the wire, but they affect handshake processing
+		t.Logf("    Total Client RootCAs size: %d bytes (local validation only)", rootCASize)
+	} else {
+		t.Logf("  Client's RootCAs: nil")
+	}
+
+	// Server name and other config
+	if serverConfig != nil && serverConfig.ServerName != "" {
+		serverNameSize := len(serverConfig.ServerName)
+		totalHandshakeSize += serverNameSize
+		t.Logf("  Server Name: %q (%d bytes)", serverConfig.ServerName, serverNameSize)
+	}
+	if clientConfig != nil && clientConfig.ServerName != "" {
+		serverNameSize := len(clientConfig.ServerName)
+		totalHandshakeSize += serverNameSize
+		t.Logf("  Client Server Name: %q (%d bytes)", clientConfig.ServerName, serverNameSize)
+	}
+
+	// Summary
+	t.Logf("  TOTAL HANDSHAKE SIZE (transmitted): %d bytes", totalHandshakeSize)
+	const maxBufferSize = 16384
+	t.Logf("  QUIC BUFFER LIMIT: %d bytes", maxBufferSize)
+}
+
+func createReceptorCertificateAndCA(tempDir string, dnsNameCount, nodeIDCount, caCount int, serverName, clientName string) (string, string, string, error) {
+	osWrapper := &certificates.OsWrapper{}
+	serverCertFile := filepath.Join(tempDir, "server.crt")
+	serverKeyFile := filepath.Join(tempDir, "server.key")
+	clientCAsFile := filepath.Join(tempDir, "client-cas.crt")
+
+	dnsNames := make([]string, dnsNameCount)
+	for i := range dnsNames {
+		dnsNames[i] = fmt.Sprintf("dns-name-%d.example.com", i)
+	}
+	dnsNames = append(dnsNames, "localhost")
+
+	nodeIDs := make([]string, nodeIDCount)
+	for i := range nodeIDs {
+		nodeIDs[i] = fmt.Sprintf("node-id-%d", i)
+	}
+	// Add the actual server and client node names to the certificate
+	nodeIDs = append(nodeIDs, serverName, clientName)
+
+	// Receptor Certificate
+	certOpts := &certificates.CertOptions{
+		CommonName: "Receptor Certificate",
+		Bits:       2048,
+		NotBefore:  time.Now(),
+		NotAfter:   time.Now().Add(365 * 24 * time.Hour),
+		CertNames: certificates.CertNames{
+			DNSNames:    dnsNames,
+			NodeIDs:     nodeIDs,
+			IPAddresses: nil,
+		},
+	}
+
+	// Create certificate request
+	req, reqKey, err := certificates.CreateCertReqWithKey(certOpts)
 	if err != nil {
-		panic(err)
+		return "", "", "", err
 	}
 
-	// Create certificate pool with minimal certificates to find threshold
-	certPool := x509.NewCertPool()
-	for i := 0; i < 5; i++ { // Reduce to just 5
-		certPool.AddCert(cert)
+	// Sign the certificate
+	signOpts := &certificates.CertOptions{
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
 	}
 
-	// Create TLS certificate pair
-	tlsCert := tls.Certificate{
-		Certificate: [][]byte{certDER},
-		PrivateKey:  privateKey,
+	// Create CA for signing the server certificate
+	caOpts := &certificates.CertOptions{
+		CommonName: "Large Test CA Organization",
+		Bits:       2048,
+		NotBefore:  time.Now(),
+		NotAfter:   time.Now().Add(10 * 365 * 24 * time.Hour),
 	}
 
-	// Return TLS config with large client CA pool
-	return &tls.Config{
-		Certificates: []tls.Certificate{tlsCert},
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ServerName:   "localhost",
+	rsaWrapper := &certificates.RsaWrapper{}
+	ca, err := certificates.CreateCA(caOpts, rsaWrapper)
+	if err != nil {
+		return "", "", "", err
 	}
+
+	cert, err := certificates.SignCertReq(req, ca, signOpts)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	var allCAs []interface{}
+	allCAs = append(allCAs, cert)
+
+	// Add the base CA first
+	allCAs = append(allCAs, ca.Certificate)
+
+	// For large CA tests, generate or load large CA bundle from file
+	if caCount > 1 {
+		// Generate large CAs and save to file for reuse
+		largeCAbundlePath, err := getOrCreateLargeCABundle(tempDir, caCount)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to create large CA bundle: %v", err)
+		}
+
+		// Read the large CA bundle and parse certificates
+		caBundleData, err := os.ReadFile(largeCAbundlePath)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to read CA bundle: %v", err)
+		}
+
+		// Parse PEM blocks from the bundle
+		block, rest := pem.Decode(caBundleData)
+		for block != nil {
+			if block.Type == "CERTIFICATE" {
+				cert, err := x509.ParseCertificate(block.Bytes)
+				if err == nil {
+					allCAs = append(allCAs, cert.Raw)
+				}
+			}
+			block, rest = pem.Decode(rest)
+		}
+
+		// Copy the large CA bundle to our client CAs file
+		clientCAsFile = largeCAbundlePath
+	} else {
+		// For smaller CA counts, use the simple duplication approach
+		for i := 0; i < caCount; i++ {
+			allCAs = append(allCAs, ca.Certificate)
+		}
+
+		// Save CA bundle using the standard approach
+		err = certificates.SaveToPEMFile(clientCAsFile, allCAs, osWrapper)
+		if err != nil {
+			return "", "", "", err
+		}
+	}
+
+	// Save server certificate
+	err = certificates.SaveToPEMFile(serverCertFile, []interface{}{cert}, osWrapper)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// Save server key
+	err = certificates.SaveToPEMFile(serverKeyFile, []interface{}{reqKey}, osWrapper)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return serverCertFile, serverKeyFile, clientCAsFile, nil
+}
+
+// generateLargeCABundle creates a bundle of large CA certificates using Receptor functions
+// This is designed to create certificates that will trigger CRYPTO_BUFFER_EXCEEDED errors
+func generateLargeCABundle(filePath string, caCount int) error {
+	rsaWrapper := &certificates.RsaWrapper{}
+	osWrapper := &certificates.OsWrapper{}
+	var allCAs []interface{}
+
+	// Create a shared private key for speed
+	baseCA, err := certificates.CreateCA(&certificates.CertOptions{
+		CommonName: "Large CA Base for Testing",
+		Bits:       2048,
+		NotBefore:  time.Now(),
+		NotAfter:   time.Now().Add(10 * 365 * 24 * time.Hour),
+	}, rsaWrapper)
+	if err != nil {
+		return fmt.Errorf("failed to create base CA: %v", err)
+	}
+
+	for i := 0; i < caCount; i++ {
+		// Create a CA certificate with an extremely long CommonName to maximize certificate size
+		// CA certificates can't have DNSNames/NodeIDs, so we make the CommonName extremely long
+		// Use repeated long strings to create massive certificates
+		paddingString := "Very-Long-Padding-String-To-Increase-Certificate-Size-For-Testing-QUIC-Crypto-Buffer-Limits-And-Trigger-Exceeded-Errors-"
+		minimalPadding := "Very-Long-Padding-String-To-Increase-Certificate-Size-For-"
+		longCommonName := fmt.Sprintf("Massive-CA-Organization-%d-%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s-Certificate-Authority-Department-Security-Division-Unit-%d",
+			i, paddingString, paddingString, paddingString, paddingString, paddingString,
+			paddingString, paddingString, paddingString, paddingString, paddingString,
+			paddingString, paddingString, paddingString, paddingString, paddingString,
+			paddingString, paddingString, paddingString, paddingString, paddingString,
+			paddingString, paddingString, paddingString, paddingString, minimalPadding, i)
+
+		// Create CA options with extremely long CommonName and larger key size to maximize certificate size
+		largeCAOpts := &certificates.CertOptions{
+			CommonName: longCommonName,
+			Bits:       4096, // Use larger key size for bigger certificates
+			NotBefore:  time.Now(),
+			NotAfter:   time.Now().Add(10 * 365 * 24 * time.Hour),
+		}
+
+		// Create the large CA certificate
+		largeCA, err := certificates.CreateCA(largeCAOpts, rsaWrapper)
+		if err != nil {
+			// If creation fails, reuse the base CA to maintain functionality
+			fmt.Printf("Warning: Failed to create large CA %d, reusing base CA: %v\n", i, err)
+			allCAs = append(allCAs, baseCA.Certificate)
+		} else {
+			allCAs = append(allCAs, largeCA.Certificate)
+		}
+	}
+
+	// Save all CAs to the bundle file using Receptor's SaveToPEMFile
+	err = certificates.SaveToPEMFile(filePath, allCAs, osWrapper)
+	if err != nil {
+		return fmt.Errorf("failed to save CA bundle: %v", err)
+	}
+
+	// Get file size for reporting
+	stat, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to stat CA bundle file: %v", err)
+	}
+
+	fmt.Printf("Generated large CA bundle with %d CAs (%d bytes) using Receptor functions at %s\n", caCount, stat.Size(), filePath)
+	return nil
+}
+
+// getOrCreateLargeCABundle returns the path to a large CA bundle file, creating it if it doesn't exist
+func getOrCreateLargeCABundle(tempDir string, caCount int) (string, error) {
+	caBundlePath := filepath.Join(tempDir, fmt.Sprintf("large-ca-bundle-%d.pem", caCount))
+
+	// Check if file already exists and is recent (within 1 hour)
+	if stat, err := os.Stat(caBundlePath); err == nil {
+		if time.Since(stat.ModTime()) < 1*time.Hour {
+			fmt.Printf("Using existing large CA bundle: %s (%d bytes)\n", caBundlePath, stat.Size())
+			return caBundlePath, nil
+		}
+	}
+
+	// Generate new CA bundle
+	err := generateLargeCABundle(caBundlePath, caCount)
+	if err != nil {
+		return "", err
+	}
+
+	return caBundlePath, nil
 }

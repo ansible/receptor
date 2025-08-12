@@ -758,6 +758,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				// Network error detected(1)
 				"Detected Error: network connection reset for pod Test_Namespace/Test_Name that is in a running state. Will retry 4 more times.",
 			},
+
 		},
 		{
 			name: "eof_with_pod_not_ready_exits_immediately",
@@ -857,6 +858,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
+
 			expectedStdoutErr: true,
 			timeoutSeconds:    15,
 			validateLogs:      true,

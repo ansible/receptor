@@ -52,7 +52,7 @@ type KubeUnit struct {
 	deletePodOnRestart     bool
 	namePrefix             string
 	config                 *rest.Config
-	clientset              *kubernetes.Clientset
+	clientset              kubernetes.Interface
 	Pod                    *corev1.Pod
 	podPendingTimeout      time.Duration
 }
@@ -71,14 +71,14 @@ type KubeExtraData struct {
 type KubeAPIer interface {
 	NewNotFound(schema.GroupResource, string) *apierrors.StatusError
 	OneTermEqualSelector(string, string) fields.Selector
-	NewForConfig(*rest.Config) (*kubernetes.Clientset, error)
-	GetLogs(*kubernetes.Clientset, string, string, *corev1.PodLogOptions) *rest.Request
-	Get(context.Context, *kubernetes.Clientset, string, string, metav1.GetOptions) (*corev1.Pod, error)
-	Create(context.Context, *kubernetes.Clientset, string, *corev1.Pod, metav1.CreateOptions) (*corev1.Pod, error)
-	List(context.Context, *kubernetes.Clientset, string, metav1.ListOptions) (*corev1.PodList, error)
-	Watch(context.Context, *kubernetes.Clientset, string, metav1.ListOptions) (watch.Interface, error)
-	Delete(context.Context, *kubernetes.Clientset, string, string, metav1.DeleteOptions) error
-	SubResource(*kubernetes.Clientset, string, string) *rest.Request
+	NewForConfig(*rest.Config) (kubernetes.Interface, error)
+	GetLogs(kubernetes.Interface, string, string, *corev1.PodLogOptions) *rest.Request
+	Get(context.Context, kubernetes.Interface, string, string, metav1.GetOptions) (*corev1.Pod, error)
+	Create(context.Context, kubernetes.Interface, string, *corev1.Pod, metav1.CreateOptions) (*corev1.Pod, error)
+	List(context.Context, kubernetes.Interface, string, metav1.ListOptions) (*corev1.PodList, error)
+	Watch(context.Context, kubernetes.Interface, string, metav1.ListOptions) (watch.Interface, error)
+	Delete(context.Context, kubernetes.Interface, string, string, metav1.DeleteOptions) error
+	SubResource(kubernetes.Interface, string, string) *rest.Request
 	InClusterConfig() (*rest.Config, error)
 	NewDefaultClientConfigLoadingRules() *clientcmd.ClientConfigLoadingRules
 	BuildConfigFromFlags(string, string) (*rest.Config, error)
@@ -100,35 +100,35 @@ func (ku KubeAPIWrapper) OneTermEqualSelector(k string, v string) fields.Selecto
 	return fields.OneTermEqualSelector(k, v)
 }
 
-func (ku KubeAPIWrapper) NewForConfig(c *rest.Config) (*kubernetes.Clientset, error) {
+func (ku KubeAPIWrapper) NewForConfig(c *rest.Config) (kubernetes.Interface, error) {
 	return kubernetes.NewForConfig(c)
 }
 
-func (ku KubeAPIWrapper) GetLogs(clientset *kubernetes.Clientset, namespace string, name string, opts *corev1.PodLogOptions) *rest.Request {
+func (ku KubeAPIWrapper) GetLogs(clientset kubernetes.Interface, namespace string, name string, opts *corev1.PodLogOptions) *rest.Request {
 	return clientset.CoreV1().Pods(namespace).GetLogs(name, opts)
 }
 
-func (ku KubeAPIWrapper) Get(ctx context.Context, clientset *kubernetes.Clientset, namespace string, name string, opts metav1.GetOptions) (*corev1.Pod, error) {
+func (ku KubeAPIWrapper) Get(ctx context.Context, clientset kubernetes.Interface, namespace string, name string, opts metav1.GetOptions) (*corev1.Pod, error) {
 	return clientset.CoreV1().Pods(namespace).Get(ctx, name, opts)
 }
 
-func (ku KubeAPIWrapper) Create(ctx context.Context, clientset *kubernetes.Clientset, namespace string, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
+func (ku KubeAPIWrapper) Create(ctx context.Context, clientset kubernetes.Interface, namespace string, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
 	return clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 }
 
-func (ku KubeAPIWrapper) List(ctx context.Context, clientset *kubernetes.Clientset, namespace string, opts metav1.ListOptions) (*corev1.PodList, error) {
+func (ku KubeAPIWrapper) List(ctx context.Context, clientset kubernetes.Interface, namespace string, opts metav1.ListOptions) (*corev1.PodList, error) {
 	return clientset.CoreV1().Pods(namespace).List(ctx, opts)
 }
 
-func (ku KubeAPIWrapper) Watch(ctx context.Context, clientset *kubernetes.Clientset, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+func (ku KubeAPIWrapper) Watch(ctx context.Context, clientset kubernetes.Interface, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
 	return clientset.CoreV1().Pods(namespace).Watch(ctx, opts)
 }
 
-func (ku KubeAPIWrapper) Delete(ctx context.Context, clientset *kubernetes.Clientset, namespace string, name string, opts metav1.DeleteOptions) error {
+func (ku KubeAPIWrapper) Delete(ctx context.Context, clientset kubernetes.Interface, namespace string, name string, opts metav1.DeleteOptions) error {
 	return clientset.CoreV1().Pods(namespace).Delete(ctx, name, opts)
 }
 
-func (ku KubeAPIWrapper) SubResource(clientset *kubernetes.Clientset, podName string, podNamespace string) *rest.Request {
+func (ku KubeAPIWrapper) SubResource(clientset kubernetes.Interface, podName string, podNamespace string) *rest.Request {
 	return clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(podNamespace).SubResource("attach")
 }
 
@@ -1010,7 +1010,7 @@ func ShouldUseReconnect(kw *KubeUnit) bool {
 		}
 	}
 
-	serverVerInfo, err := kw.clientset.ServerVersion()
+	serverVerInfo, err := kw.clientset.Discovery().ServerVersion()
 	if err != nil {
 		kw.GetWorkceptor().nc.GetLogger().Warning("could not detect Kubernetes server version, will not use reconnect support")
 
@@ -1500,7 +1500,7 @@ func (kw *KubeUnit) Status() *StatusFileData {
 }
 
 // SetClientset sets the clientset for testing purposes.
-func (kw *KubeUnit) SetClientset(clientset *kubernetes.Clientset) {
+func (kw *KubeUnit) SetClientset(clientset kubernetes.Interface) {
 	kw.clientset = clientset
 }
 

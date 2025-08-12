@@ -71,7 +71,7 @@ func (mr *MockKubeAPIerMockRecorder) BuildConfigFromFlags(arg0, arg1 any) *gomoc
 }
 
 // Create mocks base method.
-func (m *MockKubeAPIer) Create(arg0 context.Context, arg1 *kubernetes.Clientset, arg2 string, arg3 *v1.Pod, arg4 v10.CreateOptions) (*v1.Pod, error) {
+func (m *MockKubeAPIer) Create(arg0 context.Context, arg1 kubernetes.Interface, arg2 string, arg3 *v1.Pod, arg4 v10.CreateOptions) (*v1.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*v1.Pod)
@@ -86,7 +86,7 @@ func (mr *MockKubeAPIerMockRecorder) Create(arg0, arg1, arg2, arg3, arg4 any) *g
 }
 
 // Delete mocks base method.
-func (m *MockKubeAPIer) Delete(arg0 context.Context, arg1 *kubernetes.Clientset, arg2, arg3 string, arg4 v10.DeleteOptions) error {
+func (m *MockKubeAPIer) Delete(arg0 context.Context, arg1 kubernetes.Interface, arg2, arg3 string, arg4 v10.DeleteOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
@@ -100,7 +100,7 @@ func (mr *MockKubeAPIerMockRecorder) Delete(arg0, arg1, arg2, arg3, arg4 any) *g
 }
 
 // Get mocks base method.
-func (m *MockKubeAPIer) Get(arg0 context.Context, arg1 *kubernetes.Clientset, arg2, arg3 string, arg4 v10.GetOptions) (*v1.Pod, error) {
+func (m *MockKubeAPIer) Get(arg0 context.Context, arg1 kubernetes.Interface, arg2, arg3 string, arg4 v10.GetOptions) (*v1.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*v1.Pod)
@@ -115,7 +115,7 @@ func (mr *MockKubeAPIerMockRecorder) Get(arg0, arg1, arg2, arg3, arg4 any) *gomo
 }
 
 // GetLogs mocks base method.
-func (m *MockKubeAPIer) GetLogs(arg0 *kubernetes.Clientset, arg1, arg2 string, arg3 *v1.PodLogOptions) *rest.Request {
+func (m *MockKubeAPIer) GetLogs(arg0 kubernetes.Interface, arg1, arg2 string, arg3 *v1.PodLogOptions) *rest.Request {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*rest.Request)
@@ -144,7 +144,7 @@ func (mr *MockKubeAPIerMockRecorder) InClusterConfig() *gomock.Call {
 }
 
 // List mocks base method.
-func (m *MockKubeAPIer) List(arg0 context.Context, arg1 *kubernetes.Clientset, arg2 string, arg3 v10.ListOptions) (*v1.PodList, error) {
+func (m *MockKubeAPIer) List(arg0 context.Context, arg1 kubernetes.Interface, arg2 string, arg3 v10.ListOptions) (*v1.PodList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*v1.PodList)
@@ -216,10 +216,10 @@ func (mr *MockKubeAPIerMockRecorder) NewFakeNeverRateLimiter() *gomock.Call {
 }
 
 // NewForConfig mocks base method.
-func (m *MockKubeAPIer) NewForConfig(arg0 *rest.Config) (*kubernetes.Clientset, error) {
+func (m *MockKubeAPIer) NewForConfig(arg0 *rest.Config) (kubernetes.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewForConfig", arg0)
-	ret0, _ := ret[0].(*kubernetes.Clientset)
+	ret0, _ := ret[0].(kubernetes.Interface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -288,7 +288,7 @@ func (mr *MockKubeAPIerMockRecorder) StreamWithContext(arg0, arg1, arg2 any) *go
 }
 
 // SubResource mocks base method.
-func (m *MockKubeAPIer) SubResource(arg0 *kubernetes.Clientset, arg1, arg2 string) *rest.Request {
+func (m *MockKubeAPIer) SubResource(arg0 kubernetes.Interface, arg1, arg2 string) *rest.Request {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubResource", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*rest.Request)
@@ -322,7 +322,7 @@ func (mr *MockKubeAPIerMockRecorder) UntilWithSync(arg0, arg1, arg2, arg3 any, a
 }
 
 // Watch mocks base method.
-func (m *MockKubeAPIer) Watch(arg0 context.Context, arg1 *kubernetes.Clientset, arg2 string, arg3 v10.ListOptions) (watch.Interface, error) {
+func (m *MockKubeAPIer) Watch(arg0 context.Context, arg1 kubernetes.Interface, arg2 string, arg3 v10.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Watch", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(watch.Interface)

@@ -1021,7 +1021,7 @@ func TestKubeAPIWrapperExtended(t *testing.T) {
 	t.Run("NewForConfig", func(t *testing.T) {
 		// Verify NewForConfig method exists with correct signature
 		methodType := reflect.TypeOf(wrapper.NewForConfig)
-		assert.Equal(t, "func(*rest.Config) (*kubernetes.Clientset, error)", methodType.String())
+		assert.Equal(t, "func(*rest.Config) (kubernetes.Interface, error)", methodType.String())
 	})
 
 	// Test GetLogs

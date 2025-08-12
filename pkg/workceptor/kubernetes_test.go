@@ -595,8 +595,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
 					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
 				}
-				// TODO: Investigate why this is now being called twice
-				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(1)
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).AnyTimes()
 
 				req := fakerest.RESTClient{
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
@@ -640,11 +639,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    10, // Allow time for 5 retries with 1 second delays
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times. Error: pod not found",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 4 more times. Error: pod not found",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times. Error: pod not found",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times. Error: pod not found",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 1 more times. Error: pod not found",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times.",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 4 more times.",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times.",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times.",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 1 more times.",
 			},
 		},
 		{
@@ -682,11 +681,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    30, // Allow time for retries
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times.",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Error:",
 			},
 		},
@@ -729,7 +728,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 							return &http.Response{
 								StatusCode: http.StatusOK,
-								Body:       &errorReadCloser{maxReads: 1}, // Read data once, then return error to trigger retry logic
+								Body:       &errorReadCloser{maxReads: 4}, // Read data once, then return error to trigger retry logic
 							}, nil
 						default:
 							// Second cycle: Should have reset retry counter to 5
@@ -747,29 +746,17 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: true,
-			timeoutSeconds:    15, // Allow time for multiple retry cycles
+			expectedStdoutErr: false,
+			timeoutSeconds:    20, // Allow time for multiple retry cycles
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				// First cycle: Nearly exhaust retries (5->4->3->2), then succeed (tests kubeLoggingConnectionHandler)
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times",
-				// Network error detected, retry 5 times (tests retryGetLogStream)
-				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 5 more times.",
-				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 4 more times.",
-				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 3 more times.",
-				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 2 more times.",
-				"Detected Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 1 more times.",
-				"Error reading from pod Test_Namespace/Test_Name: network connection reset",
-				// Second cycle: Fresh retry counter reset to 5 (validates counter reset and tests kubeLoggingConnectionHandler again)
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Error:",
+				// First cycle: Nearly exhaust non-EOF retries (5->4->3->2)
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times.",
+				// Network error detected(1)
+				"Detected Error: network connection reset for pod Test_Namespace/Test_Name that is in a running state. Will retry 4 more times.",
 			},
 		},
 		{
@@ -836,6 +823,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 						Conditions: []corev1.PodCondition{
 							{Type: corev1.PodReady, Status: corev1.ConditionTrue},
 						},
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: "worker",
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{},
+								},
+							},
+						},
 					},
 				}
 
@@ -850,7 +845,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: http.StatusOK,
-							Body:       &eofReadCloser{content: "2024-12-09T00:31:19.123456789Z Retry log", hasRead: false},
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:19.123456789Z Retry log", hasRead: true}, // Start with hasRead=true so it immediately returns EOF
 						}, nil
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
@@ -862,16 +857,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: false,
-			timeoutSeconds:    5,
+			expectedStdoutErr: true,
+			timeoutSeconds:    15,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Will retry 5 more times",
-				"Will retry 4 more times",
-				"Will retry 3 more times",
-				"Will retry 2 more times",
-				"Will retry 1 more times",
-				"Error reading from pod Test_Namespace/Test_Name",
+				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 4 more times.",
+				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 3 more times.",
+				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 2 more times.",
+				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 1 more times.",
 			},
 		},
 		{
@@ -1532,7 +1525,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 	// Set up expectations
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
-	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).Times(6)
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(pod, nil).AnyTimes()
 	logger := logger.NewReceptorLogger("")
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 

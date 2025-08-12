@@ -320,6 +320,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	podName := kw.Pod.Name
 
 	retries := 5
+	prevDelay, curDelay := 0, 1
 	prevPodDelay, curPodDelay := 0, 1
 	prevContainerDelay, curContainerDelay := 0, 1
 	retryGetLogStream = retries
@@ -371,8 +372,24 @@ mainLoop:
 		for { // check between every line read to see if we need to stop reading
 			line, err := streamReader.ReadString('\n')
 			if err != nil {
-				// First check if the error is not EOF, if error is not EOF set error and mark the job as failed.
+				// First check if the error is not EOF, if error is not EOF retry 5 times if error persists set error and mark the job as failed.
 				if err != io.EOF {
+					retryGetLogStream--
+					if retryGetLogStream > 0 {
+						kw.GetWorkceptor().nc.GetLogger().Info(
+							"Detected Error: %s for pod %s/%s that is in a running state. Will retry %d more times.",
+							err,
+							podNamespace,
+							podName,
+							retryGetLogStream,
+						)
+
+						time.Sleep(time.Second * time.Duration(curDelay))
+						prevDelay, curDelay = curDelay, prevDelay+curDelay
+
+						continue mainLoop
+					}
+
 					*stdoutErr = err
 					kw.GetWorkceptor().nc.GetLogger().Error(
 						"Unexpected error while reading logs for pod %s/%s. Error: %s",
@@ -408,7 +425,7 @@ mainLoop:
 							retryGetLogStream--
 							if retryGetLogStream > 0 {
 								kw.GetWorkceptor().nc.GetLogger().Info(
-									"Detected Error: %s for pod %s/%s that is in a running state. Will retry %d more times.",
+									"Detected Error: %s for pod %s/%s. Will retry %d more times.",
 									err,
 									podNamespace,
 									podName,
@@ -418,7 +435,7 @@ mainLoop:
 								time.Sleep(time.Second * time.Duration(curContainerDelay))
 								prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
 
-								break mainLoop
+								continue mainLoop
 							}
 							// Retrying hasn't worked we will error and mark the job as failed
 							kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is running but unable to attach to the log stream", containerStatus.Name)

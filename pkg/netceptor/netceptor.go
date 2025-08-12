@@ -1103,7 +1103,12 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		}
 
 		for _, cert := range certs[1:] {
-			opts.Intermediates.AddCert(cert)
+			if !isCertificateInPool(cert, opts.Roots) {
+				opts.Intermediates.AddCert(cert)
+				logger.Debug("Added intermediate certificate: %s", cert.Subject.CommonName)
+			} else {
+				logger.Debug("Skipped duplicate intermediate certificate: %s", cert.Subject.CommonName)
+			}
 		}
 		_, err := certs[0].Verify(opts)
 		if err != nil {

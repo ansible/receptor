@@ -767,7 +767,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times.",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times.",
 				// Network error detected(1)
-				"Detected Error: network connection reset for pod Test_Namespace/Test_Name that is in a running state. Will retry 4 more times.",
+				"Detected non-EOF Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 4 more times.",
 			},
 		},
 		{

@@ -394,7 +394,7 @@ mainLoop:
 
 					*stdoutErr = err
 					kw.GetWorkceptor().nc.GetLogger().Error(
-						"Unexpected error while reading logs for pod %s/%s. Error: %s",
+						"Unexpected non-EOF error while reading logs for pod %s/%s, retries exhusted. Error: %s",
 						podNamespace,
 						podName,
 						err.Error(),
@@ -416,7 +416,7 @@ mainLoop:
 					// Their are many reasons why the kube api might not be able to get the pod,
 					// This does not mean their is a problem just yet.
 					// Lets try to get the pod again, max 5 times, and decide.
-					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod after reading stream: '%s' , continuing try to get pod up to 5 more times.", kubeErr)
+					kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod after reading stream: '%s' , continuing try to get pod up to 5 more times.", kubeErr)
 
 					continue mainLoop
 				}
@@ -457,8 +457,8 @@ mainLoop:
 						continue mainLoop
 					}
 					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is running but unable to attach to the log stream", WorkerContainerName)
-					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but unable to attach to the log stream", err,
+					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhusted", WorkerContainerName)
+					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhusted", err,
 						podNamespace,
 						podName,
 					)

@@ -465,12 +465,12 @@ mainLoop:
 
 					return
 				case containerState.Terminated != nil:
-					// We got EOF and the pod terminated in a bad state, we will return the error and mark the job as failed.
+					// We got EOF and the pod terminated, we will log the terminated information
 					if containerState.Terminated.ExitCode != 0 {
 						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v", WorkerContainerName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
 					}
 
-					// EOF and exit code is 0, this is a good state, we need to check if last line has data
+					// We need to check if last line has data
 					if line != "" {
 						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
 						if msg != "" {

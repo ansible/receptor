@@ -524,7 +524,7 @@ func (e *eofReadCloser) Read(p []byte) (n int, err error) {
 		n = copy(p, []byte(e.content))
 		e.hasRead = true
 
-		return n, nil
+		return n, io.EOF
 	}
 
 	return 0, io.EOF
@@ -4046,9 +4046,9 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 					Namespace: testNamespace,
 				},
 				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
+					Phase: corev1.PodFailed,
 					Conditions: []corev1.PodCondition{
-						{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+						{Type: corev1.PodReady, Status: corev1.ConditionFalse},
 					},
 					ContainerStatuses: []corev1.ContainerStatus{
 						{

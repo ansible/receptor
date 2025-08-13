@@ -467,7 +467,7 @@ mainLoop:
 				case containerState.Terminated != nil:
 					// We got EOF and the pod terminated in a bad state, we will return the error and mark the job as failed.
 					if containerState.Terminated.ExitCode != 0 {
-						kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod has terminated, with terminated exit code: %v", WorkerContainerName, containerState.Terminated.ExitCode)
+						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v", WorkerContainerName, containerState.Terminated.ExitCode)
 						*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod has terminated, with terminated exit code: %v", err,
 							podNamespace,
 							podName,

@@ -394,7 +394,7 @@ mainLoop:
 
 					*stdoutErr = err
 					kw.GetWorkceptor().nc.GetLogger().Error(
-						"Unexpected non-EOF error while reading logs for pod %s/%s, retries exhusted. Error: %s",
+						"Unexpected non-EOF error while reading logs for pod %s/%s, retries exhausted. Error: %s",
 						podNamespace,
 						podName,
 						err.Error(),
@@ -457,8 +457,8 @@ mainLoop:
 						continue mainLoop
 					}
 					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhusted", WorkerContainerName)
-					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhusted", err,
+					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhausted", WorkerContainerName)
+					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhausted", err,
 						podNamespace,
 						podName,
 					)

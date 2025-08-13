@@ -444,7 +444,7 @@ mainLoop:
 					retryGetLogStream--
 					if retryGetLogStream > 0 {
 						kw.GetWorkceptor().nc.GetLogger().Info(
-							"Detected Error: %s for pod %s/%s. Will retry %d more times.",
+							"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will retry %d more times.",
 							err,
 							podNamespace,
 							podName,

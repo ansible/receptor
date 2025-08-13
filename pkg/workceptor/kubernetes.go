@@ -467,14 +467,7 @@ mainLoop:
 				case containerState.Terminated != nil:
 					// We got EOF and the pod terminated in a bad state, we will return the error and mark the job as failed.
 					if containerState.Terminated.ExitCode != 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v", WorkerContainerName, containerState.Terminated.ExitCode)
-						*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod has terminated, with terminated exit code: %v", err,
-							podNamespace,
-							podName,
-							containerState.Terminated.ExitCode,
-						)
-
-						return
+						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v, treminated reason: %v and terminated message: %v", WorkerContainerName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
 					}
 
 					// EOF and exit code is 0, this is a good state, we need to check if last line has data
@@ -490,7 +483,7 @@ mainLoop:
 							}
 						}
 					}
-					// Got EOF, terminaled code 0 and ensured we captured last line then return
+					// Got EOF, terminated and ensured we captured last line then return
 					return
 				default:
 					// We dont expect to ever get here, However, beinging in an unknown state will not have a negative effect so we will log and ignore.

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -3950,118 +3951,159 @@ func TestKubeWorkerCfg_Run(t *testing.T) {
 	}
 }
 
-// TestKubeUnit_RunWorkUsingLogger_ExitCode1DoesNotSetFinished tests that when a container.
-// exits with exit code 1, RunWorkUsingLogger does not set the status to "Finished" but instead
-// handles it as an error condition. This test modifies the existing test to verify that:
+// TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished tests that when a container
+// exits with exit code 1, RunWorkUsingLogger sets the status to "Finished" (Succeeded).
+// This reflects the behavior where non-zero exit codes from playbooks are treated as
+// successful completion rather than failures. This test verifies that:
 // 1. A pod exists and is retrieved successfully.
 // 2. The container has terminated with exit code 1.
-// 3. The test verifies that no "Finished" status is set.
-// 4. The job should fail rather than complete successfully.
-func TestKubeUnit_RunWorkUsingLogger_ExitCode1DoesNotSetFinished(t *testing.T) {
+// 3. The job completes successfully with "Finished" status.
+// 4. If there is data in the last line when EOF occurs, it is written to stdout.
+func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 	const (
-		testPodName    = "failed-pod-123"
-		testNamespace  = "default"
-		testUnitDir    = "/tmp/taskpod/failed-pod-123/"
-		testLogContent = "2024-12-09T00:31:18.823849250Z Process failed with exit code 1"
+		testNamespace = "default"
+		testUnitDir   = "/tmp/taskpod/failed-pod-123/"
 	)
 
-	t.Run("Container with exit code 1 should not set status to finished", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+	testCases := []struct {
+		name               string
+		podName            string
+		logContent         string
+		description        string
+		expectContentWrite bool
+		expectedContent    string
+	}{
+		{
+			name:               "Container with exit code 1 should set status to finished",
+			podName:            "failed-pod-123",
+			logContent:         "",
+			description:        "Basic exit code 1 scenario - should complete successfully",
+			expectContentWrite: false,
+			expectedContent:    "",
+		},
+		{
+			name:               "Container with exit code 1 and log data should write content to stdout",
+			podName:            "failed-pod-with-data-123",
+			logContent:         "2024-12-09T00:31:18.823849250Z Process failed with exit code 1",
+			description:        "Exit code 1 with log data - should write last line content to stdout",
+			expectContentWrite: true,
+			expectedContent:    "Process failed with exit code 1",
+		},
+	}
 
-		os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", "enabled")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-		mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
-		mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-		mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
-		mockFileSystem := mock_workceptor.NewMockFileSystemer(ctrl)
-		mockFileWC := mock_workceptor.NewMockFileWriteCloser(ctrl)
+			os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", "enabled")
 
-		mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
-		mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
-		ctx := context.Background()
-		w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
-		if err != nil {
-			t.Fatalf("Error creating Workceptor: %v", err)
-		}
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
 
-		statusLock := &sync.RWMutex{}
-		statusData := &workceptor.StatusFileData{State: 1, ExtraData: &workceptor.KubeExtraData{}}
-		statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
-			KubeNamespace: testNamespace,
-			PodName:       testPodName,
-		}}
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
 
-		mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-		mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
-		mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
-		mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
-		mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir)
-		mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, gomock.Any(), gomock.Any())
-		mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
-		mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			statusLock := &sync.RWMutex{}
+			statusData := &workceptor.StatusFileData{State: 1, ExtraData: &workceptor.KubeExtraData{}}
+			statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+				KubeNamespace: testNamespace,
+				PodName:       tc.podName,
+			}}
 
-		err = os.MkdirAll(testUnitDir, 0o700)
-		if err != nil {
-			t.Logf("Failed to create unit dir for %s: %v", testUnitDir, err)
-		}
-		kubeConfig := workceptor.KubeWorkerCfg{
-			AuthMethod:   "incluster",
-			StreamMethod: "logger",
-		}
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+			mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir)
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, gomock.Any(), gomock.Any())
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateSucceeded, gomock.Any(), gomock.Any())
 
-		kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+			err = os.MkdirAll(testUnitDir, 0o700)
+			if err != nil {
+				t.Logf("Failed to create unit dir for %s: %v", testUnitDir, err)
+			}
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+			}
 
-		// Create a pod with container that has terminated with exit code 1
-		existingPod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      testPodName,
-				Namespace: testNamespace,
-			},
-			Status: corev1.PodStatus{
-				Phase: corev1.PodRunning,
-				Conditions: []corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Create a pod with container that has terminated with exit code 1
+			existingPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.podName,
+					Namespace: testNamespace,
 				},
-				ContainerStatuses: []corev1.ContainerStatus{
-					{
-						Name: workceptor.WorkerContainerName,
-						State: corev1.ContainerState{
-							Terminated: &corev1.ContainerStateTerminated{
-								ExitCode: 1,
-								Reason:   "Error",
-								Message:  "Process completed with errors",
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+					},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: workceptor.WorkerContainerName,
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 1,
+									Reason:   "Error",
+									Message:  "Process completed with errors",
+								},
 							},
 						},
 					},
 				},
-			},
-		}
-		fakeClient := fake.NewSimpleClientset(existingPod)
-		kubeUnit.SetClientset(fakeClient)
+			}
+			fakeClient := fake.NewSimpleClientset(existingPod)
+			kubeUnit.SetClientset(fakeClient)
 
-		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(existingPod, nil).AnyTimes()
+			mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, tc.podName, gomock.Any()).Return(existingPod, nil).AnyTimes()
 
-		req := fakerest.RESTClient{
-			Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       &eofReadCloser{content: testLogContent, hasRead: false},
-				}, nil
-			}),
-			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
-		}
-		mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			req := fakerest.RESTClient{
+				Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       &eofReadCloser{content: tc.logContent, hasRead: false},
+					}, nil
+				}),
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+			}
+			mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
 
-		mockFileSystem.EXPECT().OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(&os.File{}, nil)
-		stdout, _ := workceptor.NewStdoutWriter(mockFileSystem, "")
-		stdout.SetWriter(mockFileWC)
-		mockFileWC.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
+			// Use real file system so we can read the actual stdout file
+			_, stdoutErr := workceptor.NewStdoutWriter(workceptor.FileSystem{}, testUnitDir)
+			if stdoutErr != nil {
+				t.Fatalf("Failed to create stdout writer: %v", stdoutErr)
+			}
 
-		t.Log("Testing that container with exit code 1 does not set status to finished")
-		kubeUnit.RunWorkUsingLogger()
-		t.Log("Successfully verified that exit code 1 results in failed status, not finished")
-	})
+			// After test completion, read and verify the actual stdout file
+			defer func() {
+				if tc.expectContentWrite {
+					stdoutPath := filepath.Join(testUnitDir, "stdout")
+					if content, err := os.ReadFile(stdoutPath); err == nil {
+						contentStr := string(content)
+						if !strings.Contains(contentStr, tc.expectedContent) {
+							t.Errorf("Expected content '%s' not found in stdout file. Actual content: %q", tc.expectedContent, contentStr)
+						}
+					} else {
+						t.Errorf("Failed to read stdout file: %v", err)
+					}
+				}
+			}()
+
+			t.Logf("Testing: %s", tc.description)
+			kubeUnit.RunWorkUsingLogger()
+			t.Logf("Successfully verified: %s", tc.description)
+		})
+	}
 }

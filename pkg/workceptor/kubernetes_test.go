@@ -1114,6 +1114,249 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 		},
+		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
+		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
+		{
+			name: "eof_with_running_pod_stream_restored_on_retry",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{},
+								},
+							},
+						},
+					},
+				}
+				completedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodSucceeded,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 0,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				// First few calls return running pod (triggers retries), then completed pod (breaks out of retry loop)
+				gomock.InOrder(
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(runningPod, nil).Times(2),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(completedPod, nil).AnyTimes(),
+				)
+
+				callCount := 0
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						callCount++
+						if callCount <= 2 {
+							// First 2 calls return EOF to trigger retries
+							return &http.Response{
+								StatusCode: http.StatusOK,
+								Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Initial log before EOF", hasRead: true},
+							}, nil
+						}
+						// Third call returns successful stream with final logs
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:19.123456789Z Final log after reconnect", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    8,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 4 more times.",
+			},
+		},
+		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
+		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
+		{
+			name: "eof_with_terminated_pod_nonzero_exit_code",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				failedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 1,
+										Reason:   "Error",
+										Message:  "Container failed with error",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(failedPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Error log before termination", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: false,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Container in worker pod has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
+			},
+		},
+		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
+		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
+		{
+			name: "eof_with_container_not_found",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				// Pod exists but doesn't have the expected worker container
+				podWithoutWorkerContainer := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: "different-container", // Wrong container name
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(podWithoutWorkerContainer, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "", hasRead: true}, // Immediate EOF
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Unable to find the container worker for pod Test_Name. This is unrecoverable. Marking the job as failed and exiting",
+			},
+		},
+		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
+		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
+		{
+			name: "fibonacci_sequence_retry_timing_validation",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(runningPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "", hasRead: true}, // Always EOF to force retries
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    25, // Need longer timeout to accommodate Fibonacci delays (1+2+3+5 = 11+ seconds)
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Will retry 4 more times",
+				"Will retry 3 more times",
+				"Will retry 2 more times",
+				"Will retry 1 more times",
+				"continuing to stream EOF after retries exhausted",
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -502,7 +502,7 @@ mainLoop:
 				// We will fail, and mark the job as failed due to an unknown kube container state.
 
 				kw.GetWorkceptor().nc.GetLogger().Error("received EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
-				*stdoutErr = fmt.Errorf("received EOF on log stream for pod %sand container state is not valid %s, failing and markingthe job as failed", podName, containerState)
+				*stdoutErr = fmt.Errorf("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed", podName, containerState)
 
 				return
 			}

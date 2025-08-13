@@ -650,11 +650,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    15, // Allow time for 5 retries with 1 second delays
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times.",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 4 more times.",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times.",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times.",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 1 more times.",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 4 more times. Error:",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 1 more times. Error:",
 			},
 		},
 		{
@@ -692,11 +692,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    30, // Allow time for retries
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times. Error:",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Error:",
 			},
 		},
@@ -762,10 +762,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			validateLogs:      true,
 			expectedLogMsgs: []string{
 				// First cycle: Nearly exhaust non-EOF retries (5->4->3->2)
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times.",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
 				// Network error detected(1)
 				"Detected non-EOF Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 4 more times.",
 			},
@@ -900,10 +900,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    15,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 4 more times.",
-				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 3 more times.",
-				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 2 more times.",
-				"Detected Error: EOF for pod Test_Namespace/Test_Name. Will retry 1 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 4 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 3 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 1 more times.",
 			},
 		},
 		{

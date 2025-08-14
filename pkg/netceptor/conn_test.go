@@ -900,6 +900,163 @@ func TestDialContext(t *testing.T) {
 	})
 }
 
+func TestAcceptLoopWithMocks(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupMocks func(*mock_netceptor.MockQuicListenerForListener,
+			*mock_netceptor.MockQuicConnectionForConn, *mock_netceptor.MockQuicStreamForConn,
+			*mock_netceptor.MockPacketConner)
+		expectError      bool
+		expectedErrorMsg string
+		validateResult   func(*testing.T, *netceptor.AcceptResult)
+	}{
+		{
+			name: "quic listener accept error",
+			setupMocks: func(mockQL *mock_netceptor.MockQuicListenerForListener, mockQC *mock_netceptor.MockQuicConnectionForConn,
+				mockQS *mock_netceptor.MockQuicStreamForConn, mockPC *mock_netceptor.MockPacketConner,
+			) {
+				mockQL.EXPECT().Accept(gomock.Any()).Return(nil, errors.New("quic accept error")).AnyTimes()
+			},
+			expectError:      true,
+			expectedErrorMsg: "quic accept error",
+		},
+		{
+			name: "accept stream error",
+			setupMocks: func(mockQL *mock_netceptor.MockQuicListenerForListener, mockQC *mock_netceptor.MockQuicConnectionForConn,
+				mockQS *mock_netceptor.MockQuicStreamForConn, mockPC *mock_netceptor.MockPacketConner,
+			) {
+				mockQL.EXPECT().Accept(gomock.Any()).Return(mockQC, nil).AnyTimes()
+				mockQC.EXPECT().AcceptStream(gomock.Any()).Return(nil,
+					errors.New("accept stream error")).AnyTimes()
+				mockQC.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).AnyTimes()
+			},
+			expectError:      true,
+			expectedErrorMsg: "accept stream error",
+		},
+		{
+			name: "stream read error",
+			setupMocks: func(mockQL *mock_netceptor.MockQuicListenerForListener, mockQC *mock_netceptor.MockQuicConnectionForConn,
+				mockQS *mock_netceptor.MockQuicStreamForConn, mockPC *mock_netceptor.MockPacketConner,
+			) {
+				mockQL.EXPECT().Accept(gomock.Any()).Return(mockQC, nil).AnyTimes()
+				mockQC.EXPECT().AcceptStream(gomock.Any()).Return(mockQS, nil).AnyTimes()
+				mockQS.EXPECT().Read(gomock.Any()).Return(0,
+					errors.New("stream read error")).AnyTimes()
+				mockQC.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).AnyTimes()
+			},
+			expectError:      true,
+			expectedErrorMsg: "stream read error",
+		},
+		{
+			name: "invalid stream data error",
+			setupMocks: func(mockQL *mock_netceptor.MockQuicListenerForListener, mockQC *mock_netceptor.MockQuicConnectionForConn,
+				mockQS *mock_netceptor.MockQuicStreamForConn, mockPC *mock_netceptor.MockPacketConner,
+			) {
+				mockQL.EXPECT().Accept(gomock.Any()).Return(mockQC, nil).AnyTimes()
+				mockQC.EXPECT().AcceptStream(gomock.Any()).Return(mockQS, nil).AnyTimes()
+				mockQS.EXPECT().Read(gomock.Any()).DoAndReturn(func(buf []byte) (int, error) {
+					buf[0] = 1 // Invalid initialization byte
+
+					return 1, nil
+				}).AnyTimes()
+				mockQC.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).AnyTimes()
+			},
+			expectError:      true,
+			expectedErrorMsg: "stream failed to initialize",
+		},
+		{
+			name: "successful connection creation",
+			setupMocks: func(mockQL *mock_netceptor.MockQuicListenerForListener, mockQC *mock_netceptor.MockQuicConnectionForConn,
+				mockQS *mock_netceptor.MockQuicStreamForConn, mockPC *mock_netceptor.MockPacketConner,
+			) {
+				mockQL.EXPECT().Accept(gomock.Any()).Return(mockQC, nil).AnyTimes()
+				mockQC.EXPECT().AcceptStream(gomock.Any()).Return(mockQS, nil).AnyTimes()
+				mockQS.EXPECT().Read(gomock.Any()).DoAndReturn(func(buf []byte) (int, error) {
+					buf[0] = 0 // Valid initialization byte
+
+					return 1, nil
+				}).AnyTimes()
+				mockQC.EXPECT().RemoteAddr().Return(netceptor.Addr{}).AnyTimes()
+				mockQC.EXPECT().Context().Return(context.Background()).AnyTimes()
+				mockPC.EXPECT().SubscribeUnreachable(gomock.Any()).Return(nil).AnyTimes()
+				// Expect cleanup calls when connection is established
+				mockQC.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).AnyTimes()
+				mockQS.EXPECT().Close().AnyTimes()
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, result *netceptor.AcceptResult) {
+				if result.Conn == nil {
+					t.Error("Expected valid connection, got nil")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+			mockQuicListener := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+			mockQuicConnection := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+			mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+			ctx := context.Background()
+			n := netceptor.New(ctx, "test")
+			defer n.Shutdown()
+
+			doneChan := make(chan struct{})
+			acceptChan := make(chan *netceptor.AcceptResult, 10)
+			syncOnce := &sync.Once{}
+			listener := netceptor.NewListener(n, mockPacketConner, mockQuicListener, acceptChan, doneChan, syncOnce)
+
+			// Setup mocks
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockQuicListener, mockQuicConnection, mockQuicStream, mockPacketConner)
+			}
+
+			// Start AcceptLoop
+			go listener.AcceptLoop(ctx)
+
+			// Wait for result to be sent to acceptChan
+			select {
+			case result := <-acceptChan:
+				if result == nil {
+					t.Fatal("Expected AcceptResult, got nil")
+				}
+				if tt.expectError {
+					if result.Err == nil {
+						t.Error("Expected error, got nil")
+					} else if tt.expectedErrorMsg != "" && result.Err.Error() != tt.expectedErrorMsg {
+						t.Errorf("Expected error '%v', got '%v'", tt.expectedErrorMsg, result.Err)
+					}
+					if result.Conn != nil {
+						t.Error("Expected nil connection on error")
+					}
+				} else if result.Err != nil {
+					t.Errorf("Expected no error, got '%v'", result.Err)
+				}
+				if tt.validateResult != nil {
+					tt.validateResult(t, result)
+				}
+			case <-time.After(100 * time.Millisecond):
+				t.Error("Expected result to be sent to acceptChan")
+			}
+
+			// Clean up
+			select {
+			case <-doneChan: // Already closed
+			default:
+				close(doneChan)
+			}
+
+			// Give goroutines time to finish cleanup
+			time.Sleep(10 * time.Millisecond)
+		})
+	}
+}
+
 func TestListenerSendResult(t *testing.T) {
 	createListener := func() (*netceptor.Listener, chan *netceptor.AcceptResult) {
 		mockNetC := &netceptor.Netceptor{}

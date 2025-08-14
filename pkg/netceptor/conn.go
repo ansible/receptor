@@ -132,7 +132,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	syncOnce := &sync.Once{}
 	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
 
-	go li.acceptLoop(ctx)
+	go li.AcceptLoop(ctx)
 
 	return li, nil
 }
@@ -207,7 +207,7 @@ func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
 	}
 }
 
-func (li *Listener) acceptLoop(ctx context.Context) {
+func (li *Listener) AcceptLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():

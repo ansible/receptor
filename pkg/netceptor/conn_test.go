@@ -986,7 +986,7 @@ func TestAcceptLoopWithMocks(t *testing.T) {
 			expectError: false,
 			validateResult: func(t *testing.T, result *netceptor.AcceptResult) {
 				if result.Conn == nil {
-					t.Error("Expected valid connection, got nil")
+					t.Error("expected valid connection, got nil")
 				}
 			},
 		},

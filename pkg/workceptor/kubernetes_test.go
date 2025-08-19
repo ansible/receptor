@@ -3269,7 +3269,7 @@ func TestKubeUnit_RunWorkUsingLogger_StdinUnableToUpgradeConnection(t *testing.T
 
 	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
-	
+
 	// Set up a fake clientset to avoid nil pointer dereference in ShouldUseReconnect
 	fakeClientset := fakekubernetes.NewSimpleClientset()
 	kubeUnit.SetClientset(fakeClientset)

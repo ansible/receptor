@@ -3230,6 +3230,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 // TestKubeUnit_RunWorkUsingLogger_StdinUnableToUpgradeConnection specifically tests the scenario
 // where STDIN streaming fails with "unable to upgrade connection" when the worker container is not found.
 func TestKubeUnit_RunWorkUsingLogger_StdinUnableToUpgradeConnection(t *testing.T) {
+	t.Parallel() // Run in parallel to isolate from other tests
 	// Create test directory with stdin file to trigger stdin streaming
 	testDir := "/tmp/test-stdin-upgrade-connection"
 	err := os.MkdirAll(testDir, 0o755)
@@ -3255,7 +3256,9 @@ func TestKubeUnit_RunWorkUsingLogger_StdinUnableToUpgradeConnection(t *testing.T
 	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
 	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Ensure all goroutines are cancelled when test ends
+
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
 	if err != nil {
 		t.Fatalf("Error creating Workceptor: %v", err)
@@ -3292,6 +3295,7 @@ func TestKubeUnit_RunWorkUsingLogger_StdinUnableToUpgradeConnection(t *testing.T
 	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetCancel().Return(cancel).AnyTimes()
 	mockBaseWorkUnit.EXPECT().UnitDir().Return(testDir).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockBaseWorkUnit.EXPECT().ID().Return("test-unit-id").AnyTimes()

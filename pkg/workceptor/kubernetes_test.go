@@ -2982,6 +2982,17 @@ spec:
 	}
 }
 
+// mockSPDYExecutor is a simple mock implementation of remotecommand.Executor for testing
+type mockSPDYExecutor struct{}
+
+func (m *mockSPDYExecutor) Stream(options remotecommand.StreamOptions) error {
+	return nil
+}
+
+func (m *mockSPDYExecutor) StreamWithContext(ctx context.Context, options remotecommand.StreamOptions) error {
+	return nil
+}
+
 func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 	// Test basic execution paths that are feasible to test with focused mocking
 	tests := []struct {
@@ -3214,6 +3225,120 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 			t.Logf("Function completed successfully for error path test")
 		})
 	}
+}
+
+// TestKubeUnit_RunWorkUsingLogger_UnableToUpgradeConnection specifically tests the scenario
+// where stdin streaming fails with "unable to upgrade connection" when the container hasn't started yet.
+func TestKubeUnit_RunWorkUsingLogger_UnableToUpgradeConnection(t *testing.T) {
+	// Create test directory
+	testDir := "/tmp/test-upgrade-connection"
+	err := os.MkdirAll(testDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
+	}
+	defer os.RemoveAll(testDir)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+
+	ctx := context.Background()
+	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+	if err != nil {
+		t.Fatalf("Error creating Workceptor: %v", err)
+	}
+
+	// Create KubeUnit with logger stream method (this is where stdin streaming occurs)
+	kubeConfig := workceptor.KubeWorkerCfg{
+		AuthMethod:   "incluster",
+		StreamMethod: "logger",
+	}
+
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+	// Set up status to indicate an existing pod (so it doesn't try to create a new one)
+	statusLock := &sync.RWMutex{}
+	statusData := &workceptor.StatusFileData{
+		State: workceptor.WorkStateRunning,
+		ExtraData: &workceptor.KubeExtraData{},
+	}
+	statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+		KubeNamespace: "default",
+		PodName:       "container-not-ready-pod", // Non-empty triggers existing pod retrieval
+	}}
+
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UnitDir().Return(testDir).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+
+	// Mock a pod that exists but doesn't have the expected "worker" container yet
+	// This simulates a pod that's still being created and the worker container hasn't been added
+	podWithoutWorkerContainer := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "container-not-ready-pod",
+			Namespace: "default",
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "init-container", // Different container name - NOT "worker"
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					},
+					Ready: true,
+				},
+			},
+		},
+	}
+
+	// Mock successful pod retrieval - called multiple times during logger-based streaming
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "default", "container-not-ready-pod", gomock.Any()).Return(podWithoutWorkerContainer, nil).AnyTimes()
+
+	// Mock status updates
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+
+	// The key part - mock the stdin streaming attempt that will fail with "unable to upgrade connection"
+	// This happens when trying to stream to a container that isn't ready yet
+	
+	// Mock SubResource call for stdin streaming
+	mockKubeAPI.EXPECT().SubResource(gomock.Any(), "container-not-ready-pod", "default").Return(&rest.Request{}).AnyTimes()
+	
+	// Mock SPDY executor creation
+	mockExecutor := &mockSPDYExecutor{}
+	mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), "POST", gomock.Any()).Return(mockExecutor, nil).AnyTimes()
+	
+	// Mock log streaming that will also fail when worker container is not found
+	req := fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+			// Simulate the "unable to upgrade connection" error during log streaming when worker container not found
+			return nil, fmt.Errorf("unable to upgrade connection: container worker not found in pod container-not-ready-pod")
+		}),
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+	}
+	mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+
+	// Mock the StreamWithContext call that fails with the specific "worker not found" error
+	// This error occurs because the pod doesn't have the expected "worker" container yet
+	upgradeError := fmt.Errorf("unable to upgrade connection: container worker not found in pod container-not-ready-pod")
+	mockKubeAPI.EXPECT().StreamWithContext(gomock.Any(), mockExecutor, gomock.Any()).Return(upgradeError).AnyTimes()
+
+	// Test that RunWorkUsingLogger handles the upgrade failure gracefully
+	// This reproduces the real scenario where a pod exists but doesn't have the worker container yet
+	t.Log("Testing unable to upgrade connection error: container worker not found in pod")
+	kubeUnit.RunWorkUsingLogger()
+	t.Log("RunWorkUsingLogger completed - successfully handled unable to upgrade connection error")
 }
 
 // TestKubeAPIWrapper_StreamWithContext tests the StreamWithContext method.

@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
+	fakekubernetes "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
@@ -3269,6 +3269,10 @@ func TestKubeUnit_RunWorkUsingLogger_StdinUnableToUpgradeConnection(t *testing.T
 
 	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+	
+	// Set up a fake clientset to avoid nil pointer dereference in ShouldUseReconnect
+	fakeClientset := fakekubernetes.NewSimpleClientset()
+	kubeUnit.SetClientset(fakeClientset)
 
 	// CRITICAL: Set up status to trigger NEW pod creation (empty PodName)
 	// This makes skipStdin = false, which triggers stdin streaming and SPDY executor
@@ -4216,7 +4220,7 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 					},
 				},
 			}
-			fakeClient := fake.NewSimpleClientset(existingPod)
+			fakeClient := fakekubernetes.NewSimpleClientset(existingPod)
 			kubeUnit.SetClientset(fakeClient)
 
 			mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, tc.podName, gomock.Any()).Return(existingPod, nil).AnyTimes()

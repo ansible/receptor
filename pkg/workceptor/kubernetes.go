@@ -429,9 +429,9 @@ mainLoop:
 
 				podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 				if kubeErr != nil {
-					// Their are many reasons why the kube api might not be able to get the pod,
-					// This does not mean their is a problem just yet.
-					// Lets try to get the pod again, max 5 times, and decide.
+					// There are many reasons why the kube api might not be able to get the pod,
+					// This does not mean there is a problem just yet.
+					// Let's try to get the pod again, max 5 times, and decide.
 					kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod after reading stream: '%s' , continuing try to get pod up to 5 more times.", kubeErr)
 
 					continue mainLoop
@@ -923,9 +923,9 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 		for {
 			podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 			if kubeErr != nil {
-				// Their are many reasons why the kube api might not be able to get the pod,
-				// This does not mean their is a problem just yet.
-				// Lets try to get the pod again, max 5 times, and decide.
+				// There are many reasons why the kube api might not be able to get the pod,
+				// This does not mean there is a problem just yet.
+				// Let's try to get the pod again, max 5 times, and decide.
 				retryCount--
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)

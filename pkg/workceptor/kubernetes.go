@@ -374,7 +374,21 @@ mainLoop:
 		for { // check between every line read to see if we need to stop reading
 			line, err := streamReader.ReadString('\n')
 			if err != nil {
-				// First check if the error is not EOF, if error is not EOF retry 5 times if error persists set error and mark the job as failed.
+				// Check if the context was canceled and the work state isn't "Succeeded".
+				// If so, set the error and mark the job as failed.
+				if kw.GetContext().Err() == context.Canceled {
+					if kw.Status().State != WorkStateSucceeded {
+						errMsg := fmt.Sprintf("Context was canceled while reading logs for pod %s/%s. This is unrecoverable. Marking the job as failed and exiting. Error: %s",
+							podNamespace,
+							podName,
+							err.Error(),
+						)
+						*stdoutErr = fmt.Errorf("%s", errMsg)
+						kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+					}
+				}
+
+				// Check if the error is not EOF, if error is not EOF retry 5 times if error persists set error and mark the job as failed.
 				if err != io.EOF {
 					retryGetLogStream--
 					if retryGetLogStream > 0 {
@@ -900,6 +914,51 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 		streamWait.Done()
 	} else {
+		retryCount := 5
+		prevPodDelay, curPodDelay := 0, 1
+		prevContainerDelay, curContainerDelay := 0, 1
+	podLoop:	
+		for {
+			podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+			if kubeErr != nil {
+				// Their are many reasons why the kube api might not be able to get the pod,
+				// This does not mean their is a problem just yet.
+				// Lets try to get the pod again, max 5 times, and decide.
+				retryCount--
+				if retryCount > 0 {
+					kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)
+
+					time.Sleep(time.Second * time.Duration(curPodDelay))
+					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay + curPodDelay
+					
+					continue
+				}
+				kw.GetWorkceptor().nc.GetLogger().Error("Error getting pod %s/%s, after retries exhausted. Error: %s", podNamespace, podName, kubeErr)
+
+				return
+			}
+			retryCount = 5
+
+			for _, containerStatus := range podDetails.Status.ContainerStatuses {
+				if containerStatus.Name == WorkerContainerName && containerStatus.State.Running == nil {
+					retryCount--
+					if retryCount > 0 {
+						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod is not running, continuing try to wait for container to get into running state, will retry %v more times.", podName, retryCount)
+
+						time.Sleep(time.Second * time.Duration(curContainerDelay))
+						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay + curContainerDelay
+
+						continue
+					}
+					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is not running, retries exhausted", podName)
+
+					return
+				}
+
+				break podLoop
+			}
+		}
+
 		go func() {
 			defer streamWait.Done()
 

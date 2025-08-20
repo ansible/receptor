@@ -384,7 +384,7 @@ mainLoop:
 							err.Error(),
 						)
 						*stdoutErr = fmt.Errorf("%s", errMsg)
-						kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+						kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 
 						return
 					}

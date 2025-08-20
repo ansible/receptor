@@ -592,6 +592,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetStatusLock()
 
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},

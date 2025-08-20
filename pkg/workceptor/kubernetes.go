@@ -385,6 +385,8 @@ mainLoop:
 						)
 						*stdoutErr = fmt.Errorf("%s", errMsg)
 						kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+
+						return
 					}
 				}
 
@@ -917,7 +919,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 		retryCount := 5
 		prevPodDelay, curPodDelay := 0, 1
 		prevContainerDelay, curContainerDelay := 0, 1
-	podLoop:	
+	podLoop:
 		for {
 			podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
 			if kubeErr != nil {
@@ -929,8 +931,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)
 
 					time.Sleep(time.Second * time.Duration(curPodDelay))
-					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay + curPodDelay
-					
+					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+
 					continue
 				}
 				kw.GetWorkceptor().nc.GetLogger().Error("Error getting pod %s/%s, after retries exhausted. Error: %s", podNamespace, podName, kubeErr)
@@ -939,23 +941,56 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			}
 			retryCount = 5
 
+			var containerState corev1.ContainerState
+			foundContainer := false
 			for _, containerStatus := range podDetails.Status.ContainerStatuses {
-				if containerStatus.Name == WorkerContainerName && containerStatus.State.Running == nil {
-					retryCount--
-					if retryCount > 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod is not running, continuing try to wait for container to get into running state, will retry %v more times.", podName, retryCount)
+				if containerStatus.Name == WorkerContainerName {
+					containerState = containerStatus.State
+					foundContainer = true
+				}
+			}
 
-						time.Sleep(time.Second * time.Duration(curContainerDelay))
-						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay + curContainerDelay
+			if !foundContainer {
+				kw.GetWorkceptor().nc.GetLogger().Error("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
 
-						continue
-					}
+				return
+			}
+
+			// If container state not running retry or fail job.
+			switch {
+			case containerState.Running != nil:
+				break podLoop
+			case containerState.Waiting != nil:
+				retryCount--
+				if retryCount > 0 {
+					kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod is waiting, will retry %v more times.", podName, retryCount)
+
+					time.Sleep(time.Second * time.Duration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+
+					continue podLoop
+				}
+				kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is not running, retries exhausted", podName)
+
+				return
+			case containerState.Terminated != nil:
+				kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod has terminated, with exit code: %v, terminated reason: %v and terminated message: %v", podName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
+
+				return
+			default:
+				retryCount--
+				if retryCount > 0 {
+					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. Will retry %v more times.", podName, containerState, retryCount)
+
+					time.Sleep(time.Second * time.Duration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+
+					continue podLoop
+				} else {
 					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is not running, retries exhausted", podName)
 
 					return
 				}
-
-				break podLoop
 			}
 		}
 

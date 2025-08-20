@@ -959,6 +959,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			// If container state not running retry or fail job.
 			switch {
 			case containerState.Running != nil:
+				kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod is running.", podName)
+
 				break podLoop
 			case containerState.Waiting != nil:
 				retryCount--

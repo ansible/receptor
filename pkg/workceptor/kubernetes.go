@@ -386,6 +386,7 @@ mainLoop:
 						*stdoutErr = fmt.Errorf("%s", errMsg)
 						kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 					}
+
 					return
 				}
 
@@ -935,7 +936,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					continue
 				}
 				errMsg := fmt.Sprintf("Error getting pod %s/%s, after retries exhausted. Error: %s", podNamespace, podName, kubeErr)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 				return
@@ -953,7 +954,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 
 			if !foundContainer {
 				errMsg := fmt.Sprintf("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 				return
@@ -976,13 +977,13 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					continue podLoop
 				}
 				errMsg := fmt.Sprintf("Container in %s pod is not running, retries exhausted", podName)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 				return
 			case containerState.Terminated != nil:
 				errMsg := fmt.Sprintf("Container in %s pod has terminated, with exit code: %v, terminated reason: %v and terminated message: %v", podName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 				return
@@ -997,7 +998,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					continue podLoop
 				} else {
 					errMsg := fmt.Sprintf("Container in %s pod is not running container state unknown, retries exhausted", podName)
-					kw.GetWorkceptor().nc.GetLogger().Error(errMsg)
+					kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 					kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 					return

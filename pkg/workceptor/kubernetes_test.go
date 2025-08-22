@@ -4363,7 +4363,7 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 // - Running: breaks out of loop and continues
 // - Waiting: retries with exponential backoff until exhausted
 // - Terminated: fails the job immediately
-// - Default: retries with exponential backoff until exhausted
+// - Default: retries with exponential backoff until exhausted.
 func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 	const (
 		testNamespace = "default"
@@ -4435,7 +4435,7 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 			description:      "When container is terminated, should fail immediately without retries",
 		},
 		{
-			name: "Unknown container state - should retry with backoff",
+			name:           "Unknown container state - should retry with backoff",
 			containerState: corev1.ContainerState{
 				// All fields nil represents unknown/unexpected state
 			},
@@ -4522,7 +4522,7 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 			c := rest.RESTClient{}
 			req := rest.NewRequest(&c)
 			mockKubeAPI.EXPECT().SubResource(gomock.Any(), testPodName, testNamespace).Return(req)
-			
+
 			// Mock SPDY executor creation and streaming
 			mockExecutor := &ex{} // Using the existing ex test type
 			mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), "POST", gomock.Any()).Return(mockExecutor, nil)
@@ -4536,7 +4536,7 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 				// We allow both Running and Failed status since streaming might fail due to scheme issues
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, "Pod Running", gomock.Any()).MaxTimes(1)
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).AnyTimes()
-				
+
 				// Mock streaming attempts - may fail due to scheme issues but that's OK for switch case testing
 				if tc.containerState.Running != nil {
 					mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req).AnyTimes()
@@ -4547,7 +4547,7 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 				// Allow both Running and Failed status since streaming might fail due to scheme issues
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, "Pod Running", gomock.Any()).MaxTimes(1)
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).AnyTimes()
-				
+
 				// Mock streaming attempts after transition to running - may fail due to scheme issues
 				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req).AnyTimes()
 
@@ -4574,9 +4574,10 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 			// Mock the GetPod calls for the switch case testing (lines 926+ in podLoop)
 			// The pod loop will call Get multiple times to check container state
 			// PLUS calls from the initial pod retrieval logic (line 338)
-			if tc.expectRetries && tc.containerState.Waiting != nil {
+			switch {
+			case tc.expectRetries && tc.containerState.Waiting != nil:
 				// For waiting state: test retry logic then transition to running
-				// Return waiting pod for first 4 calls, then running pod to break out of loop
+				// Return waiting pod for first call, then running pod to break out of loop
 				waitingPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
 					Status: corev1.PodStatus{
@@ -4605,13 +4606,13 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 						},
 					},
 				}
-				
+
 				// First 1 call returns waiting pod (to test retry logic but avoid long fibonacci delays)
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(waitingPod, nil).Times(1)
 				// Then return running pod to break out of loop
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(runningPod, nil).AnyTimes()
-			} else if tc.expectRetries && tc.expectedBehavior == "retry_then_terminated" {
-				// For unknown state retry scenarios, first return unknown state 3 times then failed pod
+			case tc.expectRetries && tc.expectedBehavior == "retry_then_terminated":
+				// For unknown state retry scenarios, first return unknown state then failed pod
 				unknownStatePod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
 					Status: corev1.PodStatus{
@@ -4629,11 +4630,8 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(unknownStatePod, nil).Times(1)
 				// All subsequent Get calls should fail to prevent retries and exit the loop quickly
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(nil, fmt.Errorf("pod not found")).AnyTimes()
-			} else if tc.expectedBehavior == "continue_execution" {
-				// For running state, mock calls for both switch case checking AND initial retrieval + logging setup
-				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(createdPod, nil).AnyTimes()
-			} else {
-				// For immediate failure (terminated), mock one Get call for switch case + initial retrieval
+			default:
+				// For running state and immediate failure (terminated), mock calls for both switch case checking AND initial retrieval + logging setup
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(createdPod, nil).AnyTimes()
 			}
 
@@ -4646,4 +4644,3 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 		})
 	}
 }
-

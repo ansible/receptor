@@ -4523,10 +4523,11 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 			req := rest.NewRequest(&c)
 			mockKubeAPI.EXPECT().SubResource(gomock.Any(), testPodName, testNamespace).Return(req)
 
-			// Mock SPDY executor creation and streaming
+			// Mock SPDY executor creation and streaming to avoid scheme registration issues
 			mockExecutor := &ex{} // Using the existing ex test type
-			mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), "POST", gomock.Any()).Return(mockExecutor, nil)
-			mockKubeAPI.EXPECT().StreamWithContext(gomock.Any(), mockExecutor, gomock.Any()).Return(nil).AnyTimes()
+			mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), "POST", gomock.Any()).Return(mockExecutor, nil).AnyTimes()
+			// Return an error to prevent actual streaming operations that cause scheme issues
+			mockKubeAPI.EXPECT().StreamWithContext(gomock.Any(), mockExecutor, gomock.Any()).Return(fmt.Errorf("mock stream error")).AnyTimes()
 
 			// Set up expectations based on container state behavior
 			switch tc.expectedBehavior {
@@ -4537,9 +4538,14 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, "Pod Running", gomock.Any()).MaxTimes(1)
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).AnyTimes()
 
-				// Mock streaming attempts - may fail due to scheme issues but that's OK for switch case testing
+				// Return a valid but failing REST request to avoid scheme issues
 				if tc.containerState.Running != nil {
-					mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req).AnyTimes()
+					failReq := fakerest.RESTClient{
+						Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+							return nil, fmt.Errorf("mock log stream error")
+						}),
+					}
+					mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(failReq.Request()).AnyTimes()
 				}
 
 			case "retry_then_running":
@@ -4548,8 +4554,13 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, "Pod Running", gomock.Any()).MaxTimes(1)
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).AnyTimes()
 
-				// Mock streaming attempts after transition to running - may fail due to scheme issues
-				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req).AnyTimes()
+				// Return a valid but failing REST request to avoid scheme issues
+				failReq := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return nil, fmt.Errorf("mock log stream error")
+					}),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(failReq.Request()).AnyTimes()
 
 			case "immediate_failure":
 				// Terminated state: should fail immediately with specific error message

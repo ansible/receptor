@@ -377,8 +377,8 @@ mainLoop:
 				// Check if the context was canceled and the work state isn't "Succeeded".
 				// If so, set the error and mark the job as failed.
 				if kw.GetContext().Err() == context.Canceled {
-					if kw.Status().State != WorkStateSucceeded ||
-						kw.Status().State != WorkStateFailed ||
+					if kw.Status().State != WorkStateSucceeded &&
+						kw.Status().State != WorkStateFailed &&
 						kw.Status().State != WorkStateCanceled {
 						errMsg := fmt.Sprintf("Context was canceled while reading logs for pod %s/%s. This is unrecoverable. Marking the job as failed and exiting. Error: %s",
 							podNamespace,

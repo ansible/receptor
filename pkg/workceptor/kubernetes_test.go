@@ -4656,12 +4656,12 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 	}
 }
 
-// TestKubeUnit_RunWorkUsingTCP tests the runWorkUsingTCP method functionality
+// TestKubeUnit_RunWorkUsingTCP tests the runWorkUsingTCP method functionality.
 // This test covers the core TCP workflow through the Start() method when streamMethod="tcp":
 // 1. TCP listener creation (verified by actual host/port values in environment variables)
-// 2. Pod creation with RECEPTOR_HOST and RECEPTOR_PORT environment variables
-// 3. Error handling when pod creation fails (fail-fast behavior)
-// 4. Integration with the Kubernetes API for pod management
+// 2. Pod creation with RECEPTOR_HOST and RECEPTOR_PORT environment variables.
+// 3. Error handling when pod creation fails (fail-fast behavior).
+// 4. Integration with the Kubernetes API for pod management.
 func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 	const (
 		testNamespace = "default"
@@ -4730,7 +4730,7 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 		{
 			name: "Successful TCP listener creation and pod creation",
 			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor, ctx context.Context) {
-				// Mock status methods 
+				// Mock status methods
 				statusLock := &sync.RWMutex{}
 				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
 				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
@@ -4763,15 +4763,16 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 				}
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), testNamespace, gomock.Any(), gomock.Any()).DoAndReturn(
 					func(ctx context.Context, clientset any, namespace string, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
-						// Verify the pod has the RECEPTOR_HOST and RECEPTOR_PORT env vars
+						// Verify the pod has the RECEPTOR_HOST and RECEPTOR_PORT env vars.
 						workerContainer := &corev1.Container{}
 						for _, container := range pod.Spec.Containers {
 							if container.Name == workceptor.WorkerContainerName {
 								workerContainer = &container
+
 								break
 							}
 						}
-						
+
 						// Check that TCP env vars are set
 						hasHost, hasPort := false, false
 						for _, env := range workerContainer.Env {
@@ -4784,11 +4785,11 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 								t.Logf("Found RECEPTOR_PORT: %s", env.Value)
 							}
 						}
-						
+
 						if !hasHost || !hasPort {
 							t.Errorf("Expected RECEPTOR_HOST and RECEPTOR_PORT env vars to be set in pod")
 						}
-						
+
 						return createdPod, nil
 					})
 
@@ -4824,7 +4825,7 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			
+
 			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
 			if err != nil {
 				t.Fatalf("Error creating Workceptor: %v", err)
@@ -4859,7 +4860,7 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 }
 
 // TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths tests additional error scenarios
-// to achieve comprehensive coverage of runWorkUsingTCP function
+// to achieve comprehensive coverage of runWorkUsingTCP function.
 func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 	const testUnitDir = "/tmp/test/tcp/extensive/"
 
@@ -4917,7 +4918,7 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "test-cancel-pod", Namespace: "default"},
 				}
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(pod, nil)
-				
+
 				// Mock selector and pod watching (may not be called due to context cancellation)
 				selector := &hasTerm{field: "metadata.name", value: "test-cancel-pod"}
 				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", gomock.Any()).Return(selector).AnyTimes()
@@ -4970,7 +4971,7 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "test-stdin-err-pod", Namespace: "default"},
 				}
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(pod, nil)
-				
+
 				// Mock selector and pod watching
 				selector := &hasTerm{field: "metadata.name", value: "test-stdin-err-pod"}
 				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", gomock.Any()).Return(selector).AnyTimes()

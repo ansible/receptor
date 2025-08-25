@@ -4767,7 +4767,8 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 						workerContainer := &corev1.Container{}
 						for _, container := range pod.Spec.Containers {
 							if container.Name == workceptor.WorkerContainerName {
-								workerContainer = &container
+								containerCopy := container
+								workerContainer = &containerCopy
 
 								break
 							}

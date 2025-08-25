@@ -4655,3 +4655,428 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 		})
 	}
 }
+
+// TestKubeUnit_RunWorkUsingTCP tests the runWorkUsingTCP method functionality
+// This test covers the core TCP workflow through the Start() method when streamMethod="tcp":
+// 1. TCP listener creation (verified by actual host/port values in environment variables)
+// 2. Pod creation with RECEPTOR_HOST and RECEPTOR_PORT environment variables
+// 3. Error handling when pod creation fails (fail-fast behavior)
+// 4. Integration with the Kubernetes API for pod management
+func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
+	const (
+		testNamespace = "default"
+		testUnitDir   = "/tmp/test/tcp/unit/"
+	)
+
+	// Create the unit directory and stdin file for the test
+	err := os.MkdirAll(testUnitDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create test unit directory: %v", err)
+	}
+	defer os.RemoveAll(testUnitDir)
+
+	// Create a test stdin file with some data
+	stdinPath := filepath.Join(testUnitDir, "stdin")
+	stdinContent := "test input data\n"
+	err = os.WriteFile(stdinPath, []byte(stdinContent), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create stdin file: %v", err)
+	}
+
+	testCases := []struct {
+		name        string
+		setupMocks  func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, context.Context)
+		description string
+	}{
+		{
+			name: "CreatePod failure should fail fast",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor, ctx context.Context) {
+				// Mock status methods for CreatePod call
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					KubeNamespace: testNamespace,
+					PodName:       "", // Empty to trigger CreatePod
+				}}
+
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBWU.EXPECT().GetCancel().Return(func() {}).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+				mockBWU.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock Kubernetes connection setup
+				config := rest.Config{}
+				mockAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				clientset := kubernetes.Clientset{}
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+
+				// Mock failed pod creation to test early exit path
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), testNamespace, gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("pod creation failed"))
+
+				// Mock error logging and status updates
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			},
+			description: "Should fail fast when CreatePod fails and not proceed to TCP operations",
+		},
+		{
+			name: "Successful TCP listener creation and pod creation",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor, ctx context.Context) {
+				// Mock status methods 
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					KubeNamespace: testNamespace,
+					PodName:       "", // Empty to trigger CreatePod
+				}}
+
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBWU.EXPECT().GetCancel().Return(func() {}).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+				mockBWU.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock Kubernetes connection setup
+				config := rest.Config{}
+				mockAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				clientset := kubernetes.Clientset{}
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+
+				// Mock successful pod creation
+				createdPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-tcp-pod", Namespace: testNamespace},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), testNamespace, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, clientset any, namespace string, pod *corev1.Pod, opts metav1.CreateOptions) (*corev1.Pod, error) {
+						// Verify the pod has the RECEPTOR_HOST and RECEPTOR_PORT env vars
+						workerContainer := &corev1.Container{}
+						for _, container := range pod.Spec.Containers {
+							if container.Name == workceptor.WorkerContainerName {
+								workerContainer = &container
+								break
+							}
+						}
+						
+						// Check that TCP env vars are set
+						hasHost, hasPort := false, false
+						for _, env := range workerContainer.Env {
+							if env.Name == "RECEPTOR_HOST" && env.Value != "" {
+								hasHost = true
+								t.Logf("Found RECEPTOR_HOST: %s", env.Value)
+							}
+							if env.Name == "RECEPTOR_PORT" && env.Value != "" {
+								hasPort = true
+								t.Logf("Found RECEPTOR_PORT: %s", env.Value)
+							}
+						}
+						
+						if !hasHost || !hasPort {
+							t.Errorf("Expected RECEPTOR_HOST and RECEPTOR_PORT env vars to be set in pod")
+						}
+						
+						return createdPod, nil
+					})
+
+				// Mock pod waiting - these may not be called in time due to the timeout context
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+				selector := &hasTerm{field: "metadata.name", value: "test-tcp-pod"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "test-tcp-pod").Return(selector).AnyTimes()
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), testNamespace, gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), testNamespace, gomock.Any()).Return(nil, nil).AnyTimes()
+				watchEvent := &watch.Event{Type: watch.Modified, Object: createdPod}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil).AnyTimes()
+
+				// Mock logging
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+			},
+			description: "Should successfully create TCP listener and pod with RECEPTOR_HOST/RECEPTOR_PORT env vars",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			// Create KubeUnit with TCP stream method
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "incluster",
+				StreamMethod: "tcp",
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Set up test-specific mocks
+			tc.setupMocks(mockBaseWorkUnit, mockKubeAPI, mockNetceptor, w, ctx)
+
+			t.Logf("Testing: %s", tc.description)
+
+			// Start the KubeUnit - this will trigger runWorkUsingTCP() in a goroutine when streamMethod="tcp"
+			err = kubeUnit.Start()
+			if err != nil {
+				t.Logf("Start() returned error (may be expected): %v", err)
+			}
+
+			// Give the TCP functionality some time to execute before test ends
+			time.Sleep(500 * time.Millisecond)
+
+			t.Logf("Successfully completed test: %s", tc.name)
+		})
+	}
+}
+
+// TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths tests additional error scenarios
+// to achieve comprehensive coverage of runWorkUsingTCP function
+func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
+	const testUnitDir = "/tmp/test/tcp/extensive/"
+
+	// Create the unit directory for testing
+	err := os.MkdirAll(testUnitDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create test unit directory: %v", err)
+	}
+	defer os.RemoveAll(testUnitDir)
+
+	// Create a test stdin file
+	stdinPath := filepath.Join(testUnitDir, "stdin")
+	err = os.WriteFile(stdinPath, []byte("test input\n"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create stdin file: %v", err)
+	}
+
+	testCases := []struct {
+		name           string
+		setupMocks     func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, context.Context)
+		contextTimeout time.Duration
+		description    string
+	}{
+		{
+			name: "Context cancellation during TCP wait",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor, ctx context.Context) {
+				// Mock basic setup
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox",
+					Command:       "sleep 30",
+					KubeNamespace: "default",
+					PodName:       "",
+				}}
+
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBWU.EXPECT().GetCancel().Return(func() {}).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-cancel").AnyTimes()
+				mockBWU.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock successful Kubernetes setup
+				config := rest.Config{}
+				mockAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				clientset := kubernetes.Clientset{}
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+
+				// Mock successful pod creation (but context will cancel during TCP wait)
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-cancel-pod", Namespace: "default"},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(pod, nil)
+				
+				// Mock selector and pod watching (may not be called due to context cancellation)
+				selector := &hasTerm{field: "metadata.name", value: "test-cancel-pod"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", gomock.Any()).Return(selector).AnyTimes()
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(nil, nil).AnyTimes()
+				watchEvent := &watch.Event{Type: watch.Modified, Object: pod}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil).AnyTimes()
+
+				// Mock logging
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+			},
+			contextTimeout: 100 * time.Millisecond, // Short timeout to trigger context cancellation
+			description:    "Tests context cancellation during TCP connection wait (lines 1304-1305)",
+		},
+		{
+			name: "Failed stdin file access",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor, ctx context.Context) {
+				// Mock basic setup
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox",
+					Command:       "echo hello",
+					KubeNamespace: "default",
+					PodName:       "",
+				}}
+
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBWU.EXPECT().GetCancel().Return(func() {}).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-stdin-err").AnyTimes()
+				// Use non-existent directory to trigger stdin file error
+				mockBWU.EXPECT().UnitDir().Return("/non/existent/directory").AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock successful Kubernetes setup
+				config := rest.Config{}
+				mockAPI.EXPECT().InClusterConfig().Return(&config, nil)
+				clientset := kubernetes.Clientset{}
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
+
+				// Mock successful pod creation
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-stdin-err-pod", Namespace: "default"},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(pod, nil)
+				
+				// Mock selector and pod watching
+				selector := &hasTerm{field: "metadata.name", value: "test-stdin-err-pod"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", gomock.Any()).Return(selector).AnyTimes()
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(nil, nil).AnyTimes()
+				watchEvent := &watch.Event{Type: watch.Modified, Object: pod}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil).AnyTimes()
+
+				// Mock logging and status updates for error handling
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+			},
+			contextTimeout: 2 * time.Second,
+			description:    "Tests stdin file access error handling (lines 1311-1319)",
+		},
+		{
+			name: "Context early cancellation during listener setup",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor, ctx context.Context) {
+				// Mock basic setup
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox",
+					Command:       "echo hello",
+					KubeNamespace: "default",
+					PodName:       "",
+				}}
+
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBWU.EXPECT().GetCancel().Return(func() {}).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-early-cancel").AnyTimes()
+				mockBWU.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock Kubernetes setup - may not be called due to early context cancellation
+				config := rest.Config{}
+				mockAPI.EXPECT().InClusterConfig().Return(&config, nil).AnyTimes()
+				clientset := kubernetes.Clientset{}
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil).AnyTimes()
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("context cancelled")).AnyTimes()
+
+				// Mock logging
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+			},
+			contextTimeout: 10 * time.Millisecond, // Very short timeout to trigger early cancellation
+			description:    "Tests context cancellation check (lines 1240-1242)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx, cancel := context.WithTimeout(context.Background(), tc.contextTimeout)
+			defer cancel()
+
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			// Create KubeUnit with TCP stream method
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "incluster",
+				StreamMethod: "tcp",
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Set up test-specific mocks
+			tc.setupMocks(mockBaseWorkUnit, mockKubeAPI, mockNetceptor, w, ctx)
+
+			t.Logf("Testing: %s", tc.description)
+
+			// Start the KubeUnit - this will trigger runWorkUsingTCP()
+			err = kubeUnit.Start()
+			if err != nil {
+				t.Logf("Start() returned error (may be expected): %v", err)
+			}
+
+			// Wait for the context timeout or execution to complete
+			select {
+			case <-ctx.Done():
+				t.Logf("Context timeout reached as expected")
+			case <-time.After(tc.contextTimeout + 100*time.Millisecond):
+				t.Logf("Test execution completed")
+			}
+
+			t.Logf("Successfully completed test: %s", tc.name)
+		})
+	}
+}

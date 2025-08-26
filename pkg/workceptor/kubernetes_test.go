@@ -592,6 +592,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				logger := logger.NewReceptorLogger("")
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetStatusLock()
 
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -629,7 +630,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    10,
+			timeoutSeconds:    5,
 		},
 		{
 			name: "pod_retrieval_failure_exhausts_retries",
@@ -648,7 +649,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: true,
-			timeoutSeconds:    15, // Allow time for 5 retries with 1 second delays
+			timeoutSeconds:    12, // Allow time for 5 retries with Fibonacci delays
 			validateLogs:      true,
 			expectedLogMsgs: []string{
 				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
@@ -690,7 +691,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    30, // Allow time for retries
+			timeoutSeconds:    15, // Allow time for retries
 			validateLogs:      true,
 			expectedLogMsgs: []string{
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
@@ -759,7 +760,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    35, // Allow time for multiple retry cycles (increased for concurrent test execution)
+			timeoutSeconds:    20, // Allow time for multiple retry cycles
 			validateLogs:      true,
 			expectedLogMsgs: []string{
 				// First cycle: Nearly exhaust non-EOF retries (5->4->3->2)
@@ -795,10 +796,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 						},
 					},
 				}
-				notReadyPod := &corev1.Pod{
+				terminatedPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
 					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
+						Phase: corev1.PodSucceeded,
 						Conditions: []corev1.PodCondition{
 							{Type: corev1.PodReady, Status: corev1.ConditionFalse},
 						},
@@ -806,17 +807,22 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 							{
 								Name: workceptor.WorkerContainerName,
 								State: corev1.ContainerState{
-									Running: &corev1.ContainerStateRunning{},
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode:   0,
+										Reason:     "Completed",
+										Message:    "Container completed successfully",
+										FinishedAt: metav1.NewTime(time.Now()),
+									},
 								},
 							},
 						},
 					},
 				}
 
-				// First Get() for main loop, second Get() after EOF for readiness check
+				// First Get() for main loop, second Get() after EOF shows terminated state (exits immediately)
 				gomock.InOrder(
 					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
-					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil).AnyTimes(),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(terminatedPod, nil).AnyTimes(),
 				)
 
 				req := fakerest.RESTClient{
@@ -1347,7 +1353,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: true,
-			timeoutSeconds:    25, // Need longer timeout to accommodate Fibonacci delays (1+2+3+5 = 11+ seconds)
+			timeoutSeconds:    15, // Fibonacci delays (1+2+3+5 = 11+ seconds)
 			validateLogs:      true,
 			expectedLogMsgs: []string{
 				"Will retry 4 more times",
@@ -4347,6 +4353,305 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 			t.Logf("Testing: %s", tc.description)
 			kubeUnit.RunWorkUsingLogger()
 			t.Logf("Successfully verified: %s", tc.description)
+		})
+	}
+}
+
+// TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch tests the switch case logic
+// in RunWorkUsingLogger function that handles different container states.
+// This tests the pod loop switch statement that checks container states:
+// - Running: breaks out of loop and continues
+// - Waiting: retries with exponential backoff until exhausted
+// - Terminated: fails the job immediately
+// - Default: retries with exponential backoff until exhausted.
+func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
+	const (
+		testNamespace = "default"
+		testPodName   = "test-pod-123"
+		testUnitDir   = "/tmp/test/unit/"
+	)
+
+	// Create the unit directory for real file operations
+	err := os.MkdirAll(testUnitDir, 0o755)
+	if err != nil {
+		t.Fatalf("Failed to create test unit directory: %v", err)
+	}
+	defer os.RemoveAll(testUnitDir)
+
+	// Create a small stdin file to ensure we don't skip stdin processing
+	stdinPath := filepath.Join(testUnitDir, "stdin")
+	err = os.WriteFile(stdinPath, []byte("test input\n"), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create stdin file: %v", err)
+	}
+
+	testCases := []struct {
+		name             string
+		containerState   corev1.ContainerState
+		expectedBehavior string
+		expectError      bool
+		expectRetries    bool
+		description      string
+	}{
+		{
+			name: "Running container state - should break out of loop",
+			containerState: corev1.ContainerState{
+				Running: &corev1.ContainerStateRunning{
+					StartedAt: metav1.NewTime(time.Now()),
+				},
+			},
+			expectedBehavior: "continue_execution",
+			expectError:      false,
+			expectRetries:    false,
+			description:      "When container is running, should break out of pod loop and continue execution",
+		},
+		{
+			name: "Waiting container state - should retry with backoff",
+			containerState: corev1.ContainerState{
+				Waiting: &corev1.ContainerStateWaiting{
+					Reason:  "ContainerCreating",
+					Message: "Container is being created",
+				},
+			},
+			expectedBehavior: "retry_then_running",
+			expectError:      false,
+			expectRetries:    true,
+			description:      "When container is waiting, should retry with fibonacci delays then transition to running",
+		},
+		{
+			name: "Terminated container state - should fail immediately",
+			containerState: corev1.ContainerState{
+				Terminated: &corev1.ContainerStateTerminated{
+					ExitCode:   1,
+					Reason:     "Error",
+					Message:    "Container failed to start",
+					StartedAt:  metav1.NewTime(time.Now().Add(-5 * time.Minute)),
+					FinishedAt: metav1.NewTime(time.Now()),
+				},
+			},
+			expectedBehavior: "immediate_failure",
+			expectError:      true,
+			expectRetries:    false,
+			description:      "When container is terminated, should fail immediately without retries",
+		},
+		{
+			name:           "Unknown container state - should retry with backoff",
+			containerState: corev1.ContainerState{
+				// All fields nil represents unknown/unexpected state
+			},
+			expectedBehavior: "retry_then_terminated",
+			expectError:      true,
+			expectRetries:    true,
+			description:      "When container state is unknown/unexpected, should retry then transition to terminated",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+			logger := logger.NewReceptorLogger("test")
+			mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			// Create test setup for new pod creation (empty PodName triggers CreatePod path AND stdin processing)
+			statusLock := &sync.RWMutex{}
+			statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+			statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				KubeNamespace: testNamespace,
+				PodName:       "", // Empty to trigger CreatePod path AND enable stdin processing
+			}}
+
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBaseWorkUnit.EXPECT().ID().Return("test-unit-id").AnyTimes()
+			mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "incluster",
+				StreamMethod: "logger",
+			}
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Create a pod that will be "created" and then checked for container state
+			createdPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name:  workceptor.WorkerContainerName,
+							State: tc.containerState,
+						},
+					},
+				},
+			}
+
+			// Mock the CreatePod process
+			mockKubeAPI.EXPECT().Create(gomock.Any(), gomock.Any(), testNamespace, gomock.Any(), gomock.Any()).Return(createdPod, nil)
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+
+			// Mock pod waiting (UntilWithSync)
+			selector := &hasTerm{field: "metadata.name", value: testPodName}
+			mockKubeAPI.EXPECT().OneTermEqualSelector("metadata.name", testPodName).Return(selector)
+			mockKubeAPI.EXPECT().List(gomock.Any(), gomock.Any(), testNamespace, gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+			mockKubeAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), testNamespace, gomock.Any()).Return(nil, nil).AnyTimes()
+			watchEvent := &watch.Event{Type: watch.Modified, Object: createdPod}
+			mockKubeAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil)
+
+			// CRITICAL: Mock stdin setup - this is where our previous tests failed
+			// When skipStdin = false (new pod creation), these calls are made
+			// Create a proper REST request that can handle VersionedParams calls
+			c := rest.RESTClient{}
+			req := rest.NewRequest(&c)
+			mockKubeAPI.EXPECT().SubResource(gomock.Any(), testPodName, testNamespace).Return(req)
+
+			// Mock SPDY executor creation and streaming to avoid scheme registration issues
+			mockExecutor := &ex{} // Using the existing ex test type
+			mockKubeAPI.EXPECT().NewSPDYExecutor(gomock.Any(), "POST", gomock.Any()).Return(mockExecutor, nil).AnyTimes()
+			// Return an error to prevent actual streaming operations that cause scheme issues
+			mockKubeAPI.EXPECT().StreamWithContext(gomock.Any(), mockExecutor, gomock.Any()).Return(fmt.Errorf("mock stream error")).AnyTimes()
+
+			// Set up expectations based on container state behavior
+			switch tc.expectedBehavior {
+			case "continue_execution":
+				// Running state: should break out of loop and continue with logging
+				// The switch case test succeeds if we reach this point - the streaming may fail but that's OK
+				// We allow both Running and Failed status since streaming might fail due to scheme issues
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, "Pod Running", gomock.Any()).MaxTimes(1)
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).AnyTimes()
+
+				// Return a valid but failing REST request to avoid scheme issues
+				if tc.containerState.Running != nil {
+					failReq := fakerest.RESTClient{
+						Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+							return nil, fmt.Errorf("mock log stream error")
+						}),
+					}
+					mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(failReq.Request()).AnyTimes()
+				}
+
+			case "retry_then_running":
+				// Waiting state: should retry a few times, then transition to running and continue
+				// Allow both Running and Failed status since streaming might fail due to scheme issues
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, "Pod Running", gomock.Any()).MaxTimes(1)
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).AnyTimes()
+
+				// Return a valid but failing REST request to avoid scheme issues
+				failReq := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return nil, fmt.Errorf("mock log stream error")
+					}),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(failReq.Request()).AnyTimes()
+
+			case "immediate_failure":
+				// Terminated state: should fail immediately with specific error message
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).Do(
+					func(state int, msg string, stdoutSize int64) {
+						assert.Contains(t, msg, "Container in test-pod-123 pod has terminated")
+						assert.Contains(t, msg, "exit code: 1")
+						assert.Contains(t, msg, "terminated reason: Error")
+						assert.Contains(t, msg, "terminated message: Container failed to start")
+					})
+
+			case "retry_then_terminated":
+				// Unknown state: should test default case once, then fail on pod retrieval error
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).Do(
+					func(state int, msg string, stdoutSize int64) {
+						// Should get error message about pod retrieval failure after retries exhausted
+						assert.Contains(t, msg, "Error getting pod")
+						assert.Contains(t, msg, "after retries exhausted")
+					}).MaxTimes(1)
+			}
+
+			// Mock the GetPod calls for the switch case testing (lines 926+ in podLoop)
+			// The pod loop will call Get multiple times to check container state
+			// PLUS calls from the initial pod retrieval logic (line 338)
+			switch {
+			case tc.expectRetries && tc.containerState.Waiting != nil:
+				// For waiting state: test retry logic then transition to running
+				// Return waiting pod for first call, then running pod to break out of loop
+				waitingPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:  workceptor.WorkerContainerName,
+								State: tc.containerState, // Waiting state
+							},
+						},
+					},
+				}
+				runningPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Running: &corev1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(time.Now()),
+									},
+								},
+							},
+						},
+					},
+				}
+
+				// First 1 call returns waiting pod (to test retry logic but avoid long fibonacci delays)
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(waitingPod, nil).Times(1)
+				// Then return running pod to break out of loop
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(runningPod, nil).AnyTimes()
+			case tc.expectRetries && tc.expectedBehavior == "retry_then_terminated":
+				// For unknown state retry scenarios, first return unknown state then failed pod
+				unknownStatePod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: testPodName, Namespace: testNamespace},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:  workceptor.WorkerContainerName,
+								State: tc.containerState, // Unknown/empty state
+							},
+						},
+					},
+				}
+				// First call: return unknown state to test default case, then immediately return error to fail fast
+				// This prevents getting stuck in the fibonacci delay loop
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(unknownStatePod, nil).Times(1)
+				// All subsequent Get calls should fail to prevent retries and exit the loop quickly
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(nil, fmt.Errorf("pod not found")).AnyTimes()
+			default:
+				// For running state and immediate failure (terminated), mock calls for both switch case checking AND initial retrieval + logging setup
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(createdPod, nil).AnyTimes()
+			}
+
+			t.Logf("Testing: %s", tc.description)
+
+			// Execute the function - this will test the switch case logic
+			kubeUnit.RunWorkUsingLogger()
+
+			t.Logf("Successfully tested container state switch case: %s", tc.name)
 		})
 	}
 }

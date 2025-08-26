@@ -4673,7 +4673,7 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test unit directory: %v", err)
 	}
-	defer os.RemoveAll(testUnitDir)
+	t.Cleanup(func() { os.RemoveAll(testUnitDir) })
 
 	// Create a test stdin file with some data
 	stdinPath := filepath.Join(testUnitDir, "stdin")

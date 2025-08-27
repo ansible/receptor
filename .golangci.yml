@@ -102,6 +102,8 @@ linters-settings:
           - "k8s.io/client-go/kubernetes"
           - "k8s.io/client-go/rest"
           - "k8s.io/client-go/tools/remotecommand"
+          - "k8s.io/client-go/tools/clientcmd"
+          - "k8s.io/client-go/tools/clientcmd/api"
           - "github.com/quic-go/quic-go"
           - "github.com/quic-go/quic-go/logging"
           - "github.com/AaronH88/quic-go"

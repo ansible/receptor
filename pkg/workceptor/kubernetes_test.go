@@ -37,6 +37,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/remotecommand"
 )
 
@@ -4862,6 +4864,187 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 
 // TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths tests additional error scenarios
 // to achieve comprehensive coverage of runWorkUsingTCP function.
+// TestKubeUnit_ConnectUsingKubeconfig tests the connectUsingKubeconfig method through the Start() method.
+func TestKubeUnit_ConnectUsingKubeconfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		kubeConfig    string
+		kubeNamespace string
+		setupMocks    func(*mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockKubeAPIer, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor)
+		expectError   bool
+		description   string
+	}{
+		{
+			name:          "Empty kubeconfig - use default config loading",
+			kubeConfig:    "",
+			kubeNamespace: "",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeConfig:    "",
+					KubeNamespace: "",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock basic status update
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, "Connecting to Kubernetes", int64(0))
+
+				// Mock connectUsingKubeconfig path - empty config uses default loading
+				rules := &clientcmd.ClientConfigLoadingRules{}
+				mockAPI.EXPECT().NewDefaultClientConfigLoadingRules().Return(rules)
+				mockAPI.EXPECT().BuildConfigFromFlags("", gomock.Any()).Return(nil, fmt.Errorf("no kubeconfig found"))
+
+				// Mock logger for error handling
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+			},
+			expectError: true,
+			description: "Should handle empty kubeconfig with default config loading",
+		},
+		{
+			name:          "Valid kubeconfig content",
+			kubeConfig:    `apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: https://test\n  name: test`,
+			kubeNamespace: "",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeConfig:    `apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: https://test\n  name: test`,
+					KubeNamespace: "",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock basic status update
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, "Connecting to Kubernetes", int64(0))
+
+				// Mock connectUsingKubeconfig path - with config content
+				fakeConfig := &fakeClientConfig{}
+				mockAPI.EXPECT().NewClientConfigFromBytes(gomock.Any()).Return(fakeConfig, nil)
+
+				// Should call UpdateFullStatus to set namespace from config
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+					status := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+					updateFunc.(func(*workceptor.StatusFileData))(status)
+				})
+
+				// Mock rest.Config creation
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(nil, fmt.Errorf("connection failed"))
+
+				// Mock logger for error handling
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+			},
+			expectError: true, // Will fail at clientset creation but covers kubeconfig path
+			description: "Should handle valid kubeconfig content and namespace extraction",
+		},
+		{
+			name:          "Valid kubeconfig with existing namespace",
+			kubeConfig:    `apiVersion: v1\nkind: Config`,
+			kubeNamespace: "existing-ns",
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, w *workceptor.Workceptor) {
+				// Mock status calls
+				statusLock := &sync.RWMutex{}
+				statusData := &workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}}
+				statusCopy := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					KubeConfig:    `apiVersion: v1\nkind: Config`,
+					KubeNamespace: "existing-ns",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+				mockBWU.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().MonitorLocalStatus().AnyTimes()
+
+				// Mock basic status update
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStatePending, "Connecting to Kubernetes", int64(0))
+
+				// Mock connectUsingKubeconfig path - with existing namespace (no UpdateFullStatus call)
+				fakeConfig := &fakeClientConfig{}
+				mockAPI.EXPECT().NewClientConfigFromBytes(gomock.Any()).Return(fakeConfig, nil)
+				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(nil, fmt.Errorf("connection failed"))
+
+				// Mock logger for error handling
+				logger := logger.NewReceptorLogger("test")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+			},
+			expectError: true, // Will fail at clientset creation
+			description: "Should use existing namespace when provided",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			// Create KubeUnit with kubeconfig auth method to trigger connectUsingKubeconfig
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:   "kubeconfig",
+				StreamMethod: "logger",
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			// Set up test-specific mocks
+			tt.setupMocks(mockBaseWorkUnit, mockKubeAPI, mockNetceptor, w)
+
+			// Execute - this will call connectUsingKubeconfig through startOrRestart -> connectToKube
+			err = kubeUnit.Start()
+
+			if tt.expectError {
+				assert.Error(t, err, tt.description)
+			} else {
+				assert.NoError(t, err, tt.description)
+			}
+
+			t.Logf("Successfully tested: %s", tt.description)
+		})
+	}
+}
+
+// fakeClientConfig implements clientcmd.ClientConfig for testing.
+type fakeClientConfig struct{}
+
+func (f *fakeClientConfig) RawConfig() (clientcmdapi.Config, error) {
+	return clientcmdapi.Config{}, nil
+}
+
+func (f *fakeClientConfig) ClientConfig() (*rest.Config, error) {
+	return &rest.Config{Host: "https://test"}, nil
+}
+
+func (f *fakeClientConfig) Namespace() (string, bool, error) {
+	return "test-namespace", false, nil
+}
+
+func (f *fakeClientConfig) ConfigAccess() clientcmd.ConfigAccess {
+	return nil
+}
+
 func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 	const testUnitDir = "/tmp/test/tcp/extensive/"
 

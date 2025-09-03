@@ -536,6 +536,7 @@ mainLoop:
 
 			// Set successfulWrite = true after writing to stdout to track that we've successfully written during this connection session
 			successfulWrite = true
+			retryGetLogStream = retries
 		}
 	}
 }

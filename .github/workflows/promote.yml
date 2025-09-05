@@ -48,7 +48,7 @@ jobs:
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
 
       - name: Install python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
 
       - name: Install dependencies
         run: |

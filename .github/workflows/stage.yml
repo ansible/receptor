@@ -56,7 +56,7 @@ jobs:
           ref: ${{ github.event.inputs.ref }}
 
       - name: Install python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.DESIRED_PYTHON_VERSION }}
 

@@ -942,9 +942,9 @@ Work Kubernetes
     work-kubernetes:
       - worktype: cat
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Kubernetes Environment Variables
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The following environment variables can be used to configure Kubernetes worker behavior:
 

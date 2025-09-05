@@ -255,13 +255,35 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 		kubeRetryCount, err = strconv.Atoi(envRetryCount)
 		if err != nil || kubeRetryCount < 1 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Ignoring", envRetryCount)
+			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
+			kubeRetryCount = 5
+		}
+		// ignore if exceeds limit, use default
+		if kubeRetryCount > 100 {
+			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Default of 5 will be used", kubeRetryCount)
 			kubeRetryCount = 5
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
 
 	return kubeRetryCount
+}
+
+func (kw *KubeUnit) GetSleepDuration(multipler int) time.Duration {
+	const maxInt64 = int64(^uint64(0) >> 1)
+	const maxSleepDuration = 60 * time.Minute
+
+	baseTimeout := int64(kw.GetKubeTimeoutStart())
+	if baseTimeout > 0 && int64(multipler) > maxInt64/baseTimeout {
+		return maxSleepDuration
+	}
+
+	sleepDuration := kw.GetKubeTimeoutStart() * time.Duration(multipler)
+	if sleepDuration > maxSleepDuration {
+		return maxSleepDuration
+	}
+
+	return sleepDuration
 }
 
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
@@ -365,7 +387,7 @@ mainLoop:
 				retryGetPod,
 				err,
 			)
-			time.Sleep(time.Duration(int64(kw.GetKubeTimeoutStart()) * int64(curPodDelay)))
+			time.Sleep(kw.GetSleepDuration(curPodDelay))
 			prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
 		}
 		if err != nil {
@@ -423,7 +445,7 @@ mainLoop:
 							retryGetLogStream,
 						)
 
-						time.Sleep(time.Duration(int64(kw.GetKubeTimeoutStart()) * int64(curDelay)))
+						time.Sleep(kw.GetSleepDuration(curDelay))
 						prevDelay, curDelay = curDelay, prevDelay+curDelay
 
 						continue mainLoop
@@ -488,7 +510,7 @@ mainLoop:
 							retryGetLogStream,
 						)
 
-						time.Sleep(time.Duration(int64(kw.GetKubeTimeoutStart()) * int64(curContainerDelay)))
+						time.Sleep(kw.GetSleepDuration(curContainerDelay))
 						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
 
 						continue mainLoop
@@ -952,7 +974,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)
 
-					time.Sleep(time.Duration(int64(kw.GetKubeTimeoutStart()) * int64(curPodDelay)))
+					time.Sleep(kw.GetSleepDuration(curPodDelay))
 					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
 
 					continue
@@ -993,7 +1015,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is waiting, will retry %v more times.", podName, retryCount)
 
-					time.Sleep(time.Duration(int64(kw.GetKubeTimeoutStart()) * int64(curContainerDelay)))
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
 					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
 
 					continue podLoop
@@ -1014,7 +1036,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. Will retry %v more times.", podName, containerState, retryCount)
 
-					time.Sleep(time.Duration(int64(kw.GetKubeTimeoutStart()) * int64(curContainerDelay)))
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
 					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
 
 					continue podLoop

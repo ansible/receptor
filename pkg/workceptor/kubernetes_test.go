@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -5550,6 +5551,126 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 			}
 
 			t.Logf("Successfully completed test: %s", tc.name)
+		})
+	}
+}
+
+func TestGetSleepDuration(t *testing.T) {
+	tests := []struct {
+		name              string
+		baseTimeoutEnv    string
+		multiplier        int
+		expectedDuration  time.Duration
+		expectMaxDuration bool
+		description       string
+	}{
+		{
+			name:              "Normal case with default timeout",
+			baseTimeoutEnv:    "",
+			multiplier:        2,
+			expectedDuration:  2 * time.Second,
+			expectMaxDuration: false,
+			description:       "Should multiply base timeout by multiplier normally",
+		},
+		{
+			name:              "Normal case with custom timeout",
+			baseTimeoutEnv:    "5s",
+			multiplier:        3,
+			expectedDuration:  15 * time.Second,
+			expectMaxDuration: false,
+			description:       "Should work with custom base timeout",
+		},
+		{
+			name:              "Zero multiplier",
+			baseTimeoutEnv:    "",
+			multiplier:        0,
+			expectedDuration:  0,
+			expectMaxDuration: false,
+			description:       "Should handle zero multiplier",
+		},
+		{
+			name:              "Large multiplier without overflow",
+			baseTimeoutEnv:    "1s",
+			multiplier:        1000,
+			expectedDuration:  1000 * time.Second,
+			expectMaxDuration: false,
+			description:       "Should handle large multipliers that don't overflow",
+		},
+		{
+			name:              "Result exceeds max duration",
+			baseTimeoutEnv:    "1h",
+			multiplier:        2,
+			expectedDuration:  60 * time.Minute,
+			expectMaxDuration: true,
+			description:       "Should cap at max duration when result exceeds limit",
+		},
+		{
+			name:              "Potential overflow protection",
+			baseTimeoutEnv:    "1s",
+			multiplier:        math.MaxInt32,
+			expectedDuration:  60 * time.Minute,
+			expectMaxDuration: true,
+			description:       "Should protect against overflow with very large multipliers",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup environment
+			if tt.baseTimeoutEnv != "" {
+				os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", tt.baseTimeoutEnv)
+			} else {
+				os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+			}
+			t.Cleanup(func() {
+				os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+			})
+
+			// Create a KubeUnit instance for testing
+			cfg := workceptor.KubeWorkerCfg{
+				WorkType:   "test-worker",
+				AuthMethod: "incluster",
+				Image:      "busybox:latest",
+			}
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			mockBWU := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(mockCtrl)
+			mockAPI := mock_workceptor.NewMockKubeAPIer(mockCtrl)
+
+			// Mock basic methods needed for GetSleepDuration
+			logger := logger.NewReceptorLogger("test")
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(mockCtrl)
+			mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBWU.EXPECT().Init(w, "test-unit", "test-worker", workceptor.FileSystem{})
+
+			kubeUnit := cfg.NewkubeWorker(mockBWU, w, "test-unit", "test-worker", mockAPI).(*workceptor.KubeUnit)
+
+			// Test GetSleepDuration
+			result := kubeUnit.GetSleepDuration(tt.multiplier)
+
+			// Verify the result
+			if tt.expectMaxDuration {
+				if result != 60*time.Minute {
+					t.Errorf("Expected max duration of 60 minutes, got %v", result)
+				}
+			} else {
+				if result != tt.expectedDuration {
+					t.Errorf("Expected duration %v, got %v", tt.expectedDuration, result)
+				}
+			}
+
+			t.Logf("Test %s: multiplier=%d, result=%v (%s)", tt.name, tt.multiplier, result, tt.description)
 		})
 	}
 }

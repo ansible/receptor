@@ -955,15 +955,24 @@ The following environment variables can be used to configure Kubernetes worker b
     * - Variable
       - Description
       - Default value
+      - Valid range
       - Type
     * - ``RECEPTOR_KUBE_TIMEOUT_START``
-      - Initial timeout duration between Kubernetes API retry attempts (e.g., "1s", "500ms")
+      - Initial timeout duration between Kubernetes API retry attempts. Valid time units: "ns", "ms", "s", "m", "h"
       - 1s
+      - Any valid duration
       - string (duration)
     * - ``RECEPTOR_KUBE_RETRY_COUNT``
-      - Number of retry attempts for Kubernetes API operations
+      - Number of retry attempts for Kubernetes API operations. Uses exponential backoff with Fibonacci-like sequence.
       - 5
+      - 1-100
       - int
+
+**Important Notes:**
+
+- **Exponential Backoff**: Retry delays increase exponentially using a Fibonacci-like sequence. For example, with ``RECEPTOR_KUBE_TIMEOUT_START=1s``, retry delays will be: 1s, 2s, 3s, 5s, 8s, etc.
+- **Maximum Sleep Duration**: Individual sleep durations are capped at 60 minutes to prevent extremely long waits.
+- **Performance Impact**: High retry counts can result in very long wait times. Consider the total time impact when setting these values.
 
 .. code-block:: bash
 

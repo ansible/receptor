@@ -240,10 +240,10 @@ func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
 			kubeTimeoutStart = 1 * time.Second
 		}
-		// ignore if exceeds limit, use default
-		if kubeTimeoutStart > time.Minute*5 {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 5m. Default of 1s will be used", kubeTimeoutStart)
-			kubeTimeoutStart = 1 * time.Second
+		// ignore if exceeds limit, use max
+		if kubeTimeoutStart > time.Minute*1 {
+			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
+			kubeTimeoutStart = time.Minute * 1
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_TIMEOUT_START: %s", kubeTimeoutStart)
@@ -267,7 +267,7 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 		// ignore if exceeds limit, use default
 		if kubeRetryCount > 100 {
 			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Default of 5 will be used", kubeRetryCount)
-			kubeRetryCount = 5
+			kubeRetryCount = 100
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
@@ -276,12 +276,19 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 }
 
 func (kw *KubeUnit) GetSleepDuration(multipler int) time.Duration {
+	maxSleepDuration := time.Minute * 5
 	baseTimeout := int64(kw.GetKubeTimeoutStart())
+
 	if baseTimeout > 0 && int64(multipler) > math.MaxInt64/baseTimeout {
-		return time.Second * time.Duration(multipler)
+		return maxSleepDuration
 	}
 
-	return kw.GetKubeTimeoutStart() * time.Duration(multipler)
+	sleepDuration := kw.GetKubeTimeoutStart() * time.Duration(multipler)
+	if sleepDuration > maxSleepDuration {
+		return maxSleepDuration
+	}
+
+	return sleepDuration
 }
 
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {

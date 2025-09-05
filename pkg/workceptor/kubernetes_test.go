@@ -5557,60 +5557,60 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 
 func TestGetSleepDuration(t *testing.T) {
 	tests := []struct {
-		name              string
-		baseTimeoutEnv    string
-		multiplier        int
-		expectedDuration  time.Duration
-		expectMaxDuration bool
-		description       string
+		name             string
+		baseTimeoutEnv   string
+		multiplier       int
+		expectedDuration time.Duration
+		description      string
 	}{
 		{
-			name:              "Normal case with default timeout",
-			baseTimeoutEnv:    "",
-			multiplier:        2,
-			expectedDuration:  2 * time.Second,
-			expectMaxDuration: false,
-			description:       "Should multiply base timeout by multiplier normally",
+			name:             "Normal case with default timeout",
+			baseTimeoutEnv:   "",
+			multiplier:       2,
+			expectedDuration: 2 * time.Second,
+			description:      "Should multiply base timeout by multiplier normally",
 		},
 		{
-			name:              "Normal case with custom timeout",
-			baseTimeoutEnv:    "5s",
-			multiplier:        3,
-			expectedDuration:  15 * time.Second,
-			expectMaxDuration: false,
-			description:       "Should work with custom base timeout",
+			name:             "Normal case with custom timeout",
+			baseTimeoutEnv:   "5s",
+			multiplier:       3,
+			expectedDuration: 15 * time.Second,
+			description:      "Should work with custom base timeout",
 		},
 		{
-			name:              "Zero multiplier",
-			baseTimeoutEnv:    "",
-			multiplier:        0,
-			expectedDuration:  0,
-			expectMaxDuration: false,
-			description:       "Should handle zero multiplier",
+			name:             "Zero multiplier",
+			baseTimeoutEnv:   "",
+			multiplier:       0,
+			expectedDuration: 0,
+			description:      "Should handle zero multiplier",
 		},
 		{
-			name:              "Large multiplier without overflow",
-			baseTimeoutEnv:    "1s",
-			multiplier:        1000,
-			expectedDuration:  1000 * time.Second,
-			expectMaxDuration: false,
-			description:       "Should handle large multipliers that don't overflow",
+			name:             "Large multiplier without overflow",
+			baseTimeoutEnv:   "1s",
+			multiplier:       1000,
+			expectedDuration: 1000 * time.Second,
+			description:      "Should handle large multipliers that don't overflow",
 		},
 		{
-			name:              "Result exceeds max duration",
-			baseTimeoutEnv:    "1h",
-			multiplier:        2,
-			expectedDuration:  60 * time.Minute,
-			expectMaxDuration: true,
-			description:       "Should cap at max duration when result exceeds limit",
+			name:             "Large result no longer capped",
+			baseTimeoutEnv:   "4m",
+			multiplier:       10,
+			expectedDuration: 40 * time.Minute,
+			description:      "Should allow large results without capping",
 		},
 		{
-			name:              "Potential overflow protection",
-			baseTimeoutEnv:    "1s",
-			multiplier:        math.MaxInt32,
-			expectedDuration:  60 * time.Minute,
-			expectMaxDuration: true,
-			description:       "Should protect against overflow with very large multipliers",
+			name:             "Timeout exceeds 5m limit",
+			baseTimeoutEnv:   "10m",
+			multiplier:       2,
+			expectedDuration: 2 * time.Second,
+			description:      "Should use default 1s when timeout exceeds 5m limit",
+		},
+		{
+			name:             "Potential overflow protection",
+			baseTimeoutEnv:   "1s",
+			multiplier:       math.MaxInt32,
+			expectedDuration: time.Duration(math.MaxInt32) * time.Second,
+			description:      "Should protect against overflow with very large multipliers",
 		},
 	}
 
@@ -5660,14 +5660,8 @@ func TestGetSleepDuration(t *testing.T) {
 			result := kubeUnit.GetSleepDuration(tt.multiplier)
 
 			// Verify the result
-			if tt.expectMaxDuration {
-				if result != 60*time.Minute {
-					t.Errorf("Expected max duration of 60 minutes, got %v", result)
-				}
-			} else {
-				if result != tt.expectedDuration {
-					t.Errorf("Expected duration %v, got %v", tt.expectedDuration, result)
-				}
+			if result != tt.expectedDuration {
+				t.Errorf("Expected duration %v, got %v", tt.expectedDuration, result)
 			}
 
 			t.Logf("Test %s: multiplier=%d, result=%v (%s)", tt.name, tt.multiplier, result, tt.description)

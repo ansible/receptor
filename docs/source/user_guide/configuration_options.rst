@@ -942,7 +942,33 @@ Work Kubernetes
     work-kubernetes:
       - worktype: cat
 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Kubernetes Environment Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+The following environment variables can be used to configure Kubernetes worker behavior:
+
+.. list-table:: Kubernetes Environment Variables
+    :header-rows: 1
+    :widths: auto
+
+    * - Variable
+      - Description
+      - Default value
+      - Type
+    * - ``RECEPTOR_KUBE_TIMEOUT_START``
+      - Initial timeout duration between Kubernetes API retry attempts (e.g., "1s", "500ms")
+      - 1s
+      - string (duration)
+    * - ``RECEPTOR_KUBE_RETRY_COUNT``
+      - Number of retry attempts for Kubernetes API operations
+      - 5
+      - int
+
+.. code-block:: bash
+
+    export RECEPTOR_KUBE_TIMEOUT_START=500ms
+    export RECEPTOR_KUBE_RETRY_COUNT=3
 
 
 ^^^^^^^^^^^

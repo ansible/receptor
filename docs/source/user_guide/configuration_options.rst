@@ -970,7 +970,7 @@ The following environment variables can be used to configure Kubernetes worker b
 
 **Important Notes:**
 
-- **Exponential Backoff**: Retry delays increase exponentially using a Fibonacci-like sequence. For example, with ``RECEPTOR_KUBE_TIMEOUT_START=1s``, retry delays will be: 1s, 2s, 3s, 5s, 8s, etc.
+- **Fibonacci Backoff**: Retry delays increase by Fibonacci increments. For example, with ``RECEPTOR_KUBE_TIMEOUT_START=1s``, retry delays will be: 1s, 2s, 3s, 5s, 8s, etc.
 - **Timeout Start Limit**: ``RECEPTOR_KUBE_TIMEOUT_START`` values exceeding 1 minute will be capped at the maximum of 1 minute.
 - **Maximum Sleep Duration**: Individual sleep durations are capped at 5 minutes to prevent extremely long waits.
 - **Performance Impact**: High retry counts can result in very long wait times. Consider the total time impact when setting these values.

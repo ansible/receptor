@@ -264,7 +264,7 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
 			kubeRetryCount = 5
 		}
-		// ignore if exceeds limit, use default
+		// ignore if exceeds limit, use max retry
 		if kubeRetryCount > 100 {
 			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
 			kubeRetryCount = 100

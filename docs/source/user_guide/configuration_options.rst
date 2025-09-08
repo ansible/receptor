@@ -948,6 +948,9 @@ Kubernetes Environment Variables
 
 The following environment variables can be used to configure Kubernetes worker behavior:
 
+.. note::
+   The environment variable ``RECEPTOR_OPEN_LOGSTREAM_TIMEOUT`` has been replaced with ``RECEPTOR_KUBE_TIMEOUT_START``. The new variable controls the initial sleep duration for all Kubernetes API retry operations using Fibonacci backoff, not just log stream timeouts.
+
 .. list-table:: Kubernetes Environment Variables
     :header-rows: 1
     :widths: auto

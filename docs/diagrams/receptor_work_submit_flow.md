@@ -1,0 +1,449 @@
+# Receptor Work Submit Flow Analysis
+
+Based on the command: `receptorctl --socket /tmp/control.sock work submit --node execution cat -l hello -f`
+
+This document contains a detailed mermaid diagram showing what happens when this command is executed.
+
+
+## Command Breakdown
+- `--socket /tmp/control.sock`: Connect to receptor control service via Unix socket
+- `work submit`: Submit a new unit of work
+- `--node execution`: Target the "execution" node for work execution
+- `cat`: Work type (configured as a work-command that runs the `cat` command)
+- `-l hello`: Literal payload "hello"
+- `-f`: Follow the job and display results
+
+
+## Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ReceptorCtl as receptorctl (Python)
+    participant CtrlSocket as Unix Socket<br>/tmp/control.sock
+    participant CtrlSvc as Control Service<br>(Go - controlsvc)
+    participant WorkSvc as Work Service<br>(Go - workceptor)
+    participant WorkUnit as Work Unit<br>(command worker)
+    participant CatProcess as cat command<br>subprocess
+
+    Note over User, CatProcess: Command: receptorctl --socket /tmp/control.sock work submit --node execution cat -l hello -f
+
+    User->>ReceptorCtl: Execute command
+
+    Note over ReceptorCtl: Parse CLI arguments<br>cli.py:submit()
+    ReceptorCtl->>ReceptorCtl: Create ReceptorControl object
+    ReceptorCtl->>ReceptorCtl: Parse parameters:<br>- node: "execution"<br>- worktype: "cat"<br>- payload_literal: "hello"<br>- follow: true
+
+    ReceptorCtl->>CtrlSocket: Connect to Unix socket
+    CtrlSocket-->>ReceptorCtl: Connection established
+
+    ReceptorCtl->>CtrlSocket: Handshake
+    CtrlSocket-->>ReceptorCtl: "Receptor Control, node execution"
+
+    Note over ReceptorCtl: Build work submit JSON:<br>{"command": "work", "subcommand": "submit",<br>"node": "execution", "worktype": "cat"}
+
+    ReceptorCtl->>CtrlSocket: Send JSON command + newline
+    CtrlSocket->>CtrlSvc: Forward command
+
+    Note over CtrlSvc: controlsvc.go:RunControlSession()<br>Parse JSON command
+    CtrlSvc->>CtrlSvc: Route to "work" command handler
+    CtrlSvc->>WorkSvc: workceptorCommand.ControlFunc()
+
+    Note over WorkSvc: controlsvc.go:ControlFunc()<br>subcommand: "submit"
+    WorkSvc->>WorkSvc: Parse work parameters:<br>- workNode: "execution"<br>- workType: "cat"
+
+    alt Local Node (execution == current node)
+        WorkSvc->>WorkSvc: AllocateUnit("cat", "", {})
+        WorkSvc->>WorkUnit: Create new commandUnit
+        Note over WorkUnit: command.go:commandUnit<br>- command: "cat"<br>- baseParams: ""<br>- allowRuntimeParams: false
+    else Remote Node
+        WorkSvc->>WorkSvc: AllocateRemoteUnit()
+        Note over WorkSvc: Would create remote worker<br>(not applicable for this example)
+    end
+
+    WorkSvc-->>CtrlSvc: Work unit ID + "Send stdin data and EOF"
+    CtrlSvc-->>CtrlSocket: "Work unit created with ID {uuid}. Send stdin data and EOF.\n"
+    CtrlSocket-->>ReceptorCtl: Response message
+
+    ReceptorCtl->>CtrlSocket: Send payload: "hello\n"
+    CtrlSocket->>CtrlSvc: Forward payload data
+    CtrlSvc->>WorkUnit: Write to stdin file
+
+    ReceptorCtl->>CtrlSocket: Send EOF (close write side)
+    CtrlSocket->>CtrlSvc: EOF signal
+    CtrlSvc->>WorkUnit: Close stdin file
+
+    WorkUnit->>WorkUnit: UpdateBasicStatus(WorkStatePending, "Starting Worker")
+    WorkUnit->>WorkUnit: Start() - command.go:Start()
+
+    Note over WorkUnit: Create receptor subprocess:<br>receptor --node id=worker --log-level {level}<br>--command-runner command=cat params=""<br>unitdir={workdir}
+
+    WorkUnit->>CatProcess: Start subprocess
+    CatProcess->>CatProcess: commandRunner() - command.go:commandRunner()
+    CatProcess->>CatProcess: exec.Command("cat")
+    CatProcess->>CatProcess: cmd.Stdin = unitdir/stdin
+    CatProcess->>CatProcess: cmd.Stdout = unitdir/stdout
+    CatProcess->>CatProcess: cmd.Start()
+
+    loop Status Monitoring
+        CatProcess->>CatProcess: Update status every 250ms:<br>WorkStateRunning, "Running: PID {pid}"
+    end
+
+    CatProcess->>CatProcess: Read from stdin: "hello"
+    CatProcess->>CatProcess: Write to stdout: "hello"
+    CatProcess->>CatProcess: cmd.Wait() - EOF reached
+    CatProcess->>CatProcess: UpdateBasicStatus(WorkStateSucceeded)
+    CatProcess->>CatProcess: Exit with code 0
+
+    WorkUnit->>WorkUnit: MonitorLocalStatus() detects completion
+    WorkUnit->>WorkUnit: Status = WorkStateSucceeded
+
+    Note over ReceptorCtl: Since -f (follow) was specified,<br>invoke results command
+
+    ReceptorCtl->>CtrlSocket: "work results {unit_id}"
+    CtrlSocket->>CtrlSvc: Forward results request
+    CtrlSvc->>WorkSvc: Handle results command
+    WorkSvc->>WorkSvc: GetResults() - stream stdout file
+    WorkSvc-->>CtrlSvc: "Streaming results for work unit {id}"
+    CtrlSvc-->>CtrlSocket: Stream stdout content
+    CtrlSocket-->>ReceptorCtl: "hello"
+
+    ReceptorCtl->>User: Display: "hello"
+
+    Note over ReceptorCtl: Check final work status
+    ReceptorCtl->>CtrlSocket: "work status {unit_id}"
+    CtrlSocket->>CtrlSvc: Status request
+    CtrlSvc->>WorkSvc: Get work status
+    WorkSvc-->>CtrlSvc: {"State": 1, "Detail": "exit status 0"}
+    CtrlSvc-->>CtrlSocket: JSON status response
+    CtrlSocket-->>ReceptorCtl: Status data
+
+    Note over ReceptorCtl: State = 1 (WorkStateSucceeded)<br>Exit normally
+
+    ReceptorCtl->>User: Command completed successfully
+```
+
+
+## Key Components
+
+
+### 1. ReceptorCtl (Python)
+- **File**: `receptorctl/receptorctl/cli.py`, `receptorctl/receptorctl/socket_interface.py`
+- **Function**: Command-line interface and socket communication
+- **Key Classes**: `ReceptorControl`, CLI command handlers
+
+
+### 2. Control Service (Go)
+- **File**: `pkg/controlsvc/controlsvc.go`
+- **Function**: Protocol handler for control socket connections
+- **Key Functions**: `RunControlSession()`, command routing
+
+
+### 3. Work Service (Go)
+- **File**: `pkg/workceptor/controlsvc.go`, `pkg/workceptor/workceptor.go`
+- **Function**: Work unit management and execution
+- **Key Functions**: `ControlFunc()`, `AllocateUnit()`, `Start()`
+
+
+### 4. Command Worker (Go)
+- **File**: `pkg/workceptor/command.go`
+- **Function**: Executes shell commands as work units
+- **Key Functions**: `Start()`, `commandRunner()`
+
+
+## Work States
+1. **WorkStatePending (0)**: Initial state, waiting to start
+2. **WorkStateRunning (1)**: Currently executing
+3. **WorkStateSucceeded (2)**: Completed successfully
+4. **WorkStateFailed (3)**: Failed with error
+
+
+## Configuration
+The `cat` work type is configured via YAML:
+```yaml
+- work-command:
+    workType: cat
+    command: cat
+```
+
+This registers a command worker that executes the `cat` shell command when work of type "cat" is submitted.
+
+
+## Developer Debugging Walkthrough
+
+This section provides specific breakpoint locations and debugging steps to follow the code execution through the codebase.
+
+
+### Prerequisites
+
+- Set up your development environment with Go and Python debuggers
+- Build receptor with debug symbols: `make build-dev` or `go build -gcflags="all=-N -l"`
+- Install receptorctl in development mode: `cd receptorctl && pip install -e .`
+
+
+### Breakpoint Locations (in execution order)
+
+
+#### 1. ReceptorCtl Entry Point
+
+**File**: `receptorctl/receptorctl/cli.py`
+**Function**: `submit()`
+
+```python
+def submit(
+    ctx,
+    worktype,
+    node,
+    payload,
+    # ... other params
+):
+```
+
+**What to observe**: CLI argument parsing, parameter validation
+
+
+#### 2. Socket Connection Setup
+**File**: `receptorctl/receptorctl/socket_interface.py`
+**Function**: `connect()`
+
+```python
+def connect(self):
+    if self._socket is not None:
+        return
+```
+
+**What to observe**: Unix socket connection establishment
+
+
+#### 3. Work Submission Request
+**File**: `receptorctl/receptorctl/socket_interface.py`
+**Function**: `submit_work()`
+
+```python
+def submit_work(
+    self,
+    worktype,
+    payload,
+    node=None,
+    # ... other params
+):
+```
+
+**What to observe**: JSON command construction, payload handling
+
+
+#### 4. Control Service Session Handler
+**File**: `pkg/controlsvc/controlsvc.go`
+**Function**: `RunControlSession()`
+
+```go
+func (s *Server) RunControlSession(conn net.Conn) {
+    s.nc.GetLogger().Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
+```
+
+**What to observe**: Socket connection handling, command parsing
+
+
+#### 5. JSON Command Processing
+**File**: `pkg/controlsvc/controlsvc.go`
+**Function**: `RunControlSession()` (command parsing section)
+
+```go
+if cmdBytes[0] == '{' {
+    err := json.Unmarshal(cmdBytes, &jsonData)
+```
+
+**What to observe**: JSON unmarshaling, command extraction
+
+
+#### 6. Work Command Routing
+**File**: `pkg/controlsvc/controlsvc.go`
+**Function**: `RunControlSession()` (command lookup section)
+
+```go
+s.controlFuncLock.RLock()
+var ct ControlCommandType
+for f := range s.controlTypes {
+```
+
+**What to observe**: Command type lookup, routing to work handler
+
+
+#### 7. Work Command Handler Entry
+**File**: `pkg/workceptor/controlsvc.go`
+**Function**: `ControlFunc()`
+
+```go
+func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.NetceptorForControlCommand, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
+```
+
+**What to observe**: Work command parameter extraction
+
+
+#### 8. Work Submit Case Handler
+**File**: `pkg/workceptor/controlsvc.go`
+**Function**: `ControlFunc()` (submit case)
+
+```go
+case "submit":
+    workNode, err := strFromMap(c.params, "node")
+```
+
+**What to observe**: Parameter extraction, node determination
+
+
+#### 9. Local Work Unit Allocation
+**File**: `pkg/workceptor/controlsvc.go`
+**Function**: `ControlFunc()` (AllocateUnit call)
+
+```go
+worker, err = c.w.AllocateUnit(workType, workUnitID, workParams)
+```
+
+**What to observe**: Work unit creation decision (local vs remote)
+
+
+#### 10. Work Unit Allocation Implementation
+**File**: `pkg/workceptor/workceptor.go`
+**Function**: `AllocateUnit()`
+
+```go
+func (w *Workceptor) AllocateUnit(workType string, workUnitID string, workParams map[string]string) (WorkUnit, error) {
+```
+
+**What to observe**: Work type lookup, worker factory invocation
+
+
+#### 11. Command Worker Creation
+**File**: `pkg/workceptor/command.go`
+**Function**: `NewWorker()` (in CommandWorkerCfg)
+
+```go
+func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID string, workType string) WorkUnit {
+```
+
+**What to observe**: Command worker instantiation, parameter setup
+
+
+#### 12. Stdin Data Handling
+**File**: `pkg/workceptor/controlsvc.go`
+**Function**: `ControlFunc()` (stdin handling)
+
+```go
+stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O_WRONLY, 0o600)
+```
+
+**What to observe**: Stdin file creation, data writing
+
+
+#### 13. Work Unit Start
+**File**: `pkg/workceptor/command.go`
+**Function**: `Start()`
+
+```go
+func (cw *commandUnit) Start() error {
+    level := cw.GetWorkceptor().nc.GetLogger().GetLogLevel()
+```
+
+**What to observe**: Command runner subprocess creation
+
+
+#### 14. Command Runner Subprocess
+**File**: `pkg/workceptor/command.go`
+**Function**: `runCommand()`
+
+```go
+func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
+    cmdSetDetach(cmd)
+```
+
+**What to observe**: Subprocess execution setup
+
+
+#### 15. Command Runner Main Function
+**File**: `pkg/workceptor/command.go`
+**Function**: `commandRunner()`
+
+```go
+func commandRunner(command string, params string, unitdir string) error {
+    status := StatusFileData{}
+```
+
+**What to observe**: Actual command execution, status updates
+
+
+#### 16. Command Execution
+**File**: `pkg/workceptor/command.go`
+**Function**: `commandRunner()` (exec.Command section)
+
+```go
+var cmd *exec.Cmd
+if params == "" {
+    cmd = exec.Command(command)
+```
+
+**What to observe**: `cat` command execution
+
+
+#### 17. Results Streaming (if using -f flag)
+**File**: `pkg/workceptor/workceptor.go`
+**Function**: `GetResults()`
+
+```go
+func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int64) (chan []byte, error) {
+```
+
+**What to observe**: Stdout file streaming
+
+
+### Debugging Steps
+
+1. **Start the Receptor Node**:
+   ```bash
+   # Terminal 1: Start receptor with debug logging
+   ./receptor --config test-configs/execution.yml --log-level debug
+   ```
+
+2. **Set Breakpoints in Go Code**:
+   - Use delve debugger: `dlv exec ./receptor -- --config test-configs/execution.yml`
+   - Set breakpoints at the locations above: `b pkg/controlsvc/controlsvc.go:260`
+
+3. **Set Breakpoints in Python Code**:
+   ```python
+   # Add to receptorctl code
+   import pdb; pdb.set_trace()
+   ```
+
+4. **Run the Command**:
+   ```bash
+   # Terminal 2: Run the receptorctl command
+   receptorctl --socket /tmp/execution.sock work submit --node execution cat -l hello -f
+   ```
+
+5. **Step Through Execution**:
+   - Follow the breakpoints in order
+   - Inspect variables at each step
+   - Observe the data flow between components
+
+
+### Key Variables to Watch
+
+- **In receptorctl**: `worktype`, `node`, `payload_data`, `commandMap`
+- **In control service**: `cmdBytes`, `jsonData`, `cmd`, `params`
+- **In work service**: `workNode`, `workType`, `workParams`, `worker`
+- **In command worker**: `cw.command`, `cw.baseParams`, `cmd`
+- **In command runner**: `command`, `params`, `unitdir`, `status`
+
+
+### Log Analysis
+
+Enable debug logging to see the full flow:
+```bash
+# Look for these log patterns:
+# "Client connected to control service"
+# "Work unit created with ID"
+# "Running: PID"
+# "Streaming results for work unit"
+```
+
+This walkthrough allows developers to trace the complete execution path from CLI input to command execution and result output.

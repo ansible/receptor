@@ -1287,7 +1287,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Container in worker pod has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
+				"Container in Test_name pod has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code

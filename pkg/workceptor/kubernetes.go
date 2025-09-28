@@ -521,7 +521,7 @@ mainLoop:
 						continue mainLoop
 					}
 					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhausted", WorkerContainerName)
+					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhausted", podName)
 					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhausted", err,
 						podNamespace,
 						podName,
@@ -531,7 +531,7 @@ mainLoop:
 				case containerState.Terminated != nil:
 					// We got EOF and the pod terminated, we will log the terminated information
 					if containerState.Terminated.ExitCode != 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v", WorkerContainerName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
+						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v", podName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
 					}
 
 					// We need to check if last line has data

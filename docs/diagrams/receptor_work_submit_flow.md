@@ -4,15 +4,14 @@ Based on the command: `receptorctl --socket /tmp/control.sock work submit --node
 
 This document contains a detailed mermaid diagram showing what happens when this command is executed.
 
-
 ## Command Breakdown
+
 - `--socket /tmp/control.sock`: Connect to receptor control service via Unix socket
 - `work submit`: Submit a new unit of work
 - `--node execution`: Target the "execution" node for work execution
 - `cat`: Work type (configured as a work-command that runs the `cat` command)
 - `-l hello`: Literal payload "hello"
 - `-f`: Follow the job and display results
-
 
 ## Flow Diagram
 
@@ -123,43 +122,43 @@ sequenceDiagram
     ReceptorCtl->>User: Command completed successfully
 ```
 
-
 ## Key Components
 
-
 ### 1. ReceptorCtl (Python)
+
 - **File**: `receptorctl/receptorctl/cli.py`, `receptorctl/receptorctl/socket_interface.py`
 - **Function**: Command-line interface and socket communication
 - **Key Classes**: `ReceptorControl`, CLI command handlers
 
-
 ### 2. Control Service (Go)
+
 - **File**: `pkg/controlsvc/controlsvc.go`
 - **Function**: Protocol handler for control socket connections
 - **Key Functions**: `RunControlSession()`, command routing
 
-
 ### 3. Work Service (Go)
+
 - **File**: `pkg/workceptor/controlsvc.go`, `pkg/workceptor/workceptor.go`
 - **Function**: Work unit management and execution
 - **Key Functions**: `ControlFunc()`, `AllocateUnit()`, `Start()`
 
-
 ### 4. Command Worker (Go)
+
 - **File**: `pkg/workceptor/command.go`
 - **Function**: Executes shell commands as work units
 - **Key Functions**: `Start()`, `commandRunner()`
 
-
 ## Work States
+
 1. **WorkStatePending (0)**: Initial state, waiting to start
 2. **WorkStateRunning (1)**: Currently executing
 3. **WorkStateSucceeded (2)**: Completed successfully
 4. **WorkStateFailed (3)**: Failed with error
 
-
 ## Configuration
+
 The `cat` work type is configured via YAML:
+
 ```yaml
 - work-command:
     workType: cat
@@ -168,21 +167,22 @@ The `cat` work type is configured via YAML:
 
 This registers a command worker that executes the `cat` shell command when work of type "cat" is submitted.
 
-
 ## Developer Debugging Walkthrough
 
 This section provides specific breakpoint locations and debugging steps to follow the code execution through the codebase.
-
 
 ### Prerequisites
 
 - Set up your development environment with Go and Python debuggers
 - Build receptor with debug symbols: `make build-dev` or `go build -gcflags="all=-N -l"`
-- Install receptorctl in development mode: `cd receptorctl && pip install -e .`
-
+- **Important**: Install receptorctl in editable/development mode so Python breakpoints work:
+  ```bash
+  cd receptorctl
+  pip install -e .
+  ```
+  This creates a link to your source code instead of copying it, allowing the debugger to hit breakpoints in your workspace files.
 
 ### Breakpoint Locations (in execution order)
-
 
 #### 1. ReceptorCtl Entry Point
 
@@ -201,8 +201,8 @@ def submit(
 
 **What to observe**: CLI argument parsing, parameter validation
 
-
 #### 2. Socket Connection Setup
+
 **File**: `receptorctl/receptorctl/socket_interface.py`
 **Function**: `connect()`
 
@@ -214,8 +214,8 @@ def connect(self):
 
 **What to observe**: Unix socket connection establishment
 
-
 #### 3. Work Submission Request
+
 **File**: `receptorctl/receptorctl/socket_interface.py`
 **Function**: `submit_work()`
 
@@ -231,8 +231,8 @@ def submit_work(
 
 **What to observe**: JSON command construction, payload handling
 
-
 #### 4. Control Service Session Handler
+
 **File**: `pkg/controlsvc/controlsvc.go`
 **Function**: `RunControlSession()`
 
@@ -243,8 +243,8 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 **What to observe**: Socket connection handling, command parsing
 
-
 #### 5. JSON Command Processing
+
 **File**: `pkg/controlsvc/controlsvc.go`
 **Function**: `RunControlSession()` (command parsing section)
 
@@ -255,8 +255,8 @@ if cmdBytes[0] == '{' {
 
 **What to observe**: JSON unmarshaling, command extraction
 
-
 #### 6. Work Command Routing
+
 **File**: `pkg/controlsvc/controlsvc.go`
 **Function**: `RunControlSession()` (command lookup section)
 
@@ -268,8 +268,8 @@ for f := range s.controlTypes {
 
 **What to observe**: Command type lookup, routing to work handler
 
-
 #### 7. Work Command Handler Entry
+
 **File**: `pkg/workceptor/controlsvc.go`
 **Function**: `ControlFunc()`
 
@@ -279,8 +279,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 
 **What to observe**: Work command parameter extraction
 
-
 #### 8. Work Submit Case Handler
+
 **File**: `pkg/workceptor/controlsvc.go`
 **Function**: `ControlFunc()` (submit case)
 
@@ -291,8 +291,8 @@ case "submit":
 
 **What to observe**: Parameter extraction, node determination
 
-
 #### 9. Local Work Unit Allocation
+
 **File**: `pkg/workceptor/controlsvc.go`
 **Function**: `ControlFunc()` (AllocateUnit call)
 
@@ -302,8 +302,8 @@ worker, err = c.w.AllocateUnit(workType, workUnitID, workParams)
 
 **What to observe**: Work unit creation decision (local vs remote)
 
-
 #### 10. Work Unit Allocation Implementation
+
 **File**: `pkg/workceptor/workceptor.go`
 **Function**: `AllocateUnit()`
 
@@ -313,8 +313,8 @@ func (w *Workceptor) AllocateUnit(workType string, workUnitID string, workParams
 
 **What to observe**: Work type lookup, worker factory invocation
 
-
 #### 11. Command Worker Creation
+
 **File**: `pkg/workceptor/command.go`
 **Function**: `NewWorker()` (in CommandWorkerCfg)
 
@@ -324,8 +324,8 @@ func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor
 
 **What to observe**: Command worker instantiation, parameter setup
 
-
 #### 12. Stdin Data Handling
+
 **File**: `pkg/workceptor/controlsvc.go`
 **Function**: `ControlFunc()` (stdin handling)
 
@@ -335,8 +335,8 @@ stdin, err := os.OpenFile(path.Join(worker.UnitDir(), "stdin"), os.O_CREATE+os.O
 
 **What to observe**: Stdin file creation, data writing
 
-
 #### 13. Work Unit Start
+
 **File**: `pkg/workceptor/command.go`
 **Function**: `Start()`
 
@@ -347,8 +347,8 @@ func (cw *commandUnit) Start() error {
 
 **What to observe**: Command runner subprocess creation
 
-
 #### 14. Command Runner Subprocess
+
 **File**: `pkg/workceptor/command.go`
 **Function**: `runCommand()`
 
@@ -359,8 +359,8 @@ func (cw *commandUnit) runCommand(cmd *exec.Cmd) error {
 
 **What to observe**: Subprocess execution setup
 
-
 #### 15. Command Runner Main Function
+
 **File**: `pkg/workceptor/command.go`
 **Function**: `commandRunner()`
 
@@ -371,8 +371,8 @@ func commandRunner(command string, params string, unitdir string) error {
 
 **What to observe**: Actual command execution, status updates
 
-
 #### 16. Command Execution
+
 **File**: `pkg/workceptor/command.go`
 **Function**: `commandRunner()` (exec.Command section)
 
@@ -384,8 +384,8 @@ if params == "" {
 
 **What to observe**: `cat` command execution
 
-
 #### 17. Results Streaming (if using -f flag)
+
 **File**: `pkg/workceptor/workceptor.go`
 **Function**: `GetResults()`
 
@@ -395,36 +395,118 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 
 **What to observe**: Stdout file streaming
 
+### Debugging Steps with VSCode
 
-### Debugging Steps
+#### 1. Setup launch.json Configuration
 
-1. **Start the Receptor Node**:
-   ```bash
-   # Terminal 1: Start receptor with debug logging
-   ./receptor --config test-configs/execution.yml --log-level debug
-   ```
+Create or update `.vscode/launch.json` with the following configurations:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Receptor Control Node",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/receptor-cl/receptor.go",
+      "args": [
+        "--config",
+        "${workspaceFolder}/test-configs/control.yml"
+      ],
+      "env": {},
+      "showLog": true
+    },
+    {
+      "name": "Debug Receptor Execution Node",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/receptor-cl/receptor.go",
+      "args": [
+        "--config",
+        "${workspaceFolder}/test-configs/execution.yml"
+      ],
+      "env": {},
+      "showLog": true
+    },
+    {
+      "name": "Debug ReceptorCtl",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "receptorctl.cli",
+      "cwd": "${workspaceFolder}/receptorctl",
+      "args": [
+        "--socket",
+        "/tmp/control.sock",
+        "work",
+        "submit",
+        "--node",
+        "execution",
+        "cat",
+        "-l",
+        "hello",
+        "-f"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONWARNINGS": "ignore::RuntimeWarning"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Control + Execution Nodes",
+      "configurations": [
+        "Debug Receptor Control Node",
+        "Debug Receptor Execution Node"
+      ],
+      "stopAll": true
+    }
+  ]
+}
+```
+
+#### 2. Start Debugging
+
+**Important**: Before debugging, ensure receptorctl is installed in editable mode (see Prerequisites above). This is required for Python breakpoints to work.
+
+1. **Launch Both Nodes Together**:
+
+   - Open VSCode Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+   - Select "Debug: Select and Start Debugging"
+   - Choose "Debug Control + Execution Nodes" compound configuration
+   - Both receptor nodes will start with debugger attached
+   - Wait for nodes to be ready (watch for "control service listening" in debug console)
 
 2. **Set Breakpoints in Go Code**:
-   - Use delve debugger: `dlv exec ./receptor -- --config test-configs/execution.yml`
-   - Set breakpoints at the locations above: `b pkg/controlsvc/controlsvc.go:260`
 
-3. **Set Breakpoints in Python Code**:
-   ```python
-   # Add to receptorctl code
-   import pdb; pdb.set_trace()
-   ```
+   - Open the relevant Go files listed in "Breakpoint Locations" section above
+   - Click in the gutter to set breakpoints at key locations:
+     - `pkg/controlsvc/controlsvc.go:240` (RunControlSession)
+     - `pkg/workceptor/controlsvc.go:277` (ControlFunc)
+     - `pkg/workceptor/workceptor.go:311` (AllocateUnit)
+     - `pkg/workceptor/command.go:344` (Start)
+     - `pkg/workceptor/command.go:368` (commandRunner)
+     - `pkg/workceptor/workceptor.go:393` (GetResults)
 
-4. **Run the Command**:
-   ```bash
-   # Terminal 2: Run the receptorctl command
-   receptorctl --socket /tmp/execution.sock work submit --node execution cat -l hello -f
-   ```
+3. **Debug ReceptorCtl Client**:
 
-5. **Step Through Execution**:
-   - Follow the breakpoints in order
-   - Inspect variables at each step
-   - Observe the data flow between components
+   - Set breakpoints in Python files (breakpoints will only work if installed with `pip install -e .`):
+     - `receptorctl/receptorctl/cli.py:436` - `submit()` function
+     - `receptorctl/receptorctl/socket_interface.py:171` - `submit_work()` function
+   - After receptor nodes are running and ready, start the Python debugger
+   - Select "Debug ReceptorCtl" configuration from the debug dropdown
+   - The command will execute and hit both Python and Go breakpoints
 
+4. **Step Through Execution**:
+
+   - Use VSCode debug controls (Continue, Step Over, Step Into, Step Out)
+   - Watch the call stack across both Go processes
+   - Inspect variables in the Debug sidebar
+   - Observe the data flow between components in real-time
 
 ### Key Variables to Watch
 
@@ -434,10 +516,10 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 - **In command worker**: `cw.command`, `cw.baseParams`, `cmd`
 - **In command runner**: `command`, `params`, `unitdir`, `status`
 
-
 ### Log Analysis
 
 Enable debug logging to see the full flow:
+
 ```bash
 # Look for these log patterns:
 # "Client connected to control service"

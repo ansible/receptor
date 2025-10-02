@@ -895,6 +895,44 @@ func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
 	}
 }
 
+func TestTracerCreatesCorrectFilePath(t *testing.T) {
+	t.Parallel()
+
+	testNetcepter := New(context.Background(), "node1")
+	clientLoggingPerspective := logging.PerspectiveClient
+	connId := quic.ConnectionIDFromBytes([]byte{})
+	expectedFilename := "/tmp/log_28656d70747929_client.qlog"
+
+	tests := []struct {
+		name          string
+		qlogDirectory string
+	}{
+		{
+			name:          "QLOGDIR without trailing slash character",
+			qlogDirectory: "/tmp",
+		},
+		{
+			name:          "QLOGDIR with trailing slash character",
+			qlogDirectory: "/tmp/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("QLOGDIR", tt.qlogDirectory)
+			tracer := testNetcepter.tracer(testNetcepter.context, clientLoggingPerspective, connId)
+			defer tracer.Close()
+
+			_, err := os.Stat(expectedFilename)
+			if os.IsNotExist(err) {
+				t.Errorf("tracer should create file but did not exist. Expected: %s, Got: %v", expectedFilename, err)
+			} else {
+				_ = os.Remove(expectedFilename)
+			}
+		})
+	}
+}
+
 // TestRunProtocolExistingConnWithCanceledContext tests the condition in runProtocol
 // where an existing connection has a canceled context by calling the real runProtocol function.
 func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {

@@ -1,10 +1,12 @@
 package netceptor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -895,6 +897,8 @@ func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
 	}
 }
 
+// TestTracerCreatesCorrectFilePath tests the Netceptor.tracer() function that sets up
+// QUIC tracing does not depend on the QLOGDIR having a trailing slash character.
 func TestTracerCreatesCorrectFilePath(t *testing.T) {
 	t.Parallel()
 
@@ -930,6 +934,73 @@ func TestTracerCreatesCorrectFilePath(t *testing.T) {
 				_ = os.Remove(expectedFilename)
 			}
 		})
+	}
+}
+
+// TestTracerCreatesNonEmptyFiles tests that qlog files are correctly written to
+// when QUIC tracing is enabled.
+func TestTracerCreatesNonEmptyFiles(t *testing.T) {
+	// Make temporary directory to hold qlog files
+	qlogDirectory, err := os.MkdirTemp("", "receptor-qlogs-*")
+	if err != nil {
+		t.Fatalf("Error creating temp directory: %v", err)
+	}
+	defer func() {
+		err := os.RemoveAll(qlogDirectory)
+		if err != nil {
+			t.Errorf("Error removing temp directory '%s': %v", qlogDirectory, err)
+		}
+	}()
+
+	// Set QLOGDIR environment variable to enable tracing
+	os.Setenv("QLOGDIR", qlogDirectory)
+	defer func() {
+		os.Unsetenv("QLOGDIR")
+	}()
+
+	// Capture Go's log output because quic-go calls log.Printf() when it logs the
+	// "exporting qlog failed" error message
+	var logBuffer bytes.Buffer
+	log.SetOutput(&logBuffer)
+	defer func() {
+		log.SetOutput(os.Stderr)
+	}()
+
+	// Create a netceptor instance and attempt to dial a service that does not exist
+	node1 := New(context.Background(), "node1")
+
+	conn, _ := node1.Dial("node1", "testsvc", nil)
+	if conn != nil {
+		conn.Close()
+	}
+
+	node1.Shutdown()
+
+	// Verify qlog trace files exist in the temp directory
+	foundAtLeastOneQlogFile := false
+	err = filepath.Walk(qlogDirectory, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if info.Size() <= 0 {
+			foundAtLeastOneQlogFile = true
+			return fmt.Errorf("QLog trace file was empty: %s", path)
+		}
+		foundAtLeastOneQlogFile = true
+		return nil
+	})
+	if err != nil {
+		t.Errorf("Error verifying qlog trace files: %v", err)
+	}
+	if !foundAtLeastOneQlogFile {
+		t.Error("Did not find any trace files in QLOGDIR")
+	}
+
+	// Verify the "exporting qlog failed ... file already closed" error was not logged
+	logs := strings.Split(logBuffer.String(), "\n")
+	logCapture := &logCapture{messages: logs}
+	if checkLogForMessage(logCapture, "exporting qlog failed", "file already closed") {
+		t.Error("Node logs contained error about qlog file already closed")
 	}
 }
 

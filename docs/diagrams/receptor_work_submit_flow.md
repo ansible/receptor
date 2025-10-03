@@ -519,13 +519,10 @@ Create or update `.vscode/launch.json` with the following configurations:
 ### Log Analysis
 
 Enable debug logging to see the full flow:
-
+Look for these log patterns:
 ```bash
-# Look for these log patterns:
 # "Client connected to control service"
 # "Work unit created with ID"
 # "Running: PID"
 # "Streaming results for work unit"
-```
-
 This walkthrough allows developers to trace the complete execution path from CLI input to command execution and result output.

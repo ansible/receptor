@@ -566,30 +566,6 @@ func (e *errorReadCloser) Close() error {
 	return nil
 }
 
-// errorStreamExecutor is used to simulate stdin streaming errors in tests.
-// This helps reproduce the race condition where the stdin goroutine sets
-// WorkStateFailed, but the main thread's status check sees stale state.
-type errorStreamExecutor struct {
-	returnErrorAfter int
-	callCount        int
-}
-
-func (e *errorStreamExecutor) Stream(options remotecommand.StreamOptions) error {
-	return e.StreamWithContext(context.Background(), options)
-}
-
-func (e *errorStreamExecutor) StreamWithContext(ctx context.Context, options remotecommand.StreamOptions) error {
-	e.callCount++
-	if e.callCount > e.returnErrorAfter {
-		// Return an error to trigger line 1100 in kubernetes.go:
-		// stdinErr = err
-		// And then line 1108:
-		// kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
-		return errors.New("simulated stdin stream error")
-	}
-	return nil
-}
-
 func TestKubeLoggingWithReconnect(t *testing.T) {
 	// Set fast timeout and retry values for testing
 	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")

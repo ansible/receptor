@@ -5562,112 +5562,202 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 	}
 }
 
-// TestKubeUnit_StatusTransitionToFinished verifies that the final status transition
-// to "Finished" does not overwrite a failed state that was set by a concurrent operation.
+// TestKubeUnit_StatusTransitionToFinished is an integration test that verifies the fix
+// for a race condition where a failed state could be overwritten by "Finished" status.
 //
-// This test prevents regression of a race condition where:
-// 1. A goroutine sets status to WorkStateFailed
-// 2. Main thread attempts to transition to WorkStateSucceeded/"Finished"
-// 3. The failed state must be preserved (not overwritten)
+// Race condition scenario:
+// 1. A goroutine (e.g., stdout handler) encounters an error and sets WorkStateFailed
+// 2. Main thread finishes waiting for goroutines and attempts to set "Finished"
+// 3. Without atomic check-and-update, Failed state gets overwritten by Succeeded
 //
-// The fix uses UpdateFullStatus to atomically check and update the status within
-// a single lock acquisition, preventing the race.
+// The BROKEN code pattern (before fix):
+//   if kw.Status().State == WorkStateRunning {
+//       kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", ...)
+//   }
+// This has a TOCTOU race: Status() and UpdateBasicStatus() are separate operations.
+//
+// The FIXED code pattern (after fix in kubernetes.go:1158-1167):
+//   kw.UpdateFullStatus(func(status *StatusFileData) {
+//       if status.State == WorkStateRunning {
+//           status.State = WorkStateSucceeded
+//           ...
+//       }
+//   })
+// This is atomic: check and update happen within a single lock acquisition.
+//
+// This test simulates the race by having UpdateFullStatus inject a Failed state
+// right before the final transition check, then verifies Failed is preserved.
 func TestKubeUnit_StatusTransitionToFinished(t *testing.T) {
+	const (
+		testNamespace = "default"
+		testPodName   = "race-test-pod"
+		testUnitDir   = "/tmp/race-test-pod/"
+	)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", "enabled")
+	defer os.Unsetenv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+
 	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
-	// Track the actual status state and transitions
-	currentState := workceptor.WorkStateRunning
-	var statusTransitions []string
-	var mu sync.RWMutex
+	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
 
-	// Mock UpdateFullStatus to simulate atomic check-and-update behavior
-	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).DoAndReturn(
-		func(updateFunc func(*workceptor.StatusFileData)) {
-			mu.Lock()
-			defer mu.Unlock()
+	ctx := context.Background()
+	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+	if err != nil {
+		t.Fatalf("Error creating Workceptor: %v", err)
+	}
 
-			status := &workceptor.StatusFileData{
-				State:     currentState,
-				ExtraData: &workceptor.KubeExtraData{},
-			}
-			oldState := currentState
+	// Track status updates to verify the race condition fix
+	statusLock := &sync.RWMutex{}
+	statusData := &workceptor.StatusFileData{
+		State:     workceptor.WorkStateRunning,
+		ExtraData: &workceptor.KubeExtraData{},
+	}
+	statusCopy := workceptor.StatusFileData{
+		ExtraData: &workceptor.KubeExtraData{
+			KubeNamespace: testNamespace,
+			PodName:       testPodName,
+		},
+	}
 
-			// Execute the update function atomically within the lock
-			updateFunc(status)
+	updateFullStatusCalled := false
+	finalState := workceptor.WorkStateRunning
 
-			if status.State != oldState {
-				currentState = status.State
-				statusTransitions = append(statusTransitions,
-					fmt.Sprintf("UpdateFullStatus: %s → %s", getStateName(oldState), getStateName(status.State)))
-			} else {
-				statusTransitions = append(statusTransitions,
-					fmt.Sprintf("UpdateFullStatus: Check failed, kept %s", getStateName(oldState)))
-			}
-		}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}).AnyTimes()
 
+	// Mock Status() for the BROKEN code pattern
+	mockBaseWorkUnit.EXPECT().Status().DoAndReturn(func() *workceptor.StatusFileData {
+		statusLock.RLock()
+		defer statusLock.RUnlock()
+		return statusData
+	}).AnyTimes()
+
+	// Mock UpdateBasicStatus for both Running state and any final state calls
 	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(state int, detail string, size int64) {
-			mu.Lock()
-			defer mu.Unlock()
-			oldState := currentState
-			currentState = state
-			statusTransitions = append(statusTransitions,
-				fmt.Sprintf("UpdateBasicStatus: %s → %s (%s)", getStateName(oldState), getStateName(state), detail))
+			statusLock.Lock()
+			defer statusLock.Unlock()
+			statusData.State = state
+			statusData.Detail = detail
+			statusData.StdoutSize = size
+			finalState = state
+			t.Logf("UpdateBasicStatus: State = %s, Detail = %q", getStateName(state), detail)
 		}).AnyTimes()
 
-	// Simulate the scenario:
-	// 1. A goroutine sets the status to Failed
-	mockBaseWorkUnit.UpdateBasicStatus(workceptor.WorkStateFailed, "Error with pod's stdout: simulated error", 0)
+	// Mock UpdateFullStatus to simulate the race and verify the fix
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).DoAndReturn(
+		func(updateFunc func(*workceptor.StatusFileData)) {
+			updateFullStatusCalled = true
 
-	// 2. Main thread attempts to transition to Finished using atomic check-and-update
-	//    This should NOT overwrite the Failed state
-	ctx := context.Background()
-	if ctx.Err() != context.Canceled {
-		mockBaseWorkUnit.UpdateFullStatus(func(status *workceptor.StatusFileData) {
-			// Only update if still in Running state (atomic check)
-			if status.State == workceptor.WorkStateRunning {
-				status.State = workceptor.WorkStateSucceeded
-				status.Detail = "Finished"
-				status.StdoutSize = 100
-			}
-		})
+			// Simulate a concurrent goroutine setting Failed state
+			// This happens BEFORE the callback executes, simulating the race
+			statusData.State = workceptor.WorkStateFailed
+			statusData.Detail = "Error with pod's stdout: simulated error"
+
+			// Now execute the update function with Failed state
+			// The FIXED code will check status.State and see Failed, not Running
+			// So it won't overwrite with Succeeded
+			updateFunc(statusData)
+
+			finalState = statusData.State
+			t.Logf("UpdateFullStatus: Final state = %s, Detail = %q",
+				getStateName(statusData.State), statusData.Detail)
+		}).AnyTimes()
+
+	// Setup test directory
+	err = os.MkdirAll(testUnitDir, 0o700)
+	if err != nil {
+		t.Fatalf("Failed to create unit dir: %v", err)
+	}
+	defer os.RemoveAll(testUnitDir)
+
+	kubeConfig := workceptor.KubeWorkerCfg{
+		AuthMethod:   "incluster",
+		StreamMethod: "logger",
 	}
 
-	// Verify the status transitions
-	mu.RLock()
-	defer mu.RUnlock()
+	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
 
-	t.Logf("Status transitions:")
-	for i, transition := range statusTransitions {
-		t.Logf("  %d. %s", i+1, transition)
+	// Create a pod that has successfully completed
+	existingPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: testNamespace,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: workceptor.WorkerContainerName,
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 0,
+							Reason:   "Completed",
+						},
+					},
+				},
+			},
+		},
 	}
 
-	// Assert that Failed state was preserved
-	if currentState != workceptor.WorkStateFailed {
-		t.Errorf("Failed state was overwritten! Expected WorkStateFailed, got %s", getStateName(currentState))
-		t.Errorf("This indicates a regression of the race condition fix")
+	fakeClient := fake.NewSimpleClientset(existingPod)
+	kubeUnit.SetClientset(fakeClient)
+
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(existingPod, nil).AnyTimes()
+
+	req := fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		}),
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+	}
+	mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+
+	// Create stdout writer
+	_, stdoutErr := workceptor.NewStdoutWriter(workceptor.FileSystem{}, testUnitDir)
+	if stdoutErr != nil {
+		t.Fatalf("Failed to create stdout writer: %v", stdoutErr)
 	}
 
-	// Assert that the atomic check prevented the transition
-	if len(statusTransitions) != 2 {
-		t.Errorf("Expected 2 transitions, got %d", len(statusTransitions))
+	// Run the actual production code
+	kubeUnit.RunWorkUsingLogger()
+
+	// CRITICAL ASSERTION: Verify UpdateFullStatus was called
+	// This ensures the fix in kubernetes.go:1158-1167 is being used
+	if !updateFullStatusCalled {
+		t.Errorf("CRITICAL: UpdateFullStatus was NOT called for the final status transition!")
+		t.Errorf("This indicates kubernetes.go was reverted to the broken pattern:")
+		t.Errorf("  BROKEN: if kw.Status().State == WorkStateRunning { kw.UpdateBasicStatus(Succeeded, ...) }")
+		t.Errorf("  FIXED:  kw.UpdateFullStatus(func(s) { if s.State == WorkStateRunning { s.State = Succeeded } })")
+		t.Fatalf("The broken pattern causes a TOCTOU race where Failed state can be overwritten by Finished")
 	}
 
-	expectedTransitions := []string{
-		"UpdateBasicStatus: Running → Failed (Error with pod's stdout: simulated error)",
-		"UpdateFullStatus: Check failed, kept Failed",
+	// Assert: Failed state should be preserved (not overwritten)
+	// With the FIXED code using UpdateFullStatus, the atomic check will see Failed state
+	// and will NOT overwrite it with Succeeded
+	if finalState != workceptor.WorkStateFailed {
+		t.Errorf("RACE CONDITION DETECTED: Failed state was overwritten!")
+		t.Errorf("Expected final state WorkStateFailed, got %s", getStateName(finalState))
+		t.Errorf("This means the atomic check-and-update in UpdateFullStatus is not working correctly")
+		t.Fatalf("The fix for the race condition has regressed")
 	}
 
-	for i, expected := range expectedTransitions {
-		if i >= len(statusTransitions) {
-			t.Errorf("Missing transition %d: expected %q", i+1, expected)
-		} else if statusTransitions[i] != expected {
-			t.Errorf("Transition %d mismatch:\n  expected: %q\n  got:      %q", i+1, expected, statusTransitions[i])
-		}
-	}
+	t.Logf("SUCCESS: Race condition fix verified - Failed state was preserved")
 }
 
 // Helper function to convert state int to string for logging.

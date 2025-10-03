@@ -5571,18 +5571,22 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 // 3. Without atomic check-and-update, Failed state gets overwritten by Succeeded
 //
 // The BROKEN code pattern (before fix):
-//   if kw.Status().State == WorkStateRunning {
-//       kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", ...)
-//   }
+//
+//	if kw.Status().State == WorkStateRunning {
+//	    kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", ...)
+//	}
+//
 // This has a TOCTOU race: Status() and UpdateBasicStatus() are separate operations.
 //
 // The FIXED code pattern (after fix in kubernetes.go:1158-1167):
-//   kw.UpdateFullStatus(func(status *StatusFileData) {
-//       if status.State == WorkStateRunning {
-//           status.State = WorkStateSucceeded
-//           ...
-//       }
-//   })
+//
+//	kw.UpdateFullStatus(func(status *StatusFileData) {
+//	    if status.State == WorkStateRunning {
+//	        status.State = WorkStateSucceeded
+//	        ...
+//	    }
+//	})
+//
 // This is atomic: check and update happen within a single lock acquisition.
 //
 // This test simulates the race by having UpdateFullStatus inject a Failed state
@@ -5641,6 +5645,7 @@ func TestKubeUnit_StatusTransitionToFinished(t *testing.T) {
 	mockBaseWorkUnit.EXPECT().Status().DoAndReturn(func() *workceptor.StatusFileData {
 		statusLock.RLock()
 		defer statusLock.RUnlock()
+
 		return statusData
 	}).AnyTimes()
 

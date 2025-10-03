@@ -5670,7 +5670,7 @@ func TestKubeUnit_StatusTransitionToFinished(t *testing.T) {
 	}
 }
 
-// Helper function to convert state int to string for logging
+// Helper function to convert state int to string for logging.
 func getStateName(state int) string {
 	switch state {
 	case workceptor.WorkStatePending:

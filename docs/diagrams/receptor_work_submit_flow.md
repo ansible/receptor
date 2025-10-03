@@ -13,7 +13,11 @@ This document contains a detailed mermaid diagram showing what happens when this
 - `-l hello`: Literal payload "hello"
 - `-f`: Follow the job and display results
 
-## Flow Diagram
+## Flow Diagrams
+
+### Diagram 1: Work Submission Flow
+
+This diagram shows the complete flow of submitting work and executing it on the target node.
 
 ```mermaid
 sequenceDiagram
@@ -97,29 +101,64 @@ sequenceDiagram
     WorkUnit->>WorkUnit: MonitorLocalStatus() detects completion
     WorkUnit->>WorkUnit: Status = WorkStateSucceeded
 
-    Note over ReceptorCtl: Since -f (follow) was specified,<br>invoke results command
+    Note over ReceptorCtl, WorkUnit: Work execution complete.<br>Websocket connection remains open for results retrieval.
+```
 
-    ReceptorCtl->>CtrlSocket: "work results {unit_id}"
+### Diagram 2: Work Results Retrieval Flow
+
+This diagram shows how results are retrieved when the `-f` (follow) flag is used. The websocket connection from the submission phase remains open and is reused.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ReceptorCtl as receptorctl (Python)
+    participant CtrlSocket as Unix Socket<br>/tmp/control.sock
+    participant CtrlSvc as Control Service<br>(Go - controlsvc)
+    participant WorkSvc as Work Service<br>(Go - workceptor)
+    participant StdoutFile as stdout file<br>(in work unit dir)
+
+    Note over ReceptorCtl, WorkSvc: Work unit has completed execution.<br>Websocket connection still open from submission phase.<br>-f (follow) flag was specified.
+
+    Note over ReceptorCtl: Automatic results retrieval<br>triggered by -f flag
+
+    ReceptorCtl->>CtrlSocket: Send: {"command": "work", "subcommand": "results",<br>"unitid": "{unit_id}"}
     CtrlSocket->>CtrlSvc: Forward results request
-    CtrlSvc->>WorkSvc: Handle results command
-    WorkSvc->>WorkSvc: GetResults() - stream stdout file
-    WorkSvc-->>CtrlSvc: "Streaming results for work unit {id}"
-    CtrlSvc-->>CtrlSocket: Stream stdout content
-    CtrlSocket-->>ReceptorCtl: "hello"
 
-    ReceptorCtl->>User: Display: "hello"
+    CtrlSvc->>WorkSvc: workceptorCommand.ControlFunc()<br>subcommand: "results"
 
-    Note over ReceptorCtl: Check final work status
-    ReceptorCtl->>CtrlSocket: "work status {unit_id}"
-    CtrlSocket->>CtrlSvc: Status request
-    CtrlSvc->>WorkSvc: Get work status
+    Note over WorkSvc: workceptor.go:GetResults()<br>Stream stdout file contents
+
+    WorkSvc->>StdoutFile: Open unitdir/stdout for reading
+    StdoutFile-->>WorkSvc: File handle
+
+    loop Stream file contents
+        WorkSvc->>StdoutFile: Read chunks from stdout file
+        StdoutFile-->>WorkSvc: File data chunk
+        WorkSvc-->>CtrlSvc: Stream chunk
+        CtrlSvc-->>CtrlSocket: Forward chunk
+        CtrlSocket-->>ReceptorCtl: Websocket data
+        ReceptorCtl->>User: Display output ("hello")
+    end
+
+    WorkSvc-->>CtrlSvc: End of file reached
+    CtrlSvc-->>CtrlSocket: Close stream
+    CtrlSocket-->>ReceptorCtl: Stream complete
+
+    Note over ReceptorCtl: Results retrieved.<br>Now check final status.
+
+    ReceptorCtl->>CtrlSocket: Send: {"command": "work", "subcommand": "status",<br>"unitid": "{unit_id}"}
+    CtrlSocket->>CtrlSvc: Forward status request
+    CtrlSvc->>WorkSvc: workceptorCommand.ControlFunc()<br>subcommand: "status"
+
+    WorkSvc->>WorkSvc: Read status file from unitdir
     WorkSvc-->>CtrlSvc: {"State": 1, "Detail": "exit status 0"}
     CtrlSvc-->>CtrlSocket: JSON status response
     CtrlSocket-->>ReceptorCtl: Status data
 
-    Note over ReceptorCtl: State = 1 (WorkStateSucceeded)<br>Exit normally
+    Note over ReceptorCtl: State = 1 (WorkStateSucceeded)<br>Exit code = 0
 
-    ReceptorCtl->>User: Command completed successfully
+    ReceptorCtl->>CtrlSocket: Close websocket connection
+    ReceptorCtl->>User: Command completed successfully (exit 0)
 ```
 
 ## Key Components
@@ -176,15 +215,21 @@ This section provides specific breakpoint locations and debugging steps to follo
 - Set up your development environment with Go and Python debuggers
 - Build receptor with debug symbols: `make build-dev` or `go build -gcflags="all=-N -l"`
 - **Important**: Install receptorctl in editable/development mode so Python breakpoints work:
+
   ```bash
   cd receptorctl
   pip install -e .
   ```
+
   This creates a link to your source code instead of copying it, allowing the debugger to hit breakpoints in your workspace files.
 
-### Breakpoint Locations (in execution order)
+### Breakpoint Locations
 
-#### 1. ReceptorCtl Entry Point
+The breakpoints are organized by diagram to help you debug each flow independently.
+
+#### Diagram 1: Work Submission Flow Breakpoints
+
+##### 1. ReceptorCtl Entry Point
 
 **File**: `receptorctl/receptorctl/cli.py`
 **Function**: `submit()`
@@ -384,7 +429,21 @@ if params == "" {
 
 **What to observe**: `cat` command execution
 
-#### 17. Results Streaming (if using -f flag)
+#### Diagram 2: Work Results Retrieval Flow Breakpoints
+
+##### 1. Results Command Handler
+
+**File**: `pkg/workceptor/controlsvc.go`
+**Function**: `ControlFunc()` (results case)
+
+```go
+case "results":
+    unitID, err := strFromMap(c.params, "unitid")
+```
+
+**What to observe**: Results command parameter extraction
+
+##### 2. Results Streaming
 
 **File**: `pkg/workceptor/workceptor.go`
 **Function**: `GetResults()`
@@ -393,7 +452,19 @@ if params == "" {
 func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int64) (chan []byte, error) {
 ```
 
-**What to observe**: Stdout file streaming
+**What to observe**: Stdout file streaming, chunk reading
+
+##### 3. Status Command Handler
+
+**File**: `pkg/workceptor/controlsvc.go`
+**Function**: `ControlFunc()` (status case)
+
+```go
+case "status":
+    unitID, err := strFromMap(c.params, "unitid")
+```
+
+**What to observe**: Status file reading, response formatting
 
 ### Debugging Steps with VSCode
 
@@ -481,32 +552,43 @@ Create or update `.vscode/launch.json` with the following configurations:
    - Both receptor nodes will start with debugger attached
    - Wait for nodes to be ready (watch for "control service listening" in debug console)
 
-2. **Set Breakpoints in Go Code**:
+2. **Set Breakpoints for Diagram 1 (Work Submission)**:
 
-   - Open the relevant Go files listed in "Breakpoint Locations" section above
-   - Click in the gutter to set breakpoints at key locations:
-     - `pkg/controlsvc/controlsvc.go:240` (RunControlSession)
-     - `pkg/workceptor/controlsvc.go:277` (ControlFunc)
-     - `pkg/workceptor/workceptor.go:311` (AllocateUnit)
-     - `pkg/workceptor/command.go:344` (Start)
-     - `pkg/workceptor/command.go:368` (commandRunner)
-     - `pkg/workceptor/workceptor.go:393` (GetResults)
+   **Python breakpoints:**
+   - `receptorctl/receptorctl/cli.py` - `submit()` function
+   - `receptorctl/receptorctl/socket_interface.py` - `submit_work()` function
 
-3. **Debug ReceptorCtl Client**:
+   **Go breakpoints:**
+   - `pkg/controlsvc/controlsvc.go` - `RunControlSession()`
+   - `pkg/workceptor/controlsvc.go` - `ControlFunc()` (submit case)
+   - `pkg/workceptor/workceptor.go` - `AllocateUnit()`
+   - `pkg/workceptor/command.go` - `Start()`
+   - `pkg/workceptor/command.go` - `commandRunner()`
 
-   - Set breakpoints in Python files (breakpoints will only work if installed with `pip install -e .`):
-     - `receptorctl/receptorctl/cli.py:436` - `submit()` function
-     - `receptorctl/receptorctl/socket_interface.py:171` - `submit_work()` function
+3. **Set Breakpoints for Diagram 2 (Results Retrieval)**:
+
+   **Python breakpoints:**
+   - `receptorctl/receptorctl/socket_interface.py` - Results retrieval code (after work submission)
+
+   **Go breakpoints:**
+   - `pkg/workceptor/controlsvc.go` - `ControlFunc()` (results case)
+   - `pkg/workceptor/workceptor.go` - `GetResults()`
+   - `pkg/workceptor/controlsvc.go` - `ControlFunc()` (status case)
+
+4. **Debug ReceptorCtl Client**:
+
    - After receptor nodes are running and ready, start the Python debugger
    - Select "Debug ReceptorCtl" configuration from the debug dropdown
-   - The command will execute and hit both Python and Go breakpoints
+   - The command will execute and hit breakpoints in both flows sequentially
 
-4. **Step Through Execution**:
+5. **Step Through Execution**:
 
    - Use VSCode debug controls (Continue, Step Over, Step Into, Step Out)
    - Watch the call stack across both Go processes
    - Inspect variables in the Debug sidebar
-   - Observe the data flow between components in real-time
+   - Observe the data flow:
+     - **First flow**: Submission → Execution → Completion
+     - **Second flow**: Results retrieval → Status check → Exit
 
 ### Key Variables to Watch
 

@@ -904,7 +904,7 @@ func TestTracerCreatesCorrectFilePath(t *testing.T) {
 
 	testNetcepter := New(context.Background(), "node1")
 	clientLoggingPerspective := logging.PerspectiveClient
-	connId := quic.ConnectionIDFromBytes([]byte{})
+	connID := quic.ConnectionIDFromBytes([]byte{})
 	expectedFilename := "/tmp/log_28656d70747929_client.qlog"
 
 	tests := []struct {
@@ -923,8 +923,9 @@ func TestTracerCreatesCorrectFilePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			os.Setenv("QLOGDIR", tt.qlogDirectory)
-			tracer := testNetcepter.tracer(testNetcepter.context, clientLoggingPerspective, connId)
+			tracer := testNetcepter.tracer(testNetcepter.context, clientLoggingPerspective, connID)
 			defer tracer.Close()
 
 			_, err := os.Stat(expectedFilename)
@@ -984,9 +985,11 @@ func TestTracerCreatesNonEmptyFiles(t *testing.T) {
 		}
 		if info.Size() <= 0 {
 			foundAtLeastOneQlogFile = true
+
 			return fmt.Errorf("QLog trace file was empty: %s", path)
 		}
 		foundAtLeastOneQlogFile = true
+
 		return nil
 	})
 	if err != nil {

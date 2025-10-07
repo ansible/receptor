@@ -43,13 +43,29 @@ jobs:
       - name: Run receptor tests with coverage
         run: make coverage
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          fail_ci_if_error: true
-          verbose: true
+      - name: SonarCube Static Scans (on push)
+        uses: SonarSource/sonarqube-scan-action@v5
+        if: github.event_name == 'push' && startsWith(github.repository, 'ansible') && endsWith(github.repository, '/receptor')
         env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}
+        with:
+          args: >
+            -Dsonar.go.coverage.reportPaths=coverage.txt
+
+      - name: Upload Code Coverage Report from Unit Tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.txt
+
+      - name: Save off PR Number
+        run: echo "PR ${{ github.event.number }}" > pr_number.txt
+
+      - name: Upload PR Number
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr_number
+          path: pr_number.txt
 
       - name: get k8s logs
         if: ${{ failure() }}

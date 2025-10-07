@@ -206,11 +206,17 @@ jobs:
         run: nox --no-install --session ${{ matrix.session }}
         working-directory: ./receptorctl
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Upload Code Coverage Report from nox
+        uses: actions/upload-artifact@v4
         with:
-          directory: receptorctl
-          files: receptorctl_coverage.xml
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
+          name: receptorctl-coverage-report
+          path: receptorctl_coverage.xml
+
+      - name: Save off PR Number
+        run: echo "PR ${{ github.event.number }}" > pr_number.txt
+
+      - name: Upload PR Number
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr_number
+          path: pr_number.txt

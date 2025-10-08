@@ -1,4 +1,4 @@
-name: SonarCube Static Scans (PR)
+name: SonarQube Static Scans (PR)
 
 on:
   workflow_run:

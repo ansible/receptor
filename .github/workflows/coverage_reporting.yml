@@ -52,10 +52,10 @@ jobs:
           args: >
             -Dsonar.go.coverage.reportPaths=coverage.txt
 
-      - name: Upload Code Coverage Report from Unit Tests
+      - name: Upload Code Coverage Report from Receptor Unit Tests
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: receptor-coverage-report
           path: coverage.txt
 
       - name: Save off PR Number

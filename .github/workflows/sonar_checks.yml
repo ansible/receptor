@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - Code Coverage
+      - CI
     types:
       - completed
 

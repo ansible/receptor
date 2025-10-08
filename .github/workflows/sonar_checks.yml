@@ -10,7 +10,7 @@ on:
 permissions: read-all
 jobs:
   sonarcloud:
-    name: SonarCube Static Scans (PR)
+    name: SonarQube Static Scans (PR)
     runs-on: ubuntu-latest
     env:
         go_version: '1.23'

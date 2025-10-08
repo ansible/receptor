@@ -25,7 +25,7 @@ jobs:
       - name: Fetch receptor coverage report
         uses: actions/download-artifact@v4
         with:
-          name: coverage-report
+          name: receptor-coverage-report
           path: .
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}

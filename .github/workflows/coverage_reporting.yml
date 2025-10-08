@@ -45,7 +45,7 @@ jobs:
 
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v6
-        if: github.event_name == 'push' && startsWith(github.repository, 'ansible') && endsWith(github.repository, '/receptor')
+        if: github.event_name == 'push' && github.repository == 'ansible/receptor'
         env:
           SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}
         with:

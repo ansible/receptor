@@ -206,7 +206,7 @@ jobs:
         run: nox --no-install --session ${{ matrix.session }}
         working-directory: ./receptorctl
 
-      - name: Upload Code Coverage Report from nox
+      - name: Upload Code Coverage Report from Receptorctl Unit Tests
         uses: actions/upload-artifact@v4
         with:
           name: receptorctl-coverage-report

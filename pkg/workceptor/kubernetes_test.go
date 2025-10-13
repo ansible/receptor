@@ -1283,7 +1283,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: false,
+			expectedStdoutErr: true,
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{

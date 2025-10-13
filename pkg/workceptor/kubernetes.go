@@ -540,6 +540,11 @@ mainLoop:
 							podName,
 							WorkerContainerName,
 							containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
+						*stdoutErr = fmt.Errorf("pod %s/%s terminated with exit code %d: %s",
+							podNamespace,
+							podName,
+							containerState.Terminated.ExitCode,
+							containerState.Terminated.Message)
 					}
 
 					// We need to check if last line has data

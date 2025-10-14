@@ -115,11 +115,14 @@ func TestStart(t *testing.T) {
 
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).Times(2)
 	mockNetceptor.EXPECT().GetLogger().Times(2)
-	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
+	// Expect two calls to UpdateBasicStatus:
+	// 1. First call from Start() with "Launching command runner"
+	// 2. Second call from runCommand() when cmd.Start() fails (receptor not in PATH)
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
 	statusExpectCalls(mockBaseWorkUnit)
 
 	mockBaseWorkUnit.EXPECT().UnitDir()
-	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any())
+	// When cmd.Start() fails, UpdateFullStatus and MonitorLocalStatus are not called
 	mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()
 	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
 	wu.Start()

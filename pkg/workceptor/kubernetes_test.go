@@ -1238,7 +1238,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
 		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
 		{
-			name: "eof_with_terminated_pod_nonzero_exit_code",
+			name: "eof_with_terminated_pod_exit_code_1_treated_as_success",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
@@ -1283,11 +1283,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
+				"Test_Namespace/Test_Name: worker has terminated with exit code 1 (treated as success)",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code

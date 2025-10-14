@@ -534,7 +534,8 @@ mainLoop:
 					return
 				case containerState.Terminated != nil:
 					// We got EOF and the pod terminated, we will log the terminated information
-					if containerState.Terminated.ExitCode != 0 {
+					// Exit code 1 is treated as successful completion for playbooks
+					if containerState.Terminated.ExitCode != 0 && containerState.Terminated.ExitCode != 1 {
 						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v",
 							podNamespace,
 							podName,
@@ -545,6 +546,11 @@ mainLoop:
 							podName,
 							containerState.Terminated.ExitCode,
 							containerState.Terminated.Message)
+					} else if containerState.Terminated.ExitCode == 1 {
+						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s has terminated with exit code 1 (treated as success)",
+							podNamespace,
+							podName,
+							WorkerContainerName)
 					}
 
 					// We need to check if last line has data

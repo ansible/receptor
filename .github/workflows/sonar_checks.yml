@@ -3,7 +3,7 @@ name: SonarQube Static Scans (PR)
 on:
   workflow_run:
     workflows:
-      - Code Coverage
+      - Codecov
       - CI
     types:
       - completed

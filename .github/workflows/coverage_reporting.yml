@@ -72,17 +72,6 @@ jobs:
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh
 
-      - name: remove sockets before archiving logs
-        if: ${{ failure() }}
-        run: find /tmp/receptor-testing -name controlsock -delete
-
-      - name: Artifact receptor data
-        uses: actions/upload-artifact@v4.4.3
-        if: ${{ failure() }}
-        with:
-          name: test-logs
-          path: /tmp/receptor-testing
-
       - name: Archive receptor binary
         uses: actions/upload-artifact@v4.4.3
         with:

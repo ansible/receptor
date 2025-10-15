@@ -20,7 +20,6 @@ This document contains a detailed mermaid diagram showing what happens when this
 This diagram shows the complete flow of submitting work and executing it on the target node.
 
 ```mermaid
-%%{init: {'sequence': {'mirrorActors': false, 'actorFontSize': 18, 'noteFontSize': 18, 'messageFontSize': 16}}}%%
 sequenceDiagram
     participant User
     participant ReceptorCtl as receptorctl (Python)
@@ -110,7 +109,6 @@ sequenceDiagram
 This diagram shows how results are retrieved when the `-f` (follow) flag is used. The websocket connection from the submission phase remains open and is reused.
 
 ```mermaid
-%%{init: {'sequence': {'mirrorActors': false, 'actorFontSize': 18, 'noteFontSize': 18, 'messageFontSize': 16}}}%%
 sequenceDiagram
     participant User
     participant ReceptorCtl as receptorctl (Python)

@@ -95,4 +95,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: receptorctl-coverage-report
-          path: receptorctl_coverage.xml
+          path: receptorctl/receptorctl_coverage.xml

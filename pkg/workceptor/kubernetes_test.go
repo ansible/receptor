@@ -1287,7 +1287,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Container in worker pod has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
+				"Test_Namespace/Test_Name: worker has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -4547,7 +4547,14 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, gomock.Any(), gomock.Any())
 			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
-			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateSucceeded, gomock.Any(), gomock.Any())
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc func(*workceptor.StatusFileData)) {
+				// Simulate the atomic check-and-update in UpdateFullStatus
+				status := &workceptor.StatusFileData{
+					State:     workceptor.WorkStateRunning,
+					ExtraData: &workceptor.KubeExtraData{},
+				}
+				updateFunc(status)
+			})
 
 			err = os.MkdirAll(testUnitDir, 0o700)
 			if err != nil {
@@ -5552,6 +5559,227 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 
 			t.Logf("Successfully completed test: %s", tc.name)
 		})
+	}
+}
+
+// TestKubeUnit_StatusTransitionToFinished is an integration test that verifies the fix
+// for a race condition where a failed state could be overwritten by "Finished" status.
+//
+// Race condition scenario:
+// 1. A goroutine (e.g., stdout handler) encounters an error and sets WorkStateFailed
+// 2. Main thread finishes waiting for goroutines and attempts to set "Finished"
+// 3. Without atomic check-and-update, Failed state gets overwritten by Succeeded
+//
+// The BROKEN code pattern (before fix):
+//
+//	if kw.Status().State == WorkStateRunning {
+//	    kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", ...)
+//	}
+//
+// This has a TOCTOU race: Status() and UpdateBasicStatus() are separate operations.
+//
+// The FIXED code pattern (after fix in kubernetes.go:1158-1167):
+//
+//	kw.UpdateFullStatus(func(status *StatusFileData) {
+//	    if status.State == WorkStateRunning {
+//	        status.State = WorkStateSucceeded
+//	        ...
+//	    }
+//	})
+//
+// This is atomic: check and update happen within a single lock acquisition.
+//
+// This test simulates the race by having UpdateFullStatus inject a Failed state
+// right before the final transition check, then verifies Failed is preserved.
+func TestKubeUnit_StatusTransitionToFinished(t *testing.T) {
+	const (
+		testNamespace = "default"
+		testPodName   = "race-test-pod"
+		testUnitDir   = "/tmp/race-test-pod/"
+	)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", "enabled")
+	defer os.Unsetenv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+
+	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+
+	ctx := context.Background()
+	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+	if err != nil {
+		t.Fatalf("Error creating Workceptor: %v", err)
+	}
+
+	// Track status updates to verify the race condition fix
+	statusLock := &sync.RWMutex{}
+	statusData := &workceptor.StatusFileData{
+		State:     workceptor.WorkStateRunning,
+		ExtraData: &workceptor.KubeExtraData{},
+	}
+	statusCopy := workceptor.StatusFileData{
+		ExtraData: &workceptor.KubeExtraData{
+			KubeNamespace: testNamespace,
+			PodName:       testPodName,
+		},
+	}
+
+	updateFullStatusCalled := false
+	finalState := workceptor.WorkStateRunning
+
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}).AnyTimes()
+
+	// Mock Status() for the BROKEN code pattern
+	mockBaseWorkUnit.EXPECT().Status().DoAndReturn(func() *workceptor.StatusFileData {
+		statusLock.RLock()
+		defer statusLock.RUnlock()
+
+		return statusData
+	}).AnyTimes()
+
+	// Mock UpdateBasicStatus for both Running state and any final state calls
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(state int, detail string, size int64) {
+			statusLock.Lock()
+			defer statusLock.Unlock()
+			statusData.State = state
+			statusData.Detail = detail
+			statusData.StdoutSize = size
+			finalState = state
+			t.Logf("UpdateBasicStatus: State = %s, Detail = %q", getStateName(state), detail)
+		}).AnyTimes()
+
+	// Mock UpdateFullStatus to simulate the race and verify the fix
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).DoAndReturn(
+		func(updateFunc func(*workceptor.StatusFileData)) {
+			updateFullStatusCalled = true
+
+			// Simulate a concurrent goroutine setting Failed state
+			// This happens BEFORE the callback executes, simulating the race
+			statusData.State = workceptor.WorkStateFailed
+			statusData.Detail = "Error with pod's stdout: simulated error"
+
+			// Now execute the update function with Failed state
+			// The FIXED code will check status.State and see Failed, not Running
+			// So it won't overwrite with Succeeded
+			updateFunc(statusData)
+
+			finalState = statusData.State
+			t.Logf("UpdateFullStatus: Final state = %s, Detail = %q",
+				getStateName(statusData.State), statusData.Detail)
+		}).AnyTimes()
+
+	// Setup test directory
+	err = os.MkdirAll(testUnitDir, 0o700)
+	if err != nil {
+		t.Fatalf("Failed to create unit dir: %v", err)
+	}
+	defer os.RemoveAll(testUnitDir)
+
+	kubeConfig := workceptor.KubeWorkerCfg{
+		AuthMethod:   "incluster",
+		StreamMethod: "logger",
+	}
+
+	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+	// Create a pod that has successfully completed
+	existingPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: testNamespace,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: workceptor.WorkerContainerName,
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 0,
+							Reason:   "Completed",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewSimpleClientset(existingPod)
+	kubeUnit.SetClientset(fakeClient)
+
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(existingPod, nil).AnyTimes()
+
+	req := fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		}),
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+	}
+	mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+
+	// Create stdout writer
+	_, stdoutErr := workceptor.NewStdoutWriter(workceptor.FileSystem{}, testUnitDir)
+	if stdoutErr != nil {
+		t.Fatalf("Failed to create stdout writer: %v", stdoutErr)
+	}
+
+	// Run the actual production code
+	kubeUnit.RunWorkUsingLogger()
+
+	// CRITICAL ASSERTION: Verify UpdateFullStatus was called
+	// This ensures the fix in kubernetes.go:1158-1167 is being used
+	if !updateFullStatusCalled {
+		t.Errorf("CRITICAL: UpdateFullStatus was NOT called for the final status transition!")
+		t.Errorf("This indicates kubernetes.go was reverted to the broken pattern:")
+		t.Errorf("  BROKEN: if kw.Status().State == WorkStateRunning { kw.UpdateBasicStatus(Succeeded, ...) }")
+		t.Errorf("  FIXED:  kw.UpdateFullStatus(func(s) { if s.State == WorkStateRunning { s.State = Succeeded } })")
+		t.Fatalf("The broken pattern causes a TOCTOU race where Failed state can be overwritten by Finished")
+	}
+
+	// Assert: Failed state should be preserved (not overwritten)
+	// With the FIXED code using UpdateFullStatus, the atomic check will see Failed state
+	// and will NOT overwrite it with Succeeded
+	if finalState != workceptor.WorkStateFailed {
+		t.Errorf("RACE CONDITION DETECTED: Failed state was overwritten!")
+		t.Errorf("Expected final state WorkStateFailed, got %s", getStateName(finalState))
+		t.Errorf("This means the atomic check-and-update in UpdateFullStatus is not working correctly")
+		t.Fatalf("The fix for the race condition has regressed")
+	}
+
+	t.Logf("SUCCESS: Race condition fix verified - Failed state was preserved")
+}
+
+// Helper function to convert state int to string for logging.
+func getStateName(state int) string {
+	switch state {
+	case workceptor.WorkStatePending:
+		return "Pending"
+	case workceptor.WorkStateRunning:
+		return "Running"
+	case workceptor.WorkStateSucceeded:
+		return "Succeeded"
+	case workceptor.WorkStateFailed:
+		return "Failed"
+	case workceptor.WorkStateCanceled:
+		return "Canceled"
+	default:
+		return fmt.Sprintf("Unknown(%d)", state)
 	}
 }
 

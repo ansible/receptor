@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -159,18 +160,13 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 			role = "client"
 		}
 		filename := fmt.Sprintf("log_%x_%s.qlog", connID, role)
-		f, err := os.Create(qlogPath + filename)
+		fullPath := path.Join(qlogPath, filename)
+		f, err := os.Create(fullPath)
 		if err != nil {
 			s.Logger.Debug("failed to create qlog file at path: %s", qlogPath)
 
 			return nil
 		}
-		defer func() {
-			err := f.Close()
-			if err != nil {
-				s.GetLogger().Error("Error closing %s: %s", qlogPath+filename, err)
-			}
-		}()
 
 		return qlog.NewConnectionTracer(f, p, connID)
 	} else {

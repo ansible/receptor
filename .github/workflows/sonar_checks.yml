@@ -1,0 +1,87 @@
+name: SonarQube Static Scans (PR)
+
+on:
+  workflow_run:
+    workflows:
+      - Codecov
+    types:
+      - completed
+
+permissions: read-all
+jobs:
+  sonarcloud:
+    name: SonarQube Static Scans (PR)
+    runs-on: ubuntu-latest
+    env:
+        go_version: '1.23'
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch receptor coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: receptor-coverage-report
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Fetch receptorctl coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: receptorctl-coverage-report
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Fetch PR Number
+        uses: actions/download-artifact@v4
+        with:
+          name: pr_number
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Extract PR Number
+        run: |
+          cat pr_number.txt
+          echo $(head -n1 pr_number.txt | awk '{print $2}')
+          echo "PR_NUMBER=$(head -n1 pr_number.txt | awk '{print $2}')" >> $GITHUB_ENV
+
+      - name: Get Additional PR Information
+        uses: octokit/request-action@v2.x
+        id: pr_info
+        with:
+          route: GET /repos/{repo}/pulls/{number}
+          repo: ${{ github.event.repository.full_name }}
+          number: ${{ env.PR_NUMBER }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Additional PR Information
+        run: |
+          echo "PR_BASE=${{ fromJson(steps.pr_info.outputs.data).base.ref }}" >> $GITHUB_ENV
+          echo "PR_HEAD=${{ fromJson(steps.pr_info.outputs.data).head.ref }}" >> $GITHUB_ENV
+
+      - name: Checkout Code for PR
+        run: |
+          gh pr checkout ${{ env.PR_NUMBER }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: SonarQube Scan for receptor
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}
+        with:
+          args: >
+            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
+            -Dsonar.pullrequest.key=${{ env.PR_NUMBER }}
+            -Dsonar.pullrequest.branch=${{ env.PR_HEAD }}
+            -Dsonar.pullrequest.base=${{ env.PR_BASE }}
+            -Dsonar.go.coverage.reportPaths=receptor-coverage-report/coverage.txt
+            -Dsonar.python.coverage.reportPaths=receptorctl-coverage-report/receptorctl_coverage.xml

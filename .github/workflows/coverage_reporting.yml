@@ -8,6 +8,7 @@ on:  # yamllint disable-line rule:truthy
 
 env:
   DESIRED_GO_VERSION: '1.23'
+  DESIRED_PYTHON_VERSION: '3.12'
 
 jobs:
   go_test_coverage:
@@ -43,31 +44,56 @@ jobs:
       - name: Run receptor tests with coverage
         run: make coverage
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Set up nox
+        uses: wntrblm/nox@2025.05.01
         with:
-          fail_ci_if_error: true
-          verbose: true
+          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Provision nox environment for coverage
+        run: nox --install-only --session coverage
+        working-directory: ./receptorctl
+
+      - name: Run `receptorctl` nox coverage session
+        run: nox --no-install --session coverage
+        working-directory: ./receptorctl
+
+      - name: SonarCube Static Scans (on push)
+        uses: SonarSource/sonarqube-scan-action@v6
+        if: github.event_name == 'push' && github.repository == 'ansible/receptor'
         env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}
+        with:
+          args: >
+            -Dsonar.go.coverage.reportPaths=coverage.txt
+            -Dsonar.python.coverage.reportPaths=receptorctl/receptorctl_coverage.xml
+
+      - name: Upload Code Coverage Report from Receptor Unit Tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: receptor-coverage-report
+          path: coverage.txt
+
+      - name: Save off PR Number
+        run: echo "PR ${{ github.event.number }}" > pr_number.txt
+
+      - name: Upload PR Number
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr_number
+          path: pr_number.txt
 
       - name: get k8s logs
         if: ${{ failure() }}
         run: .github/workflows/artifact-k8s-logs.sh
-
-      - name: remove sockets before archiving logs
-        if: ${{ failure() }}
-        run: find /tmp/receptor-testing -name controlsock -delete
-
-      - name: Artifact receptor data
-        uses: actions/upload-artifact@v4.4.3
-        if: ${{ failure() }}
-        with:
-          name: test-logs
-          path: /tmp/receptor-testing
 
       - name: Archive receptor binary
         uses: actions/upload-artifact@v4.4.3
         with:
           name: receptor
           path: /usr/local/bin/receptor
+
+      - name: Upload Code Coverage Report from Receptorctl Unit Tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: receptorctl-coverage-report
+          path: receptorctl/receptorctl_coverage.xml

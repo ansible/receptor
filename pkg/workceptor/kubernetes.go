@@ -521,7 +521,11 @@ mainLoop:
 						continue mainLoop
 					}
 					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhausted", WorkerContainerName)
+					kw.GetWorkceptor().nc.GetLogger().Error("%s/%s: %s is running but is continuing to stream EOF after retries exhausted",
+						podNamespace,
+						podName,
+						WorkerContainerName,
+					)
 					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhausted", err,
 						podNamespace,
 						podName,
@@ -531,7 +535,11 @@ mainLoop:
 				case containerState.Terminated != nil:
 					// We got EOF and the pod terminated, we will log the terminated information
 					if containerState.Terminated.ExitCode != 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v", WorkerContainerName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
+						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v",
+							podNamespace,
+							podName,
+							WorkerContainerName,
+							containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
 					}
 
 					// We need to check if last line has data
@@ -557,8 +565,12 @@ mainLoop:
 				// Something has gone very wrong if we are here. EOF is true and we can get the container state, but it is not running or terminated.
 				// At this stage something has gone very wrong with our interactions with the container.
 				// We will fail, and mark the job as failed due to an unknown kube container state.
-
-				kw.GetWorkceptor().nc.GetLogger().Error("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed", podName, containerState)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s/%s: %s sent EOF on log stream and container state is not valid %s, failing and marking the job as failed",
+					podNamespace,
+					podName,
+					WorkerContainerName,
+					containerState,
+				)
 				*stdoutErr = fmt.Errorf("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed", podName, containerState)
 
 				return
@@ -1143,8 +1155,15 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 	}
 
 	// only transition from WorkStateRunning to WorkStateSucceeded if WorkStateFailed is set we do not override
-	if kw.GetContext().Err() != context.Canceled && kw.Status().State == WorkStateRunning {
-		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+	if kw.GetContext().Err() != context.Canceled {
+		kw.UpdateFullStatus(func(status *StatusFileData) {
+			// Atomically check and update within single lock to prevent race condition
+			if status.State == WorkStateRunning {
+				status.State = WorkStateSucceeded
+				status.Detail = "Finished"
+				status.StdoutSize = stdout.Size()
+			}
+		})
 	}
 }
 

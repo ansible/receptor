@@ -83,15 +83,5 @@ jobs:
             -Dsonar.pullrequest.key=${{ env.PR_NUMBER }}
             -Dsonar.pullrequest.branch=${{ env.PR_HEAD }}
             -Dsonar.pullrequest.base=${{ env.PR_BASE }}
-
-      - name: SonarQube Scan for receptorctl
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}
-        with:
-          projectBaseDir: receptorctl
-          args: >
-            -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha }}
-            -Dsonar.pullrequest.key=${{ env.PR_NUMBER }}
-            -Dsonar.pullrequest.branch=${{ env.PR_HEAD }}
-            -Dsonar.pullrequest.base=${{ env.PR_BASE }}
+            -Dsonar.go.coverage.reportPaths=receptor-coverage-report/coverage.txt
+            -Dsonar.python.coverage.reportPaths=receptorctl-coverage-report/receptorctl_coverage.xml

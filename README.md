@@ -1,5 +1,7 @@
 # Receptor
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ansible_receptor&metric=coverage)](https://sonarcloud.io/summary/new_code?id=ansible_receptor)
+
 Receptor is an overlay network intended to ease the distribution of work across a large and dispersed collection of workers.  Receptor nodes establish peer-to-peer connections with each other via existing networks.  Once connected, the Receptor mesh provides datagram (UDP-like) and stream (TCP-like) capabilities to applications, as well as robust unit-of-work handling with resiliency against transient network failures.
 
 See the readthedocs page for Receptor at:

@@ -44,6 +44,19 @@ jobs:
       - name: Run receptor tests with coverage
         run: make coverage
 
+      - name: Set up nox
+        uses: wntrblm/nox@2025.05.01
+        with:
+          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
+
+      - name: Provision nox environment for coverage
+        run: nox --install-only --session coverage
+        working-directory: ./receptorctl
+
+      - name: Run `receptorctl` nox coverage session
+        run: nox --no-install --session coverage
+        working-directory: ./receptorctl
+
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v6
         if: github.event_name == 'push' && github.repository == 'ansible/receptor'
@@ -52,6 +65,7 @@ jobs:
         with:
           args: >
             -Dsonar.go.coverage.reportPaths=coverage.txt
+            -Dsonar.python.coverage.reportPaths=receptorctl/receptorctl_coverage.xml
 
       - name: Upload Code Coverage Report from Receptor Unit Tests
         uses: actions/upload-artifact@v4
@@ -77,19 +91,6 @@ jobs:
         with:
           name: receptor
           path: /usr/local/bin/receptor
-
-      - name: Set up nox
-        uses: wntrblm/nox@2025.05.01
-        with:
-          python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
-
-      - name: Provision nox environment for coverage
-        run: nox --install-only --session coverage
-        working-directory: ./receptorctl
-
-      - name: Run `receptorctl` nox coverage session
-        run: nox --no-install --session coverage
-        working-directory: ./receptorctl
 
       - name: Upload Code Coverage Report from Receptorctl Unit Tests
         uses: actions/upload-artifact@v4

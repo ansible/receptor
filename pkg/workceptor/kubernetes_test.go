@@ -5896,3 +5896,58 @@ func TestGetSleepDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestFunctionNeedingIt(t *testing.T) {
+	testCases := []struct {
+		name        string
+		n           int
+		expectError bool
+	}{
+		{
+			name:        "n is negative",
+			n:           -5,
+			expectError: false,
+		},
+		{
+			name:        "n is zero",
+			n:           0,
+			expectError: false,
+		},
+		{
+			name:        "n less than 5",
+			n:           3,
+			expectError: false,
+		},
+		{
+			name:        "n is 5",
+			n:           5,
+			expectError: true,
+		},
+		{
+			name:        "n greater than 5",
+			n:           7,
+			expectError: true,
+		},
+		{
+			name:        "n is 50",
+			n:           50,
+			expectError: true,
+		},
+		{
+			name:        "n is 100",
+			n:           100,
+			expectError: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := workceptor.PleaseTestThisFunction(tc.n)
+			if err != nil && !tc.expectError {
+				t.Errorf("Did not expect this error: %v", err)
+			}
+			if err == nil && tc.expectError {
+				t.Error("Expected an error but did not get one")
+			}
+		})
+	}
+}

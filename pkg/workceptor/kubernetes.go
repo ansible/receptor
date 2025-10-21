@@ -1977,3 +1977,10 @@ func init() {
 	cmdline.RegisterConfigTypeForApp("receptor-workers",
 		"work-kubernetes", "Run a worker using Kubernetes", KubeWorkerCfg{}, cmdline.Section(workersSection))
 }
+
+func PleaseTestThisFunction(n int) error {
+	if n < 5 {
+		return nil
+	}
+	return errors.New("n cannot be 5 or greater")
+}

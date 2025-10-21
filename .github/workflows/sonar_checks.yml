@@ -83,5 +83,5 @@ jobs:
             -Dsonar.pullrequest.key=${{ env.PR_NUMBER }}
             -Dsonar.pullrequest.branch=${{ env.PR_HEAD }}
             -Dsonar.pullrequest.base=${{ env.PR_BASE }}
-            -Dsonar.go.coverage.reportPaths=receptor-coverage-report/coverage.txt
-            -Dsonar.python.coverage.reportPaths=receptorctl-coverage-report/receptorctl_coverage.xml
+            -Dsonar.go.coverage.reportPaths=coverage.txt
+            -Dsonar.python.coverage.reportPaths=receptorctl_coverage.xml

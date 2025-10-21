@@ -13,15 +13,15 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// Helper function to create test addresses
+// Helper function to create test addresses.
 func newTestAddr(node, service, network string) netceptor.Addr {
 	addr := netceptor.Addr{}
 	addr.SetNode(node)
 	addr.SetService(service)
 	addr.SetNetwork(network)
+
 	return addr
 }
-
 
 func TestNetceptor_Ping(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -98,11 +98,11 @@ func TestSendPing_Success(t *testing.T) {
 	mockPC.EXPECT().ReadFrom(gomock.Any()).DoAndReturn(func(p []byte) (int, net.Addr, error) {
 		time.Sleep(10 * time.Millisecond) // Simulate network delay
 		addr := newTestAddr("target-node", "ping", "")
+
 		return 8, &addr, nil
 	})
 
 	duration, fromNode, err := netceptor.SendPing(ctx, mockNetc, "target-node", 64)
-
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestCreateTraceroute_Success(t *testing.T) {
 	resultChan := netceptor.CreateTraceroute(ctx, mockNetc, "target")
 
 	// Collect results
-	var results []*netceptor.TracerouteResult
+	results := make([]*netceptor.TracerouteResult, 0, len(pingResponses))
 	for result := range resultChan {
 		results = append(results, result)
 	}
@@ -306,7 +306,8 @@ func TestCreateTraceroute_WithError(t *testing.T) {
 	resultChan := netceptor.CreateTraceroute(ctx, mockNetc, "target")
 
 	// Collect results
-	var results []*netceptor.TracerouteResult
+	numPings := 1
+	results := make([]*netceptor.TracerouteResult, 0, numPings)
 	for result := range resultChan {
 		results = append(results, result)
 	}
@@ -354,7 +355,8 @@ func TestCreateTraceroute_ContextCancelled(t *testing.T) {
 	resultChan := netceptor.CreateTraceroute(ctx, mockNetc, "target")
 
 	// Results channel should close due to context cancellation
-	var results []*netceptor.TracerouteResult
+	numPings := 1
+	results := make([]*netceptor.TracerouteResult, 0, numPings)
 	for result := range resultChan {
 		results = append(results, result)
 	}
@@ -390,7 +392,7 @@ func TestCreateTraceroute_MaxHopsReached(t *testing.T) {
 	resultChan := netceptor.CreateTraceroute(ctx, mockNetc, "target")
 
 	// Collect results
-	var results []*netceptor.TracerouteResult
+	results := make([]*netceptor.TracerouteResult, 0, maxHops+1)
 	for result := range resultChan {
 		results = append(results, result)
 	}

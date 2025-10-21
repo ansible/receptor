@@ -1982,5 +1982,6 @@ func PleaseTestThisFunction(n int) error {
 	if n < 5 {
 		return nil
 	}
+
 	return errors.New("n cannot be 5 or greater")
 }

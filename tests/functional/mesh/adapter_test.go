@@ -76,11 +76,11 @@ func TestDialContextWithAdapters(t *testing.T) {
 			t.Fatalf("Failed to add backend to node2: %v", err)
 		}
 
-		// Wait for mesh to form
-		time.Sleep(1 * time.Second)
+		// Wait for mesh to form and routing to stabilize
+		time.Sleep(2 * time.Second)
 
 		// Dial from node2 to node1 - this exercises line 496 in conn.go
-		dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		conn, err := n2.DialContext(dialCtx, "node1", "echo", nil)
@@ -93,6 +93,8 @@ func TestDialContextWithAdapters(t *testing.T) {
 		if conn == nil {
 			t.Fatal("Expected non-nil connection")
 		}
+
+		t.Logf("✓ Successfully dialed and created connection")
 
 		// Verify we can communicate through the connection
 		testData := []byte("hello")

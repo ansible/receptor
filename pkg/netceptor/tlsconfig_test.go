@@ -2,7 +2,11 @@ package netceptor
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/ansible/receptor/tests/utils"
@@ -311,5 +315,86 @@ func TestNodeIDWIthSkipReceptorNamesCheckTrue(t *testing.T) {
 	}
 	if err := serverCfg.Prepare(); err != nil {
 		t.Errorf("nodeId=%s; ReceptorName=foobar; this should have not failed", MainInstance.nodeID)
+	}
+}
+
+// TestReceptorVerifyFunc tests error conditions for ReceptorVerifyFunc.
+// Uses table-driven approach to test multiple scenarios without relying on exact error messages.
+func TestReceptorVerifyFunc(t *testing.T) {
+	MainInstance = New(context.Background(), "testnode")
+
+	tests := []struct {
+		name        string
+		setupFunc   func(t *testing.T) (tlscfg *tls.Config, rawCerts [][]byte, verifyType VerifyType)
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "missing certificate",
+			setupFunc: func(t *testing.T) (*tls.Config, [][]byte, VerifyType) {
+				return &tls.Config{}, [][]byte{}, VerifyServer
+			},
+			wantErr:     true,
+			errContains: "missing",
+		},
+		{
+			name: "invalid certificate data",
+			setupFunc: func(t *testing.T) (*tls.Config, [][]byte, VerifyType) {
+				return &tls.Config{}, [][]byte{[]byte("invalid")}, VerifyServer
+			},
+			wantErr:     true,
+			errContains: "parse",
+		},
+		{
+			name: "invalid verify type",
+			setupFunc: func(t *testing.T) (*tls.Config, [][]byte, VerifyType) {
+				caCert, tempCert, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "testnode")
+				t.Cleanup(func() { tearDown(t) })
+
+				caBytes, err := os.ReadFile(caCert)
+				if err != nil {
+					t.Fatalf("Failed to read CA cert: %v", err)
+				}
+
+				certPEMBytes, err := os.ReadFile(tempCert)
+				if err != nil {
+					t.Fatalf("Failed to read cert: %v", err)
+				}
+
+				block, _ := pem.Decode(certPEMBytes)
+				if block == nil {
+					t.Fatal("Failed to decode PEM certificate")
+				}
+
+				tlscfg := &tls.Config{RootCAs: x509.NewCertPool()}
+				tlscfg.RootCAs.AppendCertsFromPEM(caBytes)
+
+				return tlscfg, [][]byte{block.Bytes}, VerifyType(0)
+			},
+			wantErr:     true,
+			errContains: "verification type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tlscfg, rawCerts, verifyType := tt.setupFunc(t)
+			verifyFunc := ReceptorVerifyFunc(tlscfg, nil, "", ExpectedHostnameTypeDNS, verifyType, MainInstance.Logger)
+
+			err := verifyFunc(rawCerts, nil)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("%s: expected error, got nil", tt.name)
+
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.errContains)) {
+					t.Errorf("%s: error should contain %q, got %q", tt.name, tt.errContains, err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("%s: unexpected error: %v", tt.name, err)
+			}
+		})
 	}
 }

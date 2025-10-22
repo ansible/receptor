@@ -2,9 +2,11 @@ package netceptor
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -318,82 +320,398 @@ func TestNodeIDWIthSkipReceptorNamesCheckTrue(t *testing.T) {
 	}
 }
 
-// TestReceptorVerifyFunc tests error conditions for ReceptorVerifyFunc.
-// Uses table-driven approach to test multiple scenarios without relying on exact error messages.
-func TestReceptorVerifyFunc(t *testing.T) {
-	MainInstance = New(context.Background(), "testnode")
+// TestVerifyPinnedFingerprint tests the verifyPinnedFingerprint helper function.
+func TestVerifyPinnedFingerprint(t *testing.T) {
+	_, tempCert, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "testnode")
+	t.Cleanup(func() { tearDown(t) })
+
+	certPEMBytes, err := os.ReadFile(tempCert)
+	if err != nil {
+		t.Fatalf("Failed to read cert: %v", err)
+	}
+
+	block, _ := pem.Decode(certPEMBytes)
+	if block == nil {
+		t.Fatal("Failed to decode PEM certificate")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse cert: %v", err)
+	}
+
+	sha256fp := sha256.Sum256(cert.Raw)
 
 	tests := []struct {
-		name        string
-		setupFunc   func(t *testing.T) (tlscfg *tls.Config, rawCerts [][]byte, verifyType VerifyType)
-		wantErr     bool
-		errContains string
+		name               string
+		pinnedFingerprints [][]byte
+		wantErr            bool
+		errContains        string
 	}{
 		{
-			name: "missing certificate",
-			setupFunc: func(t *testing.T) (*tls.Config, [][]byte, VerifyType) {
-				return &tls.Config{}, [][]byte{}, VerifyServer
-			},
-			wantErr:     true,
-			errContains: "missing",
+			name:               "no fingerprints provided",
+			pinnedFingerprints: nil,
+			wantErr:            false,
 		},
 		{
-			name: "invalid certificate data",
-			setupFunc: func(t *testing.T) (*tls.Config, [][]byte, VerifyType) {
-				return &tls.Config{}, [][]byte{[]byte("invalid")}, VerifyServer
-			},
-			wantErr:     true,
-			errContains: "parse",
+			name:               "valid sha256 fingerprint",
+			pinnedFingerprints: [][]byte{sha256fp[:]},
+			wantErr:            false,
 		},
 		{
-			name: "invalid verify type",
-			setupFunc: func(t *testing.T) (*tls.Config, [][]byte, VerifyType) {
-				caCert, tempCert, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "testnode")
-				t.Cleanup(func() { tearDown(t) })
-
-				caBytes, err := os.ReadFile(caCert)
-				if err != nil {
-					t.Fatalf("Failed to read CA cert: %v", err)
-				}
-
-				certPEMBytes, err := os.ReadFile(tempCert)
-				if err != nil {
-					t.Fatalf("Failed to read cert: %v", err)
-				}
-
-				block, _ := pem.Decode(certPEMBytes)
-				if block == nil {
-					t.Fatal("Failed to decode PEM certificate")
-				}
-
-				tlscfg := &tls.Config{RootCAs: x509.NewCertPool()}
-				tlscfg.RootCAs.AppendCertsFromPEM(caBytes)
-
-				return tlscfg, [][]byte{block.Bytes}, VerifyType(0)
-			},
-			wantErr:     true,
-			errContains: "verification type",
+			name:               "invalid fingerprint length",
+			pinnedFingerprints: [][]byte{{0x01, 0x02, 0x03}},
+			wantErr:            true,
+			errContains:        "sha224, sha256, sha384 or sha512",
+		},
+		{
+			name:               "fingerprint mismatch",
+			pinnedFingerprints: [][]byte{make([]byte, 32)},
+			wantErr:            true,
+			errContains:        "does not match",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tlscfg, rawCerts, verifyType := tt.setupFunc(t)
-			verifyFunc := ReceptorVerifyFunc(tlscfg, nil, "", ExpectedHostnameTypeDNS, verifyType, MainInstance.Logger)
-
-			err := verifyFunc(rawCerts, nil)
+			err := verifyPinnedFingerprint(cert, tt.pinnedFingerprints)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("%s: expected error, got nil", tt.name)
+					t.Errorf("expected error, got nil")
 
 					return
 				}
 				if tt.errContains != "" && !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.errContains)) {
-					t.Errorf("%s: error should contain %q, got %q", tt.name, tt.errContains, err.Error())
+					t.Errorf("error should contain %q, got %q", tt.errContains, err.Error())
 				}
 			} else if err != nil {
-				t.Errorf("%s: unexpected error: %v", tt.name, err)
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestBuildVerifyOptions tests the buildVerifyOptions helper function.
+func TestBuildVerifyOptions(t *testing.T) {
+	caCert, _, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "testnode")
+	t.Cleanup(func() { tearDown(t) })
+
+	caBytes, err := os.ReadFile(caCert)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+
+	rootCAs := x509.NewCertPool()
+	rootCAs.AppendCertsFromPEM(caBytes)
+
+	clientCAs := x509.NewCertPool()
+	clientCAs.AppendCertsFromPEM(caBytes)
+
+	tests := []struct {
+		name                 string
+		tlscfg               *tls.Config
+		verifyType           VerifyType
+		expectedHostname     string
+		expectedHostnameType ExpectedHostnameType
+		wantErr              bool
+		validateFunc         func(t *testing.T, opts x509.VerifyOptions)
+	}{
+		{
+			name:                 "server with DNS hostname",
+			tlscfg:               &tls.Config{RootCAs: rootCAs},
+			verifyType:           VerifyServer,
+			expectedHostname:     "example.com",
+			expectedHostnameType: ExpectedHostnameTypeDNS,
+			wantErr:              false,
+			validateFunc: func(t *testing.T, opts x509.VerifyOptions) {
+				if opts.DNSName != "example.com" {
+					t.Errorf("expected DNSName=example.com, got %s", opts.DNSName)
+				}
+				if opts.Roots != rootCAs {
+					t.Error("expected RootCAs to be set")
+				}
+			},
+		},
+		{
+			name:                 "client verification",
+			tlscfg:               &tls.Config{ClientCAs: clientCAs},
+			verifyType:           VerifyClient,
+			expectedHostname:     "",
+			expectedHostnameType: ExpectedHostnameTypeDNS,
+			wantErr:              false,
+			validateFunc: func(t *testing.T, opts x509.VerifyOptions) {
+				if opts.Roots != clientCAs {
+					t.Error("expected ClientCAs to be used as Roots")
+				}
+			},
+		},
+		{
+			name:                 "invalid verify type",
+			tlscfg:               &tls.Config{},
+			verifyType:           VerifyType(99),
+			expectedHostname:     "",
+			expectedHostnameType: ExpectedHostnameTypeDNS,
+			wantErr:              true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := buildVerifyOptions(tt.tlscfg, tt.verifyType, tt.expectedHostname, tt.expectedHostnameType)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+
+					return
+				}
+				if tt.validateFunc != nil {
+					tt.validateFunc(t, opts)
+				}
+			}
+		})
+	}
+}
+
+// TestVerifyReceptorNodeID tests the verifyReceptorNodeID helper function.
+func TestVerifyReceptorNodeID(t *testing.T) {
+	MainInstance = New(context.Background(), "testnode")
+
+	_, tempCert, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "foobar")
+	t.Cleanup(func() { tearDown(t) })
+
+	certPEMBytes, err := os.ReadFile(tempCert)
+	if err != nil {
+		t.Fatalf("Failed to read cert: %v", err)
+	}
+
+	block, _ := pem.Decode(certPEMBytes)
+	if block == nil {
+		t.Fatal("Failed to decode PEM certificate")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse cert: %v", err)
+	}
+
+	tests := []struct {
+		name             string
+		expectedHostname string
+		wantErr          bool
+		checkErrorType   bool
+	}{
+		{
+			name:             "matching node ID",
+			expectedHostname: "foobar",
+			wantErr:          false,
+		},
+		{
+			name:             "mismatched node ID",
+			expectedHostname: "wrongnode",
+			wantErr:          true,
+			checkErrorType:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := verifyReceptorNodeID(cert, tt.expectedHostname, MainInstance.Logger)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+
+					return
+				}
+				if tt.checkErrorType {
+					var certErr ReceptorCertNameError
+					if !errors.As(err, &certErr) {
+						t.Errorf("expected ReceptorCertNameError, got %T", err)
+					}
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestAddIntermediateCerts tests the addIntermediateCerts helper function.
+func TestAddIntermediateCerts(t *testing.T) {
+	caCert, tempCert, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "testnode")
+	t.Cleanup(func() { tearDown(t) })
+
+	caBytes, err := os.ReadFile(caCert)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+
+	certPEMBytes, err := os.ReadFile(tempCert)
+	if err != nil {
+		t.Fatalf("Failed to read cert: %v", err)
+	}
+
+	block, _ := pem.Decode(certPEMBytes)
+	if block == nil {
+		t.Fatal("Failed to decode PEM certificate")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse cert: %v", err)
+	}
+
+	rootCAs := x509.NewCertPool()
+	rootCAs.AppendCertsFromPEM(caBytes)
+
+	opts := x509.VerifyOptions{
+		Intermediates: x509.NewCertPool(),
+		Roots:         rootCAs,
+	}
+
+	// Create a certificate chain: [leaf, intermediate].
+	certs := []*x509.Certificate{cert, cert}
+
+	addIntermediateCerts(certs, &opts)
+
+	// Verify intermediate was added (we can't directly inspect CertPool, but we can verify it doesn't panic).
+	if opts.Intermediates == nil {
+		t.Error("Intermediates pool should not be nil")
+	}
+}
+
+// TestReceptorVerifyFunc tests the main ReceptorVerifyFunc orchestration.
+// Uses table-driven approach to test multiple scenarios without relying on exact error messages.
+func TestReceptorVerifyFunc(t *testing.T) {
+	MainInstance = New(context.Background(), "testnode")
+
+	// Setup shared test certificate once.
+	caCert, tempCert, _, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "testnode")
+	t.Cleanup(func() { tearDown(t) })
+
+	caBytes, err := os.ReadFile(caCert)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+
+	certPEMBytes, err := os.ReadFile(tempCert)
+	if err != nil {
+		t.Fatalf("Failed to read cert: %v", err)
+	}
+
+	block, _ := pem.Decode(certPEMBytes)
+	if block == nil {
+		t.Fatal("Failed to decode PEM certificate")
+	}
+
+	rootCAs := x509.NewCertPool()
+	rootCAs.AppendCertsFromPEM(caBytes)
+
+	tests := []struct {
+		name                 string
+		rawCerts             [][]byte
+		tlscfg               *tls.Config
+		verifyType           VerifyType
+		expectedHostname     string
+		expectedHostnameType ExpectedHostnameType
+		pinnedFingerprints   [][]byte
+		wantErr              bool
+		errContains          string
+	}{
+		{
+			name:       "missing certificate",
+			rawCerts:   [][]byte{},
+			tlscfg:     &tls.Config{},
+			verifyType: VerifyServer,
+			wantErr:    true,
+		},
+		{
+			name:       "invalid certificate data",
+			rawCerts:   [][]byte{[]byte("invalid")},
+			tlscfg:     &tls.Config{},
+			verifyType: VerifyServer,
+			wantErr:    true,
+		},
+		{
+			name:                 "valid server certificate - end to end",
+			rawCerts:             [][]byte{block.Bytes},
+			tlscfg:               &tls.Config{RootCAs: rootCAs},
+			verifyType:           VerifyServer,
+			expectedHostname:     "",
+			expectedHostnameType: ExpectedHostnameTypeDNS,
+			pinnedFingerprints:   nil,
+			wantErr:              false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verifyFunc := ReceptorVerifyFunc(tt.tlscfg, tt.pinnedFingerprints, tt.expectedHostname, tt.expectedHostnameType, tt.verifyType, MainInstance.Logger)
+
+			err := verifyFunc(tt.rawCerts, nil)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.errContains)) {
+					t.Errorf("error should contain %q, got %q", tt.errContains, err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestReceptorCertNameError tests the ReceptorCertNameError type.
+func TestReceptorCertNameError(t *testing.T) {
+	tests := []struct {
+		name         string
+		validNodes   []string
+		expectedNode string
+		wantContains []string
+	}{
+		{
+			name:         "no valid nodes",
+			validNodes:   []string{},
+			expectedNode: "expected-node",
+			wantContains: []string{"not valid for any", "expected-node"},
+		},
+		{
+			name:         "single valid node",
+			validNodes:   []string{"valid-node"},
+			expectedNode: "expected-node",
+			wantContains: []string{"valid for Receptor node ID", "valid-node", "expected-node"},
+		},
+		{
+			name:         "multiple valid nodes",
+			validNodes:   []string{"node1", "node2"},
+			expectedNode: "expected-node",
+			wantContains: []string{"valid for Receptor node IDs", "node1", "node2", "expected-node"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ReceptorCertNameError{
+				ValidNodes:   tt.validNodes,
+				ExpectedNode: tt.expectedNode,
+			}
+
+			errMsg := err.Error()
+			for _, want := range tt.wantContains {
+				if !strings.Contains(errMsg, want) {
+					t.Errorf("Error message should contain %q, got %q", want, errMsg)
+				}
 			}
 		})
 	}

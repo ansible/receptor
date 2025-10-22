@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -56,13 +57,17 @@ func checkCertificatesMatchNodeID(certbytes []byte, n *Netceptor, certName strin
 		return err
 	}
 
-	found, receptorNames, err := utils.ParseReceptorNamesFromCert(parsedCert, n.nodeID, n.Logger)
+	// Use the extracted helper for validation.
+	err = verifyReceptorNodeID(parsedCert, n.nodeID, n.Logger)
 	if err != nil {
-		return err
-	}
+		// Add startup-specific context to the error.
+		var certErr ReceptorCertNameError
+		if errors.As(err, &certErr) {
+			return fmt.Errorf("nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s",
+				n.nodeID, fmt.Sprint(certErr.ValidNodes), certName, certPath)
+		}
 
-	if !found {
-		return fmt.Errorf("nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s", n.nodeID, fmt.Sprint(receptorNames), certName, certPath)
+		return err
 	}
 
 	return nil
@@ -285,132 +290,181 @@ const (
 	ExpectedHostnameTypeReceptor = 2
 )
 
+// verifyPinnedFingerprint checks if a certificate matches any of the provided pinned fingerprints.
+// Returns nil if fingerprints match or if no fingerprints are provided.
+func verifyPinnedFingerprint(cert *x509.Certificate, pinnedFingerprints [][]byte) error {
+	if len(pinnedFingerprints) == 0 {
+		return nil
+	}
+
+	var sha224sum []byte
+	var sha256sum []byte
+	var sha384sum []byte
+	var sha512sum []byte
+	fingerprintOK := false
+
+	for _, fing := range pinnedFingerprints {
+		fingLenFound := false
+		for _, s := range []struct {
+			len     int
+			sum     *[]byte
+			sumFunc func(data []byte) []byte
+		}{
+			{28, &sha224sum, func(data []byte) []byte {
+				sum := sha256.Sum224(data)
+
+				return sum[:]
+			}},
+			{32, &sha256sum, func(data []byte) []byte {
+				sum := sha256.Sum256(data)
+
+				return sum[:]
+			}},
+			{48, &sha384sum, func(data []byte) []byte {
+				sum := sha512.Sum384(data)
+
+				return sum[:]
+			}},
+			{64, &sha512sum, func(data []byte) []byte {
+				sum := sha512.Sum512(data)
+
+				return sum[:]
+			}},
+		} {
+			if len(fing) == s.len {
+				fingLenFound = true
+				if *s.sum == nil {
+					*s.sum = s.sumFunc(cert.Raw)
+				}
+				if bytes.Equal(fing, *s.sum) {
+					fingerprintOK = true
+
+					break
+				}
+			}
+		}
+		if !fingLenFound {
+			return fmt.Errorf("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
+		}
+	}
+
+	if !fingerprintOK {
+		return fmt.Errorf("RVF failed: presented certificate does not match any pinned fingerprint")
+	}
+
+	return nil
+}
+
+// buildVerifyOptions creates x509.VerifyOptions based on the verification type and hostname.
+func buildVerifyOptions(tlscfg *tls.Config, verifyType VerifyType, expectedHostname string, expectedHostnameType ExpectedHostnameType) (x509.VerifyOptions, error) {
+	var opts x509.VerifyOptions
+
+	switch verifyType {
+	case VerifyServer:
+		opts = x509.VerifyOptions{
+			Intermediates: x509.NewCertPool(),
+			Roots:         tlscfg.RootCAs,
+			CurrentTime:   time.Now(),
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		}
+		if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
+			opts.DNSName = expectedHostname
+		}
+	case VerifyClient:
+		opts = x509.VerifyOptions{
+			Intermediates: x509.NewCertPool(),
+			Roots:         tlscfg.ClientCAs,
+			CurrentTime:   time.Now(),
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
+			opts.DNSName = expectedHostname
+		}
+	default:
+		return opts, fmt.Errorf("RVF failed: invalid verification type: must be client or server")
+	}
+
+	return opts, nil
+}
+
+// addIntermediateCerts adds intermediate certificates from the peer's chain to the verify options.
+// This is where certificate deduplication will be implemented in a future change.
+func addIntermediateCerts(certs []*x509.Certificate, opts *x509.VerifyOptions) {
+	for _, cert := range certs[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+}
+
+// verifyReceptorNodeID validates that a certificate contains the expected Receptor node ID.
+func verifyReceptorNodeID(cert *x509.Certificate, expectedHostname string, logger *logger.ReceptorLogger) error {
+	found, receptorNames, err := utils.ParseReceptorNamesFromCert(cert, expectedHostname, logger)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedHostname}
+	}
+
+	return nil
+}
+
 // ReceptorVerifyFunc generates a function that verifies a Receptor node ID.
 func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expectedHostname string,
 	expectedHostnameType ExpectedHostnameType, verifyType VerifyType, logger *logger.ReceptorLogger,
 ) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		// Validate certificates are provided.
 		if len(rawCerts) == 0 {
 			logger.Error("RVF failed: peer certificate missing")
 
 			return fmt.Errorf("RVF failed: peer certificate missing")
 		}
+
+		// Parse raw certificates.
 		certs := make([]*x509.Certificate, len(rawCerts))
 		for i, asn1Data := range rawCerts {
 			cert, err := x509.ParseCertificate(asn1Data)
 			if err != nil {
 				logger.Error("RVF failed to parse: %s", err)
 
-				return fmt.Errorf("failed to parse certificate from server: " + err.Error()) //nolint:govet
+				return fmt.Errorf("failed to parse certificate from server: %w", err)
 			}
 			certs[i] = cert
 		}
-		var opts x509.VerifyOptions
-		switch verifyType {
-		case VerifyServer:
-			opts = x509.VerifyOptions{
-				Intermediates: x509.NewCertPool(),
-				Roots:         tlscfg.RootCAs,
-				CurrentTime:   time.Now(),
-				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-			}
-			if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
-				opts.DNSName = expectedHostname
-			}
-		case VerifyClient:
-			opts = x509.VerifyOptions{
-				Intermediates: x509.NewCertPool(),
-				Roots:         tlscfg.ClientCAs,
-				CurrentTime:   time.Now(),
-				KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-			}
-			if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
-				opts.DNSName = expectedHostname
-			}
-		default:
-			logger.Error("RVF failed: invalid verification type: must be client or server")
 
-			return fmt.Errorf("RVF failed: invalid verification type: must be client or server")
+		// Check pinned fingerprints if provided.
+		if err := verifyPinnedFingerprint(certs[0], pinnedFingerprints); err != nil {
+			logger.Error("%s", err)
+
+			return err
 		}
 
-		if len(pinnedFingerprints) > 0 {
-			var sha224sum []byte
-			var sha256sum []byte
-			var sha384sum []byte
-			var sha512sum []byte
-			fingerprintOK := false
-			for _, fing := range pinnedFingerprints {
-				fingLenFound := false
-				for _, s := range []struct {
-					len     int
-					sum     *[]byte
-					sumFunc func(data []byte) []byte
-				}{
-					{28, &sha224sum, func(data []byte) []byte {
-						sum := sha256.Sum224(data)
+		// Build verification options.
+		opts, err := buildVerifyOptions(tlscfg, verifyType, expectedHostname, expectedHostnameType)
+		if err != nil {
+			logger.Error("%s", err)
 
-						return sum[:]
-					}},
-					{32, &sha256sum, func(data []byte) []byte {
-						sum := sha256.Sum256(data)
-
-						return sum[:]
-					}},
-					{48, &sha384sum, func(data []byte) []byte {
-						sum := sha512.Sum384(data)
-
-						return sum[:]
-					}},
-					{64, &sha512sum, func(data []byte) []byte {
-						sum := sha512.Sum512(data)
-
-						return sum[:]
-					}},
-				} {
-					if len(fing) == s.len {
-						fingLenFound = true
-						if *s.sum == nil {
-							*s.sum = s.sumFunc(certs[0].Raw)
-						}
-						if bytes.Equal(fing, *s.sum) {
-							fingerprintOK = true
-
-							break
-						}
-					}
-				}
-				if !fingLenFound {
-					logger.Error("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
-
-					return fmt.Errorf("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
-				}
-			}
-			if !fingerprintOK {
-				logger.Error("RVF failed: presented certificate does not match any pinned fingerprint")
-
-				return fmt.Errorf("RVF failed: presented certificate does not match any pinned fingerprint")
-			}
+			return err
 		}
 
-		for _, cert := range certs[1:] {
-			opts.Intermediates.AddCert(cert)
-		}
-		_, err := certs[0].Verify(opts)
+		// Add intermediate certificates to the verification options.
+		addIntermediateCerts(certs, &opts)
+
+		// Verify the certificate chain.
+		_, err = certs[0].Verify(opts)
 		if err != nil {
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
 
 			return err
 		}
 
+		// Verify Receptor node ID if required.
 		if expectedHostnameType == ExpectedHostnameTypeReceptor {
-			found, receptorNames, err := utils.ParseReceptorNamesFromCert(certs[0], expectedHostname, logger)
-			if err != nil {
-				return err
-			}
-			if !found {
-				logger.Error("RVF ReceptorNameError: expected %s but found %s", expectedHostname, strings.Join(receptorNames, ", "))
+			if err := verifyReceptorNodeID(certs[0], expectedHostname, logger); err != nil {
+				logger.Error("%s", err)
 
-				return ReceptorCertNameError{ValidNodes: receptorNames, ExpectedNode: expectedHostname}
+				return err
 			}
 		}
 

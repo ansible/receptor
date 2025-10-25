@@ -544,21 +544,20 @@ mainLoop:
 							WorkerContainerName,
 							containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
 						*stdoutErr = fmt.Errorf("pod %s/%s execution interrupted: reason=%s, exit=%d, msg=%s",
-              podNamespace,
-              podName,
-              reason,
-              containerState.Terminated.ExitCode,
-              containerState.Terminated.Message)
+							podNamespace,
+							podName,
+							reason,
+							containerState.Terminated.ExitCode,
+							containerState.Terminated.Message)
 					}
 
 					// Log completion (whether success or error)
 					kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s terminated with reason=%s, exit=%d",
-							podNamespace,
-							podName,
-							WorkerContainerName,
-							reason,
-							containerState.Terminated.ExitCode)
-
+						podNamespace,
+						podName,
+						WorkerContainerName,
+						reason,
+						containerState.Terminated.ExitCode)
 
 					// We need to check if last line has data
 					if line != "" {

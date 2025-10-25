@@ -964,6 +964,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1035,6 +1036,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1189,6 +1191,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1287,7 +1290,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker has terminated with exit code 1 (treated as success)",
+				"Test_Namespace/Test_Name: worker terminated with reason=Error, exit=1",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -1966,6 +1969,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -2082,6 +2086,7 @@ func TestRetryGetLogStreamResetValidation(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -2276,6 +2281,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},

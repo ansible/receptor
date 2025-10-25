@@ -533,25 +533,32 @@ mainLoop:
 
 					return
 				case containerState.Terminated != nil:
-					// We got EOF and the pod terminated, we will log the terminated information
-					// Exit code 1 is treated as successful completion for playbooks
-					if containerState.Terminated.ExitCode != 0 && containerState.Terminated.ExitCode != 1 {
+					reason := containerState.Terminated.Reason
+
+					// Whitelist: "Completed" and "Error" mean the program ran to completion
+					// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
+					if reason != "Completed" && reason != "Error" {
 						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v",
 							podNamespace,
 							podName,
 							WorkerContainerName,
 							containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
-						*stdoutErr = fmt.Errorf("pod %s/%s terminated with exit code %d: %s",
-							podNamespace,
-							podName,
-							containerState.Terminated.ExitCode,
-							containerState.Terminated.Message)
-					} else if containerState.Terminated.ExitCode == 1 {
-						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s has terminated with exit code 1 (treated as success)",
-							podNamespace,
-							podName,
-							WorkerContainerName)
+						*stdoutErr = fmt.Errorf("pod %s/%s execution interrupted: reason=%s, exit=%d, msg=%s",
+              podNamespace,
+              podName,
+              reason,
+              containerState.Terminated.ExitCode,
+              containerState.Terminated.Message)
 					}
+
+					// Log completion (whether success or error)
+					kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s terminated with reason=%s, exit=%d",
+							podNamespace,
+							podName,
+							WorkerContainerName,
+							reason,
+							containerState.Terminated.ExitCode)
+
 
 					// We need to check if last line has data
 					if line != "" {

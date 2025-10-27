@@ -320,12 +320,12 @@ func TestListenerAddr(t *testing.T) {
 
 			mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
 			mockNetC := &netceptor.Netceptor{}
-			ql := &quic.Listener{}
+			mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 			doneChan := make(chan struct{})
 			acceptChan := make(chan *netceptor.AcceptResult)
 			syncOnce := &sync.Once{}
 
-			listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+			listener := netceptor.NewListener(mockNetC, mockPacketConner, mockQL, acceptChan, doneChan, syncOnce)
 
 			tt.setupMock(mockPacketConner)
 
@@ -387,12 +387,14 @@ func TestListenerAccept(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Common listener setup moved outside the table
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 			mockNetC := &netceptor.Netceptor{}
-			ql := &quic.Listener{}
+			mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 			doneChan := make(chan struct{})
 			acceptChan := make(chan *netceptor.AcceptResult)
 			syncOnce := &sync.Once{}
-			listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+			listener := netceptor.NewListener(mockNetC, nil, mockQL, acceptChan, doneChan, syncOnce)
 
 			tt.setupAction(listener)
 
@@ -467,13 +469,15 @@ func TestListenerAcceptEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 			mockNetC := &netceptor.Netceptor{}
-			ql := &quic.Listener{}
+			mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 			doneChan := make(chan struct{})
 			acceptChan := make(chan *netceptor.AcceptResult, 2)
 			syncOnce := &sync.Once{}
 
-			listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+			listener := netceptor.NewListener(mockNetC, nil, mockQL, acceptChan, doneChan, syncOnce)
 
 			tt.setupAction(listener)
 
@@ -534,13 +538,13 @@ func TestListenerAcceptWithContextCancellation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
 	mockNetC := &netceptor.Netceptor{}
-	ql := &quic.Listener{}
+	mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 
 	t.Run("accept blocks and then receives done signal", func(t *testing.T) {
 		doneChan := make(chan struct{})
 		acceptChan := make(chan *netceptor.AcceptResult)
 		syncOnce := &sync.Once{}
-		listener := netceptor.NewListener(mockNetC, mockPacketConner, ql, acceptChan, doneChan, syncOnce)
+		listener := netceptor.NewListener(mockNetC, mockPacketConner, mockQL, acceptChan, doneChan, syncOnce)
 		resultChan := make(chan error, 1)
 		expectErrMsg := "listener done channel closed"
 
@@ -1059,13 +1063,14 @@ func TestAcceptLoopWithMocks(t *testing.T) {
 
 func TestListenerSendResult(t *testing.T) {
 	createListener := func() (*netceptor.Listener, chan *netceptor.AcceptResult) {
+		ctrl := gomock.NewController(t)
 		mockNetC := &netceptor.Netceptor{}
-		ql := &quic.Listener{}
+		mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 		doneChan := make(chan struct{})
 		acceptChan := make(chan *netceptor.AcceptResult, 1)
 		syncOnce := &sync.Once{}
 
-		return netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce), acceptChan
+		return netceptor.NewListener(mockNetC, nil, mockQL, acceptChan, doneChan, syncOnce), acceptChan
 	}
 
 	t.Run("successful send to AcceptChan", func(t *testing.T) {
@@ -1157,13 +1162,15 @@ func TestListenerSendResult(t *testing.T) {
 	})
 
 	t.Run("context cancelled during send - should be interrupted - sends nil conn and err", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 		mockNetC := &netceptor.Netceptor{}
-		ql := &quic.Listener{}
+		mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 		doneChan := make(chan struct{})
 		acceptChan := make(chan *netceptor.AcceptResult) // Unbuffered to block send
 		syncOnce := &sync.Once{}
 
-		listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+		listener := netceptor.NewListener(mockNetC, nil, mockQL, acceptChan, doneChan, syncOnce)
 		cancelCtx, cancel := context.WithCancel(context.Background())
 
 		// Start SendResult in a goroutine
@@ -1200,13 +1207,15 @@ func TestListenerSendResult(t *testing.T) {
 	})
 
 	t.Run("concurrent SendResult calls", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 		mockNetC := &netceptor.Netceptor{}
-		ql := &quic.Listener{}
+		mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
 		doneChan := make(chan struct{})
 		acceptChan := make(chan *netceptor.AcceptResult, 10) // Large buffer for concurrent sends
 		syncOnce := &sync.Once{}
 
-		listener := netceptor.NewListener(mockNetC, nil, ql, acceptChan, doneChan, syncOnce)
+		listener := netceptor.NewListener(mockNetC, nil, mockQL, acceptChan, doneChan, syncOnce)
 		ctx := context.Background()
 
 		const numGoroutines = 5

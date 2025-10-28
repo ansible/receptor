@@ -626,3 +626,33 @@ Look for these log patterns:
 # "Running: PID"
 # "Streaming results for work unit"
 This walkthrough allows developers to trace the complete execution path from CLI input to command execution and result output.
+
+
+### Related Documentation
+
+- [AWX to Receptor Integration Flow](awx_receptor_integration.md) - Complete walkthrough of how AWX uses Receptor for job execution
+- [AWX Job Execution Walkthrough](https://gist.github.com/fosterseth/f0966ac6e214099ce28be5b154fd8f5b) - Detailed AWX-side flow from API to ansible-playbook
+
+### Official Receptor Documentation
+
+- [Receptor GitHub Repository](https://github.com/ansible/receptor) - Source code and development information
+- [Receptor Documentation](https://receptor.readthedocs.io/) - Official documentation for Receptor
+- [Receptor User Guide](https://receptor.readthedocs.io/en/latest/user_guide/) - Usage and configuration guides
+
+### Ansible Automation Platform Documentation
+
+- [Ansible Automation Platform - Receptor Overview](https://docs.ansible.com/automation-controller/latest/html/administration/receptor.html) - Receptor in Automation Controller context
+- [Ansible Automation Platform - Mesh Topology](https://docs.ansible.com/automation-controller/latest/html/administration/topology.html) - Understanding mesh networking with Receptor
+- [Ansible Automation Platform Installation Guide](https://docs.ansible.com/automation-controller/latest/html/installerguide/index.html) - Installation and setup
+
+### Technical Resources
+
+- [Receptor Work System](https://receptor.readthedocs.io/en/latest/user_guide/workceptor.html) - Detailed work submission documentation
+- [Receptor Control Service](https://receptor.readthedocs.io/en/latest/user_guide/controlsvc.html) - Control service API reference
+- [ReceptorCtl Command Reference](https://receptor.readthedocs.io/en/latest/receptorctl/) - Command-line tool documentation
+
+### Community and Support
+
+- [Ansible Community Forum](https://forum.ansible.com/) - Community discussions and support
+- [Receptor Issues](https://github.com/ansible/receptor/issues) - Bug reports and feature requests
+- [Ansible AWX Project](https://github.com/ansible/awx) - Related project that uses Receptor

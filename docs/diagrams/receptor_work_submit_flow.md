@@ -3,7 +3,23 @@
 Based on the command: `receptorctl --socket /tmp/control.sock work submit --node execution cat -l hello -f`
 
 This document provides a technical analysis of how Receptor executes work submissions. Receptor is a distributed mesh networking system used by Ansible Automation Platform (AAP) to execute tasks across multiple nodes. When you submit work (like running a command) to a remote execution node, this flow shows how it passes through 4 architectural layers (Python CLI → Control Service → Work Service → Command Worker) from submission to execution and results retrieval.
+## Table of Contents
 
+- [Command Breakdown](#command-breakdown)
+- [Flow Diagrams](#flow-diagrams)
+  - [Diagram 1: Work Submission Flow](#diagram-1-work-submission-flow)
+  - [Diagram 2: Work Results Retrieval Flow](#diagram-2-work-results-retrieval-flow)
+- [Key Components](#key-components)
+- [Work States](#work-states)
+- [Configuration](#configuration)
+- [Developer Debugging Walkthrough](#developer-debugging-walkthrough)
+  - [Prerequisites](#prerequisites)
+  - [Breakpoint Locations](#breakpoint-locations)
+    - [Diagram 1: Work Submission Flow Breakpoints](#diagram-1-work-submission-flow-breakpoints)
+    - [Diagram 2: Work Results Retrieval Flow Breakpoints](#diagram-2-work-results-retrieval-flow-breakpoints)
+  - [Debugging Steps with VSCode](#debugging-steps-with-vscode)
+  - [Key Variables to Watch](#key-variables-to-watch)
+  - [Log Analysis](#log-analysis)
 ## Command Breakdown
 
 - `--socket /tmp/control.sock`: Connect to receptor control service via Unix socket

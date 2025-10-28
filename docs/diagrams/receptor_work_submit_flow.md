@@ -2,7 +2,7 @@
 
 Based on the command: `receptorctl --socket /tmp/control.sock work submit --node execution cat -l hello -f`
 
-This document contains a detailed mermaid diagram showing what happens when this command is executed.
+This document provides a technical analysis of how Receptor executes work submissions. Receptor is a distributed mesh networking system used by Ansible Automation Platform (AAP) to execute tasks across multiple nodes. When you submit work (like running a command) to a remote execution node, this flow shows how it passes through 4 architectural layers (Python CLI → Control Service → Work Service → Command Worker) from submission to execution and results retrieval.
 
 ## Command Breakdown
 

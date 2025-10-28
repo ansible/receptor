@@ -96,7 +96,7 @@ type TLSServerConfig struct {
 	ClientCAs              string   `required:"false" description:"Filename of CA bundle to verify client certs with"`
 	PinnedClientCert       []string `required:"false" description:"Pinned fingerprint of required client certificate"`
 	SkipReceptorNamesCheck bool     `required:"false" description:"Skip verifying ReceptorNames OIDs in certificate at startup" default:"false"`
-	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"false"`
+	MinTLS13               bool     `required:"false" description:"Set minimum TLS version to 1.3. Otherwise the minimum is 1.2" default:"true"`
 }
 
 func (cfg TLSServerConfig) PrepareTLSServerConfig(n *Netceptor) (*tls.Config, error) {

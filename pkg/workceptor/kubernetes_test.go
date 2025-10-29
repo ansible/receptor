@@ -1290,7 +1290,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker terminated with reason=Error, exit=1",
+				"Test_Namespace/Test_Name: worker completed with error, exit code: 1, terminated reason: Error, terminated message: Container failed with error",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -1395,7 +1395,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker terminated with reason=OOMKilled, exit=137",
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 137, terminated reason: OOMKilled and terminated message: Container exceeded memory limit",
 			},
 		},
 		{
@@ -1448,8 +1448,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker has terminated, with nonzero exit code: 2",
-				"Test_Namespace/Test_Name: worker terminated with reason=Unknown, exit=2",
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 2, terminated reason: Unknown and terminated message: Unknown termination reason",
 			},
 		},
 		{
@@ -1502,7 +1501,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker terminated with reason=Evicted, exit=1",
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 1, terminated reason: Evicted and terminated message: Pod was evicted due to node pressure",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code

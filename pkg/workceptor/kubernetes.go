@@ -535,7 +535,13 @@ mainLoop:
 					return
 				case containerState.Terminated != nil:
 
-					if containerState.Terminated.ExitCode != 0 {
+					if containerState.Terminated.ExitCode == 0 {
+						// Log successful completion
+						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed successfully",
+							podNamespace,
+							podName,
+							WorkerContainerName)
+					} else {
 						reason := containerState.Terminated.Reason
 						// Whitelist: "Completed" and "Error" mean the program ran to completion
 						// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
@@ -565,12 +571,6 @@ mainLoop:
 								reason,
 								containerState.Terminated.Message)
 						}
-					} else {
-						// Log successful completion
-						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed successfully",
-							podNamespace,
-							podName,
-							WorkerContainerName)
 					}
 
 					// We need to check if last line has data

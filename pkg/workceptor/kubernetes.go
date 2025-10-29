@@ -539,6 +539,7 @@ mainLoop:
 						reason := containerState.Terminated.Reason
 						// Whitelist: "Completed" and "Error" mean the program ran to completion
 						// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
+						// Note: Reason field is not strictly defined in K8s API, these are observed conventions
 						allowedReasons := []string{"Completed", "Error"}
 						if !slices.Contains(allowedReasons, reason) {
 							kw.GetWorkceptor().nc.GetLogger().Warning("%s/%s: %s execution was interrupted, exit code: %d, terminated reason: %s and terminated message: %s",

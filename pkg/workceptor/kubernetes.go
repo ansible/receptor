@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -538,7 +539,8 @@ mainLoop:
 						reason := containerState.Terminated.Reason
 						// Whitelist: "Completed" and "Error" mean the program ran to completion
 						// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
-						if reason != "Completed" && reason != "Error" {
+						allowedReasons := []string{"Completed", "Error"}
+						if !slices.Contains(allowedReasons, reason) {
 							kw.GetWorkceptor().nc.GetLogger().Warning("%s/%s: %s execution was interrupted, exit code: %d, terminated reason: %s and terminated message: %s",
 								podNamespace,
 								podName,

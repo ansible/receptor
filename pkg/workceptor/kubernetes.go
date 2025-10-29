@@ -533,7 +533,7 @@ mainLoop:
 
 					return
 				case containerState.Terminated != nil:
-					
+
 					if containerState.Terminated.ExitCode != 0 {
 						reason := containerState.Terminated.Reason
 						// Whitelist: "Completed" and "Error" mean the program ran to completion
@@ -569,7 +569,6 @@ mainLoop:
 							podName,
 							WorkerContainerName)
 					}
-
 
 					// We need to check if last line has data
 					if line != "" {

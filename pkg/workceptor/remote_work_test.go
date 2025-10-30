@@ -6,24 +6,113 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
 	"go.uber.org/mock/gomock"
 )
 
-func createRemoteWorkTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor) {
+// createRemoteWorkNetworkSetup creates a mock network Conn for testing remote work operations.
+// It takes a list of messages to be sent to the mock Conn and sets up the mock netceptor and base work unit expectations.
+func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx context.Context, messages []string, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, tmpDir string, remoteExtraData *workceptor.RemoteExtraData, anytimes bool) {
+	t.Helper()
+
+	// Create a mock Conn using the mock interfaces
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockQuicConnection := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+	messageIndex := 0
+	// Set up reads to return different messages based on the provided list
+	readExpectation := mockQuicStream.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if messageIndex < len(messages) {
+			msg := messages[messageIndex]
+			messageIndex++
+			copy(b, msg)
+
+			return len(msg), nil
+		} else {
+			return 0, ctx.Err()
+		}
+	})
+	if anytimes {
+		readExpectation.AnyTimes()
+	} else {
+		readExpectation.Times(len(messages))
+	}
+	mockQuicStream.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
+	mockQuicStream.EXPECT().Close().Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetReadDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
+
+	var cancelFunc context.CancelFunc = func() {}
+	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
+	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
+	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+	mockQuicConnection.EXPECT().LocalAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+
+	mockConn := netceptor.NewConn(
+		netceptor.New(ctx, "test-node"), // s: *Netceptor
+		mockPacketConner,                // pc: PacketConner
+		mockQuicConnection,              // qc: QuicConnectionForConn
+		mockQuicStream,                  // qs: QuicStreamForConn
+		make(chan struct{}),             // doneChan
+		&sync.Once{},                    // doneOnce
+		ctx,                             // ctx
+	)
+
+	// Set up mock netceptor expectations
+	mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockConn, nil).AnyTimes()
+
+	// Set up common mock base work unit expectations
+	mockBaseWorkUnit.EXPECT().Load().Return(nil).AnyTimes()
+	mockBaseWorkUnit.EXPECT().StdoutFileName().Return(filepath.Join(tmpDir, "stdout")).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UnitDir().Return(tmpDir).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+		updateFunc.(func(*workceptor.StatusFileData))(&workceptor.StatusFileData{
+			ExtraData: remoteExtraData,
+		})
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().LastUpdateError().Return(nil).AnyTimes()
+
+	// Create temporary directory and stdin file
+	_ = os.MkdirAll(tmpDir, 0o755)
+	stdinFile, err := os.Create(filepath.Join(tmpDir, "stdin"))
+	if err != nil {
+		t.Errorf("Error creating temporary file: %v", err)
+	} else {
+		stdinFile.Close()
+		t.Cleanup(func() {
+			os.Remove(filepath.Join(tmpDir, "stdin"))
+		})
+	}
+}
+
+// createRemoteWorkTestSetup creates the basic setup for remote work unit tests.
+func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, *gomock.Controller) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
-	ctx := context.Background()
 
 	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNetceptor.EXPECT().NodeID().Return("NodeID")
-	mockNetceptor.EXPECT().GetLogger()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
 
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
 	if err != nil {
@@ -34,12 +123,13 @@ func createRemoteWorkTestSetup(t *testing.T) (workceptor.WorkUnit, *mock_workcep
 	mockBaseWorkUnit.EXPECT().SetStatusExtraData(gomock.Any())
 	workUnit := workceptor.NewRemoteWorker(mockBaseWorkUnit, w, "", "")
 
-	return workUnit, mockBaseWorkUnit, mockNetceptor, w
+	return workUnit, mockBaseWorkUnit, mockNetceptor, w, ctrl
 }
 
 func TestRemoteWorkUnredactedStatus(t *testing.T) {
 	t.Parallel()
-	wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
+	ctx := context.Background()
+	wu, mockBaseWorkUnit, _, _, _ := createRemoteWorkTestSetup(t, ctx) //nolint:dogsled
 	restartTestCases := []struct {
 		name string
 	}{
@@ -52,7 +142,9 @@ func TestRemoteWorkUnredactedStatus(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			})
 			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
 				ExtraData: &workceptor.RemoteExtraData{},
 			})
@@ -63,7 +155,8 @@ func TestRemoteWorkUnredactedStatus(t *testing.T) {
 
 func TestRemoteWorkSetFromParams(t *testing.T) {
 	t.Parallel()
-	wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
+	ctx := context.Background()
+	wu, mockBaseWorkUnit, _, _, _ := createRemoteWorkTestSetup(t, ctx) //nolint:dogsled
 
 	params := map[string]string{
 		"param1": "value1",
@@ -126,11 +219,14 @@ func TestRemoteWorkStatusRedaction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
+			ctx := context.Background()
+			wu, mockBaseWorkUnit, _, _, _ := createRemoteWorkTestSetup(t, ctx)
 
 			statusLock := &sync.RWMutex{}
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			})
 			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
 				ExtraData: &workceptor.RemoteExtraData{
 					RemoteParams: tt.remoteParams,
@@ -171,38 +267,8 @@ func TestRemoteWorkStatusRedaction(t *testing.T) {
 	}
 }
 
-func TestRemoteWorkConnectToRemoteMissingExtraData(t *testing.T) {
-	t.Parallel()
-	wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
-
-	statusLock := &sync.RWMutex{}
-	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-		ExtraData: "invalid", // Wrong type
-	}).AnyTimes()
-
-	ctx := context.Background()
-
-	// Test connection with missing extra data
-	if rw, ok := wu.(interface {
-		ConnectToRemote(context.Context) (net.Conn, *bufio.Reader, error)
-	}); ok {
-		_, _, err := rw.ConnectToRemote(ctx)
-		if err == nil {
-			t.Error("Expected error for missing extra data")
-		}
-		if !strings.Contains(err.Error(), "remote ExtraData missing") {
-			t.Errorf("Expected 'remote ExtraData missing' error, got: %v", err)
-		}
-	} else {
-		t.Error("WorkUnit doesn't implement ConnectToRemote method")
-	}
-}
-
 func TestRemoteWorkLifecycleOperations(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
 		name          string
 		operation     string
@@ -211,74 +277,178 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:          "start already started",
+			name:      "start_not_started",
+			operation: "start",
+		},
+		{
+			name:          "start_already_started",
 			operation:     "start",
 			remoteStarted: true,
 			expectError:   true,
 			errorContains: "unit was already started",
 		},
 		{
-			name:          "restart not started",
+			name:          "restart_not_started",
 			operation:     "restart",
-			remoteStarted: false,
 			expectError:   true,
 			errorContains: "remote work had not previously started",
 		},
 		{
-			name:        "cancel not started",
-			operation:   "cancel",
-			expectError: false,
+			name:          "restart_already_started",
+			operation:     "restart",
+			remoteStarted: true,
+			expectError:   false,
 		},
 		{
-			name:        "release not started",
-			operation:   "release",
-			expectError: false,
+			name:          "restart_local_released",
+			operation:     "restart",
+			expectError:   true,
+			errorContains: "remote work had not previously started",
+		},
+		{
+			name:          "restart_unknown_work_unit",
+			operation:     "restart",
+			remoteStarted: true,
+			expectError:   false, // No error expected because the error is handled via the status file
+		},
+		{
+			name:      "cancel_not_started",
+			operation: "cancel",
+		},
+		{
+			name:          "cancel_already_started",
+			operation:     "cancel",
+			remoteStarted: true,
+		},
+		{
+			name:      "release_not_started",
+			operation: "release",
+		},
+		{
+			name:          "release_already_started",
+			operation:     "release",
+			remoteStarted: true,
+		},
+		{
+			name:          "force_release_already_started",
+			operation:     "release",
+			remoteStarted: true,
+			expectError:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Each test creates its own cancellable context to stop goroutines
+			// Each test creates its own gomock Controller instance
+
 			t.Parallel()
-			wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
+			contextWithCancel, cancel := context.WithCancel(context.Background())
+			wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, contextWithCancel)
+
+			t.Cleanup(func() {
+				cancel() // Signal goroutines to stop
+				// Wait for goroutines to finish
+				time.Sleep(200 * time.Millisecond)
+			})
 
 			remoteExtraData := &workceptor.RemoteExtraData{
 				RemoteStarted: tt.remoteStarted,
+				RemoteNode:    "execution",
 				RemoteParams:  make(map[string]string),
 			}
 
 			statusLock := &sync.RWMutex{}
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
 			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
 				ExtraData: remoteExtraData,
 			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 
 			if tt.operation == "cancel" || tt.operation == "release" {
-				if !tt.remoteStarted {
-					mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
-						updateFunc.(func(*workceptor.StatusFileData))(&workceptor.StatusFileData{
-							ExtraData: remoteExtraData,
-						})
+				mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+					updateFunc.(func(*workceptor.StatusFileData))(&workceptor.StatusFileData{
+						ExtraData: remoteExtraData,
 					})
-					if tt.operation == "cancel" {
-						mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, "Locally Cancelled", int64(0))
-					} else {
-						mockBaseWorkUnit.EXPECT().Release(true).Return(nil)
-					}
-				}
+				})
 			}
 
+			// Use test case name for temp directory
+			tmpDir := filepath.Join("/tmp", tt.name)
+
 			var err error
-			switch tt.operation {
-			case "start":
+			switch tt.name {
+			case "start_not_started":
+				mockBaseWorkUnit.EXPECT().ID().Return("test-id").Times(1)
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"Work unit created with ID execution. Send stdin data and EOF.\n",
+					"OK\n", // Acknowledgment after stdin sent
+					"{\"State\": 1, \"Detail\": \"Running\", \"StdoutSize\": 0}\n", // Status updates for monitoring
+				}
+				anyTimes := true // Needed because this will monitor the remote work unit in a loop
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
 				err = wu.Start()
-			case "restart":
+			case "start_already_started":
+				err = wu.Start()
+			case "restart_not_started":
 				err = wu.Restart()
-			case "cancel":
+			case "restart_already_started":
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"{\"State\": 1, \"Detail\": \"Running\", \"StdoutSize\": 0}\n", // Response to status command
+				}
+				anyTimes := true // Needed because this will monitor the remote work unit in a loop
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
+				err = wu.Restart()
+			case "restart_local_released":
+				remoteExtraData.LocalReleased = true
+				err = wu.Restart()
+			case "restart_unknown_work_unit":
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"ERROR: unknown work unit\n",
+				}
+				anyTimes := true // Needed because this will monitor the remote work unit in a loop
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
+				err = wu.Restart()
+			case "cancel_not_started":
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, "Locally Cancelled", int64(0))
 				err = wu.Cancel()
-			case "release":
+			case "cancel_already_started":
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"{\"State\": 4, \"Detail\": \"Cancelled\", \"StdoutSize\": 0}\n", // Acknowledgment to release command
+				}
+				anyTimes := true // Needed because this will monitor the remote work unit in a loop
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
+				err = wu.Cancel()
+			case "release_not_started":
+				mockBaseWorkUnit.EXPECT().Release(true).Return(nil)
 				err = wu.Release(false)
+			case "release_already_started":
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"{\"State\": 4, \"Detail\": \"Cancelled\", \"StdoutSize\": 0}\n", // Acknowledgment to release command
+				}
+				anyTimes := true // Needed because this will monitor the remote work unit in a loop
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
+				mockBaseWorkUnit.EXPECT().Release(false).Return(nil).AnyTimes() // Called after monitoring completes (may not complete before context cancels)
+				err = wu.Release(false)
+			case "force_release_already_started":
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"{\"State\": 4, \"Detail\": \"Cancelled\", \"StdoutSize\": 0}\n", // Acknowledgment to release command
+				}
+				anyTimes := true // Needed because this will monitor the remote work unit in a loop
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
+				mockBaseWorkUnit.EXPECT().Release(true).Return(nil)
+				err = wu.Release(true)
+			default:
+				t.Errorf("Unknown test case: %s", tt.name)
 			}
 
 			if tt.expectError {
@@ -291,387 +461,6 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error for %s operation: %v", tt.operation, err)
 				}
-			}
-		})
-	}
-}
-
-func TestRemoteWorkStartRemoteUnitInvalidResponse(t *testing.T) {
-	t.Parallel()
-	wu, mockBaseWorkUnit, _, w := createRemoteWorkTestSetup(t)
-
-	remoteExtraData := &workceptor.RemoteExtraData{
-		RemoteNode:     "remote-node",
-		TLSClient:      "tls-client",
-		RemoteWorkType: "test-work",
-		RemoteParams:   make(map[string]string),
-		SignWork:       false,
-	}
-
-	statusLock := &sync.RWMutex{}
-	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-		ExtraData: remoteExtraData,
-	}).AnyTimes()
-
-	mockBaseWorkUnit.EXPECT().ID().Return("test-unit-id").AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-
-	// Test basic creation and setup - the actual StartRemoteUnit method requires complex mocking
-	// This test verifies our setup works and we can access the remote work unit
-	if wu == nil {
-		t.Error("Expected WorkUnit to be created")
-	}
-
-	// Verify the unit has proper extra data setup
-	status := wu.UnredactedStatus()
-	if status == nil {
-		t.Error("Expected status to be available")
-	}
-}
-
-func TestRemoteWorkGetConnection(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name:          "interface exists and can be called",
-			expectError:   true, // Will fail due to missing network mocks
-			errorContains: "remote ExtraData missing",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
-
-			remoteExtraData := &workceptor.RemoteExtraData{
-				RemoteNode:     "remote-node",
-				TLSClient:      "tls-client",
-				RemoteWorkType: "test-work",
-				RemoteParams:   make(map[string]string),
-				RemoteStarted:  false,
-			}
-
-			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-				ExtraData: remoteExtraData,
-			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
-
-			// Test the interface exists
-			if _, ok := wu.(interface {
-				ConnectToRemote(context.Context) (net.Conn, *bufio.Reader, error)
-			}); ok {
-				// Interface exists - we can't test implementation without full network mocking
-				// This test verifies the method signature is correct
-			} else {
-				t.Error("WorkUnit doesn't implement ConnectToRemote method")
-			}
-		})
-	}
-}
-
-func TestRemoteWorkConnectAndRun(t *testing.T) {
-	t.Parallel()
-
-	// Since connectAndRun and getConnectionAndRun are not exported,
-	// we test their behavior through the exported methods that use them
-	tests := []struct {
-		name        string
-		expectError bool
-	}{
-		{
-			name:        "interface verification",
-			expectError: true, // Will fail due to missing network setup
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			wu, mockBaseWorkUnit, _, _ := createRemoteWorkTestSetup(t)
-
-			remoteExtraData := &workceptor.RemoteExtraData{
-				RemoteNode:     "remote-node",
-				TLSClient:      "tls-client",
-				RemoteWorkType: "test-work",
-				RemoteParams:   make(map[string]string),
-			}
-
-			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-				ExtraData: remoteExtraData,
-			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
-
-			// Verify the interface exists by checking the WorkUnit implements expected methods
-			if _, ok := wu.(interface {
-				ConnectToRemote(context.Context) (net.Conn, *bufio.Reader, error)
-			}); !ok {
-				t.Error("WorkUnit doesn't implement ConnectToRemote method")
-			}
-		})
-	}
-}
-
-func TestRemoteWorkStartRemoteUnit(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		response      string
-		signWork      bool
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name:          "invalid response format",
-			response:      "Invalid response",
-			expectError:   true,
-			errorContains: "could not parse response",
-		},
-		{
-			name:        "valid response format",
-			response:    "Work unit submitted with ID abc123.",
-			expectError: false,
-		},
-		{
-			name:        "signed work valid response",
-			response:    "Work unit submitted with ID def456.",
-			signWork:    true,
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			wu, mockBaseWorkUnit, _, w := createRemoteWorkTestSetup(t)
-
-			remoteExtraData := &workceptor.RemoteExtraData{
-				RemoteNode:     "remote-node",
-				TLSClient:      "tls-client",
-				RemoteWorkType: "test-work",
-				RemoteParams:   make(map[string]string),
-				SignWork:       tt.signWork,
-			}
-
-			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-				ExtraData: remoteExtraData,
-			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
-
-			mockBaseWorkUnit.EXPECT().ID().Return("test-unit-id").AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-			mockBaseWorkUnit.EXPECT().UnitDir().Return("/tmp/test-unit").AnyTimes()
-
-			if !tt.expectError {
-				mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
-			}
-
-			// Test that StartRemoteUnit interface exists
-			if rw, ok := wu.(interface {
-				StartRemoteUnit(context.Context, net.Conn, *bufio.Reader) error
-			}); ok {
-				// We can't fully test without mocking the entire network stack,
-				// but we can verify the interface exists
-				_ = rw
-			} else {
-				t.Error("WorkUnit doesn't implement StartRemoteUnit method")
-			}
-		})
-	}
-}
-
-func TestRemoteWorkCancelOrReleaseRemoteUnit(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		release     bool
-		signWork    bool
-		expectError bool
-	}{
-		{
-			name:        "cancel remote unit",
-			release:     false,
-			expectError: false,
-		},
-		{
-			name:        "release remote unit",
-			release:     true,
-			expectError: false,
-		},
-		{
-			name:        "signed cancel",
-			release:     false,
-			signWork:    true,
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			wu, mockBaseWorkUnit, _, w := createRemoteWorkTestSetup(t)
-
-			remoteExtraData := &workceptor.RemoteExtraData{
-				RemoteNode:     "remote-node",
-				TLSClient:      "tls-client",
-				RemoteWorkType: "test-work",
-				RemoteParams:   make(map[string]string),
-				RemoteUnitID:   "remote-123",
-				SignWork:       tt.signWork,
-			}
-
-			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-				ExtraData: remoteExtraData,
-			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
-
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-
-			// Test that the cancel/release methods exist and function can be accessed
-			// We can't test full implementation without extensive network mocking
-			if wu == nil {
-				t.Error("Expected WorkUnit to be created")
-			}
-		})
-	}
-}
-
-func TestRemoteWorkMonitoring(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		forRelease    bool
-		remoteStarted bool
-	}{
-		{
-			name:          "monitor for normal operation",
-			forRelease:    false,
-			remoteStarted: true,
-		},
-		{
-			name:          "monitor for release",
-			forRelease:    true,
-			remoteStarted: true,
-		},
-		{
-			name:          "monitor not started unit",
-			forRelease:    false,
-			remoteStarted: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			wu, mockBaseWorkUnit, _, w := createRemoteWorkTestSetup(t)
-
-			remoteExtraData := &workceptor.RemoteExtraData{
-				RemoteNode:     "remote-node",
-				TLSClient:      "tls-client",
-				RemoteWorkType: "test-work",
-				RemoteParams:   make(map[string]string),
-				RemoteUnitID:   "remote-123",
-				RemoteStarted:  tt.remoteStarted,
-			}
-
-			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-				ExtraData: remoteExtraData,
-			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
-
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-
-			// Test monitoring functions exist
-			// We can't test full implementation without extensive network/file system mocking
-			if wu == nil {
-				t.Error("Expected WorkUnit to be created")
-			}
-		})
-	}
-}
-
-func TestRemoteWorkExpiration(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		expiration    time.Time
-		remoteStarted bool
-		expectFail    bool
-	}{
-		{
-			name:          "not expired, remote started",
-			expiration:    time.Now().Add(1 * time.Hour),
-			remoteStarted: true,
-			expectFail:    false,
-		},
-		{
-			name:          "expired, not started",
-			expiration:    time.Now().Add(-1 * time.Hour),
-			remoteStarted: false,
-			expectFail:    true,
-		},
-		{
-			name:          "zero expiration time",
-			expiration:    time.Time{},
-			remoteStarted: false,
-			expectFail:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			wu, mockBaseWorkUnit, _, w := createRemoteWorkTestSetup(t)
-
-			remoteExtraData := &workceptor.RemoteExtraData{
-				RemoteNode:     "remote-node",
-				TLSClient:      "tls-client",
-				RemoteWorkType: "test-work",
-				RemoteParams:   make(map[string]string),
-				RemoteStarted:  tt.remoteStarted,
-				Expiration:     tt.expiration,
-			}
-
-			statusLock := &sync.RWMutex{}
-			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-				ExtraData: remoteExtraData,
-			}).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(&workceptor.Workceptor{}).AnyTimes()
-
-			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-
-			// Test expiration logic exists
-			// We can't test full implementation without time mocking
-			if wu == nil {
-				t.Error("Expected WorkUnit to be created")
 			}
 		})
 	}
@@ -731,7 +520,8 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			wu, mockBaseWorkUnit, mockNetceptor, w := createRemoteWorkTestSetup(t)
+			ctx := context.Background()
+			wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
 
 			// Set up remote extra data
 			remoteExtraData := &workceptor.RemoteExtraData{
@@ -744,7 +534,9 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 			// Configure basic mock expectations
 			statusLock := &sync.RWMutex{}
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
 
 			// Handle missing extra data case
 			if tt.name == "missing extra data" {
@@ -758,7 +550,6 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 			}
 
 			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-
 			// Configure netceptor mock expectations based on test case
 			if tt.tlsError != nil {
 				mockNetceptor.EXPECT().GetClientTLSConfig(tt.tlsClientName, tt.remoteNode, gomock.Any()).Return(nil, tt.tlsError)

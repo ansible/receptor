@@ -434,9 +434,8 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 					"execution\n", // Hello message with remote node ID
 					"{\"State\": 4, \"Detail\": \"Cancelled\", \"StdoutSize\": 0}\n", // Acknowledgment to release command
 				}
-				anyTimes := true // Needed because this will monitor the remote work unit in a loop
-				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
-				mockBaseWorkUnit.EXPECT().Release(false).Return(nil).AnyTimes() // Called after monitoring completes (may not complete before context cancels)
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, false)
+				mockBaseWorkUnit.EXPECT().Release(false).Return(nil)
 				err = wu.Release(false)
 			case "force_release_already_started":
 				messages := []string{

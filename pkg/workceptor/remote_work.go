@@ -90,7 +90,19 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 		errStr := err.Error()
-		if strings.Contains(errStr, "CRYPTO_ERROR") {
+		if strings.Contains(errStr, "CRYPTO_BUFFER_EXCEEDED") {
+			shouldExit := false
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.Detail = fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
+				if !status.ExtraData.(*RemoteExtraData).RemoteStarted {
+					shouldExit = true
+					status.State = WorkStateFailed
+				}
+			})
+			if shouldExit {
+				return nil, nil
+			}
+		} else if strings.Contains(errStr, "CRYPTO_ERROR") {
 			shouldExit := false
 			rw.UpdateFullStatus(func(status *StatusFileData) {
 				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)

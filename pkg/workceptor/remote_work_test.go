@@ -589,3 +589,86 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoteWorkGetConnectionCryptoBufferExceeded(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CRYPTO_BUFFER_EXCEEDED sets status detail with KCS reference", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+
+		remoteExtraData := &workceptor.RemoteExtraData{
+			RemoteNode:     "execution",
+			TLSClient:      "test-client",
+			RemoteWorkType: "test-work",
+			RemoteParams:   make(map[string]string),
+			RemoteStarted:  false, // Important: not started yet, so it should fail
+		}
+
+		statusLock := &sync.RWMutex{}
+		var capturedDetail string
+
+		// Set up mocks
+		mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+			return &workceptor.StatusFileData{}
+		}).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+			ExtraData: remoteExtraData,
+		}).AnyTimes()
+		mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+
+		// Capture the status update that contains the KCS reference
+		mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+			status := &workceptor.StatusFileData{
+				ExtraData: remoteExtraData,
+			}
+			updateFunc.(func(*workceptor.StatusFileData))(status)
+			capturedDetail = status.Detail
+		}).AnyTimes()
+
+		// Mock TLS config to succeed
+		mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+
+		// Mock DialContext to return CRYPTO_BUFFER_EXCEEDED error
+		cryptoBufferError := fmt.Errorf("CRYPTO_BUFFER_EXCEEDED (local): received invalid offset 17125 on crypto stream, maximum allowed 16384")
+		mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, cryptoBufferError).AnyTimes()
+
+		// Call GetConnection - it should fail and set the status detail
+		conn, reader := wu.(interface {
+			GetConnection(context.Context) (net.Conn, *bufio.Reader)
+		}).GetConnection(ctx)
+
+		// Verify connection failed
+		if conn != nil {
+			t.Error("Expected nil connection on CRYPTO_BUFFER_EXCEEDED error")
+		}
+		if reader != nil {
+			t.Error("Expected nil reader on CRYPTO_BUFFER_EXCEEDED error")
+		}
+
+		// Verify the status detail contains KCS reference
+		if !strings.Contains(capturedDetail, "KCS 7129200") {
+			t.Errorf("Expected status detail to contain 'KCS 7129200', got: %s", capturedDetail)
+		}
+		if !strings.Contains(capturedDetail, "16KB") {
+			t.Errorf("Expected status detail to mention 16KB limit, got: %s", capturedDetail)
+		}
+		if !strings.Contains(capturedDetail, "CRYPTO_BUFFER_EXCEEDED") {
+			t.Errorf("Expected status detail to contain original error, got: %s", capturedDetail)
+		}
+
+		// Verify it's a helpful message
+		expectedPhrases := []string{"QUIC crypto buffer exceeded", "CA bundle", "too large"}
+		for _, phrase := range expectedPhrases {
+			if !strings.Contains(capturedDetail, phrase) {
+				t.Errorf("Expected status detail to contain '%s', got: %s", phrase, capturedDetail)
+			}
+		}
+
+		ctrl.Finish()
+	})
+}

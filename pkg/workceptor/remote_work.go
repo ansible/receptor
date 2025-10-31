@@ -328,13 +328,11 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
-				if !forRelease {
-					rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
-					rw.UpdateFullStatus(func(status *StatusFileData) {
-						status.State = WorkStateFailed
-						status.Detail = "Remote work unit is gone"
-					})
-				}
+				rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
+				rw.UpdateFullStatus(func(status *StatusFileData) {
+					status.State = WorkStateFailed
+					status.Detail = "Remote work unit is gone"
+				})
 
 				return
 			}
@@ -510,16 +508,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 }
 
 // monitorRemoteUnit watches a remote unit on another node and maintains local status.
-func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
+func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context) {
 	subJC := &utils.JobContext{}
-	if forRelease {
-		subJC.NewJob(ctx, 1, false)
-		go rw.monitorRemoteStatus(subJC, true)
-	} else {
-		subJC.NewJob(ctx, 2, false)
-		go rw.monitorRemoteStatus(subJC, false)
-		go rw.monitorRemoteStdout(subJC)
-	}
+	subJC.NewJob(ctx, 2, false)
+	go rw.monitorRemoteStatus(subJC, false)
+	go rw.monitorRemoteStdout(subJC)
 	subJC.Wait()
 }
 
@@ -579,12 +572,13 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 			return err
 		}
 		go func() {
-			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
 				err := rw.BaseWorkUnitForWorkUnit.Release(false)
 				if err != nil {
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
+			} else {
+				rw.monitorRemoteUnit(ctx)
 			}
 			mw.WorkerDone()
 		}()
@@ -634,7 +628,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 		})
 	}
 	go func() {
-		rw.monitorRemoteUnit(rw.topJC, false)
+		rw.monitorRemoteUnit(rw.topJC)
 		rw.topJC.WorkerDone()
 	}()
 

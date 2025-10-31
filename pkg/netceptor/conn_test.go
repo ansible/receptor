@@ -82,6 +82,82 @@ func TestCancelRead(t *testing.T) {
 	conn.CancelRead()
 }
 
+// TestAcceptLoopNonReceptorAddr tests that AcceptLoop handles non-Receptor RemoteAddr correctly
+// and properly cancels the connection context via the lifecycle goroutine.
+func TestAcceptLoopNonReceptorAddr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockNetC := netceptor.New(context.Background(), "test-node")
+	defer mockNetC.Shutdown()
+
+	mockPC := mock_netceptor.NewMockPacketConner(ctrl)
+	mockQL := mock_netceptor.NewMockQuicListenerForListener(ctrl)
+	mockQC := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQS := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+	// Setup: connection with non-Receptor RemoteAddr (triggers else branch)
+	mockQL.EXPECT().Accept(gomock.Any()).Return(mockQC, nil).Times(1)
+	mockQC.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).Times(1)
+	mockQC.EXPECT().AcceptStream(gomock.Any()).Return(mockQS, nil).Times(1)
+	mockQS.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		b[0] = 0
+
+		return 1, nil
+	}).Times(1)
+	mockQS.EXPECT().Close().Return(nil).AnyTimes()
+	mockQC.EXPECT().Context().Return(context.Background()).AnyTimes()
+
+	// After first connection, block on Accept to keep test running
+	mockQL.EXPECT().Accept(gomock.Any()).DoAndReturn(func(ctx context.Context) (netceptor.QuicConnectionForConn, error) {
+		<-ctx.Done()
+
+		return nil, ctx.Err()
+	}).AnyTimes()
+
+	doneChan := make(chan struct{})
+	acceptChan := make(chan *netceptor.AcceptResult, 1)
+	syncOnce := &sync.Once{}
+	listener := netceptor.NewListener(mockNetC, mockPC, mockQL, acceptChan, doneChan, syncOnce)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go listener.AcceptLoop(ctx)
+
+	// Wait for connection to be accepted
+	select {
+	case result := <-acceptChan:
+		if result.Err != nil {
+			t.Fatalf("Expected successful connection, got error: %v", result.Err)
+		}
+		if result.Conn == nil {
+			t.Fatal("Expected connection, got nil")
+		}
+
+		// Verify connection works
+		conn := result.Conn.(*netceptor.Conn)
+		if conn == nil {
+			t.Fatal("Expected *netceptor.Conn type")
+		}
+
+		// Close the connection, which should trigger the lifecycle goroutine's defer conn_cancel()
+		err := conn.Close()
+		if err != nil {
+			t.Errorf("Close returned error: %v", err)
+		}
+
+		// Give the lifecycle goroutine time to clean up
+		time.Sleep(10 * time.Millisecond)
+
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Timeout waiting for connection")
+	}
+
+	// Clean shutdown
+	close(doneChan)
+}
+
 func TestWrite(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)

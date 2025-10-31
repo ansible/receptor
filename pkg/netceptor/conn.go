@@ -299,8 +299,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				return
 			}
 			doneChan := make(chan struct{}, 1)
-			cctx, ccancel := context.WithCancel(li.s.context)
-			defer ccancel()
+			connCtx, connCancel := context.WithCancel(li.s.context)
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -308,19 +307,20 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				qs:       qs,
 				doneChan: doneChan,
 				doneOnce: &sync.Once{},
-				ctx:      cctx,
+				ctx:      connCtx,
 			}
 			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
-				go MonitorUnreachable(li.pc, doneChan, rAddr, ccancel)
+				go MonitorUnreachable(li.pc, doneChan, rAddr, connCancel)
 			} else {
 				li.s.Logger.Debug("Remote address is not a Receptor address, skipping unreachable monitoring")
 			}
 			go func() {
+				defer connCancel()
 				select {
 				case <-li.DoneChan:
 					_ = conn.Close()
-				case <-cctx.Done():
+				case <-connCtx.Done():
 					_ = conn.Close()
 				case <-doneChan:
 					return

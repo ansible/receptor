@@ -394,7 +394,7 @@ mainLoop:
 				err,
 			)
 			time.Sleep(kw.GetSleepDuration(curPodDelay))
-			prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+			prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 		}
 		if err != nil {
 			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -452,7 +452,7 @@ mainLoop:
 						)
 
 						time.Sleep(kw.GetSleepDuration(curDelay))
-						prevDelay, curDelay = curDelay, prevDelay+curDelay
+						prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
 
 						continue mainLoop
 					}
@@ -514,7 +514,7 @@ mainLoop:
 					)
 
 					time.Sleep(kw.GetSleepDuration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue mainLoop
 				case containerState.Terminated != nil:
@@ -1007,7 +1007,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)
 
 					time.Sleep(kw.GetSleepDuration(curPodDelay))
-					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+					prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 
 					continue
 				}
@@ -1048,7 +1048,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is waiting, will retry %v more times.", podName, retryCount)
 
 					time.Sleep(kw.GetSleepDuration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
 				}
@@ -1069,7 +1069,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. Will retry %v more times.", podName, containerState, retryCount)
 
 					time.Sleep(kw.GetSleepDuration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
 				} else {
@@ -1304,6 +1304,24 @@ func getDefaultInterface() (string, error) {
 	}
 
 	return "", fmt.Errorf("could not determine local address")
+}
+
+// GetNextFibonacciValues gets the next values in the Fibonacci sequence.
+// Returned values will not be negative or larger than 1000.
+func GetNextFibonacciValues(m, n int) (int, int) {
+	// Reset if either value is negative.
+	if m < 0 || n < 0 {
+		return 0, 1
+	}
+
+	// Don't let n be larger than 1000.
+	// Maximum sleep value is 5 minutes in GetSleepDuration().
+	if m+n > 1000 {
+		//fmt.Printf("%d+%d > 1000. Returning values given.\n", m, n)
+		return m, n
+	}
+
+	return n, m + n
 }
 
 func (kw *KubeUnit) runWorkUsingTCP() {

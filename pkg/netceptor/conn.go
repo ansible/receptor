@@ -14,7 +14,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ansible/receptor/pkg/utils"
@@ -31,10 +30,6 @@ var MaxIdleTimeoutForQuicConnections = 30 * time.Second
 // If you are doing a heartbeat your connection wont timeout without severing the connection i.e. firewall.
 // Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
 var KeepAliveForQuicConnections = true
-
-// TestOnContextCancelDeferCalled is a test hook to verify defer ccancel() is executed.
-// Only used for testing the context leak fix. Thread-safe.
-var TestOnContextCancelDeferCalled atomic.Bool
 
 // QuicListenerAdapter adapts *quic.Listener to QuicListenerForListener interface.
 // This allows real QUIC listeners to work with our interface while enabling test mocking.
@@ -305,6 +300,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 			}
 			doneChan := make(chan struct{}, 1)
 			cctx, ccancel := context.WithCancel(li.s.context)
+			defer ccancel()
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -319,10 +315,6 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				go MonitorUnreachable(li.pc, doneChan, rAddr, ccancel)
 			} else {
 				li.s.Logger.Debug("Remote address is not a Receptor address, skipping unreachable monitoring")
-				defer func() {
-					TestOnContextCancelDeferCalled.Store(true)
-					ccancel()
-				}()
 			}
 			go func() {
 				select {

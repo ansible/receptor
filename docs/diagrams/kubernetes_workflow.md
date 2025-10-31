@@ -247,7 +247,7 @@ sequenceDiagram
 This diagram details the three authentication methods supported by the Kubernetes worker.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#4a9eff', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#4a9eff', 'lineColor':'#6bb3ff', 'secondaryColor':'#1a1a1a', 'tertiaryColor':'#2a2a2a', 'background':'#000000', 'mainBkgColor':'#000000', 'secondBkgColor':'#1a1a1a', 'nodeBkg':'#1a1a1a', 'nodeBorder':'#4a9eff', 'clusterBkg':'#0a0a0a', 'clusterBorder':'#4a9eff', 'defaultLinkColor':'#6bb3ff', 'titleColor':'#ffffff', 'edgeLabelBackground':'#1a1a1a', 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 flowchart TD
     Start([KubeUnit.Start]) --> Connect[connectToKube]
     Connect --> AuthMethod{Check authMethod}
@@ -514,7 +514,7 @@ sequenceDiagram
 This diagram details the sophisticated reconnection logic used in `KubeLoggingWithReconnect()` to handle log stream disconnections.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#4a9eff', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#4a9eff', 'lineColor':'#6bb3ff', 'secondaryColor':'#1a1a1a', 'tertiaryColor':'#2a2a2a', 'background':'#000000', 'mainBkgColor':'#000000', 'secondBkgColor':'#1a1a1a', 'nodeBkg':'#1a1a1a', 'nodeBorder':'#4a9eff', 'clusterBkg':'#0a0a0a', 'clusterBorder':'#4a9eff', 'defaultLinkColor':'#6bb3ff', 'titleColor':'#ffffff', 'edgeLabelBackground':'#1a1a1a', 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 flowchart TD
     Start([KubeLoggingWithReconnect]) --> MainLoop[Main reconnection loop]
     
@@ -698,7 +698,7 @@ sequenceDiagram
 This diagram shows the comprehensive error handling and retry mechanisms throughout the Kubernetes worker.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#4a9eff', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#4a9eff', 'lineColor':'#6bb3ff', 'secondaryColor':'#1a1a1a', 'tertiaryColor':'#2a2a2a', 'background':'#000000', 'mainBkgColor':'#000000', 'secondBkgColor':'#1a1a1a', 'nodeBkg':'#1a1a1a', 'nodeBorder':'#4a9eff', 'clusterBkg':'#0a0a0a', 'clusterBorder':'#4a9eff', 'defaultLinkColor':'#6bb3ff', 'titleColor':'#ffffff', 'edgeLabelBackground':'#1a1a1a', 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 flowchart TD
     Start([Error Handling Overview]) --> ErrorTypes[Error Categories]
     

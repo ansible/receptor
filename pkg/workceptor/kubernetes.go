@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -533,13 +534,43 @@ mainLoop:
 
 					return
 				case containerState.Terminated != nil:
-					// We got EOF and the pod terminated, we will log the terminated information
-					if containerState.Terminated.ExitCode != 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v",
+
+					if containerState.Terminated.ExitCode == 0 {
+						// Log successful completion
+						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed successfully",
 							podNamespace,
 							podName,
-							WorkerContainerName,
-							containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
+							WorkerContainerName)
+					} else {
+						reason := containerState.Terminated.Reason
+						// Whitelist: "Completed" and "Error" mean the program ran to completion
+						// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
+						// Note: Reason field is not strictly defined in K8s API, these are observed conventions
+						allowedReasons := []string{"Completed", "Error"}
+						if !slices.Contains(allowedReasons, reason) {
+							kw.GetWorkceptor().nc.GetLogger().Warning("%s/%s: %s execution was interrupted, exit code: %d, terminated reason: %s and terminated message: %s",
+								podNamespace,
+								podName,
+								WorkerContainerName,
+								containerState.Terminated.ExitCode,
+								reason,
+								containerState.Terminated.Message)
+							*stdoutErr = fmt.Errorf("pod %s/%s execution interrupted: exit code: %d, terminated reason: %s, terminated message: %s",
+								podNamespace,
+								podName,
+								containerState.Terminated.ExitCode,
+								reason,
+								containerState.Terminated.Message)
+						} else {
+							// Log error completion
+							kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed with error, exit code: %d, terminated reason: %s, terminated message: %s",
+								podNamespace,
+								podName,
+								WorkerContainerName,
+								containerState.Terminated.ExitCode,
+								reason,
+								containerState.Terminated.Message)
+						}
 					}
 
 					// We need to check if last line has data

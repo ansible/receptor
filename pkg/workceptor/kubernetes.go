@@ -504,8 +504,8 @@ mainLoop:
 
 				switch {
 				case containerState.Running != nil:
-					// We got EOF but pod is running, is this because we checked too fast? Will it turn into a terminated state soon or are we hitting the 4 hour log stream kube error. We will attempt to reconnect a max of 5 times in order to cover both cases
-					// If we can't get reconnect without an EOF we will error and mark the job as failed.
+					// EOF was seen but the pod is still running. Is this because we checked too fast and it will switch to a terminated state soon, or are we hitting the 4-hour log stream kube error?
+					// There is no way to tell so continue checking without failing the job.
 					kw.GetWorkceptor().nc.GetLogger().Info(
 						"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will continue attempting to run job.",
 						err,

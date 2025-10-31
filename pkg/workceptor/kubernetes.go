@@ -1309,6 +1309,8 @@ func getDefaultInterface() (string, error) {
 // GetNextFibonacciValues gets the next values in the Fibonacci sequence.
 // Returned values will not be negative or larger than 1000.
 func GetNextFibonacciValues(m, n int) (int, int) {
+	const maxFibonacciValue = 400
+
 	// Reset if either value is negative.
 	if m < 0 || n < 0 {
 		return 0, 1
@@ -1316,8 +1318,7 @@ func GetNextFibonacciValues(m, n int) (int, int) {
 
 	// Don't let n be larger than 1000.
 	// Maximum sleep value is 5 minutes in GetSleepDuration().
-	if m+n > 1000 {
-		//fmt.Printf("%d+%d > 1000. Returning values given.\n", m, n)
+	if m+n > maxFibonacciValue {
 		return m, n
 	}
 

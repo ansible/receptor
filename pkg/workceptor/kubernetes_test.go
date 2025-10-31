@@ -869,10 +869,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    5, // Increase timeout slightly to give context cancellation time to work
 		},
 		{
-			name: "eof_with_pod_ready_triggers_retry_then_exhausts",
+			name: "eof_with_pod_ready_never_exhausts",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				// This test ensures that a Kube worker will continue retrying a job that produces no output
+				// for long periods of time. But because tests should not take a long time to run, the context is
+				// canceled which causes a different error. This test is set up to expect a context canceled error.
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, "Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled", int64(0)).Times(1)
 
 				runningPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -920,12 +924,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 1 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
 			},
 		},
 		{
@@ -1235,7 +1238,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    8,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -1548,13 +1551,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    2, // Fast delays with 10ms timeouts
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Will retry 2 more times",
-				"Will retry 1 more times",
-				"continuing to stream EOF after retries exhausted",
+				"Will continue attempting to run job",
 			},
 		},
 	}

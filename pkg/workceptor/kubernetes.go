@@ -506,33 +506,17 @@ mainLoop:
 				case containerState.Running != nil:
 					// We got EOF but pod is running, is this because we checked too fast? Will it turn into a terminated state soon or are we hitting the 4 hour log stream kube error. We will attempt to reconnect a max of 5 times in order to cover both cases
 					// If we can't get reconnect without an EOF we will error and mark the job as failed.
-					retryGetLogStream--
-					if retryGetLogStream > 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info(
-							"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will retry %d more times.",
-							err,
-							podNamespace,
-							podName,
-							retryGetLogStream,
-						)
-
-						time.Sleep(kw.GetSleepDuration(curContainerDelay))
-						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
-
-						continue mainLoop
-					}
-					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Error("%s/%s: %s is running but is continuing to stream EOF after retries exhausted",
-						podNamespace,
-						podName,
-						WorkerContainerName,
-					)
-					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhausted", err,
+					kw.GetWorkceptor().nc.GetLogger().Info(
+						"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+						err,
 						podNamespace,
 						podName,
 					)
 
-					return
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+
+					continue mainLoop
 				case containerState.Terminated != nil:
 
 					if containerState.Terminated.ExitCode == 0 {

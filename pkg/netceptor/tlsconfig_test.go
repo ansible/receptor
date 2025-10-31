@@ -1,6 +1,7 @@
 package netceptor
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -387,6 +388,81 @@ func TestVerifyPinnedFingerprint(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestHashAlgorithms tests getSupportedHashAlgorithms and computeHashForFingerprint together.
+func TestHashAlgorithms(t *testing.T) {
+	algorithms := getSupportedHashAlgorithms()
+
+	// Verify we have exactly 4 supported algorithms (sha224, sha256, sha384, sha512).
+	if len(algorithms) != 4 {
+		t.Fatalf("expected 4 hash algorithms, got %d", len(algorithms))
+	}
+
+	certData := []byte("test certificate data")
+
+	tests := []struct {
+		name            string
+		fingerprintLen  int
+		expectValid     bool
+		expectedHashLen int
+	}{
+		{
+			name:            "sha224 - 28 bytes",
+			fingerprintLen:  28,
+			expectValid:     true,
+			expectedHashLen: 28,
+		},
+		{
+			name:            "sha256 - 32 bytes",
+			fingerprintLen:  32,
+			expectValid:     true,
+			expectedHashLen: 32,
+		},
+		{
+			name:            "sha384 - 48 bytes",
+			fingerprintLen:  48,
+			expectValid:     true,
+			expectedHashLen: 48,
+		},
+		{
+			name:            "sha512 - 64 bytes",
+			fingerprintLen:  64,
+			expectValid:     true,
+			expectedHashLen: 64,
+		},
+		{
+			name:           "unsupported length",
+			fingerprintLen: 16,
+			expectValid:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hash, valid := computeHashForFingerprint(certData, tt.fingerprintLen, algorithms)
+
+			if valid != tt.expectValid {
+				t.Errorf("expected valid=%v, got %v", tt.expectValid, valid)
+			}
+
+			if tt.expectValid {
+				if hash == nil {
+					t.Error("expected hash to be non-nil for valid fingerprint length")
+				}
+				if len(hash) != tt.expectedHashLen {
+					t.Errorf("expected hash length %d, got %d", tt.expectedHashLen, len(hash))
+				}
+				// Verify hash is deterministic.
+				hash2, _ := computeHashForFingerprint(certData, tt.fingerprintLen, algorithms)
+				if !bytes.Equal(hash, hash2) {
+					t.Error("hash computation should be deterministic")
+				}
+			} else if hash != nil {
+				t.Errorf("expected nil hash for invalid fingerprint length, got %v", hash)
 			}
 		})
 	}

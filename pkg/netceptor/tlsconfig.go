@@ -290,6 +290,50 @@ const (
 	ExpectedHostnameTypeReceptor = 2
 )
 
+// hashAlgorithm represents a supported hash algorithm for fingerprint verification.
+type hashAlgorithm struct {
+	length  int
+	compute func([]byte) []byte
+}
+
+// getSupportedHashAlgorithms returns the list of supported hash algorithms for certificate fingerprints.
+func getSupportedHashAlgorithms() []hashAlgorithm {
+	return []hashAlgorithm{
+		{28, func(data []byte) []byte {
+			sum := sha256.Sum224(data)
+
+			return sum[:]
+		}},
+		{32, func(data []byte) []byte {
+			sum := sha256.Sum256(data)
+
+			return sum[:]
+		}},
+		{48, func(data []byte) []byte {
+			sum := sha512.Sum384(data)
+
+			return sum[:]
+		}},
+		{64, func(data []byte) []byte {
+			sum := sha512.Sum512(data)
+
+			return sum[:]
+		}},
+	}
+}
+
+// computeHashForFingerprint computes the hash for a certificate based on fingerprint length.
+// Returns the hash and true if a matching algorithm was found, nil and false otherwise.
+func computeHashForFingerprint(certRaw []byte, fingerprintLen int, algorithms []hashAlgorithm) ([]byte, bool) {
+	for _, algo := range algorithms {
+		if fingerprintLen == algo.length {
+			return algo.compute(certRaw), true
+		}
+	}
+
+	return nil, false
+}
+
 // verifyPinnedFingerprint checks if a certificate matches any of the provided pinned fingerprints.
 // Returns nil if fingerprints match or if no fingerprints are provided.
 func verifyPinnedFingerprint(cert *x509.Certificate, pinnedFingerprints [][]byte) error {
@@ -297,98 +341,60 @@ func verifyPinnedFingerprint(cert *x509.Certificate, pinnedFingerprints [][]byte
 		return nil
 	}
 
-	var sha224sum []byte
-	var sha256sum []byte
-	var sha384sum []byte
-	var sha512sum []byte
-	fingerprintOK := false
+	algorithms := getSupportedHashAlgorithms()
+	hashCache := make(map[int][]byte)
 
 	for _, fing := range pinnedFingerprints {
-		fingLenFound := false
-		for _, s := range []struct {
-			len     int
-			sum     *[]byte
-			sumFunc func(data []byte) []byte
-		}{
-			{28, &sha224sum, func(data []byte) []byte {
-				sum := sha256.Sum224(data)
-
-				return sum[:]
-			}},
-			{32, &sha256sum, func(data []byte) []byte {
-				sum := sha256.Sum256(data)
-
-				return sum[:]
-			}},
-			{48, &sha384sum, func(data []byte) []byte {
-				sum := sha512.Sum384(data)
-
-				return sum[:]
-			}},
-			{64, &sha512sum, func(data []byte) []byte {
-				sum := sha512.Sum512(data)
-
-				return sum[:]
-			}},
-		} {
-			if len(fing) == s.len {
-				fingLenFound = true
-				if *s.sum == nil {
-					*s.sum = s.sumFunc(cert.Raw)
-				}
-				if bytes.Equal(fing, *s.sum) {
-					fingerprintOK = true
-
-					break
-				}
+		hash, exists := hashCache[len(fing)]
+		if !exists {
+			var valid bool
+			hash, valid = computeHashForFingerprint(cert.Raw, len(fing), algorithms)
+			if !valid {
+				return fmt.Errorf("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
 			}
+			hashCache[len(fing)] = hash
 		}
-		if !fingLenFound {
-			return fmt.Errorf("RVF failed: pinned certificate must be sha224, sha256, sha384 or sha512")
+
+		if bytes.Equal(fing, hash) {
+			return nil
 		}
 	}
 
-	if !fingerprintOK {
-		return fmt.Errorf("RVF failed: presented certificate does not match any pinned fingerprint")
-	}
-
-	return nil
+	return fmt.Errorf("RVF failed: presented certificate does not match any pinned fingerprint")
 }
 
 // buildVerifyOptions creates x509.VerifyOptions based on the verification type and hostname.
 func buildVerifyOptions(tlscfg *tls.Config, verifyType VerifyType, expectedHostname string, expectedHostnameType ExpectedHostnameType) (x509.VerifyOptions, error) {
-	var opts x509.VerifyOptions
+	var roots *x509.CertPool
+	var keyUsage x509.ExtKeyUsage
 
 	switch verifyType {
 	case VerifyServer:
-		opts = x509.VerifyOptions{
-			Intermediates: x509.NewCertPool(),
-			Roots:         tlscfg.RootCAs,
-			CurrentTime:   time.Now(),
-			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		}
-		if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
-			opts.DNSName = expectedHostname
-		}
+		roots = tlscfg.RootCAs
+		keyUsage = x509.ExtKeyUsageServerAuth
 	case VerifyClient:
-		opts = x509.VerifyOptions{
-			Intermediates: x509.NewCertPool(),
-			Roots:         tlscfg.ClientCAs,
-			CurrentTime:   time.Now(),
-			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		}
-		if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
-			opts.DNSName = expectedHostname
-		}
+		roots = tlscfg.ClientCAs
+		keyUsage = x509.ExtKeyUsageClientAuth
 	default:
-		return opts, fmt.Errorf("RVF failed: invalid verification type: must be client or server")
+		return x509.VerifyOptions{}, fmt.Errorf("RVF failed: invalid verification type: must be client or server")
+	}
+
+	opts := x509.VerifyOptions{
+		Intermediates: x509.NewCertPool(),
+		Roots:         roots,
+		CurrentTime:   time.Now(),
+		KeyUsages:     []x509.ExtKeyUsage{keyUsage},
+	}
+
+	if expectedHostnameType == ExpectedHostnameTypeDNS && expectedHostname != "" {
+		opts.DNSName = expectedHostname
 	}
 
 	return opts, nil
 }
 
 // addIntermediateCerts adds intermediate certificates from the peer's chain to the verify options.
-// This is where certificate deduplication will be implemented in a future change.
+// Note: Certificate deduplication was considered but rejected to avoid invalidating user-provided certificate bundles.
 func addIntermediateCerts(certs []*x509.Certificate, opts *x509.VerifyOptions) {
 	for _, cert := range certs[1:] {
 		opts.Intermediates.AddCert(cert)

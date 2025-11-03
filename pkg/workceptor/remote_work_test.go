@@ -104,7 +104,8 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 	}
 }
 
-// createRemoteWorkTestSetup creates the basic setup for remote work unit tests.
+// createRemoteWorkTestSetup creates mocks for testing remote work units.
+// Note: ctrl.Finish() is automatically called via t.Cleanup() when using gomock.NewController(t).
 func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, *gomock.Controller) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -598,7 +599,7 @@ func TestRemoteWorkGetConnectionCryptoBufferExceeded(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
-		wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+		wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
 
 		remoteExtraData := &workceptor.RemoteExtraData{
 			RemoteNode:     "execution",
@@ -669,6 +670,7 @@ func TestRemoteWorkGetConnectionCryptoBufferExceeded(t *testing.T) {
 			}
 		}
 
-		ctrl.Finish()
+		// Note: The helpful error detail is stored in status.Detail for operators to reference.
+		// A generic INFO log appears: "Connection to <node> failed with error: <err>"
 	})
 }

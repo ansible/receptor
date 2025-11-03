@@ -90,27 +90,27 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 		errStr := err.Error()
+
+		var detail string
 		if strings.Contains(errStr, "CRYPTO_BUFFER_EXCEEDED") {
-			shouldExit := false
-			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
-				if !status.ExtraData.(*RemoteExtraData).RemoteStarted {
-					shouldExit = true
-					status.State = WorkStateFailed
-				}
-			})
-			if shouldExit {
-				return nil, nil
-			}
+			detail = fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
 		} else if strings.Contains(errStr, "CRYPTO_ERROR") {
+			detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+		}
+
+		if detail != "" {
 			shouldExit := false
 			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+				status.Detail = detail
 				if !status.ExtraData.(*RemoteExtraData).RemoteStarted {
 					shouldExit = true
 					status.State = WorkStateFailed
 				}
 			})
+
+			// Log the helpful error message so it appears in logs, not just status file
+			rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
+
 			if shouldExit {
 				return nil, nil
 			}

@@ -591,86 +591,113 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 	}
 }
 
-func TestRemoteWorkGetConnectionCryptoBufferExceeded(t *testing.T) {
+func TestRemoteWorkGetConnectionCryptoErrors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("CRYPTO_BUFFER_EXCEEDED sets status detail with KCS reference", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
+	tests := []struct {
+		name              string
+		dialError         error
+		extraData         interface{}
+		expectStateFailed bool
+		expectContains    []string
+	}{
+		{
+			name:      "CRYPTO_BUFFER_EXCEEDED sets helpful message with KCS reference",
+			dialError: fmt.Errorf("CRYPTO_BUFFER_EXCEEDED (local): received invalid offset 17125 on crypto stream, maximum allowed 16384"),
+			extraData: &workceptor.RemoteExtraData{
+				RemoteNode: "execution", TLSClient: "test-client",
+				RemoteWorkType: "test-work", RemoteParams: make(map[string]string), RemoteStarted: false,
+			},
+			expectStateFailed: true,
+			expectContains:    []string{"KCS 7129200", "16KB", "QUIC crypto buffer exceeded", "CA bundle", "too large"},
+		},
+		{
+			name:      "CRYPTO_ERROR sets TLS error message",
+			dialError: fmt.Errorf("CRYPTO_ERROR: TLS handshake failed"),
+			extraData: &workceptor.RemoteExtraData{
+				RemoteNode: "execution", TLSClient: "test-client",
+				RemoteWorkType: "test-work", RemoteParams: make(map[string]string), RemoteStarted: false,
+			},
+			expectStateFailed: true,
+			expectContains:    []string{"TLS error connecting to remote service", "CRYPTO_ERROR"},
+		},
+		{
+			name:              "nil ExtraData handles gracefully",
+			dialError:         fmt.Errorf("CRYPTO_BUFFER_EXCEEDED: test"),
+			extraData:         nil,
+			expectStateFailed: false, // Defensive check prevents State update
+			expectContains:    []string{"KCS 7129200"},
+		},
+	}
 
-		wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
 
-		remoteExtraData := &workceptor.RemoteExtraData{
-			RemoteNode:     "execution",
-			TLSClient:      "test-client",
-			RemoteWorkType: "test-work",
-			RemoteParams:   make(map[string]string),
-			RemoteStarted:  false, // Important: not started yet, so it should fail
-		}
+			wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
 
-		statusLock := &sync.RWMutex{}
-		var capturedDetail string
+			remoteExtraData := &workceptor.RemoteExtraData{
+				RemoteNode:     "execution",
+				TLSClient:      "test-client",
+				RemoteWorkType: "test-work",
+				RemoteParams:   make(map[string]string),
+				RemoteStarted:  false,
+			}
 
-		// Set up mocks
-		mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-		mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
-			return &workceptor.StatusFileData{}
-		}).AnyTimes()
-		mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
-			ExtraData: remoteExtraData,
-		}).AnyTimes()
-		mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			statusLock := &sync.RWMutex{}
+			var capturedDetail string
+			var capturedState int
 
-		// Capture the status update that contains the KCS reference
-		mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
-			status := &workceptor.StatusFileData{
+			// Set up mocks
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
 				ExtraData: remoteExtraData,
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+
+			// Capture status update - use tt.extraData for different scenarios
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+				status := &workceptor.StatusFileData{
+					ExtraData: tt.extraData,
+				}
+				updateFunc.(func(*workceptor.StatusFileData))(status)
+				capturedDetail = status.Detail
+				capturedState = status.State
+			}).AnyTimes()
+
+			// Mock TLS config and DialContext with test-specific error
+			mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+			mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, tt.dialError).AnyTimes()
+
+			// Call GetConnection
+			conn, reader := wu.(interface {
+				GetConnection(context.Context) (net.Conn, *bufio.Reader)
+			}).GetConnection(ctx)
+
+			// Verify connection failed
+			if conn != nil || reader != nil {
+				t.Error("Expected nil connection and reader")
 			}
-			updateFunc.(func(*workceptor.StatusFileData))(status)
-			capturedDetail = status.Detail
-		}).AnyTimes()
 
-		// Mock TLS config to succeed
-		mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
-
-		// Mock DialContext to return CRYPTO_BUFFER_EXCEEDED error
-		cryptoBufferError := fmt.Errorf("CRYPTO_BUFFER_EXCEEDED (local): received invalid offset 17125 on crypto stream, maximum allowed 16384")
-		mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, cryptoBufferError).AnyTimes()
-
-		// Call GetConnection - it should fail and set the status detail
-		conn, reader := wu.(interface {
-			GetConnection(context.Context) (net.Conn, *bufio.Reader)
-		}).GetConnection(ctx)
-
-		// Verify connection failed
-		if conn != nil {
-			t.Error("Expected nil connection on CRYPTO_BUFFER_EXCEEDED error")
-		}
-		if reader != nil {
-			t.Error("Expected nil reader on CRYPTO_BUFFER_EXCEEDED error")
-		}
-
-		// Verify the status detail contains KCS reference
-		if !strings.Contains(capturedDetail, "KCS 7129200") {
-			t.Errorf("Expected status detail to contain 'KCS 7129200', got: %s", capturedDetail)
-		}
-		if !strings.Contains(capturedDetail, "16KB") {
-			t.Errorf("Expected status detail to mention 16KB limit, got: %s", capturedDetail)
-		}
-		if !strings.Contains(capturedDetail, "CRYPTO_BUFFER_EXCEEDED") {
-			t.Errorf("Expected status detail to contain original error, got: %s", capturedDetail)
-		}
-
-		// Verify it's a helpful message
-		expectedPhrases := []string{"QUIC crypto buffer exceeded", "CA bundle", "too large"}
-		for _, phrase := range expectedPhrases {
-			if !strings.Contains(capturedDetail, phrase) {
-				t.Errorf("Expected status detail to contain '%s', got: %s", phrase, capturedDetail)
+			// Verify status detail contains expected strings
+			for _, expected := range tt.expectContains {
+				if !strings.Contains(capturedDetail, expected) {
+					t.Errorf("Expected status detail to contain '%s', got: %s", expected, capturedDetail)
+				}
 			}
-		}
 
-		// Note: The helpful error detail is stored in status.Detail for operators to reference.
-		// A generic INFO log appears: "Connection to <node> failed with error: <err>"
-	})
+			// Verify State
+			if tt.expectStateFailed && capturedState != workceptor.WorkStateFailed {
+				t.Errorf("Expected State=Failed, got: %d", capturedState)
+			}
+			if !tt.expectStateFailed && capturedState != 0 {
+				t.Errorf("Expected State=0, got: %d", capturedState)
+			}
+		})
+	}
 }

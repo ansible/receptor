@@ -394,7 +394,7 @@ mainLoop:
 				err,
 			)
 			time.Sleep(kw.GetSleepDuration(curPodDelay))
-			prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+			prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 		}
 		if err != nil {
 			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -452,7 +452,7 @@ mainLoop:
 						)
 
 						time.Sleep(kw.GetSleepDuration(curDelay))
-						prevDelay, curDelay = curDelay, prevDelay+curDelay
+						prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
 
 						continue mainLoop
 					}
@@ -504,35 +504,19 @@ mainLoop:
 
 				switch {
 				case containerState.Running != nil:
-					// We got EOF but pod is running, is this because we checked too fast? Will it turn into a terminated state soon or are we hitting the 4 hour log stream kube error. We will attempt to reconnect a max of 5 times in order to cover both cases
-					// If we can't get reconnect without an EOF we will error and mark the job as failed.
-					retryGetLogStream--
-					if retryGetLogStream > 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info(
-							"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will retry %d more times.",
-							err,
-							podNamespace,
-							podName,
-							retryGetLogStream,
-						)
-
-						time.Sleep(kw.GetSleepDuration(curContainerDelay))
-						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
-
-						continue mainLoop
-					}
-					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Error("%s/%s: %s is running but is continuing to stream EOF after retries exhausted",
-						podNamespace,
-						podName,
-						WorkerContainerName,
-					)
-					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhausted", err,
+					// EOF was seen but the pod is still running. Is this because we checked too fast and it will switch to a terminated state soon, or are we hitting the 4-hour log stream kube error?
+					// There is no way to tell so continue checking without failing the job.
+					kw.GetWorkceptor().nc.GetLogger().Info(
+						"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+						err,
 						podNamespace,
 						podName,
 					)
 
-					return
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
+
+					continue mainLoop
 				case containerState.Terminated != nil:
 
 					if containerState.Terminated.ExitCode == 0 {
@@ -1023,7 +1007,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)
 
 					time.Sleep(kw.GetSleepDuration(curPodDelay))
-					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+					prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 
 					continue
 				}
@@ -1064,7 +1048,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is waiting, will retry %v more times.", podName, retryCount)
 
 					time.Sleep(kw.GetSleepDuration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
 				}
@@ -1085,7 +1069,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. Will retry %v more times.", podName, containerState, retryCount)
 
 					time.Sleep(kw.GetSleepDuration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
 				} else {
@@ -1320,6 +1304,25 @@ func getDefaultInterface() (string, error) {
 	}
 
 	return "", fmt.Errorf("could not determine local address")
+}
+
+// GetNextFibonacciValues gets the next values in the Fibonacci sequence.
+// Returned values will not be negative or larger than 1000.
+func GetNextFibonacciValues(m, n int) (int, int) {
+	const maxFibonacciValue = 400
+
+	// Reset if either value is negative.
+	if m < 0 || n < 0 {
+		return 0, 1
+	}
+
+	// Don't let n be larger than 1000.
+	// Maximum sleep value is 5 minutes in GetSleepDuration().
+	if m+n > maxFibonacciValue {
+		return m, n
+	}
+
+	return n, m + n
 }
 
 func (kw *KubeUnit) runWorkUsingTCP() {

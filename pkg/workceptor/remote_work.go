@@ -102,7 +102,7 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 			shouldExit := false
 			rw.UpdateFullStatus(func(status *StatusFileData) {
 				status.Detail = detail
-				if !status.ExtraData.(*RemoteExtraData).RemoteStarted {
+				if red, ok := status.ExtraData.(*RemoteExtraData); ok && !red.RemoteStarted {
 					shouldExit = true
 					status.State = WorkStateFailed
 				}

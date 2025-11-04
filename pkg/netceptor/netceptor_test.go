@@ -900,8 +900,6 @@ func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
 // TestTracerCreatesCorrectFilePath tests the Netceptor.tracer() function that sets up
 // QUIC tracing does not depend on the QLOGDIR having a trailing slash character.
 func TestTracerCreatesCorrectFilePath(t *testing.T) {
-	t.Parallel()
-
 	testNetcepter := New(context.Background(), "node1")
 	clientLoggingPerspective := logging.PerspectiveClient
 	connID := quic.ConnectionIDFromBytes([]byte{})

@@ -31,7 +31,6 @@ func TestNetceptor_Ping(t *testing.T) {
 		name         string
 		target       string
 		hopsToLive   byte
-		setupMock    func(*netceptor.Netceptor) (*netceptor.Netceptor, error)
 		expectError  bool
 		expectedNode string
 	}{

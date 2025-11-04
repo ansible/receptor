@@ -923,7 +923,6 @@ func TestTracerCreatesCorrectFilePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			os.Setenv("QLOGDIR", tt.qlogDirectory)
 			tracer := testNetcepter.tracer(testNetcepter.context, clientLoggingPerspective, connID)
 			defer tracer.Close()

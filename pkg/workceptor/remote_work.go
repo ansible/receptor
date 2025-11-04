@@ -91,6 +91,7 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 		errStr := err.Error()
 
+		// Only return on CRYPTO errors, others are retryable.
 		var detail string
 		if strings.Contains(errStr, "CRYPTO_BUFFER_EXCEEDED") {
 			detail = fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
@@ -108,10 +109,10 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 				}
 			})
 
-			// Log the helpful error message so it appears in logs, not just status file
-			rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
-
 			if shouldExit {
+				// Log the helpful error message so it appears in logs, not just status file
+				rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
+
 				return nil, nil
 			}
 		}

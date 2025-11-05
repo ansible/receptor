@@ -567,9 +567,8 @@ flowchart TD
     CheckContainer -->|No| Exit7([Exit - container not found])
     CheckContainer -->|Yes| CheckState2{Container<br/>state?}
     
-    CheckState2 -->|Running| SleepEOF[Sleep with Fibonacci backoff<br/>Possible 4hr timeout or<br/>transition to terminated]
+    CheckState2 -->|Running| SleepEOF[Sleep with Fibonacci backoff<br/>Possible 4hr timeout or<br/>transition to terminated<br/>No retry limit - continues until<br/>terminated or context canceled]
     SleepEOF --> MainLoop
-    Note over MainLoop: No retry limit - continues<br/>checking until terminated or<br/>context canceled
     
     CheckState2 -->|Terminated| CheckExitCode{Exit<br/>code?}
     CheckExitCode -->|0| LogSuccess[Mark as Succeeded<br/>Log: Completed successfully]
@@ -744,8 +743,7 @@ flowchart TD
     CheckContext -->|No| CheckEOF{Error ==<br/>EOF?}
     CheckEOF -->|Yes| CheckPodState[Get pod state]
     CheckPodState --> PodRunning{Container<br/>Running?}
-    PodRunning -->|Yes| ReconnectLogs[Reconnect log stream<br/>with Fibonacci backoff<br/>Continue indefinitely]
-    Note over ReconnectLogs: No retry limit - continues<br/>until container terminates<br/>or context canceled
+    PodRunning -->|Yes| ReconnectLogs[Reconnect log stream<br/>with Fibonacci backoff<br/>Continue indefinitely<br/>No retry limit - continues until<br/>container terminates or context canceled]
     
     PodRunning -->|No| PodTerminated{Container<br/>Terminated?}
     PodTerminated -->|Yes| CheckExit{Exit<br/>code == 0?}

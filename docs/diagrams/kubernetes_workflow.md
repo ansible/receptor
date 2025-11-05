@@ -7,8 +7,9 @@ This document provides comprehensive diagrams documenting the Kubernetes worker 
 - [Kubernetes Worker Workflow](#kubernetes-worker-workflow)
   - [Table of Contents](#table-of-contents)
   - [Purpose](#purpose)
+    - [Core Capabilities](#core-capabilities)
+    - [Use Cases](#use-cases)
   - [Overview](#overview)
-    - [Auxiliary Components](#auxiliary-components)
   - [Architecture Components](#architecture-components)
     - [Core Structures](#core-structures)
     - [Key Interfaces](#key-interfaces)
@@ -42,12 +43,12 @@ This document provides comprehensive diagrams documenting the Kubernetes worker 
       - [Pod CrashLoopBackOff](#pod-crashloopbackoff)
       - [Pod Is Killed](#pod-is-killed)
     - [Container Execution Errors](#container-execution-errors)
-      - [Container Executing ansible-playbook Is Killed](#container-executing-ansible-playbook-is-killed)
+      - [Container Executing Work Is Killed](#container-executing-work-is-killed)
       - [Other Containers in Pod Are Killed](#other-containers-in-pod-are-killed)
     - [Invalid Input Handling](#invalid-input-handling)
-      - [Customer Provides Invalid PodTemplate via Controller](#customer-provides-invalid-podtemplate-via-controller)
+      - [Invalid PodTemplate Provided](#invalid-podtemplate-provided)
     - [Long-Running Job Scenarios](#long-running-job-scenarios)
-      - [Job Running for 40+ Hours (IBM/AFMAM Scenarios)](#job-running-for-40-hours-ibmafmam-scenarios)
+      - [Job Running for 40+ Hours](#job-running-for-40-hours)
       - [Context Cancellation Issues](#context-cancellation-issues)
     - [Log and Disk I/O Errors](#log-and-disk-io-errors)
       - [Log Returned by Kube API Is Truncated](#log-returned-by-kube-api-is-truncated)
@@ -58,14 +59,22 @@ This document provides comprehensive diagrams documenting the Kubernetes worker 
 
 ## Purpose
 
-The Kubernetes worker (`kubernetes.go`) provides a way for **Ansible Automation Platform (AAP)** to execute Ansible jobs in Kubernetes clusters. This component is a critical part of AAP's Controller service, enabling job execution by:
+The Kubernetes worker (`kubernetes.go`) enables Receptor to execute work units by creating and managing Kubernetes pods. This component provides a way to run containerized workloads in Kubernetes clusters.
 
-1. **Creating Kubernetes pods** on demand to run Ansible playbooks
-2. **Streaming job input** (playbooks, inventory, etc.) to the pod via stdin
-3. **Capturing job output** (stdout/stderr) from the pod via Kubernetes log streaming or TCP
+### Core Capabilities
+
+The Kubernetes worker provides:
+
+1. **Creating Kubernetes pods** on demand with specified container images and commands
+2. **Streaming input data** to the pod via stdin
+3. **Capturing output** (stdout/stderr) from the pod via Kubernetes log streaming or TCP
 4. **Managing pod lifecycle** from creation through completion, handling both success and failure scenarios
 
-This implementation allows AAP Controller to leverage Kubernetes clusters as execution environments, providing scalability, isolation, and resource management capabilities for Ansible job execution. The worker integrates with AAP's job execution workflow, where Controller submits work units to Receptor, which then uses this Kubernetes worker to execute them in pods.
+### Use Cases
+
+The Kubernetes worker can execute any containerized workload, making it suitable for running custom scripts, batch jobs, data processing tasks, or any containerized service that accepts stdin and produces stdout/stderr.
+
+One notable use case is **Ansible Automation Platform (AAP)**, which uses this Kubernetes worker to execute Ansible playbooks in Kubernetes clusters. AAP's Controller service submits work units to Receptor, which then uses this Kubernetes worker to execute them in pods, providing scalability, isolation, and resource management capabilities.
 
 For more details on how AAP uses Receptor for job execution, see:
 
@@ -85,14 +94,6 @@ Two streaming methods are supported:
 
 - **Logger Method**: Uses Kubernetes log streaming API (recommended for K8s >= 1.23.14)
 - **TCP Method**: Pod connects back via TCP (legacy, simpler but less robust)
-
-### Auxiliary Components
-
-- **`pod.go`**: Provides helper functions for pod health checking:
-
-  - `PodHealthy()`: Checks overall pod health status
-  - `PodContainerHealthy()`: Validates container state, detects CrashLoopBackOff, ImagePullBackOff, and other error states
-  - These are used to validate pod and container states during execution
 
 ## Architecture Components
 
@@ -213,11 +214,13 @@ sequenceDiagram
                 KubeUnit->>KubeAPI: Get pod status
                 alt Container Terminated
                     Logger->>KubeUnit: EOF (expected)
-                    KubeUnit->>KubeUnit: Check exit code
+                    KubeUnit->>KubeUnit: Check exit code and termination reason
                     alt Exit code 0
-                        KubeUnit->>KubeUnit: UpdateBasicStatus(WorkStateSucceeded)
-                    else Exit code != 0
-                        KubeUnit->>KubeUnit: UpdateBasicStatus(WorkStateFailed)
+                        KubeUnit->>KubeUnit: Mark as Succeeded
+                    else Exit code != 0 AND reason is "Completed"/"Error"
+                        KubeUnit->>KubeUnit: Mark as Succeeded<br/>(normal completion with error)
+                    else Exit code != 0 AND reason is "OOMKilled"/"Evicted"/etc
+                        KubeUnit->>KubeUnit: Mark as Failed<br/>(execution interrupted)
                     end
                 else Container Running
                     Logger->>KubeUnit: EOF (unexpected - may be 4hr timeout)
@@ -564,17 +567,16 @@ flowchart TD
     CheckContainer -->|No| Exit7([Exit - container not found])
     CheckContainer -->|Yes| CheckState2{Container<br/>state?}
     
-    CheckState2 -->|Running| RetryEOF{Retries<br/>remaining?}
-    RetryEOF -->|Yes| SleepEOF[Sleep with backoff<br/>Possible 4hr timeout]
+    CheckState2 -->|Running| SleepEOF[Sleep with Fibonacci backoff<br/>Possible 4hr timeout or<br/>transition to terminated]
     SleepEOF --> MainLoop
-    RetryEOF -->|No| Exit8([Exit - EOF but still running])
+    Note over MainLoop: No retry limit - continues<br/>checking until terminated or<br/>context canceled
     
     CheckState2 -->|Terminated| CheckExitCode{Exit<br/>code?}
-    CheckExitCode -->|0| LogSuccess[Log: Completed successfully]
+    CheckExitCode -->|0| LogSuccess[Mark as Succeeded<br/>Log: Completed successfully]
     CheckExitCode -->|!= 0| CheckReason{Terminated<br/>reason?}
     
-    CheckReason -->|Completed/Error| LogErrorComplete[Log: Completed with error<br/>exit code]
-    CheckReason -->|OOMKilled/Evicted/etc| LogInterrupted[Log: Execution interrupted<br/>Set stdoutErr]
+    CheckReason -->|Completed/Error| LogErrorComplete[Mark as Succeeded<br/>Log: Completed with error<br/>exit code<br/>Normal completion]
+    CheckReason -->|OOMKilled/Evicted/etc| LogInterrupted[Mark as Failed<br/>Set stdoutErr<br/>Log: Execution interrupted]
     
     LogSuccess --> CheckLastLine{Last line<br/>has data?}
     LogErrorComplete --> CheckLastLine
@@ -596,7 +598,6 @@ flowchart TD
     style Exit5 fill:#4a9eff
     style Exit6 fill:#ff6b35
     style Exit7 fill:#ff6b35
-    style Exit8 fill:#ff6b35
     style Exit9 fill:#ff6b35
     style Exit10 fill:#4a9eff
     style Exit11 fill:#ff6b35
@@ -743,15 +744,14 @@ flowchart TD
     CheckContext -->|No| CheckEOF{Error ==<br/>EOF?}
     CheckEOF -->|Yes| CheckPodState[Get pod state]
     CheckPodState --> PodRunning{Container<br/>Running?}
-    PodRunning -->|Yes| RetryEOF{Retries<br/>remaining?}
-    RetryEOF -->|Yes| ReconnectLogs[Reconnect log stream<br/>with exponential backoff]
-    RetryEOF -->|No| FailEOF[Mark as Failed:<br/>EOF but pod still running]
+    PodRunning -->|Yes| ReconnectLogs[Reconnect log stream<br/>with Fibonacci backoff<br/>Continue indefinitely]
+    Note over ReconnectLogs: No retry limit - continues<br/>until container terminates<br/>or context canceled
     
     PodRunning -->|No| PodTerminated{Container<br/>Terminated?}
     PodTerminated -->|Yes| CheckExit{Exit<br/>code == 0?}
     CheckExit -->|Yes| Success[Mark as Succeeded]
     CheckExit -->|No| CheckReason{Terminated<br/>reason?}
-    CheckReason -->|Completed/Error| FailNormal[Mark as Failed<br/>Normal error exit]
+    CheckReason -->|Completed/Error| SuccessNormal[Mark as Succeeded<br/>Normal completion with error]
     CheckReason -->|OOMKilled/etc| FailInterrupted[Mark as Failed<br/>Interrupted execution]
     
     CheckEOF -->|No| RetryNonEOF{Retries<br/>remaining?}
@@ -777,9 +777,8 @@ flowchart TD
     style FailStdin fill:#ff6b35
     style FailContext fill:#ff6b35
     style ExitContext fill:#4a9eff
-    style FailEOF fill:#ff6b35
     style Success fill:#4a9eff
-    style FailNormal fill:#ff6b35
+    style SuccessNormal fill:#4a9eff
     style FailInterrupted fill:#ff6b35
     style FailNonEOF fill:#ff6b35
     style FailAuth fill:#ff6b35
@@ -791,10 +790,11 @@ flowchart TD
 ### Resilience Mechanisms
 
 1. **Automatic Reconnection**: Logger method automatically reconnects on stream disconnection
-2. **Retry Logic**: Exponential backoff for transient errors
+2. **Retry Logic**: Fibonacci backoff (exponential-like) for transient errors, with no retry limit for EOF with Running state
 3. **Duplicate Detection**: Timestamp-based log line deduplication during reconnections
 4. **Timeout Handling**: Configurable timeouts for pod pending state
 5. **Graceful Degradation**: Falls back to no-reconnect method for older Kubernetes versions
+6. **Long-Running Job Support**: Continues attempting reconnection indefinitely when EOF occurs with Running containers (handles 4-hour log stream timeouts)
 
 ### Configuration Flexibility
 
@@ -835,8 +835,12 @@ flowchart TD
 
 1. **WorkStatePending (0)**: Initial state, connecting to Kubernetes or creating pod
 2. **WorkStateRunning (1)**: Pod running, streaming data
-3. **WorkStateSucceeded (2)**: Work completed successfully (exit code 0)
-4. **WorkStateFailed (3)**: Work failed (exit code != 0 or error occurred)
+3. **WorkStateSucceeded (2)**: Work completed successfully. Determined by:
+   - Exit code 0, OR
+   - Exit code != 0 but termination reason is "Completed" or "Error" (indicates normal program completion with error)
+4. **WorkStateFailed (3)**: Work failed. Determined by:
+   - Exit code != 0 AND termination reason indicates interruption (OOMKilled, Evicted, etc.), OR
+   - Other errors occurred during execution (stream errors, pod failures, etc.)
 5. **WorkStateCanceled (4)**: Work was canceled, pod deleted
 
 ## Error Scenarios and Handling
@@ -991,10 +995,9 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Detected in pod.go**: `PodContainerHealthy()` checks for `CrashLoopBackOff` in waiting state (line 55-56 of pod.go)
-- ⚠️ **Limited usage**: `pod.go` functions are defined but not actively used in main workflow
-- ⚠️ **Watch may miss**: Current `podRunningAndReady()` doesn't explicitly check for CrashLoopBackOff
+- ⚠️ **Limited detection**: Current `podRunningAndReady()` doesn't explicitly check for CrashLoopBackOff
 - ⚠️ **Timeout behavior**: Pod stuck in CrashLoopBackOff may timeout if `podPendingTimeout` is set
+- ⚠️ **Container status checks**: May be detected via container status checks during pod watch, but not explicitly handled
 
 **Impact:** May timeout waiting for ready state, or may be detected via container status checks.
 
@@ -1007,30 +1010,36 @@ This section documents how the Kubernetes worker handles various error condition
 **Current handling:**
 
 - ✅ **Watch detects deletion**: `podRunningAndReady()` returns `NotFound` if pod deleted (line 188-190)
-- ✅ **Terminated state detection**: `KubeLoggingWithReconnect()` checks for terminated containers (line 536-574)
-- ✅ **Exit code handling**: Checks `containerState.Terminated.ExitCode` (line 538)
-- ✅ **Reason classification**: Distinguishes between "Completed"/"Error" (normal) vs "OOMKilled"/"Evicted" (interrupted) (line 546-563)
-- ✅ **Interrupted execution**: Sets error if terminated reason is not in allowed list (line 550-563)
+- ✅ **Terminated state detection**: `KubeLoggingWithReconnect()` checks for terminated containers (line 520-574)
+- ✅ **Exit code handling**: Checks `containerState.Terminated.ExitCode` (line 522)
+- ✅ **Reason classification**: Distinguishes between "Completed"/"Error" (normal completion) vs "OOMKilled"/"Evicted" (interrupted) (line 529-557)
+- ✅ **Work state determination**:
+  - Exit code 0 → WorkStateSucceeded
+  - Exit code != 0 + reason "Completed"/"Error" → WorkStateSucceeded (normal completion with error)
+  - Exit code != 0 + reason "OOMKilled"/"Evicted"/etc → WorkStateFailed (execution interrupted, sets stdoutErr)
 
-**Impact:** Properly detected and classified. Jobs marked as failed if interrupted, or succeeded if exit code 0.
+**Impact:** Properly detected and classified. Work state depends on both exit code AND termination reason. Jobs marked as succeeded for normal completions (even with non-zero exit) but failed for interrupted executions.
 
 ### Container Execution Errors
 
-#### Container Executing ansible-playbook Is Killed
+#### Container Executing Work Is Killed
 
 **What happens:**
 
-- OOMKilled, SIGKILL, container runtime issues
+- Container running the work is killed (OOMKilled, SIGKILL, container runtime issues)
 
 **Current handling:**
 
-- ✅ **Terminated state**: Detected via `containerState.Terminated` (line 536)
-- ✅ **Reason detection**: Checks `Terminated.Reason` for "OOMKilled", "Evicted" (line 546-563)
-- ✅ **Exit code**: Uses `Terminated.ExitCode` to determine success/failure
-- ✅ **Error marking**: Sets `stdoutErr` if execution interrupted (line 558-563)
-- ✅ **Log capture**: Attempts to write last line before container termination (line 577-588)
+- ✅ **Terminated state**: Detected via `containerState.Terminated` (line 520)
+- ✅ **Reason detection**: Checks `Terminated.Reason` for "OOMKilled", "Evicted" vs "Completed"/"Error" (line 529-557)
+- ✅ **Work state logic**:
+  - Exit code 0 → WorkStateSucceeded
+  - Exit code != 0 + reason "Completed"/"Error" → WorkStateSucceeded (normal completion)
+  - Exit code != 0 + reason "OOMKilled"/"Evicted"/etc → WorkStateFailed (sets `stdoutErr` at line 542-547)
+- ✅ **Error marking**: Sets `stdoutErr` only if execution interrupted (not for normal error completions)
+- ✅ **Log capture**: Attempts to write last line before container termination (line 561-572)
 
-**Impact:** Properly detected and job marked as failed with details about interruption.
+**Impact:** Properly detected and classified. Work state determined by both exit code AND termination reason. Jobs with non-zero exit codes but "Completed"/"Error" reasons are marked as succeeded (normal completion), while interrupted executions (OOMKilled, Evicted) are marked as failed.
 
 #### Other Containers in Pod Are Killed
 
@@ -1049,11 +1058,11 @@ This section documents how the Kubernetes worker handles various error condition
 
 ### Invalid Input Handling
 
-#### Customer Provides Invalid PodTemplate via Controller
+#### Invalid PodTemplate Provided
 
 **What happens:**
 
-- Invalid YAML/JSON, missing required fields, invalid container names, incompatible spec
+- Invalid YAML/JSON, missing required fields, invalid container names, incompatible spec provided in pod template
 
 **Current handling:**
 
@@ -1067,7 +1076,7 @@ This section documents how the Kubernetes worker handles various error condition
 
 ### Long-Running Job Scenarios
 
-#### Job Running for 40+ Hours (IBM/AFMAM Scenarios)
+#### Job Running for 40+ Hours
 
 **What happens:**
 
@@ -1079,16 +1088,18 @@ This section documents how the Kubernetes worker handles various error condition
 - ✅ **Automatic reconnection**: `KubeLoggingWithReconnect()` detects EOF and reconnects with `sinceTime` to avoid duplicates (line 360-631)
 - ✅ **Timestamp-based deduplication**: `ProcessLogLine()` uses timestamps to skip duplicate lines (line 1865-1886)
 - ✅ **Context cancellation handling**: Checks `context.Canceled` during log reading (line 426-439)
+- ✅ **EOF with Running state**: When EOF is detected but container is still Running, the system continues attempting to reconnect indefinitely (no retry limit) using Fibonacci backoff (line 506-519). This handles both cases: 4-hour log stream timeouts and rapid state transitions to terminated.
+- ✅ **Fibonacci backoff**: Uses `GetNextFibonacciValues()` for exponential backoff calculations (capped at 400 to prevent excessive delays)
 - ⚠️ **No job timeout**: No maximum job duration enforced by Receptor itself
-- ⚠️ **Context cancellation**: Depends on external context cancellation (e.g., AAP Controller timeout)
+- ⚠️ **Context cancellation**: Depends on external context cancellation (e.g., from the work submission client)
 
-**Impact:** Jobs can run indefinitely if context not canceled. Log streams automatically reconnect every 4 hours. May face context cancellation issues if parent context times out.
+**Impact:** Jobs can run indefinitely if context not canceled. Log streams automatically reconnect every 4 hours. When EOF occurs with a Running container, the system continues attempting reconnection indefinitely rather than failing, which improves handling of long-running jobs and 4-hour timeout scenarios.
 
 #### Context Cancellation Issues
 
 **What happens:**
 
-- Parent context (from AAP Controller) times out or is canceled while job still running
+- Parent context (from the work submission client) times out or is canceled while job still running
 
 **Current handling:**
 

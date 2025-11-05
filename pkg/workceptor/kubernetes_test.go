@@ -577,14 +577,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
 	})
 
+	type countedLogMsg struct {
+		text          string
+		expectedCount int
+	}
+
 	type testCase struct {
-		name              string
-		setupMocks        func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
-		stdinErr          *error
-		expectedStdoutErr bool
-		timeoutSeconds    int
-		validateLogs      bool
-		expectedLogMsgs   []string
+		name                 string
+		setupMocks           func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
+		stdinErr             *error
+		expectedStdoutErr    bool
+		timeoutSeconds       int
+		validateLogs         bool
+		expectedLogMsgs      []string
+		validatedCountedLogs bool
+		countedLogMsgs       []countedLogMsg
 	}
 
 	tests := []testCase{
@@ -869,10 +876,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    5, // Increase timeout slightly to give context cancellation time to work
 		},
 		{
-			name: "eof_with_pod_ready_triggers_retry_then_exhausts",
+			name: "eof_with_pod_ready_never_exhausts",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				// This test ensures that a Kube worker will continue retrying a job that produces no output
+				// for long periods of time. But because tests should not take a long time to run, the context is
+				// canceled which causes a different error. This test is set up to expect a context canceled error.
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, "Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled", int64(0)).Times(1)
 
 				runningPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -920,12 +931,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 1 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled",
+			},
+			validatedCountedLogs: true,
+			countedLogMsgs: []countedLogMsg{
+				{
+					text:          "Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+					expectedCount: 11, // 1 + (2sec timeout * 200ms sleep)
+				},
 			},
 		},
 		{
@@ -1235,7 +1255,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    8,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -1548,13 +1568,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    2, // Fast delays with 10ms timeouts
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Will retry 2 more times",
-				"Will retry 1 more times",
-				"continuing to stream EOF after retries exhausted",
+				"Will continue attempting to run job",
 			},
 		},
 	}
@@ -1685,6 +1703,15 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				for _, expectedMsg := range tt.expectedLogMsgs {
 					if !strings.Contains(logOutput, expectedMsg) {
 						t.Errorf("Missing expected log message: %s got:\n%s", expectedMsg, logOutput)
+					}
+				}
+			}
+			if tt.validatedCountedLogs {
+				logOutput := logBuffer.String()
+				for _, msg := range tt.countedLogMsgs {
+					seenCount := strings.Count(logOutput, msg.text)
+					if seenCount != msg.expectedCount {
+						t.Errorf("Expected log message %d times. Seen %d times\nLog Message: %s", msg.expectedCount, seenCount, msg.text)
 					}
 				}
 			}

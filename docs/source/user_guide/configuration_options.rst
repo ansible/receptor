@@ -250,7 +250,7 @@ TLS Clients
       - string
     * - ``mintls13``
       - Set minimum TLS version to 1.3. Otherwise the minimum is 1.2
-      - false
+      - true
       - bool
     * - ``name``
       - Name of this TLS client configuration (required)
@@ -302,7 +302,7 @@ TLS Servers
       - string
     * - ``mintls13``
       - Set minimum TLS version to 1.3. Otherwise the minimum is 1.2
-      - false
+      - true
       - bool
     * - ``name``
       - Name of this TLS server configuration (required)

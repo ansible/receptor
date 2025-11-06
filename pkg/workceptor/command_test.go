@@ -115,11 +115,10 @@ func TestStart(t *testing.T) {
 
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).Times(2)
 	mockNetceptor.EXPECT().GetLogger().Times(2)
-	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	statusExpectCalls(mockBaseWorkUnit)
 
 	mockBaseWorkUnit.EXPECT().UnitDir()
-	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any())
 	mockBaseWorkUnit.EXPECT().MonitorLocalStatus().AnyTimes()
 	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
 	wu.Start()

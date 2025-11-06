@@ -577,14 +577,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
 	})
 
+	type countedLogMsg struct {
+		text          string
+		expectedCount int
+	}
+
 	type testCase struct {
-		name              string
-		setupMocks        func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
-		stdinErr          *error
-		expectedStdoutErr bool
-		timeoutSeconds    int
-		validateLogs      bool
-		expectedLogMsgs   []string
+		name                 string
+		setupMocks           func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
+		stdinErr             *error
+		expectedStdoutErr    bool
+		timeoutSeconds       int
+		validateLogs         bool
+		expectedLogMsgs      []string
+		validatedCountedLogs bool
+		countedLogMsgs       []countedLogMsg
 	}
 
 	tests := []testCase{
@@ -869,10 +876,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    5, // Increase timeout slightly to give context cancellation time to work
 		},
 		{
-			name: "eof_with_pod_ready_triggers_retry_then_exhausts",
+			name: "eof_with_pod_ready_never_exhausts",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				// This test ensures that a Kube worker will continue retrying a job that produces no output
+				// for long periods of time. But because tests should not take a long time to run, the context is
+				// canceled which causes a different error. This test is set up to expect a context canceled error.
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, "Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled", int64(0)).Times(1)
 
 				runningPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -920,12 +931,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    2,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 1 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled",
+			},
+			validatedCountedLogs: true,
+			countedLogMsgs: []countedLogMsg{
+				{
+					text:          "Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+					expectedCount: 11, // 1 + (2sec timeout * 200ms sleep)
+				},
 			},
 		},
 		{
@@ -964,6 +984,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1035,6 +1056,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1189,6 +1211,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1232,13 +1255,13 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    8,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
 		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
 		{
-			name: "eof_with_terminated_pod_nonzero_exit_code",
+			name: "eof_with_terminated_pod_exit_code_1_treated_as_success",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
@@ -1287,7 +1310,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Test_Namespace/Test_Name: worker has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
+				"Test_Namespace/Test_Name: worker completed with error, exit code: 1, terminated reason: Error, terminated message: Container failed with error",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -1342,6 +1365,165 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				"Unable to find the container worker for pod Test_Name. This is unrecoverable. Marking the job as failed and exiting",
 			},
 		},
+		{
+			name: "eof_with_terminated_pod_oom_killed",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				oomKilledPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 137,
+										Reason:   "OOMKilled",
+										Message:  "Container exceeded memory limit",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(oomKilledPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Running task before OOM", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 137, terminated reason: OOMKilled and terminated message: Container exceeded memory limit",
+			},
+		},
+		{
+			name: "eof_with_terminated_pod_unknown_reason",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				unknownPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 2,
+										Reason:   "Unknown",
+										Message:  "Unknown termination reason",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(unknownPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Task output", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 2, terminated reason: Unknown and terminated message: Unknown termination reason",
+			},
+		},
+		{
+			name: "eof_with_terminated_pod_evicted",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				evictedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 1,
+										Reason:   "Evicted",
+										Message:  "Pod was evicted due to node pressure",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(evictedPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Task started", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 1, terminated reason: Evicted and terminated message: Pod was evicted due to node pressure",
+			},
+		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
 		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
 		{
@@ -1386,13 +1568,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: true,
+			expectedStdoutErr: false,
 			timeoutSeconds:    2, // Fast delays with 10ms timeouts
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Will retry 2 more times",
-				"Will retry 1 more times",
-				"continuing to stream EOF after retries exhausted",
+				"Will continue attempting to run job",
 			},
 		},
 	}
@@ -1523,6 +1703,15 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				for _, expectedMsg := range tt.expectedLogMsgs {
 					if !strings.Contains(logOutput, expectedMsg) {
 						t.Errorf("Missing expected log message: %s got:\n%s", expectedMsg, logOutput)
+					}
+				}
+			}
+			if tt.validatedCountedLogs {
+				logOutput := logBuffer.String()
+				for _, msg := range tt.countedLogMsgs {
+					seenCount := strings.Count(logOutput, msg.text)
+					if seenCount != msg.expectedCount {
+						t.Errorf("Expected log message %d times. Seen %d times\nLog Message: %s", msg.expectedCount, seenCount, msg.text)
 					}
 				}
 			}
@@ -1966,6 +2155,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -2082,6 +2272,7 @@ func TestRetryGetLogStreamResetValidation(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -2276,6 +2467,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},

@@ -90,16 +90,29 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
 			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 		errStr := err.Error()
-		if strings.Contains(errStr, "CRYPTO_ERROR") {
+
+		// Only return on CRYPTO errors, others are retryable.
+		var detail string
+		if strings.Contains(errStr, "CRYPTO_BUFFER_EXCEEDED") {
+			detail = fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
+		} else if strings.Contains(errStr, "CRYPTO_ERROR") {
+			detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+		}
+
+		if detail != "" {
 			shouldExit := false
 			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
-				if !status.ExtraData.(*RemoteExtraData).RemoteStarted {
+				status.Detail = detail
+				if red, ok := status.ExtraData.(*RemoteExtraData); ok && !red.RemoteStarted {
 					shouldExit = true
 					status.State = WorkStateFailed
 				}
 			})
+
 			if shouldExit {
+				// Log the helpful error message so it appears in logs, not just status file
+				rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
+
 				return nil, nil
 			}
 		}
@@ -328,13 +341,11 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
-				if !forRelease {
-					rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
-					rw.UpdateFullStatus(func(status *StatusFileData) {
-						status.State = WorkStateFailed
-						status.Detail = "Remote work unit is gone"
-					})
-				}
+				rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
+				rw.UpdateFullStatus(func(status *StatusFileData) {
+					status.State = WorkStateFailed
+					status.Detail = "Remote work unit is gone"
+				})
 
 				return
 			}
@@ -510,16 +521,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 }
 
 // monitorRemoteUnit watches a remote unit on another node and maintains local status.
-func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context, forRelease bool) {
+func (rw *remoteUnit) monitorRemoteUnit(ctx context.Context) {
 	subJC := &utils.JobContext{}
-	if forRelease {
-		subJC.NewJob(ctx, 1, false)
-		go rw.monitorRemoteStatus(subJC, true)
-	} else {
-		subJC.NewJob(ctx, 2, false)
-		go rw.monitorRemoteStatus(subJC, false)
-		go rw.monitorRemoteStdout(subJC)
-	}
+	subJC.NewJob(ctx, 2, false)
+	go rw.monitorRemoteStatus(subJC, false)
+	go rw.monitorRemoteStdout(subJC)
 	subJC.Wait()
 }
 
@@ -579,12 +585,13 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 			return err
 		}
 		go func() {
-			rw.monitorRemoteUnit(ctx, forRelease)
 			if forRelease {
 				err := rw.BaseWorkUnitForWorkUnit.Release(false)
 				if err != nil {
 					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
+			} else {
+				rw.monitorRemoteUnit(ctx)
 			}
 			mw.WorkerDone()
 		}()
@@ -634,7 +641,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 		})
 	}
 	go func() {
-		rw.monitorRemoteUnit(rw.topJC, false)
+		rw.monitorRemoteUnit(rw.topJC)
 		rw.topJC.WorkerDone()
 	}()
 

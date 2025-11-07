@@ -40,7 +40,6 @@ This document provides comprehensive diagrams documenting the Kubernetes worker 
       - [Kube API Authentication Error](#kube-api-authentication-error)
     - [Pod Lifecycle Errors](#pod-lifecycle-errors)
       - [Pod Cannot Be Scheduled](#pod-cannot-be-scheduled)
-      - [Pod CrashLoopBackOff](#pod-crashloopbackoff)
       - [Pod Is Killed](#pod-is-killed)
     - [Container Execution Errors](#container-execution-errors)
       - [Container Executing Work Is Killed](#container-executing-work-is-killed)
@@ -51,7 +50,6 @@ This document provides comprehensive diagrams documenting the Kubernetes worker 
       - [Job Running for 40+ Hours](#job-running-for-40-hours)
       - [Context Cancellation Issues](#context-cancellation-issues)
     - [Log and Disk I/O Errors](#log-and-disk-io-errors)
-      - [Log Returned by Kube API Is Truncated](#log-returned-by-kube-api-is-truncated)
       - [Log Returned by Kube API Is Too Long](#log-returned-by-kube-api-is-too-long)
       - [Cannot Write Logs to Disk](#cannot-write-logs-to-disk)
     - [Known Unknowns](#known-unknowns)
@@ -76,9 +74,8 @@ The Kubernetes worker can execute any containerized workload, making it suitable
 
 One notable use case is **Ansible Automation Platform (AAP)**, which uses this Kubernetes worker to execute Ansible playbooks in Kubernetes clusters. AAP's Controller service submits work units to Receptor, which then uses this Kubernetes worker to execute them in pods, providing scalability, isolation, and resource management capabilities.
 
-For more details on how AAP uses Receptor for job execution, see:
+For more details on how work is submitted to Receptor, see:
 
-- [AAP Handbook: How a Job Runs](https://handbook.eng.ansible.com/docs/AAP/Services/Controller/how-a-job-runs)
 - [Receptor Work Submit Flow](./receptor_work_submit_flow.md)
 
 ## Overview
@@ -985,20 +982,6 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Impact:** Job fails with timeout if pod never schedules. Error message may not clearly indicate scheduling issue.
 
-#### Pod CrashLoopBackOff
-
-**What happens:**
-
-- Container starts, crashes, restarts repeatedly
-
-**Current handling:**
-
-- ⚠️ **Limited detection**: Current `podRunningAndReady()` doesn't explicitly check for CrashLoopBackOff
-- ⚠️ **Timeout behavior**: Pod stuck in CrashLoopBackOff may timeout if `podPendingTimeout` is set
-- ⚠️ **Container status checks**: May be detected via container status checks during pod watch, but not explicitly handled
-
-**Impact:** May timeout waiting for ready state, or may be detected via container status checks.
-
 #### Pod Is Killed
 
 **What happens:**
@@ -1111,21 +1094,6 @@ This section documents how the Kubernetes worker handles various error condition
 
 ### Log and Disk I/O Errors
 
-#### Log Returned by Kube API Is Truncated
-
-**What happens:**
-
-- Kubernetes API returns partial log data due to size limits or network issues
-
-**Current handling:**
-
-- ❌ **No explicit truncation detection**: Assumes all log data is received
-- ⚠️ **Line-based reading**: Uses `ReadString('\n')` which may handle partial lines
-- ⚠️ **EOF handling**: EOF detection triggers reconnection, which may recover from truncation
-- ❌ **No validation**: Doesn't verify log completeness or detect missing chunks
-
-**Impact:** Truncated logs written to stdout file. May not be detected unless obvious (e.g., mid-line).
-
 #### Log Returned by Kube API Is Too Long
 
 **What happens:**
@@ -1162,28 +1130,26 @@ This section documents how the Kubernetes worker handles various error condition
 
 These scenarios either have unclear handling or require further investigation:
 
-1. **API Server Network Partitions**: What happens if network partitions between Receptor and API server during job execution? (Partial answer: Retries may help, but eventual consistency issues unclear)
+1. **API Server Network Partitions**: What happens if network partitions between Receptor and API server during job execution?
 
-2. **Etcd Backend Failures**: How does API server backend failure affect in-flight jobs? (Partial answer: API calls fail, retries occur, but no explicit handling)
+   **What happens:**
 
-3. **Multi-Region API Server Failover**: Behavior during API server failover events? (Unknown: Depends on `client-go` retry behavior)
+   - Network connectivity is lost between Receptor and the Kubernetes API server (routing issues, network maintenance, infrastructure failures)
+   - API calls fail with connection refused or timeout errors
+   - Receptor cannot observe pod state changes during the partition
 
-4. **Resource Quota Exhaustion**: What happens when namespace quota is exhausted mid-job? (Partial answer: Pod creation fails, but handling of quota exhaustion during execution unclear)
+   **Current handling:**
 
-5. **Node Draining/Eviction**: What if node is drained while pod is running? (Partial answer: Pod eviction detected via terminated state, but timing of detection unclear)
+   - ✅ **Retry logic**: `KubeLoggingWithReconnect()` retries getting the pod with exponential backoff (Fibonacci sequence, default 5 retries, max 100)
+   - ⚠️ **Limited retries**: With default settings (5 retries, 1s base timeout), total retry time is approximately 12-15 seconds. Partitions longer than this cause job failure
+   - ⚠️ **Eventual consistency**: If the partition occurs while the pod transitions from Running to Terminated, Receptor may miss the state change and fail the job even if the pod completed successfully
+   - ⚠️ **No infinite retry**: Retries are finite (default 5, max 100), so long partitions will cause job failure even if the pod is still running or completes successfully
 
-6. **Log Stream Line Limits**: Are there limits on individual log line length? (Unknown: Depends on Kubernetes and `client-go`)
+   **Impact:** Network partitions longer than the retry window (default ~15 seconds) will cause job failure, potentially even if the pod completes successfully during the partition. The retry logic helps with transient issues but cannot handle extended partitions.
 
-7. **Concurrent Job Limits**: How many concurrent jobs can run? (Unknown: Depends on Kubernetes cluster capacity and Receptor configuration)
-
-8. **Pod Template Mutations**: What if pod spec is mutated after creation by admission controllers or webhooks? (Unknown: Original spec used, mutations not tracked)
-
-9. **Image Pull Secrets Expiration**: What if image pull secret expires during job execution? (Unknown: Only affects initial image pull, but not investigated)
-
-10. **Network Policy Blocking**: What if network policies block log stream access? (Unknown: Would manifest as connection errors, but not explicitly handled)
+2. **Pod Template Mutations**: What if pod spec is mutated after creation by admission controllers or webhooks? (Unknown: Original spec used, mutations not tracked)
 
 ## Related Documentation
 
 - [Receptor Work Submit Flow](receptor_work_submit_flow.md) - General work submission flow
 - [Add Listener Backend](AddListenerBackend.md) - Backend connection handling
-- [AAP Handbook: How a Job Runs](https://handbook.eng.ansible.com/docs/AAP/Services/Controller/how-a-job-runs) - AAP's use of Receptor for job execution

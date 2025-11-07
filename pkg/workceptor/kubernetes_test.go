@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -119,8 +120,8 @@ func TestShouldUseReconnect(t *testing.T) {
 	}
 }
 
-func TestGetTimeoutOpenLogstream(t *testing.T) {
-	const envVariable string = "RECEPTOR_OPEN_LOGSTREAM_TIMEOUT"
+func TestGetKubeTimeoutStart(t *testing.T) {
+	const envVariable string = "RECEPTOR_KUBE_TIMEOUT_START"
 
 	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
@@ -130,46 +131,53 @@ func TestGetTimeoutOpenLogstream(t *testing.T) {
 	tests := []struct {
 		name     string
 		envValue string
-		want     int
+		want     time.Duration
 	}{
 		{
 			name:     "No env value set",
 			envValue: "",
-			want:     1,
+			want:     time.Second,
 		},
 		{
 			name:     "Env value set incorrectly to text",
 			envValue: "text instead of int",
-			want:     1,
+			want:     time.Second,
 		},
 		{
 			name:     "Env value set incorrectly to negative",
-			envValue: "-1",
-			want:     1,
+			envValue: "-1s",
+			want:     time.Second,
 		},
 		{
 			name:     "Env value set incorrectly to zero",
 			envValue: "0",
-			want:     1,
+			want:     time.Second,
 		},
 		{
-			name:     "Env value set correctly",
-			envValue: "2",
-			want:     2,
+			name:     "Env value set correctly in seconds",
+			envValue: "2s",
+			want:     2 * time.Second,
+		},
+		{
+			name:     "Env value set correctly milliseconds",
+			envValue: "200ms",
+			want:     200 * time.Millisecond,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
 				os.Setenv(envVariable, tt.envValue)
-				defer os.Unsetenv(envVariable)
 			} else {
 				os.Unsetenv(envVariable)
 			}
 
-			if got := workceptor.GetTimeoutOpenLogstream(kw); got != tt.want {
+			if got := kw.GetKubeTimeoutStart(); got != tt.want {
 				t.Errorf("GetTimeoutOpenLogstream() = %v, want %v", got, tt.want)
 			}
+		})
+		t.Cleanup(func() {
+			os.Unsetenv(envVariable)
 		})
 	}
 }
@@ -559,14 +567,31 @@ func (e *errorReadCloser) Close() error {
 }
 
 func TestKubeLoggingWithReconnect(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
+
+	type countedLogMsg struct {
+		text          string
+		expectedCount int
+	}
+
 	type testCase struct {
-		name              string
-		setupMocks        func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
-		stdinErr          *error
-		expectedStdoutErr bool
-		timeoutSeconds    int
-		validateLogs      bool
-		expectedLogMsgs   []string
+		name                 string
+		setupMocks           func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context)
+		stdinErr             *error
+		expectedStdoutErr    bool
+		timeoutSeconds       int
+		validateLogs         bool
+		expectedLogMsgs      []string
+		validatedCountedLogs bool
+		countedLogMsgs       []countedLogMsg
 	}
 
 	tests := []testCase{
@@ -641,7 +666,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 
 				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil, errors.New("pod not found")).Times(5)
+					Return(nil, errors.New("pod not found")).Times(3)
 
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any()).MaxTimes(6)
 			},
@@ -651,11 +676,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: true,
-			timeoutSeconds:    12, // Allow time for 5 retries with Fibonacci delays
+			timeoutSeconds:    2, // Allow time for 3 retries with 10ms delays
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Error getting pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
-				"Error getting pod Test_Namespace/Test_Name. Will retry 4 more times. Error:",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
+				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
 				"Error getting pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
 				"Error getting pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
 				"Error getting pod Test_Namespace/Test_Name. Will retry 1 more times. Error:",
@@ -693,11 +718,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    15, // Allow time for retries
+			timeoutSeconds:    2, // Allow time for retries with fast timeouts
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times. Error:",
@@ -732,13 +757,13 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 						requestCount++
 						switch requestCount {
-						case 1, 2, 3, 4:
-							// First cycle: 4 failures, leaving retries=1
+						case 1, 2:
+							// First cycle: 2 failures, leaving retries=1
 							t.Logf("HTTP Request #%d - first cycle error connection failed - attempt %d", requestCount, requestCount)
 
 							return nil, fmt.Errorf("connection failed - attempt %d", requestCount)
-						case 5:
-							// First cycle: Success on very last attempt (retries=1)
+						case 3:
+							// First cycle: Success on last attempt (retries=1)
 							t.Logf("HTTP Request #%d - First cycle success on last attempt", requestCount)
 
 							return &http.Response{
@@ -746,10 +771,10 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								Body:       &errorReadCloser{maxReads: 4}, // Read data once, then return error to trigger retry logic
 							}, nil
 						default:
-							// Second cycle: Should have reset retry counter to 5
-							t.Logf("HTTP Request #%d - second cycle error connection refused - attempt %d", requestCount, requestCount-5)
+							// Second cycle: Should have reset retry counter to 3
+							t.Logf("HTTP Request #%d - second cycle error connection refused - attempt %d", requestCount, requestCount-3)
 
-							return nil, fmt.Errorf("connection refused - second cycle attempt %d", requestCount-5)
+							return nil, fmt.Errorf("connection refused - second cycle attempt %d", requestCount-3)
 						}
 					}),
 					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
@@ -762,16 +787,13 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 			expectedStdoutErr: false,
-			timeoutSeconds:    20, // Allow time for multiple retry cycles
+			timeoutSeconds:    2, // Allow time for multiple retry cycles with fast timeouts
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				// First cycle: Nearly exhaust non-EOF retries (5->4->3->2)
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 5 more times. Error:",
-				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 4 more times. Error:",
+				// First cycle: Nearly exhaust non-EOF retries (3->2->1)
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
 				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error:",
-				// Network error detected(1)
-				"Detected non-EOF Error: network connection reset for pod Test_Namespace/Test_Name. Will retry 4 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error:",
 			},
 		},
 		{
@@ -854,10 +876,14 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    5, // Increase timeout slightly to give context cancellation time to work
 		},
 		{
-			name: "eof_with_pod_ready_triggers_retry_then_exhausts",
+			name: "eof_with_pod_ready_never_exhausts",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				// This test ensures that a Kube worker will continue retrying a job that produces no output
+				// for long periods of time. But because tests should not take a long time to run, the context is
+				// canceled which causes a different error. This test is set up to expect a context canceled error.
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, "Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled", int64(0)).Times(1)
 
 				runningPod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
@@ -905,14 +931,21 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				return &err
 			}(),
 
-			expectedStdoutErr: true,
-			timeoutSeconds:    15,
+			expectedStdoutErr: false,
+			timeoutSeconds:    2,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 4 more times.",
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 3 more times.",
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 2 more times.",
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 1 more times.",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 3 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 2 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Will retry 1 more times. Error: context canceled",
+				"Error opening log stream for pod Test_Namespace/Test_Name. Error: context canceled",
+			},
+			validatedCountedLogs: true,
+			countedLogMsgs: []countedLogMsg{
+				{
+					text:          "Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+					expectedCount: 11, // 1 + (2sec timeout * 200ms sleep)
+				},
 			},
 		},
 		{
@@ -951,6 +984,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1022,6 +1056,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1098,9 +1133,28 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 					},
 				}
 
+				terminatedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodSucceeded,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 0,
+										Reason:   "Completed",
+									},
+								},
+							},
+						},
+					},
+				}
+
 				gomock.InOrder(
 					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil),
-					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil).MaxTimes(6),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(notReadyPod, nil).Times(1),
+					mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(terminatedPod, nil).AnyTimes(),
 				)
 
 				req := fakerest.RESTClient{
@@ -1157,6 +1211,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 								State: corev1.ContainerState{
 									Terminated: &corev1.ContainerStateTerminated{
 										ExitCode: 0,
+										Reason:   "Completed",
 									},
 								},
 							},
@@ -1200,13 +1255,13 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    8,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will retry 4 more times.",
+				"Detected EOF Error: EOF for pod Test_Namespace/Test_Name in with container state: Running. Job may not be complete. Will continue attempting to run job.",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
 		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
 		{
-			name: "eof_with_terminated_pod_nonzero_exit_code",
+			name: "eof_with_terminated_pod_exit_code_1_treated_as_success",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
@@ -1255,7 +1310,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			timeoutSeconds:    3,
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Container in worker pod has terminated, with nonzero exit code: 1, terminated reason: Error and terminated message: Container failed with error",
+				"Test_Namespace/Test_Name: worker completed with error, exit code: 1, terminated reason: Error, terminated message: Container failed with error",
 			},
 		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
@@ -1310,6 +1365,165 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				"Unable to find the container worker for pod Test_Name. This is unrecoverable. Marking the job as failed and exiting",
 			},
 		},
+		{
+			name: "eof_with_terminated_pod_oom_killed",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				oomKilledPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 137,
+										Reason:   "OOMKilled",
+										Message:  "Container exceeded memory limit",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(oomKilledPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Running task before OOM", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 137, terminated reason: OOMKilled and terminated message: Container exceeded memory limit",
+			},
+		},
+		{
+			name: "eof_with_terminated_pod_unknown_reason",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				unknownPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 2,
+										Reason:   "Unknown",
+										Message:  "Unknown termination reason",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(unknownPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Task output", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 2, terminated reason: Unknown and terminated message: Unknown termination reason",
+			},
+		},
+		{
+			name: "eof_with_terminated_pod_evicted",
+			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
+				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+				logger := logger.NewReceptorLogger("")
+				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+
+				evictedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "Test_Name", Namespace: "Test_Namespace"},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodFailed,
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: workceptor.WorkerContainerName,
+								State: corev1.ContainerState{
+									Terminated: &corev1.ContainerStateTerminated{
+										ExitCode: 1,
+										Reason:   "Evicted",
+										Message:  "Pod was evicted due to node pressure",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), "Test_Namespace", "Test_Name", gomock.Any()).Return(evictedPod, nil).AnyTimes()
+
+				req := fakerest.RESTClient{
+					Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       &eofReadCloser{content: "2024-12-09T00:31:18.823849250Z Task started", hasRead: false},
+						}, nil
+					}),
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				}
+				mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+			},
+			stdinErr: func() *error {
+				var err error
+
+				return &err
+			}(),
+			expectedStdoutErr: true,
+			timeoutSeconds:    3,
+			validateLogs:      true,
+			expectedLogMsgs: []string{
+				"Test_Namespace/Test_Name: worker execution was interrupted, exit code: 1, terminated reason: Evicted and terminated message: Pod was evicted due to node pressure",
+			},
+		},
 		// AIA: Primarily AI, New content, Human-initiated, Reviewed, Claude (Anthropic AI) via Claude Code
 		// AIA PAI Nc Hin R Claude Code - https://aiattribution.github.io/interpret-attribution
 		{
@@ -1354,15 +1568,11 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 				return &err
 			}(),
-			expectedStdoutErr: true,
-			timeoutSeconds:    15, // Fibonacci delays (1+2+3+5 = 11+ seconds)
+			expectedStdoutErr: false,
+			timeoutSeconds:    2, // Fast delays with 10ms timeouts
 			validateLogs:      true,
 			expectedLogMsgs: []string{
-				"Will retry 4 more times",
-				"Will retry 3 more times",
-				"Will retry 2 more times",
-				"Will retry 1 more times",
-				"continuing to stream EOF after retries exhausted",
+				"Will continue attempting to run job",
 			},
 		},
 	}
@@ -1493,6 +1703,15 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				for _, expectedMsg := range tt.expectedLogMsgs {
 					if !strings.Contains(logOutput, expectedMsg) {
 						t.Errorf("Missing expected log message: %s got:\n%s", expectedMsg, logOutput)
+					}
+				}
+			}
+			if tt.validatedCountedLogs {
+				logOutput := logBuffer.String()
+				for _, msg := range tt.countedLogMsgs {
+					seenCount := strings.Count(logOutput, msg.text)
+					if seenCount != msg.expectedCount {
+						t.Errorf("Expected log message %d times. Seen %d times\nLog Message: %s", msg.expectedCount, seenCount, msg.text)
 					}
 				}
 			}
@@ -1831,8 +2050,8 @@ func TestIsCompatibleK8SExtended(t *testing.T) {
 }
 
 // TestGetTimeoutOpenLogstreamExtended tests the GetTimeoutOpenLogstream function with more cases.
-func TestGetTimeoutOpenLogstreamExtended(t *testing.T) {
-	const envVariable string = "RECEPTOR_OPEN_LOGSTREAM_TIMEOUT"
+func TestGetKubeRetryCount(t *testing.T) {
+	const envVariable string = "RECEPTOR_KUBE_RETRY_COUNT"
 
 	kw, err := startNetceptorNodeWithWorkceptor()
 	if err != nil {
@@ -1852,22 +2071,22 @@ func TestGetTimeoutOpenLogstreamExtended(t *testing.T) {
 		{
 			name:     "Zero value",
 			envValue: "0",
-			want:     1, // Should default to 1
+			want:     5, // Should default to 1
 		},
 		{
 			name:     "Negative value",
 			envValue: "-10",
-			want:     1, // Should default to 1
+			want:     5, // Should default to 1
 		},
 		{
 			name:     "Non-integer value",
 			envValue: "abc",
-			want:     1, // Should default to 1
+			want:     5, // Should default to 1
 		},
 		{
 			name:     "Float value",
 			envValue: "1.5",
-			want:     1, // Should default to 1
+			want:     5, // Should default to 1
 		},
 	}
 
@@ -1875,20 +2094,32 @@ func TestGetTimeoutOpenLogstreamExtended(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
 				os.Setenv(envVariable, tt.envValue)
-				defer os.Unsetenv(envVariable)
 			} else {
 				os.Unsetenv(envVariable)
 			}
 
-			if got := workceptor.GetTimeoutOpenLogstream(kw); got != tt.want {
-				t.Errorf("GetTimeoutOpenLogstream() = %v, want %v", got, tt.want)
+			if got := kw.GetKubeRetryCount(); got != tt.want {
+				t.Errorf("GetKubeRetryCount() = %v, want %v", got, tt.want)
 			}
+		})
+		t.Cleanup(func() {
+			os.Unsetenv(envVariable)
 		})
 	}
 }
 
 // TestKubeLoggingWithReconnectSimple tests the KubeLoggingWithReconnect function with a simple success case.
 func TestKubeLoggingWithReconnectSimple(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
+
 	// We'll test just the success case for now to avoid mock complexity
 	var stdinErr error
 	var stdoutErr error
@@ -1924,6 +2155,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -1978,8 +2210,18 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 
 // TestRetryGetLogStreamResetValidation validates that retryGetLogStream = retries reset is working.
 func TestRetryGetLogStreamResetValidation(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
+
 	// This test validates the specific pattern from TestKubeLoggingWithReconnectDuplicateDetection
-	// Expected with reset working: 4→4→3 (second message shows 4, proving reset worked)
+	// Expected with reset working: 2→2→1 (second message shows 2, proving reset worked)
 
 	// Capture the logger output during the test
 	var logBuffer bytes.Buffer
@@ -2030,6 +2272,7 @@ func TestRetryGetLogStreamResetValidation(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -2121,35 +2364,35 @@ func TestRetryGetLogStreamResetValidation(t *testing.T) {
 	// Log the call count for debugging
 	t.Logf("GetLogs was called %d times", getLogsCallCount)
 
-	// We expect exactly 3 retry messages in the pattern: 4→4→3
+	// We expect exactly 3 retry messages in the pattern: 2→2→1
 	// This specific pattern proves that the reset line at kubernetes.go:539 is working
 	if len(retryMessages) == 3 {
 		t.Logf("SUCCESS: Got exactly 3 retry messages as expected")
 
-		// Check the specific pattern: first message should show "4 more times"
-		if !strings.Contains(retryMessages[0], "Will retry 4 more times") {
-			t.Errorf("First message should show '4 more times', got: %s", retryMessages[0])
+		// Check the specific pattern: first message should show "2 more times"
+		if !strings.Contains(retryMessages[0], "Will retry 2 more times") {
+			t.Errorf("First message should show '2 more times', got: %s", retryMessages[0])
 		}
 
-		// This is the critical test: second message should show "4 more times" if reset is working
-		// If reset line is commented out, this will show "3 more times" and the test will fail
-		if !strings.Contains(retryMessages[1], "Will retry 4 more times") {
-			t.Errorf("RESET LINE NOT WORKING: Second message should show '4 more times' (indicating reset worked), got: %s", retryMessages[1])
+		// This is the critical test: second message should show "2 more times" if reset is working
+		// If reset line is commented out, this will show "1 more times" and the test will fail
+		if !strings.Contains(retryMessages[1], "Will retry 2 more times") {
+			t.Errorf("RESET LINE NOT WORKING: Second message should show '2 more times' (indicating reset worked), got: %s", retryMessages[1])
 			t.Errorf("This indicates that 'retryGetLogStream = retries' at line 539 is commented out or not working")
-			t.Errorf("Expected pattern: 4→4→3, but got: %s", extractRetryNumbers(retryMessages))
+			t.Errorf("Expected pattern: 2→2→1, but got: %s", extractRetryNumbers(retryMessages))
 		} else {
-			t.Logf("SUCCESS: Second message shows '4 more times' - reset is working correctly!")
+			t.Logf("SUCCESS: Second message shows '2 more times' - reset is working correctly!")
 		}
 
-		// Third message should show "3 more times" (after reset and one more decrement)
-		if !strings.Contains(retryMessages[2], "Will retry 3 more times") {
-			t.Errorf("Third message should show '3 more times', got: %s", retryMessages[2])
+		// Third message should show "1 more times" (after reset and one more decrement)
+		if !strings.Contains(retryMessages[2], "Will retry 1 more times") {
+			t.Errorf("Third message should show '1 more times', got: %s", retryMessages[2])
 		}
 
 		// Log the successful pattern
 		t.Logf("SUCCESS: Retry pattern is %s - reset line is working correctly!", extractRetryNumbers(retryMessages))
 	} else {
-		t.Logf("Expected exactly 3 retry messages for 4→4→3 pattern, got %d. Messages: %v", len(retryMessages), retryMessages)
+		t.Logf("Expected exactly 3 retry messages for 2→2→1 pattern, got %d. Messages: %v", len(retryMessages), retryMessages)
 		t.Logf("Full log output:\n%s", logOutput)
 
 		// Even if we don't get the full pattern, test what we can
@@ -2164,10 +2407,6 @@ func extractRetryNumbers(messages []string) string {
 	var numbers []string
 	for _, msg := range messages {
 		switch {
-		case strings.Contains(msg, "Will retry 4 more times"):
-			numbers = append(numbers, "4")
-		case strings.Contains(msg, "Will retry 3 more times"):
-			numbers = append(numbers, "3")
 		case strings.Contains(msg, "Will retry 2 more times"):
 			numbers = append(numbers, "2")
 		case strings.Contains(msg, "Will retry 1 more times"):
@@ -2180,6 +2419,16 @@ func extractRetryNumbers(messages []string) string {
 
 // TestKubeLoggingWithReconnectDuplicateDetection tests that reconnection properly handles duplicate lines.
 func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
+
 	var stdinErr error
 	var stdoutErr error
 	_, mockBaseWorkUnit, mockNetceptor, w, mockKubeAPI, ctrl, ctx := createKubernetesTestSetup(t)
@@ -2218,6 +2467,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 					State: corev1.ContainerState{
 						Terminated: &corev1.ContainerStateTerminated{
 							ExitCode: 0,
+							Reason:   "Completed",
 						},
 					},
 				},
@@ -3436,6 +3686,16 @@ spec:
 }
 
 func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
+
 	// Test basic execution paths that are feasible to test with focused mocking
 	tests := []struct {
 		name        string
@@ -4479,7 +4739,14 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateRunning, gomock.Any(), gomock.Any())
 			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
-			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateSucceeded, gomock.Any(), gomock.Any())
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc func(*workceptor.StatusFileData)) {
+				// Simulate the atomic check-and-update in UpdateFullStatus
+				status := &workceptor.StatusFileData{
+					State:     workceptor.WorkStateRunning,
+					ExtraData: &workceptor.KubeExtraData{},
+				}
+				updateFunc(status)
+			})
 
 			err = os.MkdirAll(testUnitDir, 0o700)
 			if err != nil {
@@ -4569,6 +4836,15 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 // - Terminated: fails the job immediately
 // - Default: retries with exponential backoff until exhausted.
 func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
 	const (
 		testNamespace = "default"
 		testPodName   = "test-pod-123"
@@ -4867,6 +5143,16 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 // 3. Error handling when pod creation fails (fail-fast behavior).
 // 4. Integration with the Kubernetes API for pod management.
 func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
+	// Set fast timeout and retry values for testing
+	os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10ms")
+	os.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "3")
+
+	// Clean up environment variables
+	t.Cleanup(func() {
+		os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+		os.Unsetenv("RECEPTOR_KUBE_RETRY_COUNT")
+	})
+
 	const (
 		testNamespace = "default"
 		testUnitDir   = "/tmp/test/tcp/unit/"
@@ -5464,6 +5750,341 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 			}
 
 			t.Logf("Successfully completed test: %s", tc.name)
+		})
+	}
+}
+
+// TestKubeUnit_StatusTransitionToFinished is an integration test that verifies the fix
+// for a race condition where a failed state could be overwritten by "Finished" status.
+//
+// Race condition scenario:
+// 1. A goroutine (e.g., stdout handler) encounters an error and sets WorkStateFailed
+// 2. Main thread finishes waiting for goroutines and attempts to set "Finished"
+// 3. Without atomic check-and-update, Failed state gets overwritten by Succeeded
+//
+// The BROKEN code pattern (before fix):
+//
+//	if kw.Status().State == WorkStateRunning {
+//	    kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", ...)
+//	}
+//
+// This has a TOCTOU race: Status() and UpdateBasicStatus() are separate operations.
+//
+// The FIXED code pattern (after fix in kubernetes.go:1158-1167):
+//
+//	kw.UpdateFullStatus(func(status *StatusFileData) {
+//	    if status.State == WorkStateRunning {
+//	        status.State = WorkStateSucceeded
+//	        ...
+//	    }
+//	})
+//
+// This is atomic: check and update happen within a single lock acquisition.
+//
+// This test simulates the race by having UpdateFullStatus inject a Failed state
+// right before the final transition check, then verifies Failed is preserved.
+func TestKubeUnit_StatusTransitionToFinished(t *testing.T) {
+	const (
+		testNamespace = "default"
+		testPodName   = "race-test-pod"
+		testUnitDir   = "/tmp/race-test-pod/"
+	)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	os.Setenv("RECEPTOR_KUBE_SUPPORT_RECONNECT", "enabled")
+	defer os.Unsetenv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+
+	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+
+	ctx := context.Background()
+	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+	if err != nil {
+		t.Fatalf("Error creating Workceptor: %v", err)
+	}
+
+	// Track status updates to verify the race condition fix
+	statusLock := &sync.RWMutex{}
+	statusData := &workceptor.StatusFileData{
+		State:     workceptor.WorkStateRunning,
+		ExtraData: &workceptor.KubeExtraData{},
+	}
+	statusCopy := workceptor.StatusFileData{
+		ExtraData: &workceptor.KubeExtraData{
+			KubeNamespace: testNamespace,
+			PodName:       testPodName,
+		},
+	}
+
+	updateFullStatusCalled := false
+	finalState := workceptor.WorkStateRunning
+
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(statusData).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(statusCopy).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UnitDir().Return(testUnitDir).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{}).AnyTimes()
+
+	// Mock Status() for the BROKEN code pattern
+	mockBaseWorkUnit.EXPECT().Status().DoAndReturn(func() *workceptor.StatusFileData {
+		statusLock.RLock()
+		defer statusLock.RUnlock()
+
+		return statusData
+	}).AnyTimes()
+
+	// Mock UpdateBasicStatus for both Running state and any final state calls
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(state int, detail string, size int64) {
+			statusLock.Lock()
+			defer statusLock.Unlock()
+			statusData.State = state
+			statusData.Detail = detail
+			statusData.StdoutSize = size
+			finalState = state
+			t.Logf("UpdateBasicStatus: State = %s, Detail = %q", getStateName(state), detail)
+		}).AnyTimes()
+
+	// Mock UpdateFullStatus to simulate the race and verify the fix
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).DoAndReturn(
+		func(updateFunc func(*workceptor.StatusFileData)) {
+			updateFullStatusCalled = true
+
+			// Simulate a concurrent goroutine setting Failed state
+			// This happens BEFORE the callback executes, simulating the race
+			statusData.State = workceptor.WorkStateFailed
+			statusData.Detail = "Error with pod's stdout: simulated error"
+
+			// Now execute the update function with Failed state
+			// The FIXED code will check status.State and see Failed, not Running
+			// So it won't overwrite with Succeeded
+			updateFunc(statusData)
+
+			finalState = statusData.State
+			t.Logf("UpdateFullStatus: Final state = %s, Detail = %q",
+				getStateName(statusData.State), statusData.Detail)
+		}).AnyTimes()
+
+	// Setup test directory
+	err = os.MkdirAll(testUnitDir, 0o700)
+	if err != nil {
+		t.Fatalf("Failed to create unit dir: %v", err)
+	}
+	defer os.RemoveAll(testUnitDir)
+
+	kubeConfig := workceptor.KubeWorkerCfg{
+		AuthMethod:   "incluster",
+		StreamMethod: "logger",
+	}
+
+	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+	// Create a pod that has successfully completed
+	existingPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: testNamespace,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: workceptor.WorkerContainerName,
+					State: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							ExitCode: 0,
+							Reason:   "Completed",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewSimpleClientset(existingPod)
+	kubeUnit.SetClientset(fakeClient)
+
+	mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), testNamespace, testPodName, gomock.Any()).Return(existingPod, nil).AnyTimes()
+
+	req := fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		}),
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+	}
+	mockKubeAPI.EXPECT().GetLogs(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(req.Request()).AnyTimes()
+
+	// Create stdout writer
+	_, stdoutErr := workceptor.NewStdoutWriter(workceptor.FileSystem{}, testUnitDir)
+	if stdoutErr != nil {
+		t.Fatalf("Failed to create stdout writer: %v", stdoutErr)
+	}
+
+	// Run the actual production code
+	kubeUnit.RunWorkUsingLogger()
+
+	// CRITICAL ASSERTION: Verify UpdateFullStatus was called
+	// This ensures the fix in kubernetes.go:1158-1167 is being used
+	if !updateFullStatusCalled {
+		t.Errorf("CRITICAL: UpdateFullStatus was NOT called for the final status transition!")
+		t.Errorf("This indicates kubernetes.go was reverted to the broken pattern:")
+		t.Errorf("  BROKEN: if kw.Status().State == WorkStateRunning { kw.UpdateBasicStatus(Succeeded, ...) }")
+		t.Errorf("  FIXED:  kw.UpdateFullStatus(func(s) { if s.State == WorkStateRunning { s.State = Succeeded } })")
+		t.Fatalf("The broken pattern causes a TOCTOU race where Failed state can be overwritten by Finished")
+	}
+
+	// Assert: Failed state should be preserved (not overwritten)
+	// With the FIXED code using UpdateFullStatus, the atomic check will see Failed state
+	// and will NOT overwrite it with Succeeded
+	if finalState != workceptor.WorkStateFailed {
+		t.Errorf("RACE CONDITION DETECTED: Failed state was overwritten!")
+		t.Errorf("Expected final state WorkStateFailed, got %s", getStateName(finalState))
+		t.Errorf("This means the atomic check-and-update in UpdateFullStatus is not working correctly")
+		t.Fatalf("The fix for the race condition has regressed")
+	}
+
+	t.Logf("SUCCESS: Race condition fix verified - Failed state was preserved")
+}
+
+// Helper function to convert state int to string for logging.
+func getStateName(state int) string {
+	switch state {
+	case workceptor.WorkStatePending:
+		return "Pending"
+	case workceptor.WorkStateRunning:
+		return "Running"
+	case workceptor.WorkStateSucceeded:
+		return "Succeeded"
+	case workceptor.WorkStateFailed:
+		return "Failed"
+	case workceptor.WorkStateCanceled:
+		return "Canceled"
+	default:
+		return fmt.Sprintf("Unknown(%d)", state)
+	}
+}
+
+func TestGetSleepDuration(t *testing.T) {
+	tests := []struct {
+		name             string
+		baseTimeoutEnv   string
+		multiplier       int
+		expectedDuration time.Duration
+		description      string
+	}{
+		{
+			name:             "Normal case with default timeout",
+			baseTimeoutEnv:   "",
+			multiplier:       2,
+			expectedDuration: 2 * time.Second,
+			description:      "Should multiply base timeout by multiplier normally",
+		},
+		{
+			name:             "Normal case with custom timeout",
+			baseTimeoutEnv:   "5s",
+			multiplier:       3,
+			expectedDuration: 15 * time.Second,
+			description:      "Should work with custom base timeout",
+		},
+		{
+			name:             "Zero multiplier",
+			baseTimeoutEnv:   "",
+			multiplier:       0,
+			expectedDuration: 0,
+			description:      "Should handle zero multiplier",
+		},
+		{
+			name:             "Large multiplier capped at 5m",
+			baseTimeoutEnv:   "1s",
+			multiplier:       1000,
+			expectedDuration: 5 * time.Minute,
+			description:      "Should cap large results at 5 minutes",
+		},
+		{
+			name:             "Result capped at 5m total",
+			baseTimeoutEnv:   "1m",
+			multiplier:       10,
+			expectedDuration: 5 * time.Minute,
+			description:      "Should cap total sleep duration at 5 minutes",
+		},
+		{
+			name:             "Timeout exceeds 1m limit",
+			baseTimeoutEnv:   "10m",
+			multiplier:       2,
+			expectedDuration: 2 * time.Minute,
+			description:      "Should use max 1m when timeout exceeds 1m limit",
+		},
+		{
+			name:             "Potential overflow protection",
+			baseTimeoutEnv:   "1s",
+			multiplier:       math.MaxInt32,
+			expectedDuration: 5 * time.Minute,
+			description:      "Should protect against overflow and cap at 5 minutes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup environment
+			if tt.baseTimeoutEnv != "" {
+				os.Setenv("RECEPTOR_KUBE_TIMEOUT_START", tt.baseTimeoutEnv)
+			} else {
+				os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+			}
+			t.Cleanup(func() {
+				os.Unsetenv("RECEPTOR_KUBE_TIMEOUT_START")
+			})
+
+			// Create a KubeUnit instance for testing
+			cfg := workceptor.KubeWorkerCfg{
+				WorkType:   "test-worker",
+				AuthMethod: "incluster",
+				Image:      "busybox:latest",
+			}
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			mockBWU := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(mockCtrl)
+			mockAPI := mock_workceptor.NewMockKubeAPIer(mockCtrl)
+
+			// Mock basic methods needed for GetSleepDuration
+			logger := logger.NewReceptorLogger("test")
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(mockCtrl)
+			mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			ctx := context.Background()
+			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBWU.EXPECT().Init(w, "test-unit", "test-worker", workceptor.FileSystem{})
+
+			kubeUnit := cfg.NewkubeWorker(mockBWU, w, "test-unit", "test-worker", mockAPI).(*workceptor.KubeUnit)
+
+			// Test GetSleepDuration
+			result := kubeUnit.GetSleepDuration(tt.multiplier)
+
+			// Verify the result
+			if result != tt.expectedDuration {
+				t.Errorf("Expected duration %v, got %v", tt.expectedDuration, result)
+			}
+
+			t.Logf("Test %s: multiplier=%d, result=%v (%s)", tt.name, tt.multiplier, result, tt.description)
 		})
 	}
 }

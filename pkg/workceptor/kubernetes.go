@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -226,23 +228,68 @@ func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	return inner
 }
 
-func GetTimeoutOpenLogstream(kw *KubeUnit) int {
-	// RECEPTOR_OPEN_LOGSTREAM_TIMEOUT
-	// default: 1
-	openLogStreamTimeout := 1
-	envTimeout := os.Getenv("RECEPTOR_OPEN_LOGSTREAM_TIMEOUT")
+func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
+	// RECEPTOR_KUBE_TIMEOUT_START
+	// default: 1 second
+	kubeTimeoutStart := 1 * time.Second
+	envTimeout := os.Getenv("RECEPTOR_KUBE_TIMEOUT_START")
 	if envTimeout != "" {
 		var err error
-		openLogStreamTimeout, err = strconv.Atoi(envTimeout)
-		if err != nil || openLogStreamTimeout < 1 {
+		kubeTimeoutStart, err = time.ParseDuration(envTimeout)
+		if err != nil || kubeTimeoutStart <= 0 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_OPEN_LOGSTREAM_TIMEOUT: %s. Ignoring", envTimeout)
-			openLogStreamTimeout = 1
+			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
+			kubeTimeoutStart = 1 * time.Second
+		}
+		// ignore if exceeds limit, use max
+		if kubeTimeoutStart > time.Minute*1 {
+			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
+			kubeTimeoutStart = time.Minute * 1
 		}
 	}
-	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_OPEN_LOGSTREAM_TIMEOUT: %d", openLogStreamTimeout)
+	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_TIMEOUT_START: %s", kubeTimeoutStart)
 
-	return openLogStreamTimeout
+	return kubeTimeoutStart
+}
+
+func (kw *KubeUnit) GetKubeRetryCount() int {
+	// RECEPTOR_KUBE_RETRY_COUNT
+	// default: 5
+	kubeRetryCount := 5
+	envRetryCount := os.Getenv("RECEPTOR_KUBE_RETRY_COUNT")
+	if envRetryCount != "" {
+		var err error
+		kubeRetryCount, err = strconv.Atoi(envRetryCount)
+		if err != nil || kubeRetryCount < 1 {
+			// ignore error, use default
+			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
+			kubeRetryCount = 5
+		}
+		// ignore if exceeds limit, use max retry
+		if kubeRetryCount > 100 {
+			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
+			kubeRetryCount = 100
+		}
+	}
+	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
+
+	return kubeRetryCount
+}
+
+func (kw *KubeUnit) GetSleepDuration(multipler int) time.Duration {
+	maxSleepDuration := time.Minute * 5
+	baseTimeout := int64(kw.GetKubeTimeoutStart())
+
+	if baseTimeout > 0 && int64(multipler) > math.MaxInt64/baseTimeout {
+		return maxSleepDuration
+	}
+
+	sleepDuration := kw.GetKubeTimeoutStart() * time.Duration(multipler)
+	if sleepDuration > maxSleepDuration {
+		return maxSleepDuration
+	}
+
+	return sleepDuration
 }
 
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
@@ -261,7 +308,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 
 	logReq := kw.KubeAPIWrapperInstance.GetLogs(kw.clientset, podNamespace, podName, podOptions)
 	// get logstream, with retry
-	for retries := 5; retries > 0; retries-- {
+	for retries := kw.GetKubeRetryCount(); retries > 0; retries-- {
 		logStream, err = logReq.Stream(kw.GetContext())
 		if err == nil {
 			break
@@ -273,7 +320,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 			retries,
 			err,
 		)
-		time.Sleep(time.Duration(GetTimeoutOpenLogstream(kw)) * time.Second)
+		time.Sleep(kw.GetKubeTimeoutStart())
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -320,7 +367,7 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	podNamespace := kw.Pod.Namespace
 	podName := kw.Pod.Name
 
-	retries := 5
+	retries := kw.GetKubeRetryCount()
 	prevDelay, curDelay := 0, 1
 	prevPodDelay, curPodDelay := 0, 1
 	prevContainerDelay, curContainerDelay := 0, 1
@@ -346,8 +393,8 @@ mainLoop:
 				retryGetPod,
 				err,
 			)
-			time.Sleep(time.Second * time.Duration(curPodDelay))
-			prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+			time.Sleep(kw.GetSleepDuration(curPodDelay))
+			prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 		}
 		if err != nil {
 			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
@@ -404,8 +451,8 @@ mainLoop:
 							retryGetLogStream,
 						)
 
-						time.Sleep(time.Second * time.Duration(curDelay))
-						prevDelay, curDelay = curDelay, prevDelay+curDelay
+						time.Sleep(kw.GetSleepDuration(curDelay))
+						prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
 
 						continue mainLoop
 					}
@@ -457,35 +504,57 @@ mainLoop:
 
 				switch {
 				case containerState.Running != nil:
-					// We got EOF but pod is running, is this because we checked too fast? Will it turn into a terminated state soon or are we hitting the 4 hour log stream kube error. We will attempt to reconnect a max of 5 times in order to cover both cases
-					// If we can't get reconnect without an EOF we will error and mark the job as failed.
-					retryGetLogStream--
-					if retryGetLogStream > 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info(
-							"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will retry %d more times.",
-							err,
-							podNamespace,
-							podName,
-							retryGetLogStream,
-						)
-
-						time.Sleep(time.Second * time.Duration(curContainerDelay))
-						prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
-
-						continue mainLoop
-					}
-					// Retrying hasn't worked we will error and mark the job as failed
-					kw.GetWorkceptor().nc.GetLogger().Error("Container in %s pod is running but is continuing to stream EOF after retries exhausted", WorkerContainerName)
-					*stdoutErr = fmt.Errorf("detected Error: %s for pod %s/%s. Pod is running but is continuing to stream EOF after retries exhausted", err,
+					// EOF was seen but the pod is still running. Is this because we checked too fast and it will switch to a terminated state soon, or are we hitting the 4-hour log stream kube error?
+					// There is no way to tell so continue checking without failing the job.
+					kw.GetWorkceptor().nc.GetLogger().Info(
+						"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+						err,
 						podNamespace,
 						podName,
 					)
 
-					return
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
+
+					continue mainLoop
 				case containerState.Terminated != nil:
-					// We got EOF and the pod terminated, we will log the terminated information
-					if containerState.Terminated.ExitCode != 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info("Container in %s pod has terminated, with nonzero exit code: %v, terminated reason: %v and terminated message: %v", WorkerContainerName, containerState.Terminated.ExitCode, containerState.Terminated.Reason, containerState.Terminated.Message)
+
+					if containerState.Terminated.ExitCode == 0 {
+						// Log successful completion
+						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed successfully",
+							podNamespace,
+							podName,
+							WorkerContainerName)
+					} else {
+						reason := containerState.Terminated.Reason
+						// Whitelist: "Completed" and "Error" mean the program ran to completion
+						// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
+						// Note: Reason field is not strictly defined in K8s API, these are observed conventions
+						allowedReasons := []string{"Completed", "Error"}
+						if !slices.Contains(allowedReasons, reason) {
+							kw.GetWorkceptor().nc.GetLogger().Warning("%s/%s: %s execution was interrupted, exit code: %d, terminated reason: %s and terminated message: %s",
+								podNamespace,
+								podName,
+								WorkerContainerName,
+								containerState.Terminated.ExitCode,
+								reason,
+								containerState.Terminated.Message)
+							*stdoutErr = fmt.Errorf("pod %s/%s execution interrupted: exit code: %d, terminated reason: %s, terminated message: %s",
+								podNamespace,
+								podName,
+								containerState.Terminated.ExitCode,
+								reason,
+								containerState.Terminated.Message)
+						} else {
+							// Log error completion
+							kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed with error, exit code: %d, terminated reason: %s, terminated message: %s",
+								podNamespace,
+								podName,
+								WorkerContainerName,
+								containerState.Terminated.ExitCode,
+								reason,
+								containerState.Terminated.Message)
+						}
 					}
 
 					// We need to check if last line has data
@@ -511,8 +580,12 @@ mainLoop:
 				// Something has gone very wrong if we are here. EOF is true and we can get the container state, but it is not running or terminated.
 				// At this stage something has gone very wrong with our interactions with the container.
 				// We will fail, and mark the job as failed due to an unknown kube container state.
-
-				kw.GetWorkceptor().nc.GetLogger().Error("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed", podName, containerState)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s/%s: %s sent EOF on log stream and container state is not valid %s, failing and marking the job as failed",
+					podNamespace,
+					podName,
+					WorkerContainerName,
+					containerState,
+				)
 				*stdoutErr = fmt.Errorf("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed", podName, containerState)
 
 				return
@@ -919,7 +992,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 		streamWait.Done()
 	} else {
-		retryCount := 5
+		retryCount := kw.GetKubeRetryCount()
 		prevPodDelay, curPodDelay := 1, 1
 		prevContainerDelay, curContainerDelay := 1, 1
 	podLoop:
@@ -933,8 +1006,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Error getting pod while trying to attach stdin: '%s' , continuing try to get pod up to %v more times.", kubeErr, retryCount)
 
-					time.Sleep(time.Second * time.Duration(curPodDelay))
-					prevPodDelay, curPodDelay = curPodDelay, prevPodDelay+curPodDelay
+					time.Sleep(kw.GetSleepDuration(curPodDelay))
+					prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 
 					continue
 				}
@@ -944,7 +1017,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 
 				return
 			}
-			retryCount = 5
+			retryCount = kw.GetKubeRetryCount()
 
 			var containerState corev1.ContainerState
 			foundContainer := false
@@ -974,8 +1047,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Debug("Container in %s pod is waiting, will retry %v more times.", podName, retryCount)
 
-					time.Sleep(time.Second * time.Duration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
 				}
@@ -995,8 +1068,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				if retryCount > 0 {
 					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. Will retry %v more times.", podName, containerState, retryCount)
 
-					time.Sleep(time.Second * time.Duration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = curContainerDelay, prevContainerDelay+curContainerDelay
+					time.Sleep(kw.GetSleepDuration(curContainerDelay))
+					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
 				} else {
@@ -1018,7 +1091,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			})
 
 			var err error
-			for retries := 5; retries > 0; retries-- {
+			for retries := kw.GetKubeRetryCount(); retries > 0; retries-- {
 				err = kw.KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
 					Stdin: stdin,
 					Tty:   false,
@@ -1097,8 +1170,15 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 	}
 
 	// only transition from WorkStateRunning to WorkStateSucceeded if WorkStateFailed is set we do not override
-	if kw.GetContext().Err() != context.Canceled && kw.Status().State == WorkStateRunning {
-		kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+	if kw.GetContext().Err() != context.Canceled {
+		kw.UpdateFullStatus(func(status *StatusFileData) {
+			// Atomically check and update within single lock to prevent race condition
+			if status.State == WorkStateRunning {
+				status.State = WorkStateSucceeded
+				status.Detail = "Finished"
+				status.StdoutSize = stdout.Size()
+			}
+		})
 	}
 }
 
@@ -1224,6 +1304,25 @@ func getDefaultInterface() (string, error) {
 	}
 
 	return "", fmt.Errorf("could not determine local address")
+}
+
+// GetNextFibonacciValues gets the next values in the Fibonacci sequence.
+// Returned values will not be negative or larger than 1000.
+func GetNextFibonacciValues(m, n int) (int, int) {
+	const maxFibonacciValue = 400
+
+	// Reset if either value is negative.
+	if m < 0 || n < 0 {
+		return 0, 1
+	}
+
+	// Don't let n be larger than 1000.
+	// Maximum sleep value is 5 minutes in GetSleepDuration().
+	if m+n > maxFibonacciValue {
+		return m, n
+	}
+
+	return n, m + n
 }
 
 func (kw *KubeUnit) runWorkUsingTCP() {

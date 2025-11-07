@@ -51,19 +51,33 @@ type NetcForTraceroute interface {
 
 // -- Connection Layer Interfaces (QUIC-based) -------------------------------------------
 
-// QuicStreamForConn wraps quic.Stream to provide stream functionality for Conn instances.
+// QuicStreamForConn defines the subset of quic.Stream methods used by Conn.
+// In QUIC v0.54.0+, Stream became a struct; this interface enables mocking.
 type QuicStreamForConn interface {
-	quic.Stream
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
+	Close() error
+	CancelRead(quic.StreamErrorCode)
+	SetDeadline(time.Time) error
+	SetReadDeadline(time.Time) error
+	SetWriteDeadline(time.Time) error
 }
 
-// QuicConnectionForConn wraps quic.Connection to provide connection functionality for Conn instances.
+// QuicConnectionForConn defines the subset of quic.Conn methods used by Conn.
+// In QUIC v0.54.0+, Connection became *quic.Conn struct; this interface enables mocking.
 type QuicConnectionForConn interface {
-	quic.Connection
+	AcceptStream(context.Context) (QuicStreamForConn, error)
+	OpenStreamSync(context.Context) (QuicStreamForConn, error)
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
+	CloseWithError(quic.ApplicationErrorCode, string) error
+	Context() context.Context
 }
 
-// QuicListenerForListener wraps quic.Listener functionality needed by the Listener struct.
+// QuicListenerForListener defines the quic.Listener methods used by Listener.
+// Accept returns QuicConnectionForConn interface for test mocking compatibility.
 type QuicListenerForListener interface {
-	Accept(ctx context.Context) (quic.Connection, error)
+	Accept(ctx context.Context) (QuicConnectionForConn, error)
 	Addr() net.Addr
 	Close() error
 }

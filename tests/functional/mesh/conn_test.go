@@ -17,6 +17,9 @@ func TestQuicConnectTimeout(t *testing.T) {
 	// Note!
 	// It is important that this test do not run in parellel since it modifies package-level variables.
 	//
+	// This test also exercises the quicListenerAdapter and quicConnAdapter
+	// with real QUIC connections, verifying the adapter pattern works correctly.
+	//
 
 	defaultIdleTimeout := netceptor.MaxIdleTimeoutForQuicConnections
 	defaultQuicKeepAlive := netceptor.KeepAliveForQuicConnections
@@ -56,15 +59,25 @@ func TestQuicConnectTimeout(t *testing.T) {
 	}
 
 	// Start an echo server on node 1
+	// This uses quicListenerAdapter internally to wrap quic.Listener
 	l1, err := n1.Listen("echo", nil)
 	if err != nil {
 		t.Fatalf("Error listening on Receptor network: %s\n", err)
 	}
+
+	// Verify listener was created (exercises adapter Accept path)
+	if l1 == nil {
+		t.Fatal("Expected non-nil listener")
+	}
+	if l1.Addr() == nil {
+		t.Fatal("Expected non-nil listener address")
+	}
+
 	go func() {
 		// Accept an incoming connection - note that conn is just a regular net.Conn
 		conn, err := l1.Accept()
 		if err != nil {
-			t.Fatalf("Error accepting connection: %s\n", err)
+			t.Errorf("Error accepting connection: %s\n", err)
 
 			return
 		}
@@ -81,7 +94,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 					if strings.Contains(err.Error(), "no recent network activity") {
 						t.Log("Successfully got the desired timeout error")
 					} else {
-						t.Fatalf("Read error in Receptor listener: %s\n", err)
+						t.Errorf("Read error in Receptor listener: %s\n", err)
 					}
 
 					return
@@ -89,7 +102,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 				if n > 0 {
 					_, err := conn.Write(buf[:n])
 					if err != nil {
-						t.Fatalf("Write error in Receptor listener: %s\n", err)
+						t.Errorf("Write error in Receptor listener: %s\n", err)
 
 						return
 					}
@@ -100,7 +113,8 @@ func TestQuicConnectTimeout(t *testing.T) {
 
 	// Connect to the echo server from node 2.  We expect this to error out at first with
 	// "no route to node" because it takes a second or two for node1 and node2 to exchange
-	// routing information and form a mesh
+	// routing information and form a mesh.
+	// Dial uses quicConnAdapter internally to wrap quic.Conn.
 	var c2 net.Conn
 	for {
 		c2, err = n2.Dial("node1", "echo", nil)
@@ -111,6 +125,14 @@ func TestQuicConnectTimeout(t *testing.T) {
 		}
 
 		break
+	}
+
+	// Verify connection was established (exercises adapter OpenStreamSync path)
+	if c2.LocalAddr() == nil {
+		t.Fatal("Expected non-nil local address")
+	}
+	if c2.RemoteAddr() == nil {
+		t.Fatal("Expected non-nil remote address")
 	}
 
 	// Sleep longer than MaxIdleTimeout (see pkg/netceptor/conn.go for current setting)
@@ -126,14 +148,14 @@ func TestQuicConnectTimeout(t *testing.T) {
 			n, err := c2.Read(rbuf)
 			if n > 0 {
 				n2.Shutdown()
-				t.Fatal("Should not have gotten data back")
+				t.Error("Should not have gotten data back")
 
 				return
 			}
 			if err == io.EOF {
 				// Shut down the whole Netceptor when any connection closes, because this is just a demo
 				n2.Shutdown()
-				t.Fatal("Should not have gotten an EOF")
+				t.Error("Should not have gotten an EOF")
 
 				return
 			}

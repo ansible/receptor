@@ -15,7 +15,7 @@ require (
 	github.com/minio/highwayhash v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prep/socketpair v0.0.0-20171228153254-c2c6a7f821c2
-	github.com/quic-go/quic-go v0.50.1
+	github.com/quic-go/quic-go v0.54.1
 	github.com/rogpeppe/go-internal v1.13.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
@@ -33,6 +33,7 @@ require (
 )
 
 require (
+	github.com/onsi/gomega v1.34.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 )
@@ -51,7 +52,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.4 // indirect
-	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect

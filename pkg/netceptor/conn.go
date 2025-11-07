@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -29,6 +30,44 @@ var MaxIdleTimeoutForQuicConnections = 30 * time.Second
 // If you are doing a heartbeat your connection wont timeout without severing the connection i.e. firewall.
 // Having this variablized allows the tests to set KeepAliveForQuicConnections = False so that things will properly fail.
 var KeepAliveForQuicConnections = true
+
+// QuicListenerAdapter adapts *quic.Listener to QuicListenerForListener interface.
+// This allows real QUIC listeners to work with our interface while enabling test mocking.
+type QuicListenerAdapter struct {
+	*quic.Listener
+}
+
+func (a *QuicListenerAdapter) Accept(ctx context.Context) (QuicConnectionForConn, error) {
+	conn, err := a.Listener.Accept(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to accept connection: %w", err)
+	}
+
+	return &QuicConnAdapter{Conn: conn}, nil
+}
+
+// QuicConnAdapter adapts *quic.Conn to QuicConnectionForConn interface.
+type QuicConnAdapter struct {
+	*quic.Conn
+}
+
+func (a *QuicConnAdapter) AcceptStream(ctx context.Context) (QuicStreamForConn, error) {
+	stream, err := a.Conn.AcceptStream(ctx)
+
+	return stream, err
+}
+
+func (a *QuicConnAdapter) OpenStreamSync(ctx context.Context) (QuicStreamForConn, error) {
+	stream, err := a.Conn.OpenStreamSync(ctx)
+
+	return stream, err
+}
+
+// Compile-time verification that adapters satisfy their interfaces.
+var (
+	_ QuicListenerForListener = (*QuicListenerAdapter)(nil)
+	_ QuicConnectionForConn   = (*QuicConnAdapter)(nil)
+)
 
 type AcceptResult struct {
 	Conn net.Conn
@@ -130,7 +169,9 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	}()
 	acceptChan := make(chan *AcceptResult)
 	syncOnce := &sync.Once{}
-	li := NewListener(s, pc, ql, acceptChan, doneChan, syncOnce)
+	// Wrap the real QUIC listener in an adapter for interface compatibility
+	adaptedListener := &QuicListenerAdapter{Listener: ql}
+	li := NewListener(s, pc, adaptedListener, acceptChan, doneChan, syncOnce)
 
 	go li.AcceptLoop(ctx)
 
@@ -159,18 +200,13 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 			role = "client"
 		}
 		filename := fmt.Sprintf("log_%x_%s.qlog", connID, role)
-		f, err := os.Create(qlogPath + filename)
+		fullPath := path.Join(qlogPath, filename)
+		f, err := os.Create(fullPath)
 		if err != nil {
 			s.Logger.Debug("failed to create qlog file at path: %s", qlogPath)
 
 			return nil
 		}
-		defer func() {
-			err := f.Close()
-			if err != nil {
-				s.GetLogger().Error("Error closing %s: %s", qlogPath+filename, err)
-			}
-		}()
 
 		return qlog.NewConnectionTracer(f, p, connID)
 	} else {
@@ -419,10 +455,12 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 
 		return nil, err
 	}
-	qs, err := qc.OpenStreamSync(cctx)
+	// Wrap the connection in an adapter for interface compatibility
+	qcAdapted := &QuicConnAdapter{Conn: qc}
+	qs, err := qcAdapted.OpenStreamSync(cctx)
 	if err != nil {
 		close(okChan)
-		_ = qc.CloseWithError(500, err.Error())
+		_ = qcAdapted.CloseWithError(500, err.Error())
 		_ = pc.Close()
 		if cctx.Err() != nil {
 			return nil, cctx.Err()
@@ -445,7 +483,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	close(okChan)
 	go func() {
 		select {
-		case <-qc.Context().Done():
+		case <-qcAdapted.Context().Done():
 			_ = qs.Close()
 			_ = pc.Close()
 		case <-s.context.Done():
@@ -455,7 +493,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			return
 		}
 	}()
-	conn := NewConn(s, pc, qc, qs, doneChan, &sync.Once{}, cctx)
+	conn := NewConn(s, pc, qcAdapted, qs, doneChan, &sync.Once{}, cctx)
 
 	return conn, nil
 }

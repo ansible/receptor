@@ -68,7 +68,7 @@ jobs:
             -Dsonar.python.coverage.reportPaths=receptorctl/receptorctl_coverage.xml
 
       - name: Upload Code Coverage Report from Receptor Unit Tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: receptor-coverage-report
           path: coverage.txt
@@ -77,7 +77,7 @@ jobs:
         run: echo "PR ${{ github.event.number }}" > pr_number.txt
 
       - name: Upload PR Number
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pr_number
           path: pr_number.txt
@@ -87,13 +87,13 @@ jobs:
         run: .github/workflows/artifact-k8s-logs.sh
 
       - name: Archive receptor binary
-        uses: actions/upload-artifact@v4.4.3
+        uses: actions/upload-artifact@v5
         with:
           name: receptor
           path: /usr/local/bin/receptor
 
       - name: Upload Code Coverage Report from Receptorctl Unit Tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: receptorctl-coverage-report
           path: receptorctl/receptorctl_coverage.xml

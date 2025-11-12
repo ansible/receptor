@@ -104,7 +104,8 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 	}
 }
 
-// createRemoteWorkTestSetup creates the basic setup for remote work unit tests.
+// createRemoteWorkTestSetup creates mocks for testing remote work units.
+// Note: ctrl.Finish() is automatically called via t.Cleanup() when using gomock.NewController(t).
 func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.WorkUnit, *mock_workceptor.MockBaseWorkUnitForWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor, *workceptor.Workceptor, *gomock.Controller) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -585,6 +586,117 @@ func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 				}
 			} else {
 				t.Error("WorkUnit doesn't implement ConnectToRemote method")
+			}
+		})
+	}
+}
+
+func TestRemoteWorkGetConnectionCryptoErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		dialError         error
+		extraData         interface{}
+		expectStateFailed bool
+		expectContains    []string
+	}{
+		{
+			name:      "CRYPTO_BUFFER_EXCEEDED sets helpful message with KCS reference",
+			dialError: fmt.Errorf("CRYPTO_BUFFER_EXCEEDED (local): received invalid offset 17125 on crypto stream, maximum allowed 16384"),
+			extraData: &workceptor.RemoteExtraData{
+				RemoteNode: "execution", TLSClient: "test-client",
+				RemoteWorkType: "test-work", RemoteParams: make(map[string]string), RemoteStarted: false,
+			},
+			expectStateFailed: true,
+			expectContains:    []string{"KCS 7129200", "16KB", "QUIC crypto buffer exceeded", "CA bundle", "too large"},
+		},
+		{
+			name:      "CRYPTO_ERROR sets TLS error message",
+			dialError: fmt.Errorf("CRYPTO_ERROR: TLS handshake failed"),
+			extraData: &workceptor.RemoteExtraData{
+				RemoteNode: "execution", TLSClient: "test-client",
+				RemoteWorkType: "test-work", RemoteParams: make(map[string]string), RemoteStarted: false,
+			},
+			expectStateFailed: true,
+			expectContains:    []string{"TLS error connecting to remote service", "CRYPTO_ERROR"},
+		},
+		{
+			name:              "nil ExtraData handles gracefully",
+			dialError:         fmt.Errorf("CRYPTO_BUFFER_EXCEEDED: test"),
+			extraData:         nil,
+			expectStateFailed: false, // Defensive check prevents State update
+			expectContains:    []string{"KCS 7129200"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+
+			wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
+
+			remoteExtraData := &workceptor.RemoteExtraData{
+				RemoteNode:     "execution",
+				TLSClient:      "test-client",
+				RemoteWorkType: "test-work",
+				RemoteParams:   make(map[string]string),
+				RemoteStarted:  false,
+			}
+
+			statusLock := &sync.RWMutex{}
+			var capturedDetail string
+			var capturedState int
+
+			// Set up mocks
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+				ExtraData: remoteExtraData,
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+
+			// Capture status update - use tt.extraData for different scenarios
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+				status := &workceptor.StatusFileData{
+					ExtraData: tt.extraData,
+				}
+				updateFunc.(func(*workceptor.StatusFileData))(status)
+				capturedDetail = status.Detail
+				capturedState = status.State
+			}).AnyTimes()
+
+			// Mock TLS config and DialContext with test-specific error
+			mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+			mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, tt.dialError).AnyTimes()
+
+			// Call GetConnection
+			conn, reader := wu.(interface {
+				GetConnection(context.Context) (net.Conn, *bufio.Reader)
+			}).GetConnection(ctx)
+
+			// Verify connection failed
+			if conn != nil || reader != nil {
+				t.Error("Expected nil connection and reader")
+			}
+
+			// Verify status detail contains expected strings
+			for _, expected := range tt.expectContains {
+				if !strings.Contains(capturedDetail, expected) {
+					t.Errorf("Expected status detail to contain '%s', got: %s", expected, capturedDetail)
+				}
+			}
+
+			// Verify State
+			if tt.expectStateFailed && capturedState != workceptor.WorkStateFailed {
+				t.Errorf("Expected State=Failed, got: %d", capturedState)
+			}
+			if !tt.expectStateFailed && capturedState != 0 {
+				t.Errorf("Expected State=0, got: %d", capturedState)
 			}
 		})
 	}

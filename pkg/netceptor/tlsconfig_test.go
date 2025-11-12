@@ -792,3 +792,164 @@ func TestReceptorCertNameError(t *testing.T) {
 		})
 	}
 }
+
+// TestBaseTLS tests the baseTLS helper function that sets MinVersion based on MinTLS13 flag.
+// We test the public contract (MinVersion) rather than implementation details (which fields are set).
+// This makes tests resilient to future TLS versions and implementation changes.
+func TestBaseTLS(t *testing.T) {
+	tests := []struct {
+		name               string
+		minTLS13           bool
+		expectedMinVersion uint16
+	}{
+		{
+			name:               "MinTLS13 true sets TLS 1.3",
+			minTLS13:           true,
+			expectedMinVersion: tls.VersionTLS13,
+		},
+		{
+			name:               "MinTLS13 false sets TLS 1.2",
+			minTLS13:           false,
+			expectedMinVersion: tls.VersionTLS12,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := baseTLS(tt.minTLS13)
+
+			if cfg == nil {
+				t.Fatal("Expected non-nil tls.Config")
+			}
+
+			if cfg.MinVersion != tt.expectedMinVersion {
+				t.Errorf("Expected MinVersion=%d (TLS %s), got MinVersion=%d",
+					tt.expectedMinVersion,
+					tlsVersionToString(tt.expectedMinVersion),
+					cfg.MinVersion)
+			}
+		})
+	}
+}
+
+// TestTLSServerConfigMinTLS13 tests that TLSServerConfig correctly applies MinTLS13 setting.
+// Note: The struct tag `default:"true"` is applied by the config parser (YAML/CLI),
+// not when creating structs in Go code. These tests verify the PrepareTLSServerConfig behavior.
+func TestTLSServerConfigMinTLS13(t *testing.T) {
+	caCert, tempCert, tempCertKey, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "test-server")
+	t.Cleanup(func() { tearDown(t) })
+
+	MainInstance = New(context.Background(), "test-server")
+
+	tests := []struct {
+		name               string
+		minTLS13           bool
+		expectedMinVersion uint16
+	}{
+		{
+			name:               "explicit MinTLS13=true enforces TLS 1.3",
+			minTLS13:           true,
+			expectedMinVersion: tls.VersionTLS13,
+		},
+		{
+			name:               "explicit MinTLS13=false allows TLS 1.2",
+			minTLS13:           false,
+			expectedMinVersion: tls.VersionTLS12,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &TLSServerConfig{
+				Name:                   "test-server-" + tt.name,
+				Cert:                   tempCert,
+				Key:                    tempCertKey,
+				RequireClientCert:      false,
+				ClientCAs:              caCert,
+				SkipReceptorNamesCheck: true, // Skip cert validation to focus on TLS version testing
+				MinTLS13:               tt.minTLS13,
+			}
+
+			tlscfg, err := cfg.PrepareTLSServerConfig(MainInstance)
+			if err != nil {
+				t.Fatalf("Failed to prepare TLS server config: %v", err)
+			}
+
+			if tlscfg.MinVersion != tt.expectedMinVersion {
+				t.Errorf("Expected MinVersion=TLS %s (%d), got %d",
+					tlsVersionToString(tt.expectedMinVersion),
+					tt.expectedMinVersion,
+					tlscfg.MinVersion)
+			}
+		})
+	}
+}
+
+// TestTLSClientConfigMinTLS13 tests that TLSClientConfig correctly applies MinTLS13 setting.
+// Note: The struct tag `default:"true"` is applied by the config parser (YAML/CLI),
+// not when creating structs in Go code. These tests verify the PrepareTLSClientConfig behavior.
+func TestTLSClientConfigMinTLS13(t *testing.T) {
+	caCert, tempCert, tempCertKey, tearDown := useUtilsSetupSuiteWithGenerateWithCA(t, "test-client")
+	t.Cleanup(func() { tearDown(t) })
+
+	MainInstance = New(context.Background(), "test-client")
+
+	tests := []struct {
+		name               string
+		minTLS13           bool
+		expectedMinVersion uint16
+	}{
+		{
+			name:               "explicit MinTLS13=true enforces TLS 1.3",
+			minTLS13:           true,
+			expectedMinVersion: tls.VersionTLS13,
+		},
+		{
+			name:               "explicit MinTLS13=false allows TLS 1.2",
+			minTLS13:           false,
+			expectedMinVersion: tls.VersionTLS12,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &TLSClientConfig{
+				Name:                   "test-client-" + tt.name,
+				Cert:                   tempCert,
+				Key:                    tempCertKey,
+				RootCAs:                caCert,
+				InsecureSkipVerify:     false,
+				SkipReceptorNamesCheck: true, // Skip cert validation to focus on TLS version testing
+				MinTLS13:               tt.minTLS13,
+			}
+
+			tlscfg, _, err := cfg.PrepareTLSClientConfig(MainInstance)
+			if err != nil {
+				t.Fatalf("Failed to prepare TLS client config: %v", err)
+			}
+
+			if tlscfg.MinVersion != tt.expectedMinVersion {
+				t.Errorf("Expected MinVersion=TLS %s (%d), got %d",
+					tlsVersionToString(tt.expectedMinVersion),
+					tt.expectedMinVersion,
+					tlscfg.MinVersion)
+			}
+		})
+	}
+}
+
+// tlsVersionToString is a helper for error messages.
+func tlsVersionToString(version uint16) string {
+	switch version {
+	case tls.VersionTLS10:
+		return "1.0"
+	case tls.VersionTLS11:
+		return "1.1"
+	case tls.VersionTLS12:
+		return "1.2"
+	case tls.VersionTLS13:
+		return "1.3"
+	default:
+		return "unknown"
+	}
+}

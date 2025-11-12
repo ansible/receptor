@@ -425,3 +425,115 @@ func TestTCPSSLServerAuthFailBadKey(t *testing.T) {
 		})
 	}
 }
+
+// TestExplicitTLSVersions tests that both TLS 1.3 and TLS 1.2 work when explicitly configured.
+// This verifies both the new default (MinTLS13=true) and backward compatibility (MinTLS13=false).
+func TestExplicitTLSVersions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		minTLS13    bool
+		description string
+	}{
+		{
+			name:        "TLS-1.3",
+			minTLS13:    true,
+			description: "TLS 1.3 explicitly enabled",
+		},
+		{
+			name:        "TLS-1.2",
+			minTLS13:    false,
+			description: "TLS 1.2 backward compatibility",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		for _, proto := range []string{"tcp", "ws"} {
+			proto := proto
+			testName := tt.name + "/" + proto
+			t.Run(testName, func(t *testing.T) {
+				t.Parallel()
+
+				m := NewLibMesh()
+
+				caKey, caCrt, err := utils.GenerateCA("ca", "localhost")
+				if err != nil {
+					t.Fatal(err)
+				}
+				key1, crt1, err := utils.GenerateCertWithCA("node1", caKey, caCrt, "localhost", []string{"localhost"}, []string{"node1"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				key2, crt2, err := utils.GenerateCertWithCA("node2", caKey, caCrt, "localhost", []string{"localhost"}, []string{"node2"})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				defer func() {
+					t.Log(m.LogWriter.String())
+				}()
+
+				node1 := m.NewLibNode("node1")
+				node1.TLSServerConfigs = []*netceptor.TLSServerConfig{
+					{
+						Name:              "server",
+						Key:               key1,
+						Cert:              crt1,
+						RequireClientCert: true,
+						ClientCAs:         caCrt,
+						MinTLS13:          tt.minTLS13,
+					},
+				}
+				node1.ListenerCfgs = map[listenerName]ListenerCfg{
+					listenerName(proto): newListenerCfg(proto, "server", 1, nil),
+				}
+				m.GetNodes()[node1.GetID()] = node1
+
+				node2 := m.NewLibNode("node2")
+				node2.Connections = []Connection{
+					{RemoteNode: node1, Protocol: proto, TLS: "client"},
+				}
+				node2.TLSClientConfigs = []*netceptor.TLSClientConfig{
+					{
+						Name:     "client",
+						Key:      key2,
+						Cert:     crt2,
+						RootCAs:  caCrt,
+						MinTLS13: tt.minTLS13,
+					},
+				}
+				m.GetNodes()[node2.GetID()] = node2
+
+				err = m.Start(t.Name())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer m.WaitForShutdown()
+				defer m.Destroy()
+
+				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+				defer cancel()
+
+				err = m.WaitForReady(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Verify nodes can communicate
+				controller := NewReceptorControl()
+				err = controller.Connect(node2.GetControlSocket())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer controller.Close()
+
+				_, err = controller.Ping(node1.GetID())
+				if err != nil {
+					t.Fatalf("%s connection failed: %v", tt.description, err)
+				}
+			})
+		}
+	}
+}

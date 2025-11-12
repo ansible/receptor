@@ -51,12 +51,12 @@ jobs:
           exit 0
 
       - name: Checkout receptor
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.ref }}
 
       - name: Install python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.DESIRED_PYTHON_VERSION }}
 

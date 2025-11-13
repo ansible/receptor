@@ -150,6 +150,16 @@ func TestAcceptLoopNonReceptorAddr(t *testing.T) {
 		// Give the lifecycle goroutine time to clean up
 		time.Sleep(10 * time.Millisecond)
 
+		// If the context error is anything other than "context canceled" then
+		// the connCancel() cancel function was not called.
+		connErr := conn.Context().Err()
+		if connErr == nil {
+			t.Fatal("Connection context should be canceled, but Err() returned nil")
+		}
+		if connErr.Error() != "context canceled" {
+			t.Fatalf("Connection context should be canceled. Was: %s", connErr.Error())
+		}
+
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("Timeout waiting for connection")
 	}

@@ -578,6 +578,11 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.qs.SetWriteDeadline(t)
 }
 
+// Context returns the connection's context.
+func (c *Conn) Context() context.Context {
+	return c.ctx
+}
+
 const insecureCommonName = "netceptor-insecure-common-name"
 
 func generateServerTLSConfig() *tls.Config {

@@ -45,7 +45,7 @@ jobs:
         run: make coverage
 
       - name: Set up nox
-        uses: wntrblm/nox@2025.05.01
+        uses: wntrblm/nox@2025.11.12
         with:
           python-versions: ${{ env.DESIRED_PYTHON_VERSION }}
 

@@ -32,6 +32,8 @@ const (
 	WorkStateCanceled  = 4
 )
 
+const logFormatWithUnitID = "[%s] %s"
+
 // IsComplete returns true if a given WorkState indicates the job is finished.
 func IsComplete(workState int) bool {
 	return workState == WorkStateSucceeded || workState == WorkStateFailed
@@ -98,25 +100,25 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs 
 
 // Error logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Error(format string, v ...interface{}) {
-	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	format = fmt.Sprintf(logFormatWithUnitID, bwu.unitID, format)
 	bwu.w.nc.GetLogger().Error(format, v...)
 }
 
 // Warning logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Warning(format string, v ...interface{}) {
-	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	format = fmt.Sprintf(logFormatWithUnitID, bwu.unitID, format)
 	bwu.w.nc.GetLogger().Warning(format, v...)
 }
 
 // Info logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Info(format string, v ...interface{}) {
-	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	format = fmt.Sprintf(logFormatWithUnitID, bwu.unitID, format)
 	bwu.w.nc.GetLogger().Info(format, v...)
 }
 
 // Debug logs message with unitID prepended.
 func (bwu *BaseWorkUnit) Debug(format string, v ...interface{}) {
-	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	format = fmt.Sprintf(logFormatWithUnitID, bwu.unitID, format)
 	bwu.w.nc.GetLogger().Debug(format, v...)
 }
 

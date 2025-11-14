@@ -2,13 +2,15 @@ package cmd
 
 import "github.com/ansible/receptor/pkg/types"
 
+const DefaultBindAddr = "0.0.0.0"
+
 func SetTCPListenerDefaults(config *BackendConfig) {
 	for _, listener := range config.TCPListeners {
 		if listener.Cost == 0 {
 			listener.Cost = 1.0
 		}
 		if listener.BindAddr == "" {
-			listener.BindAddr = "0.0.0.0"
+			listener.BindAddr = DefaultBindAddr
 		}
 	}
 }
@@ -19,7 +21,7 @@ func SetUDPListenerDefaults(config *BackendConfig) {
 			listener.Cost = 1.0
 		}
 		if listener.BindAddr == "" {
-			listener.BindAddr = "0.0.0.0"
+			listener.BindAddr = DefaultBindAddr
 		}
 	}
 }
@@ -30,7 +32,7 @@ func SetWSListenerDefaults(config *BackendConfig) {
 			listener.Cost = 1.0
 		}
 		if listener.BindAddr == "" {
-			listener.BindAddr = "0.0.0.0"
+			listener.BindAddr = DefaultBindAddr
 		}
 		if listener.Path == "" {
 			listener.Path = "/"

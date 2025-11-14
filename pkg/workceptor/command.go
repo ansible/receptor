@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const errMsgStatusFileUpdate = "Error updating status file %s: %s"
+
 type BaseWorkUnitForWorkUnit interface {
 	CancelContext()
 	ID() string
@@ -103,7 +105,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	statusFilename := path.Join(unitdir, "status")
 	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
 	if err != nil {
-		MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+		MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 	}
 	var cmd *exec.Cmd
 	if params == "" {
@@ -174,13 +176,13 @@ loop:
 			termThenKill(cmd, doneChan)
 			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
 			if err != nil {
-				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 			}
 			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
 			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
-				MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+				MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 				writeStatusFailures++
 				if writeStatusFailures > 3 {
 					MainInstance.nc.GetLogger().Error("Exceeded retries for updating status file %s: %s", statusFilename, err)
@@ -194,7 +196,7 @@ loop:
 	if err != nil {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 		}
 
 		return err
@@ -202,12 +204,12 @@ loop:
 	if cmd.ProcessState.Success() {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 		}
 	} else {
 		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
 		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err)
+			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 		}
 	}
 	err = stdin.Close()
@@ -450,7 +452,7 @@ func (cfg commandRunnerCfg) Run() error {
 		statusFilename := path.Join(cfg.UnitDir, "status")
 		err2 := (&StatusFileData{}).UpdateBasicStatus(statusFilename, WorkStateFailed, err.Error(), stdoutSize(cfg.UnitDir))
 		if err2 != nil {
-			MainInstance.nc.GetLogger().Error("Error updating status file %s: %s", statusFilename, err2)
+			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err2)
 		}
 		MainInstance.nc.GetLogger().Error("Command runner exited with error: %s\n", err)
 		os.Exit(-1)

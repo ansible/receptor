@@ -13,9 +13,11 @@
 # sys.path.insert(0, os.path.abspath('.'))
 # -- Project information -----------------------------------------------------
 
+AUTHOR_NAME = "Red Hat Ansible"
+
 project = "receptor"
-copyright = "Red Hat Ansible"
-author = "Red Hat Ansible"
+copyright = AUTHOR_NAME
+author = AUTHOR_NAME
 
 # The full version, including alpha/beta/rc tags
 # release = '0.0.0'
@@ -81,7 +83,7 @@ latex_elements = {
 }
 
 latex_documents = [
-    (master_doc, "receptor.tex", "receptor Documentation", "Red Hat Ansible", "manual"),
+    (master_doc, "receptor.tex", "receptor Documentation", AUTHOR_NAME, "manual"),
 ]
 
 # -- Options for manual page output ---------------------------------------

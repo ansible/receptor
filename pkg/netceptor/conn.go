@@ -243,6 +243,9 @@ func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
 	}
 }
 
+// AcceptLoop continuously accepts incoming QUIC connections.
+// In production, all connections use Receptor Addr types. The non-Receptor path (ok == false)
+// is defensive programming, primarily exercised in unit tests with mocked connections.
 func (li *Listener) AcceptLoop(ctx context.Context) {
 	for {
 		select {
@@ -326,6 +329,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 					return
 				}
 			}()
+			// Send connection to caller. The lifecycle goroutine will cancel connCtx when the connection ends.
 			li.SendResult(ctx, conn, err)
 		}()
 	}

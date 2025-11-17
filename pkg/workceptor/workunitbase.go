@@ -34,6 +34,8 @@ const (
 
 const logFormatWithUnitID = "[%s] %s"
 
+const errMsgErrorClosing = "Error closing %s: %s"
+
 // IsComplete returns true if a given WorkState indicates the job is finished.
 func IsComplete(workState int) bool {
 	return workState == WorkStateSucceeded || workState == WorkStateFailed
@@ -193,7 +195,7 @@ func (sfd *StatusFileData) Save(filename string) error {
 		serr := file.Close()
 
 		if serr != nil {
-			MainInstance.nc.GetLogger().Error("Error closing %s: %s", filename, serr)
+			MainInstance.nc.GetLogger().Error(errMsgErrorClosing, filename, serr)
 		}
 
 		return err
@@ -235,7 +237,7 @@ func (sfd *StatusFileData) Load(filename string) error {
 	if err != nil {
 		lerr := file.Close()
 		if lerr != nil {
-			MainInstance.nc.GetLogger().Error("Error closing %s: %s", filename, lerr)
+			MainInstance.nc.GetLogger().Error(errMsgErrorClosing, filename, lerr)
 		}
 
 		return err
@@ -267,7 +269,7 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error closing %s: %s", filename, err)
+			MainInstance.nc.GetLogger().Error(errMsgErrorClosing, filename, err)
 		}
 	}()
 	size, err := file.Seek(0, 2)

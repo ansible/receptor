@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,6 +21,8 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 )
+
+const errMsgRemoteExtraDataMissing = "remote ExtraData missing"
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
@@ -49,7 +52,7 @@ func (rw *remoteUnit) ConnectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
-		return nil, nil, fmt.Errorf("remote ExtraData missing")
+		return nil, nil, errors.New(errMsgRemoteExtraDataMissing)
 	}
 	tlsConfig, err := rw.GetWorkceptor().nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
@@ -294,7 +297,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
-		rw.GetWorkceptor().nc.GetLogger().Error("remote ExtraData missing")
+		rw.GetWorkceptor().nc.GetLogger().Error(errMsgRemoteExtraDataMissing)
 
 		return
 	}
@@ -387,7 +390,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
-		rw.GetWorkceptor().nc.GetLogger().Error("remote ExtraData missing")
+		rw.GetWorkceptor().nc.GetLogger().Error(errMsgRemoteExtraDataMissing)
 
 		return
 	}

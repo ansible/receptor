@@ -244,8 +244,8 @@ func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
 }
 
 // AcceptLoop continuously accepts incoming QUIC connections.
-// In production, all connections use Receptor Addr types. The non-Receptor path (ok == false)
-// is defensive programming, primarily exercised in unit tests with mocked connections.
+// Connections may have RemoteAddr as either Receptor Addr type or other net.Addr implementations (like net.TCPAddr).
+// Both types require lifecycle management to prevent context leaks.
 func (li *Listener) AcceptLoop(ctx context.Context) {
 	for {
 		select {
@@ -312,6 +312,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				doneOnce: &sync.Once{},
 				ctx:      connCtx,
 			}
+			// Receptor Addr connections can be monitored for unreachable service; other types cannot
 			rAddr, ok := conn.RemoteAddr().(Addr)
 			if ok {
 				go MonitorUnreachable(li.pc, doneChan, rAddr, connCancel)

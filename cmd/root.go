@@ -19,6 +19,8 @@ var (
 	backendConfig *BackendConfig
 )
 
+const errMsgUnableToDecode = "unable to decode into struct, %v"
+
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "receptor",
@@ -117,19 +119,19 @@ func handleRootCommand(cmd *cobra.Command, args []string) {
 
 	receptorConfig, err := ParseReceptorConfig(cfgFile)
 	if err != nil {
-		fmt.Printf("unable to decode into struct, %v", err)
+		fmt.Printf(errMsgUnableToDecode, err)
 		os.Exit(1)
 	}
 
 	certifcatesConfig, err := ParseCertificatesConfig(cfgFile)
 	if err != nil {
-		fmt.Printf("unable to decode into struct, %v", err)
+		fmt.Printf(errMsgUnableToDecode, err)
 		os.Exit(1)
 	}
 
 	backendConfig, err = ParseBackendConfig(cfgFile)
 	if err != nil {
-		fmt.Printf("unable to decode into struct, %v", err)
+		fmt.Printf(errMsgUnableToDecode, err)
 		os.Exit(1)
 	}
 

@@ -42,6 +42,10 @@ type RemoteExtraData struct {
 	Expiration     time.Time
 }
 
+const (
+	errRemoteExtraDataMissing = "remote ExtraData missing"
+)
+
 type actionFunc func(context.Context, net.Conn, *bufio.Reader) error
 
 // ConnectToRemote establishes a control socket connection to a remote node.
@@ -49,7 +53,7 @@ func (rw *remoteUnit) ConnectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
-		return nil, nil, fmt.Errorf("remote ExtraData missing")
+		return nil, nil, fmt.Errorf("%s", errRemoteExtraDataMissing)
 	}
 	tlsConfig, err := rw.GetWorkceptor().nc.GetClientTLSConfig(red.TLSClient, red.RemoteNode, netceptor.ExpectedHostnameTypeReceptor)
 	if err != nil {
@@ -294,7 +298,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
-		rw.GetWorkceptor().nc.GetLogger().Error("remote ExtraData missing")
+		rw.GetWorkceptor().nc.GetLogger().Error("%s", errRemoteExtraDataMissing)
 
 		return
 	}
@@ -387,7 +391,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	status := rw.Status()
 	red, ok := status.ExtraData.(*RemoteExtraData)
 	if !ok {
-		rw.GetWorkceptor().nc.GetLogger().Error("remote ExtraData missing")
+		rw.GetWorkceptor().nc.GetLogger().Error("%s", errRemoteExtraDataMissing)
 
 		return
 	}

@@ -813,8 +813,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Pod creation**: Uses `context.WithTimeout()` if `podPendingTimeout` is set (line 750-753). Returns error if timeout exceeded
-- ✅ **Pod readiness wait**: `UntilWithSync()` respects context timeout (line 757). Returns timeout error
+- ✅ **Pod creation**: Uses `context.WithTimeout()` if `podPendingTimeout` is set. Returns error if timeout exceeded
+- ✅ **Pod readiness wait**: `UntilWithSync()` respects context timeout. Returns timeout error
 - ⚠️ **API calls without explicit timeout**: Relies on context cancellation or underlying HTTP client timeouts
 - ⚠️ **Retry logic**: Retries use exponential backoff but may continue indefinitely if context isn't canceled
 
@@ -828,11 +828,11 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ❌ **No explicit retry**: Connection errors during `connectToKube()` are returned immediately (line 1558-1560)
-- ❌ **No retry in CreatePod()**: TODO comment on line 849 mentions adding retry logic but not implemented
-- ✅ **Retry in log stream**: `kubeLoggingConnectionHandler()` retries up to `GetKubeRetryCount()` times with backoff (line 311-324)
-- ✅ **Retry in Get pod**: When resuming, retries 5 times with 200ms delay (line 878-901)
-- ✅ **Retry in log reconnection**: Main loop retries getting pod with exponential backoff (line 384-398)
+- ❌ **No explicit retry**: Connection errors during `connectToKube()` are returned immediately
+- ❌ **No retry in CreatePod()**: TODO comment mentions adding retry logic but not implemented
+- ✅ **Retry in log stream**: `kubeLoggingConnectionHandler()` retries up to `GetKubeRetryCount()` times with backoff
+- ✅ **Retry in Get pod**: When resuming, retries 5 times with 200ms delay
+- ✅ **Retry in log reconnection**: Main loop retries getting pod with exponential backoff
 
 **Impact:** Initial connection failure causes immediate job failure. However, transient connection issues during execution are retried.
 
@@ -857,7 +857,7 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ⚠️ **Partial handling**: Pod YAML/JSON decoding errors are caught in `CreatePod()` (line 649-651) and returned
+- ⚠️ **Partial handling**: Pod YAML/JSON decoding errors are caught in `CreatePod()` and returned
 - ❌ **Watch/list responses**: No explicit validation of malformed API responses
 - ❌ **Log stream responses**: No validation of log stream format
 - ⚠️ **Error propagation**: Depends on `client-go` library to handle malformed responses
@@ -873,7 +873,7 @@ This section documents how the Kubernetes worker handles various error condition
 **Current handling:**
 
 - ❌ **No explicit handling**: TLS errors from `client-go` are propagated as-is
-- ⚠️ **Error location**: TLS errors occur during `NewForConfig()` (line 1641) or API calls
+- ⚠️ **Error location**: TLS errors occur during `NewForConfig()` or API calls
 - ⚠️ **Certificate validation**: Handled by `client-go` based on `rest.Config` TLS settings
 
 **Impact:** Job fails with TLS error. No retry logic for TLS errors.
@@ -886,9 +886,9 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Version detection**: `ShouldUseReconnect()` checks server version via `Discovery().ServerVersion()` (line 1275)
+- ✅ **Version detection**: `ShouldUseReconnect()` checks server version via `Discovery().ServerVersion()`
 - ✅ **Graceful degradation**: Falls back to no-reconnect logging method for older versions
-- ✅ **Compatibility check**: `IsCompatibleK8S()` validates version >= 1.23.14 for reconnect support (line 1201-1242)
+- ✅ **Compatibility check**: `IsCompatibleK8S()` validates version >= 1.23.14 for reconnect support
 - ⚠️ **Feature detection**: Only checks for reconnect support. Other version-dependent features not explicitly checked.
 
 **Impact:** Automatically falls back to legacy method. Should work on older versions.
@@ -915,8 +915,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **kubeconfig errors**: Caught in `connectUsingKubeconfig()` (line 1492-1536), errors returned immediately
-- ✅ **in-cluster errors**: `InClusterConfig()` errors caught (line 1540-1542)
+- ✅ **kubeconfig errors**: Caught in `connectUsingKubeconfig()`, errors returned immediately
+- ✅ **in-cluster errors**: `InClusterConfig()` errors caught
 - ❌ **No retry**: Authentication errors are not retried (correctly, as they won't resolve)
 - ⚠️ **Permission errors**: API calls return `apierrors.IsForbidden()` which propagates through error handling
 - ⚠️ **Token expiration**: No token refresh logic; tokens from kubeconfig expected to be valid
@@ -933,8 +933,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Watch detects**: `podRunningAndReady()` watches for pod phase changes (line 185-229)
-- ⚠️ **Timeout handling**: If `podPendingTimeout` is set, pending pods timeout (line 750-753)
+- ✅ **Watch detects**: `podRunningAndReady()` watches for pod phase changes
+- ⚠️ **Timeout handling**: If `podPendingTimeout` is set, pending pods timeout
 - ⚠️ **No explicit unscheduled detection**: Doesn't specifically check `pod.Status.Conditions` for `PodScheduled: False`
 - ⚠️ **Error message**: Returns generic error from `UntilWithSync()` timeout
 
@@ -948,10 +948,10 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Watch detects deletion**: `podRunningAndReady()` returns `NotFound` if pod deleted (line 188-190)
-- ✅ **Terminated state detection**: `KubeLoggingWithReconnect()` checks for terminated containers (line 520-574)
-- ✅ **Exit code handling**: Checks `containerState.Terminated.ExitCode` (line 522)
-- ✅ **Reason classification**: Distinguishes between "Completed"/"Error" (normal completion) vs "OOMKilled"/"Evicted" (interrupted) (line 529-557)
+- ✅ **Watch detects deletion**: `podRunningAndReady()` returns `NotFound` if pod deleted
+- ✅ **Terminated state detection**: `KubeLoggingWithReconnect()` checks for terminated containers
+- ✅ **Exit code handling**: Checks `containerState.Terminated.ExitCode`
+- ✅ **Reason classification**: Distinguishes between "Completed"/"Error" (normal completion) vs "OOMKilled"/"Evicted" (interrupted)
 - ✅ **Work state determination**:
   - Exit code 0 → WorkStateSucceeded
   - Exit code != 0 + reason "Completed"/"Error" → WorkStateSucceeded (normal completion with error)
@@ -969,14 +969,14 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Terminated state**: Detected via `containerState.Terminated` (line 520)
-- ✅ **Reason detection**: Checks `Terminated.Reason` for "OOMKilled", "Evicted" vs "Completed"/"Error" (line 529-557)
+- ✅ **Terminated state**: Detected via `containerState.Terminated`
+- ✅ **Reason detection**: Checks `Terminated.Reason` for "OOMKilled", "Evicted" vs "Completed"/"Error"
 - ✅ **Work state logic**:
   - Exit code 0 → WorkStateSucceeded
   - Exit code != 0 + reason "Completed"/"Error" → WorkStateSucceeded (normal completion)
-  - Exit code != 0 + reason "OOMKilled"/"Evicted"/etc → WorkStateFailed (sets `stdoutErr` at line 542-547)
+  - Exit code != 0 + reason "OOMKilled"/"Evicted"/etc → WorkStateFailed (sets `stdoutErr`)
 - ✅ **Error marking**: Sets `stdoutErr` only if execution interrupted (not for normal error completions)
-- ✅ **Log capture**: Attempts to write last line before container termination (line 561-572)
+- ✅ **Log capture**: Attempts to write last line before container termination
 
 **Impact:** Properly detected and classified. Work state determined by both exit code AND termination reason. Jobs with non-zero exit codes but "Completed"/"Error" reasons are marked as succeeded (normal completion), while interrupted executions (OOMKilled, Evicted) are marked as failed.
 
@@ -988,7 +988,7 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ⚠️ **Limited detection**: Only checks `WorkerContainerName` container (line 491-496)
+- ⚠️ **Limited detection**: Only checks `WorkerContainerName` container
 - ⚠️ **No sidecar monitoring**: Doesn't check status of other containers
 - ⚠️ **Pod phase impact**: If sidecar failures cause pod to fail, pod phase change is detected
 - ⚠️ **Init container failures**: May prevent pod from starting, detected via pod phase
@@ -1005,8 +1005,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **YAML/JSON decoding**: Errors caught in `CreatePod()` when decoding `ked.KubePod` (line 649-651)
-- ✅ **Worker container validation**: Checks that container named "worker" exists (line 656-665)
+- ✅ **YAML/JSON decoding**: Errors caught in `CreatePod()` when decoding `ked.KubePod`
+- ✅ **Worker container validation**: Checks that container named "worker" exists
 - ✅ **Required fields**: Kubernetes API validates pod spec during `Create()` call
 - ⚠️ **Partial validation**: Only validates worker container exists, not other aspects
 - ❌ **No pre-validation**: Invalid specs discovered only when creating pod
@@ -1024,10 +1024,10 @@ This section documents how the Kubernetes worker handles various error condition
 **Current handling:**
 
 - ✅ **4-hour log stream timeout**: Kubernetes API closes log streams after 4 hours
-- ✅ **Automatic reconnection**: `KubeLoggingWithReconnect()` detects EOF and reconnects with `sinceTime` to avoid duplicates (line 360-631)
-- ✅ **Timestamp-based deduplication**: `ProcessLogLine()` uses timestamps to skip duplicate lines (line 1865-1886)
-- ✅ **Context cancellation handling**: Checks `context.Canceled` during log reading (line 426-439)
-- ✅ **EOF with Running state**: When EOF is detected but container is still Running, the system continues attempting to reconnect indefinitely (no retry limit) using Fibonacci backoff (line 506-519). This handles both cases: 4-hour log stream timeouts and rapid state transitions to terminated.
+- ✅ **Automatic reconnection**: `KubeLoggingWithReconnect()` detects EOF and reconnects with `sinceTime` to avoid duplicates
+- ✅ **Timestamp-based deduplication**: `ProcessLogLine()` uses timestamps to skip duplicate lines
+- ✅ **Context cancellation handling**: Checks `context.Canceled` during log reading
+- ✅ **EOF with Running state**: When EOF is detected but container is still Running, the system continues attempting to reconnect indefinitely (no retry limit) using Fibonacci backoff. This handles both cases: 4-hour log stream timeouts and rapid state transitions to terminated.
 - ✅ **Fibonacci backoff**: Uses `GetNextFibonacciValues()` for exponential backoff calculations (capped at 400 to prevent excessive delays)
 - ⚠️ **No job timeout**: No maximum job duration enforced by Receptor itself
 - ⚠️ **Context cancellation**: Depends on external context cancellation (e.g., from the work submission client)
@@ -1042,9 +1042,9 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Context check in log reading**: Detects `context.Canceled` and marks job as failed if not already succeeded (line 426-439)
+- ✅ **Context check in log reading**: Detects `context.Canceled` and marks job as failed if not already succeeded
 - ✅ **Context propagation**: Uses `kw.GetContext()` throughout for cancellation propagation
-- ✅ **Cancel() method**: Deletes pod when `Cancel()` is called (line 1838-1852)
+- ✅ **Cancel() method**: Deletes pod when `Cancel()` is called
 - ⚠️ **No graceful shutdown**: No attempt to wait for current operation to complete
 - ⚠️ **Pod cleanup**: Pod is deleted immediately on cancel, may interrupt running job
 
@@ -1060,8 +1060,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Streaming approach**: Uses streaming reads (`bufio.NewReader`) not loading all logs into memory (line 420)
-- ✅ **Line-by-line processing**: Processes one line at a time (line 422)
+- ✅ **Streaming approach**: Uses streaming reads (`bufio.NewReader`) not loading all logs into memory
+- ✅ **Line-by-line processing**: Processes one line at a time
 - ⚠️ **No size limits**: No explicit maximum log size limits
 - ⚠️ **Disk space**: Depends on available disk space for stdout file
 - ⚠️ **Memory**: Should be safe due to streaming, but very long individual lines may cause issues
@@ -1076,8 +1076,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Error detection**: Checks `stdout.Write()` errors (line 618-624, 580-586)
-- ✅ **Error propagation**: Sets `stdoutErr` and logs error (line 620-623)
+- ✅ **Error detection**: Checks `stdout.Write()` errors
+- ✅ **Error propagation**: Sets `stdoutErr` and logs error
 - ✅ **Job failure**: Marks job as failed when write error occurs
 - ⚠️ **No retry**: Write errors are not retried (assumed to be persistent)
 - ⚠️ **Partial writes**: If write fails mid-stream, partial data may be in file

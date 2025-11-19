@@ -113,7 +113,6 @@ Two streaming methods are supported:
 This diagram shows the complete flow from work submission to completion using the logger streaming method.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 sequenceDiagram
     participant Client
     participant Workceptor as Work Service<br/>(Workceptor)
@@ -247,7 +246,6 @@ sequenceDiagram
 This diagram details the three authentication methods supported by the Kubernetes worker.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#4a9eff', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#4a9eff', 'lineColor':'#6bb3ff', 'secondaryColor':'#1a1a1a', 'tertiaryColor':'#2a2a2a', 'background':'#000000', 'mainBkgColor':'#000000', 'secondBkgColor':'#1a1a1a', 'nodeBkg':'#1a1a1a', 'nodeBorder':'#4a9eff', 'clusterBkg':'#0a0a0a', 'clusterBorder':'#4a9eff', 'defaultLinkColor':'#6bb3ff', 'titleColor':'#ffffff', 'edgeLabelBackground':'#1a1a1a', 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 flowchart TD
     Start([KubeUnit.Start]) --> Connect[connectToKube]
     Connect --> AuthMethod{Check authMethod}
@@ -285,14 +283,6 @@ flowchart TD
     RuntimeCheck -->|No| RuntimeError[Error: secret_kube_config<br/>must be provided]
     RuntimeCheck -->|Yes| LoadRuntime[Load config from params]
     LoadRuntime --> BuildCustom
-    
-    style Start fill:#1a1a1a
-    style Done fill:#1a1a1a
-    style AuthMethod fill:#4a9eff
-    style CheckConfig fill:#4a9eff
-    style CheckNamespace fill:#4a9eff
-    style RuntimeCheck fill:#4a9eff
-    style RuntimeError fill:#ff6b35
 ```
 
 ### Diagram 3: Pod Creation and Lifecycle
@@ -300,7 +290,6 @@ flowchart TD
 This diagram shows how pods are created and how the system waits for them to become ready.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 sequenceDiagram
     participant KubeUnit
     participant KubeAPI as Kubernetes API
@@ -397,7 +386,6 @@ sequenceDiagram
 This diagram shows the logger streaming method flow, including stdin streaming and log retrieval with reconnection support.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 sequenceDiagram
     participant KubeUnit
     participant KubeAPI as Kubernetes API
@@ -514,7 +502,6 @@ sequenceDiagram
 This diagram details the sophisticated reconnection logic used in `KubeLoggingWithReconnect()` to handle log stream disconnections.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#4a9eff', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#4a9eff', 'lineColor':'#6bb3ff', 'secondaryColor':'#1a1a1a', 'tertiaryColor':'#2a2a2a', 'background':'#000000', 'mainBkgColor':'#000000', 'secondBkgColor':'#1a1a1a', 'nodeBkg':'#1a1a1a', 'nodeBorder':'#4a9eff', 'clusterBkg':'#0a0a0a', 'clusterBorder':'#4a9eff', 'defaultLinkColor':'#6bb3ff', 'titleColor':'#ffffff', 'edgeLabelBackground':'#1a1a1a', 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 flowchart TD
     Start([KubeLoggingWithReconnect]) --> MainLoop[Main reconnection loop]
     
@@ -582,21 +569,9 @@ flowchart TD
     ProcessLast --> WriteLast[Write last line to stdout]
     WriteLast --> Exit10([Exit - normal completion])
     CheckLastLine -->|No| Exit10
-    
+
     CheckState2 -->|Unknown| LogUnknown[Log: Unexpected state<br/>Continue]
     LogUnknown --> Exit11([Exit - unknown state])
-    
-    style Start fill:#1a1a1a
-    style Exit1 fill:#ff6b35
-    style Exit2 fill:#ff6b35
-    style Exit3 fill:#ff6b35
-    style Exit4 fill:#ff6b35
-    style Exit5 fill:#4a9eff
-    style Exit6 fill:#ff6b35
-    style Exit7 fill:#ff6b35
-    style Exit9 fill:#ff6b35
-    style Exit10 fill:#4a9eff
-    style Exit11 fill:#ff6b35
 ```
 
 ### Diagram 6: TCP Streaming Method (Legacy)
@@ -604,7 +579,6 @@ flowchart TD
 This diagram shows the TCP streaming method where the pod connects back to the host.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 sequenceDiagram
     participant KubeUnit
     participant TCPListener as TCP Listener
@@ -695,7 +669,6 @@ sequenceDiagram
 This diagram shows the comprehensive error handling and retry mechanisms throughout the Kubernetes worker.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#4a9eff', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#4a9eff', 'lineColor':'#6bb3ff', 'secondaryColor':'#1a1a1a', 'tertiaryColor':'#2a2a2a', 'background':'#000000', 'mainBkgColor':'#000000', 'secondBkgColor':'#1a1a1a', 'nodeBkg':'#1a1a1a', 'nodeBorder':'#4a9eff', 'clusterBkg':'#0a0a0a', 'clusterBorder':'#4a9eff', 'defaultLinkColor':'#6bb3ff', 'titleColor':'#ffffff', 'edgeLabelBackground':'#1a1a1a', 'actorBkg':'#000000', 'actorBorder':'#4a9eff', 'actorTextColor':'#ffffff', 'actorLineColor':'#4a9eff', 'signalColor':'#ffffff', 'signalTextColor':'#ffffff', 'labelBoxBkgColor':'#000000', 'labelBoxBorderColor':'#4a9eff', 'labelTextColor':'#ffffff', 'loopTextColor':'#ffffff', 'noteBkgColor':'#000000', 'noteTextColor':'#ffffff', 'noteBorderColor':'#ff6b35', 'activationBkgColor':'#1a1a1a', 'activationBorderColor':'#4a9eff', 'sequenceNumberColor':'#000000'}}}%%
 flowchart TD
     Start([Error Handling Overview]) --> ErrorTypes[Error Categories]
     
@@ -763,21 +736,6 @@ flowchart TD
     LogStreamTimeout --> ReconnectLogs
     
     ReconnectLogs --> MainLoop[Continue main loop]
-    
-    style Start fill:#1a1a1a
-    style HandlePodFailed fill:#ff6b35
-    style HandlePodCompleted fill:#4a9eff
-    style HandleImagePull fill:#ff6b35
-    style HandleNotFound fill:#ff6b35
-    style FailStdin fill:#ff6b35
-    style FailContext fill:#ff6b35
-    style ExitContext fill:#4a9eff
-    style Success fill:#4a9eff
-    style SuccessNormal fill:#4a9eff
-    style FailInterrupted fill:#ff6b35
-    style FailNonEOF fill:#ff6b35
-    style FailAuth fill:#ff6b35
-    style FailTimeout fill:#ff6b35
 ```
 
 ## Key Features

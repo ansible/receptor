@@ -1000,15 +1000,22 @@ This section documents how the Kubernetes worker handles various error condition
 **What happens:**
 
 - Sidecar containers or init containers fail or are killed
+- **Note**: Multi-container pods are only possible when using custom pod specs (Pod parameter). In normal mode (Image/Command/Params), the pod is created with a single container named "worker", so sidecars and init containers are not possible.
 
 **Current handling:**
 
 - ⚠️ **Limited detection**: Only checks `WorkerContainerName` container
-- ⚠️ **No sidecar monitoring**: Doesn't check status of other containers
-- ⚠️ **Pod phase impact**: If sidecar failures cause pod to fail, pod phase change is detected
-- ⚠️ **Init container failures**: May prevent pod from starting, detected via pod phase
+- ⚠️ **No sidecar monitoring**: Doesn't check status of other containers in `pod.Status.ContainerStatuses`
+- ⚠️ **No init container monitoring**: Doesn't check `pod.Status.InitContainerStatuses`
+- ⚠️ **Pod phase impact**: If sidecar/init failures cause pod to fail, pod phase change is detected via watch
+- ⚠️ **Init container failures**: May prevent pod from reaching Ready state, detected as timeout during `podRunningAndReady()` watch
 
-**Impact:** If worker container unaffected, job continues. If pod fails due to sidecar, detected via pod phase.
+**Impact:**
+
+- If worker container unaffected by sidecar failure, job continues normally
+- If pod fails due to sidecar/init failure, detected indirectly via pod phase (PodFailed) or timeout waiting for Ready state
+- No visibility into which sidecar/init container caused the failure - only that the pod failed
+- Custom pod specs allow multiple containers and init containers, but normal mode creates single-container pods only
 
 ### Invalid Input Handling
 

@@ -357,7 +357,7 @@ sequenceDiagram
             Watch-->>KubeUnit: Error: ErrPodFailed
         else Pod Phase: Succeeded
             Watch-->>KubeUnit: Error: ErrPodCompleted
-        else Pod Deleted
+        else Pod Deleted (during startup)
             Watch-->>KubeUnit: Error: NotFound
         end
     end
@@ -680,25 +680,25 @@ flowchart TD
     PodErrors --> PodFailed[ErrPodFailed:<br/>Pod Phase = Failed]
     PodErrors --> PodCompleted[ErrPodCompleted:<br/>Pod Phase = Succeeded]
     PodErrors --> ImagePullBack[ErrImagePullBackOff:<br/>Container waiting - ImagePullBackOff]
-    PodErrors --> NotFound[Pod NotFound:<br/>Pod deleted or doesn't exist]
-    
+    PodErrors --> NotFound[Pod NotFound:<br/>Pod deleted during startup<br/>or doesn't exist]
+
     StreamErrors --> StdinError[Stdin Stream Error:<br/>SPDY executor failure]
     StreamErrors --> StdoutError[Stdout Stream Error:<br/>Log stream EOF/timeout]
     StreamErrors --> NonEOFError[Non-EOF Error:<br/>Unexpected stream error]
-    
+
     AuthErrors --> ConfigError[Config Parse Error:<br/>Invalid kubeconfig]
     AuthErrors --> ClusterError[InCluster Error:<br/>Not running in cluster]
-    
+
     TimeoutErrors --> PodPendingTimeout[Pod Pending Timeout:<br/>Pod didn't become ready]
     TimeoutErrors --> LogStreamTimeout[4-hour Log Stream Timeout:<br/>Kubernetes API closes stream]
-    
+
     PodFailed --> HandlePodFailed[Handle:<br/>1. Try to get pod logs<br/>2. Update status to Failed<br/>3. Return error with details]
-    
+
     PodCompleted --> HandlePodCompleted[Handle:<br/>1. Check container exit code<br/>2. If exit != 0, return error<br/>3. If exit == 0, return ErrPodCompleted]
-    
+
     ImagePullBack --> HandleImagePull[Handle:<br/>1. Retry check 3 times<br/>2. If still failing, return ErrImagePullBackOff]
-    
-    NotFound --> HandleNotFound[Handle:<br/>1. If resume mode, mark as Failed<br/>2. If create mode, return error]
+
+    NotFound --> HandleNotFound[Handle:<br/>1. During startup: Return NotFound error<br/>2. During execution: Retry Get with backoff<br/>3. After retries exhausted: Mark as Failed]
     
     StdinError --> RetryStdin{Retries<br/>remaining?}
     RetryStdin -->|Yes| RetryStdinAction[Retry with 200ms delay<br/>Max: GetKubeRetryCount times]
@@ -948,7 +948,8 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Current handling:**
 
-- ✅ **Watch detects deletion**: `podRunningAndReady()` returns `NotFound` if pod deleted
+- ✅ **Watch detects deletion during startup**: `podRunningAndReady()` returns `NotFound` if pod deleted while waiting for pod to become ready
+- ⚠️ **Deletion during execution handled indirectly**: When pod is deleted during job execution, the log stream closes and subsequent `Get()` calls return `NotFound` errors. After retries are exhausted (default 5 retries), the job fails with error "Error getting pod X/Y. Error: pods 'X' not found". No explicit check for `IsNotFound()` to distinguish deletion from other API errors.
 - ✅ **Terminated state detection**: `KubeLoggingWithReconnect()` checks for terminated containers
 - ✅ **Exit code handling**: Checks `containerState.Terminated.ExitCode`
 - ✅ **Reason classification**: Distinguishes between "Completed"/"Error" (normal completion) vs "OOMKilled"/"Evicted" (interrupted)

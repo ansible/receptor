@@ -48,7 +48,7 @@ This document provides comprehensive diagrams documenting the Kubernetes worker 
       - [Invalid PodTemplate Provided](#invalid-podtemplate-provided)
     - [Long-Running Job Scenarios](#long-running-job-scenarios)
       - [Job Running for 40+ Hours](#job-running-for-40-hours)
-      - [Context Cancellation Issues](#context-cancellation-issues)
+      - [Context Cancellation](#context-cancellation)
     - [Log and Disk I/O Errors](#log-and-disk-io-errors)
       - [Log Returned by Kube API Is Too Long](#log-returned-by-kube-api-is-too-long)
       - [Cannot Write Logs to Disk](#cannot-write-logs-to-disk)
@@ -1056,21 +1056,39 @@ This section documents how the Kubernetes worker handles various error condition
 
 **Impact:** Jobs can run indefinitely if context not canceled. Log streams automatically reconnect every 4 hours. When EOF occurs with a Running container, the system continues attempting reconnection indefinitely rather than failing, which improves handling of long-running jobs and 4-hour timeout scenarios.
 
-#### Context Cancellation Issues
+#### Context Cancellation
 
 **What happens:**
 
-- Parent context (from the work submission client) times out or is canceled while job still running
+- Context is canceled, triggering cleanup of the work unit
+- **Important distinction**:
+  - **Pod startup failures** (before execution begins): `Cancel()` IS called automatically
+  - **Errors during execution** (after pod running): Errors do NOT cancel context - they just mark job as failed and set error details
+  - **Context cancellation during execution**: Only from explicit user action or Receptor shutdown, NOT from execution errors
+
+**Cancellation triggers:**
+
+- ✅ **User cancels work**: Via `receptorctl work cancel <unit-id>`
+- ✅ **User releases work**: Via `receptorctl work release <unit-id>` (calls `Cancel()`)
+- ✅ **Pod startup failure**: When `CreatePod()` fails (e.g., ErrPodFailed, ErrImagePullBackOff) - automatic cleanup
+- ⚠️ **Receptor shutdown**: SIGTERM/SIGINT to the Receptor process (if signal handler cancels contexts)
+- ❌ **NOT triggered by execution errors**: Container failures, OOMKilled, log stream errors, etc. do NOT cancel context - they mark job as failed but don't trigger `Cancel()`
 
 **Current handling:**
 
-- ✅ **Context check in log reading**: Detects `context.Canceled` and marks job as failed if not already succeeded
+- ✅ **Context check in log reading**: Detects `context.Canceled` and marks job as failed if not already in terminal state
 - ✅ **Context propagation**: Uses `kw.GetContext()` throughout for cancellation propagation
-- ✅ **Cancel() method**: Deletes pod when `Cancel()` is called
-- ⚠️ **No graceful shutdown**: No attempt to wait for current operation to complete
-- ⚠️ **Pod cleanup**: Pod is deleted immediately on cancel, may interrupt running job
+- ✅ **Cancel() method**: Deletes pod via Kubernetes API and marks as `WorkStateCanceled`
+- ⚠️ **No graceful shutdown**: No attempt to wait for current operation to complete or allow pod to finish
+- ⚠️ **Immediate pod deletion**: Pod is deleted immediately, may interrupt running job and lose partial output
 
-**Impact:** Job marked as failed on context cancellation. Pod deleted, potentially losing partial output.
+**Impact:**
+
+- Job marked as `WorkStateCanceled`
+- Pod deleted from Kubernetes cluster
+- Partial output may be lost if job was mid-execution
+- For user-initiated cancellation, this is intentional behavior
+- For pod startup failures, this is automatic cleanup to remove failed pods
 
 ### Log and Disk I/O Errors
 

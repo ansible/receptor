@@ -944,21 +944,21 @@ This section documents how the Kubernetes worker handles various error condition
 
 **What happens:**
 
-- Pod evicted, OOMKilled, node shutdown, manual deletion
+- Pod evicted due to node pressure, node shutdown, manual pod deletion via kubectl
 
 **Current handling:**
 
-- ✅ **Watch detects deletion during startup**: `podRunningAndReady()` returns `NotFound` if pod deleted while waiting for pod to become ready
-- ⚠️ **Deletion during execution handled indirectly**: When pod is deleted during job execution, the log stream closes and subsequent `Get()` calls return `NotFound` errors. After retries are exhausted (default 5 retries), the job fails with error "Error getting pod X/Y. Error: pods 'X' not found". No explicit check for `IsNotFound()` to distinguish deletion from other API errors.
-- ✅ **Terminated state detection**: `KubeLoggingWithReconnect()` checks for terminated containers
-- ✅ **Exit code handling**: Checks `containerState.Terminated.ExitCode`
-- ✅ **Reason classification**: Distinguishes between "Completed"/"Error" (normal completion) vs "OOMKilled"/"Evicted" (interrupted)
-- ✅ **Work state determination**:
-  - Exit code 0 → WorkStateSucceeded
-  - Exit code != 0 + reason "Completed"/"Error" → WorkStateSucceeded (normal completion with error)
-  - Exit code != 0 + reason "OOMKilled"/"Evicted"/etc → WorkStateFailed (execution interrupted, sets stdoutErr)
+- ✅ **Watch detects deletion during startup**: `podRunningAndReady()` watches for pod events and returns `NotFound` error if `watch.Deleted` event received while waiting for pod to become ready
+- ✅ **Watch detects pod phase failures**: Returns `ErrPodFailed` if pod enters `PodFailed` phase, `ErrPodCompleted` if pod enters `PodSucceeded` phase before ready
+- ⚠️ **Deletion during execution handled indirectly**: When pod is deleted during job execution:
+  1. Log stream closes (EOF received)
+  2. Subsequent `Get()` calls to retrieve pod status return errors (likely `NotFound`)
+  3. After retries are exhausted (default 5 retries at kubernetes.go:384-406), the job fails with error "Error getting pod X/Y. Error: pods 'X' not found"
+  4. No explicit `IsNotFound()` check to distinguish pod deletion from other API errors
+- ⚠️ **No explicit eviction detection**: Does not check pod conditions or events for eviction-specific signals (e.g., `pod.Status.Reason == "Evicted"`)
+- ⚠️ **Generic error handling**: Pod-level failures (eviction, node shutdown) are detected through watch phase changes or API Get() errors, not through specific eviction events
 
-**Impact:** Properly detected and classified. Work state depends on both exit code AND termination reason. Jobs marked as succeeded for normal completions (even with non-zero exit) but failed for interrupted executions.
+**Impact:** Pod deletion/eviction is detected but reported as generic API errors ("Error getting pod"). Error messages may not clearly indicate whether the pod was deleted, evicted, or experienced another failure. Handling is indirect, relies on watch events (during startup) or API errors (during execution) rather than explicit pod condition checks.
 
 ### Container Execution Errors
 
@@ -966,20 +966,34 @@ This section documents how the Kubernetes worker handles various error condition
 
 **What happens:**
 
-- Container running the work is killed (OOMKilled, SIGKILL, container runtime issues)
+- Container running the work is killed or terminates abnormally:
+  - **OOMKilled**: Container exceeded memory limit (container-level event, not pod-level)
+  - **SIGKILL/SIGTERM**: Container killed by runtime or scheduler
+  - **Container runtime issues**: containerd/CRI-O failures
+  - **Image issues**: Container crashes on startup
 
 **Current handling:**
 
-- ✅ **Terminated state**: Detected via `containerState.Terminated`
-- ✅ **Reason detection**: Checks `Terminated.Reason` for "OOMKilled", "Evicted" vs "Completed"/"Error"
-- ✅ **Work state logic**:
+- ✅ **Container state monitoring**: When EOF received on log stream, `KubeLoggingWithReconnect()` gets fresh pod status and examines container state
+- ✅ **Terminated state detection**: Checks `containerState.Terminated` to determine if container has stopped
+- ✅ **Exit code inspection**: Reads `containerState.Terminated.ExitCode` to determine exit status
+- ✅ **Reason classification**: Checks `containerState.Terminated.Reason` field and uses a whitelist approach:
+  - **Whitelist reasons** `["Completed", "Error"]`: Container ran to normal completion (even if it exited with error code)
+  - **All other reasons** (OOMKilled, Evicted, etc.): Execution was interrupted abnormally
+- ✅ **Work state determination logic**:
   - Exit code 0 → WorkStateSucceeded
-  - Exit code != 0 + reason "Completed"/"Error" → WorkStateSucceeded (normal completion)
-  - Exit code != 0 + reason "OOMKilled"/"Evicted"/etc → WorkStateFailed (sets `stdoutErr`)
+  - Exit code != 0 + reason in whitelist (`"Completed"` or `"Error"`) → WorkStateSucceeded (normal program completion with error)
+  - Exit code != 0 + reason NOT in whitelist (e.g., `"OOMKilled"`, `"Evicted"`) → WorkStateFailed and sets `stdoutErr`
 - ✅ **Error marking**: Sets `stdoutErr` only if execution interrupted (not for normal error completions)
-- ✅ **Log capture**: Attempts to write last line before container termination
+- ✅ **Last line capture**: Attempts to write last line from log stream before container termination
+- ✅ **Detailed logging**: Logs exit code, termination reason, and termination message for all non-zero exits
 
-**Impact:** Properly detected and classified. Work state determined by both exit code AND termination reason. Jobs with non-zero exit codes but "Completed"/"Error" reasons are marked as succeeded (normal completion), while interrupted executions (OOMKilled, Evicted) are marked as failed.
+**Impact:** Container-level terminations are properly detected and classified. Work state determined by both exit code AND termination reason. This correctly distinguishes between:
+
+- Programs that exit with non-zero status intentionally (marked as succeeded if reason is "Completed"/"Error")
+- Containers killed by OOM, eviction, or other interruptions (marked as failed)
+
+**Note:** OOMKilled is a **container-level event** that appears in `containerState.Terminated.Reason`, distinct from pod-level eviction events.
 
 #### Other Containers in Pod Are Killed
 

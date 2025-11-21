@@ -82,6 +82,19 @@ func (rw *remoteUnit) ConnectToRemote(ctx context.Context) (net.Conn, *bufio.Rea
 	return conn, reader, nil
 }
 
+// getCryptoErrorDetail checks if an error is a crypto-related error and returns
+// a detailed error message if it is, or an empty string if it's not.
+func getCryptoErrorDetail(errStr string) string {
+	if strings.Contains(errStr, "CRYPTO_BUFFER_EXCEEDED") {
+		return fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
+	}
+	if strings.Contains(errStr, "CRYPTO_ERROR") {
+		return fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
+	}
+
+	return ""
+}
+
 // GetConnection retries connectToRemote until connected or the context expires.
 func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
@@ -95,13 +108,7 @@ func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reade
 		errStr := err.Error()
 
 		// Only return on CRYPTO errors, others are retryable.
-		var detail string
-		if strings.Contains(errStr, "CRYPTO_BUFFER_EXCEEDED") {
-			detail = fmt.Sprintf("QUIC crypto buffer exceeded. CA bundle may be too large (limit: 16KB). See KCS 7129200: %s", errStr)
-		} else if strings.Contains(errStr, "CRYPTO_ERROR") {
-			detail = fmt.Sprintf("TLS error connecting to remote service: %s", errStr)
-		}
-
+		detail := getCryptoErrorDetail(errStr)
 		if detail != "" {
 			shouldExit := false
 			rw.UpdateFullStatus(func(status *StatusFileData) {

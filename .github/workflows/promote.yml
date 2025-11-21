@@ -14,7 +14,7 @@ jobs:
       TAG: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Log in to GHCR
         run: |
@@ -81,7 +81,7 @@ jobs:
       VERSION: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5

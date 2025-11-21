@@ -50,7 +50,7 @@ jobs:
           python-versions: ${{ inputs.python-version }}
 
       - name: Check out the source code from Git
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Needed for the automation in Nox to find the last tag
           sparse-checkout: receptorctl

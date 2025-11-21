@@ -710,7 +710,7 @@ flowchart TD
 
     ImagePullBack --> HandleImagePull[Handle:<br/>1. Retry check 3 times<br/>2. If still failing, return ErrImagePullBackOff]
 
-    NotFound --> HandleNotFound[Handle:<br/>1. During startup: Return NotFound error<br/>2. During execution: Retry Get with Fibonacci backoff<br/>3. After retries exhausted: Mark as Failed]
+    NotFound --> HandleNotFound[Handle: Return error with details]
     
     StdinError --> RetryStdin{Retries<br/>remaining?}
     RetryStdin -->|Yes| RetryStdinAction[Retry with 200ms delay<br/>Max: GetKubeRetryCount times]

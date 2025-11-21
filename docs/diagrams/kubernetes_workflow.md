@@ -89,8 +89,12 @@ The Kubernetes worker (`KubeUnit`) implements the `WorkUnit` interface to execut
 
 Two streaming methods are supported:
 
-- **Logger Method**: Uses Kubernetes log streaming API (recommended for K8s >= 1.23.14)
+- **Logger Method**: Uses Kubernetes log streaming API for stdout/stderr (recommended for K8s >= 1.23.14)
+  - **Stdin streaming**: Uses SPDY protocol via Kubernetes attach API (similar to `kubectl attach`)
+  - **Stdout streaming**: Uses Kubernetes logs API with automatic reconnection support
 - **TCP Method**: Pod connects back via TCP (legacy, simpler but less robust)
+
+**What is SPDY?** SPDY is a deprecated HTTP/2 precursor protocol that Kubernetes uses for streaming operations like `kubectl exec` and `kubectl attach`. The SPDY executor creates a multiplexed connection to the Kubernetes API server that allows bidirectional streaming to/from containers. Receptor uses the Kubernetes client-go library's `remotecommand.NewSPDYExecutor()` to create these connections for streaming stdin to pods.
 
 ## Architecture Components
 

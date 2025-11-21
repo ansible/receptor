@@ -704,7 +704,7 @@ flowchart TD
     TimeoutErrors --> PodPendingTimeout[Pod Pending Timeout:<br/>Pod didn't become ready]
     TimeoutErrors --> LogStreamTimeout[4-hour Log Stream Timeout:<br/>Kubernetes API closes stream]
 
-    PodFailed --> HandlePodFailed[Handle:<br/>1. Try to get pod logs<br/>2. Update status to Failed<br/>3. Return error with details]
+    PodFailed --> HandlePodFailed[Handle: Return error with details]
 
     PodCompleted --> HandlePodCompleted[Handle:<br/>1. Check container exit code<br/>2. If exit != 0, return error<br/>3. If exit == 0, return ErrPodCompleted]
 

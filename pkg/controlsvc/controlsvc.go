@@ -256,6 +256,65 @@ func writeToConnWithLog(conn net.Conn, nc NetceptorForControlsvc, writeMessage s
 	return errorNormal(nc, logMessage, err)
 }
 
+// readCommandBytes reads a single line from the connection, one byte at a time.
+// Returns the command bytes, whether EOF was hit, and whether to close the connection.
+func readCommandBytes(conn net.Conn, nc NetceptorForControlsvc) ([]byte, bool, bool) {
+	cmdBytes := make([]byte, 0)
+	buf := make([]byte, 1)
+	hitEOF := false
+
+	for {
+		n, err := conn.Read(buf)
+		if err == io.EOF {
+			nc.GetLogger().Debug("Control service closed\n")
+			hitEOF = true
+			break
+		} else if err != nil {
+			if !strings.HasSuffix(err.Error(), normalCloseError) {
+				nc.GetLogger().Warning("Could not read in control service: %s\n", err)
+			}
+			return nil, false, true
+		}
+		if n == 1 {
+			if buf[0] == '\r' {
+				continue
+			} else if buf[0] == '\n' {
+				break
+			}
+			cmdBytes = append(cmdBytes, buf[0])
+		}
+	}
+
+	return cmdBytes, hitEOF, false
+}
+
+// parseCommand parses command bytes into a command string and either params or JSON data.
+func parseCommand(cmdBytes []byte) (cmd string, params string, jsonData map[string]interface{}, err error) {
+	if cmdBytes[0] == '{' {
+		err = json.Unmarshal(cmdBytes, &jsonData)
+		if err == nil {
+			cmdIf, ok := jsonData["command"]
+			if ok {
+				cmd, ok = cmdIf.(string)
+				if !ok {
+					err = fmt.Errorf("command must be a string")
+				}
+			} else {
+				err = fmt.Errorf("JSON did not contain a command")
+			}
+		}
+	} else {
+		tokens := strings.SplitN(string(cmdBytes), " ", 2)
+		if len(tokens) > 0 {
+			cmd = strings.ToLower(tokens[0])
+			if len(tokens) > 1 {
+				params = tokens[1]
+			}
+		}
+	}
+	return cmd, params, jsonData, err
+}
+
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
 	s.nc.GetLogger().Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
@@ -279,63 +338,20 @@ func (s *Server) RunControlSession(conn net.Conn) {
 	for !done {
 		// Inefficiently read one line from the socket - we can't use bufio
 		// because we cannot read ahead beyond the newline character
-		cmdBytes := make([]byte, 0)
-		buf := make([]byte, 1)
-		for {
-			n, err := conn.Read(buf)
-			if err == io.EOF {
-				s.nc.GetLogger().Debug("Control service closed\n")
-				done = true
-
-				break
-			} else if err != nil {
-				if !strings.HasSuffix(err.Error(), normalCloseError) {
-					s.nc.GetLogger().Warning("Could not read in control service: %s\n", err)
-				}
-
-				return
-			}
-			if n == 1 {
-				if buf[0] == '\r' {
-					continue
-				} else if buf[0] == '\n' {
-					break
-				}
-				cmdBytes = append(cmdBytes, buf[0])
-			}
+		cmdBytes, hitEOF, shouldClose := readCommandBytes(conn, s.nc)
+		if shouldClose {
+			return
 		}
+		done = hitEOF
 		if len(cmdBytes) == 0 {
 			continue
 		}
-		var cmd string
-		var params string
-		var jsonData map[string]interface{}
-		if cmdBytes[0] == '{' {
-			err := json.Unmarshal(cmdBytes, &jsonData)
-			if err == nil {
-				cmdIf, ok := jsonData["command"]
-				if ok {
-					cmd, ok = cmdIf.(string)
-					if !ok {
-						err = fmt.Errorf("command must be a string")
-					}
-				} else {
-					err = fmt.Errorf("JSON did not contain a command")
-				}
-			}
-			if err != nil {
-				writeMsg := fmt.Sprintf("ERROR: %s\n", err)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			}
-		} else {
-			tokens := strings.SplitN(string(cmdBytes), " ", 2)
-			if len(tokens) > 0 {
-				cmd = strings.ToLower(tokens[0])
-				if len(tokens) > 1 {
-					params = tokens[1]
-				}
+
+		cmd, params, jsonData, err := parseCommand(cmdBytes)
+		if err != nil {
+			writeMsg := fmt.Sprintf("ERROR: %s\n", err)
+			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
+				return
 			}
 		}
 		s.controlFuncLock.RLock()

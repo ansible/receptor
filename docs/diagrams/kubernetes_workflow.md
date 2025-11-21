@@ -1106,7 +1106,17 @@ This section documents how the Kubernetes worker handles various error condition
 - ⚠️ **Disk space**: Depends on available disk space for stdout file
 - ⚠️ **Memory**: Should be safe due to streaming, but very long individual lines may cause issues
 
-**Impact:** Large logs should work due to streaming, but disk space may become an issue.
+**AAP Controller capacity checks:**
+
+- ✅ **Memory**: AAP controller checks memory capacity before starting jobs via `mem_capacity` algorithm
+  - Jobs stay in "pending" state if insufficient memory capacity available
+  - Reserves ~100MB per fork + 2GB for system services
+- ❌ **Disk space**: AAP controller does NOT check disk space before starting jobs
+  - No pre-flight validation of available disk space
+  - Jobs can start successfully then fail mid-execution when disk fills
+  - Work units write stdout to disk without size limits until disk is full
+
+**Impact:** Large logs should work due to streaming, but **disk space exhaustion is a real operational risk**. Jobs will fail with "no space left on device" errors if disk fills during execution. Monitor disk usage on execution nodes, especially `/var/lib/awx` and `/tmp`.
 
 #### Cannot Write Logs to Disk
 

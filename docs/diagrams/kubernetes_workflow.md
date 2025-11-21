@@ -183,7 +183,7 @@ sequenceDiagram
             KubeUnit->>KubeAPI: Get pod status
             KubeAPI-->>KubeUnit: Container state
             alt Container Waiting
-                Note over KubeUnit: Retry with backoff
+                Note over KubeUnit: Retry with Fibonacci backoff
             else Container Terminated
                 KubeUnit->>KubeUnit: Mark as Failed
             end
@@ -418,7 +418,7 @@ sequenceDiagram
             KubeUnit->>KubeAPI: Get pod status
             KubeAPI-->>KubeUnit: Container status
             alt Container Waiting
-                KubeUnit->>KubeUnit: Sleep with backoff
+                KubeUnit->>KubeUnit: Sleep with Fibonacci backoff
                 KubeUnit->>KubeAPI: Retry get pod
             else Container Terminated
                 KubeUnit->>KubeUnit: Mark as Failed
@@ -515,11 +515,11 @@ flowchart TD
     
     MainLoop --> CheckStdin{stdinErr<br/>!= nil?}
     CheckStdin -->|Yes| Exit1([Exit - stdin failed])
-    CheckStdin -->|No| GetPod[Get pod with retry<br/>backoff]
+    CheckStdin -->|No| GetPod[Get pod with Fibonacci<br/>retry backoff]
     
     GetPod --> PodError{Pod get<br/>error?}
     PodError -->|Yes| RetryPod{Retries<br/>remaining?}
-    RetryPod -->|Yes| SleepPod[Sleep with<br/>exponential backoff]
+    RetryPod -->|Yes| SleepPod[Sleep with<br/>Fibonacci backoff]
     SleepPod --> GetPod
     RetryPod -->|No| Exit2([Exit - pod error])
     
@@ -547,7 +547,7 @@ flowchart TD
     
     CheckCancel -->|No| CheckEOF{Error ==<br/>EOF?}
     CheckEOF -->|No| RetryRead{Retries<br/>remaining?}
-    RetryRead -->|Yes| SleepRead[Sleep with<br/>exponential backoff]
+    RetryRead -->|Yes| SleepRead[Sleep with<br/>Fibonacci backoff]
     SleepRead --> MainLoop
     RetryRead -->|No| Exit6([Exit - non-EOF error])
     
@@ -706,7 +706,7 @@ flowchart TD
 
     ImagePullBack --> HandleImagePull[Handle:<br/>1. Retry check 3 times<br/>2. If still failing, return ErrImagePullBackOff]
 
-    NotFound --> HandleNotFound[Handle:<br/>1. During startup: Return NotFound error<br/>2. During execution: Retry Get with backoff<br/>3. After retries exhausted: Mark as Failed]
+    NotFound --> HandleNotFound[Handle:<br/>1. During startup: Return NotFound error<br/>2. During execution: Retry Get with Fibonacci backoff<br/>3. After retries exhausted: Mark as Failed]
     
     StdinError --> RetryStdin{Retries<br/>remaining?}
     RetryStdin -->|Yes| RetryStdinAction[Retry with 200ms delay<br/>Max: GetKubeRetryCount times]
@@ -731,7 +731,7 @@ flowchart TD
     CheckReason -->|OOMKilled/etc| FailInterrupted[Mark as Failed<br/>Interrupted execution]
     
     CheckEOF -->|No| RetryNonEOF{Retries<br/>remaining?}
-    RetryNonEOF -->|Yes| RetryLogRead[Retry read with backoff]
+    RetryNonEOF -->|Yes| RetryLogRead[Retry read with Fibonacci backoff]
     RetryLogRead --> ReconnectLogs
     RetryNonEOF -->|No| FailNonEOF[Mark as Failed]
     
@@ -751,7 +751,7 @@ flowchart TD
 ### Resilience Mechanisms
 
 1. **Automatic Reconnection**: Logger method automatically reconnects on stream disconnection
-2. **Retry Logic**: Fibonacci backoff (exponential-like) for transient errors, with no retry limit for EOF with Running state
+2. **Retry Logic**: Fibonacci backoff for transient errors, with no retry limit for EOF with Running state
 3. **Duplicate Detection**: Timestamp-based log line deduplication during reconnections
 4. **Timeout Handling**: Configurable timeouts for pod pending state
 5. **Graceful Degradation**: Falls back to no-reconnect method for older Kubernetes versions
@@ -824,7 +824,7 @@ This section documents how the Kubernetes worker handles various error condition
 - ✅ **Pod creation**: Uses `context.WithTimeout()` if `podPendingTimeout` is set. Returns error if timeout exceeded
 - ✅ **Pod readiness wait**: `UntilWithSync()` respects context timeout. Returns timeout error
 - ⚠️ **API calls without explicit timeout**: Relies on context cancellation or underlying HTTP client timeouts
-- ⚠️ **Retry logic**: Retries use exponential backoff but may continue indefinitely if context isn't canceled
+- ⚠️ **Retry logic**: Retries use Fibonacci backoff but may continue indefinitely if context isn't canceled
 
 **Impact:** Jobs will fail with timeout error. Pod may remain in pending state.
 
@@ -838,9 +838,9 @@ This section documents how the Kubernetes worker handles various error condition
 
 - ❌ **No explicit retry**: Connection errors during `connectToKube()` are returned immediately
 - ❌ **No retry in CreatePod()**: TODO comment mentions adding retry logic but not implemented
-- ✅ **Retry in log stream**: `kubeLoggingConnectionHandler()` retries up to `GetKubeRetryCount()` times with backoff
+- ✅ **Retry in log stream**: `kubeLoggingConnectionHandler()` retries up to `GetKubeRetryCount()` times with simple delay (not Fibonacci)
 - ✅ **Retry in Get pod**: When resuming, retries 5 times with 200ms delay
-- ✅ **Retry in log reconnection**: Main loop retries getting pod with exponential backoff
+- ✅ **Retry in log reconnection**: Main loop retries getting pod with Fibonacci backoff
 
 **Impact:** Initial connection failure causes immediate job failure. However, transient connection issues during execution are retried.
 
@@ -1058,7 +1058,7 @@ This section documents how the Kubernetes worker handles various error condition
 - ✅ **Timestamp-based deduplication**: `ProcessLogLine()` uses timestamps to skip duplicate lines
 - ✅ **Context cancellation handling**: Checks `context.Canceled` during log reading
 - ✅ **EOF with Running state**: When EOF is detected but container is still Running, the system continues attempting to reconnect indefinitely (no retry limit) using Fibonacci backoff. This handles both cases: 4-hour log stream timeouts and rapid state transitions to terminated.
-- ✅ **Fibonacci backoff**: Uses `GetNextFibonacciValues()` for exponential backoff calculations (capped at 400 to prevent excessive delays)
+- ✅ **Fibonacci backoff**: Uses `GetNextFibonacciValues()` for retry delay calculations (capped at 400 to prevent excessive delays, max sleep duration of 5 minutes)
 - ⚠️ **No job timeout**: No maximum job duration enforced by Receptor itself
 - ⚠️ **Context cancellation**: Depends on external context cancellation (e.g., from the work submission client)
 
@@ -1156,7 +1156,7 @@ These scenarios either have unclear handling or require further investigation:
 
    **Current handling:**
 
-   - ✅ **Retry logic**: `KubeLoggingWithReconnect()` retries getting the pod with exponential backoff (Fibonacci sequence, default 5 retries, max 100)
+   - ✅ **Retry logic**: `KubeLoggingWithReconnect()` retries getting the pod with Fibonacci backoff (default 5 retries, max 100)
    - ⚠️ **Limited retries**: With default settings (5 retries, 1s base timeout), total retry time is approximately 12-15 seconds. Partitions longer than this cause job failure
    - ⚠️ **Eventual consistency**: If the partition occurs while the pod transitions from Running to Terminated, Receptor may miss the state change and fail the job even if the pod completed successfully
    - ⚠️ **No infinite retry**: Retries are finite (default 5, max 100), so long partitions will cause job failure even if the pod is still running or completes successfully

@@ -408,7 +408,10 @@ sequenceDiagram
         Note over KubeUnit: skipStdin = false<br/>(must send stdin to new pod)
     end
 
+    Note over KubeUnit: streamWait.Add(2) - always expects 2 completions
+
     alt !skipStdin (new pod)
+        Note over KubeUnit: Will launch 2 goroutines (stdin + stdout)
         Note over KubeUnit: Wait for container Running state
         
         loop Check container state
@@ -427,7 +430,7 @@ sequenceDiagram
         KubeUnit->>KubeAPI: Create SPDY executor<br/>(SubResource attach)
         KubeAPI-->>KubeUnit: Executor ready
 
-        par Stream stdin to pod
+        par Stream stdin to pod (goroutine 1)
             KubeUnit->>StdinFile: Open stdin file
             StdinFile-->>KubeUnit: File reader
             
@@ -450,7 +453,7 @@ sequenceDiagram
             else Stdin stream error
                 KubeUnit->>KubeUnit: UpdateBasicStatus(WorkStateFailed)
             end
-        and Stream stdout from pod
+        and Stream stdout from pod (goroutine 2)
             KubeUnit->>StdoutFile: Open stdout file
             StdoutFile-->>KubeUnit: File writer
             
@@ -476,9 +479,14 @@ sequenceDiagram
             end
         end
     else skipStdin (resume)
+        Note over KubeUnit: Will launch 1 goroutine (stdout only)<br/>streamWait.Done() called immediately<br/>(no stdin goroutine needed)
+
+        KubeUnit->>KubeUnit: streamWait.Done()<br/>(count stdin as "complete")
         KubeUnit->>KubeUnit: UpdateBasicStatus(WorkStateRunning)
+
+        Note over KubeUnit: Launch stdout goroutine
         KubeUnit->>KubeAPI: GetLogs(Follow=true,<br/>Timestamps=true,<br/>SinceTime=lastTimestamp)
-        
+
         loop Stream logs from sinceTime
             KubeUnit->>KubeAPI: Read log lines
             KubeAPI->>LogStream: Stream lines with timestamps
@@ -488,7 +496,7 @@ sequenceDiagram
         end
     end
 
-    KubeUnit->>KubeUnit: Wait for both streams to complete
+    Note over KubeUnit: streamWait.Wait() - blocks until 2 completions<br/>(New pod: 2 goroutines | Resume: 1 goroutine + 1 immediate Done())
     
     alt Both streams successful
         KubeUnit->>KubeUnit: UpdateFullStatus(WorkStateSucceeded)

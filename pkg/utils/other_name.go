@@ -19,34 +19,66 @@ type OtherNameDecode struct {
 	Value asn1.RawValue
 }
 
+// decodeReceptorName decodes a single ASN.1 value and extracts the Receptor name if present.
+func decodeReceptorName(value asn1.RawValue) (string, bool, error) {
+	if value.Tag != 0 {
+		return "", false, nil
+	}
+
+	on := OtherNameDecode{}
+	_, err := asn1.UnmarshalWithParams(value.FullBytes, &on, "tag:0")
+	if err != nil {
+		return "", false, err
+	}
+
+	if !on.ID.Equal(OIDReceptorName) {
+		return "", false, nil
+	}
+
+	var name string
+	_, err = asn1.Unmarshal(on.Value.Bytes, &name)
+	if err != nil {
+		return "", false, err
+	}
+
+	return name, true, nil
+}
+
+// extractNamesFromExtension extracts Receptor names from a single extension.
+func extractNamesFromExtension(extension pkix.Extension) ([]string, error) {
+	if !extension.Id.Equal(OIDSubjectAltName) {
+		return nil, nil
+	}
+
+	values := make([]asn1.RawValue, 0)
+	_, err := asn1.Unmarshal(extension.Value, &values)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0)
+	for _, value := range values {
+		name, found, err := decodeReceptorName(value)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			names = append(names, name)
+		}
+	}
+
+	return names, nil
+}
+
 // ReceptorNames returns a list of Receptor node IDs found in the subjectAltName field of an x.509 certificate.
 func ReceptorNames(extensions []pkix.Extension) ([]string, error) {
 	names := make([]string, 0)
 	for _, extension := range extensions {
-		if extension.Id.Equal(OIDSubjectAltName) {
-			values := make([]asn1.RawValue, 0)
-			_, err := asn1.Unmarshal(extension.Value, &values)
-			if err != nil {
-				return nil, err
-			}
-			for _, value := range values {
-				if value.Tag == 0 {
-					on := OtherNameDecode{}
-					_, err = asn1.UnmarshalWithParams(value.FullBytes, &on, "tag:0")
-					if err != nil {
-						return nil, err
-					}
-					if on.ID.Equal(OIDReceptorName) {
-						var name string
-						_, err = asn1.Unmarshal(on.Value.Bytes, &name)
-						if err != nil {
-							return nil, err
-						}
-						names = append(names, name)
-					}
-				}
-			}
+		extensionNames, err := extractNamesFromExtension(extension)
+		if err != nil {
+			return nil, err
 		}
+		names = append(names, extensionNames...)
 	}
 
 	return names, nil

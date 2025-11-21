@@ -268,11 +268,13 @@ func readCommandBytes(conn net.Conn, nc NetceptorForControlsvc) ([]byte, bool, b
 		if err == io.EOF {
 			nc.GetLogger().Debug("Control service closed\n")
 			hitEOF = true
+
 			break
 		} else if err != nil {
 			if !strings.HasSuffix(err.Error(), normalCloseError) {
 				nc.GetLogger().Warning("Could not read in control service: %s\n", err)
 			}
+
 			return nil, false, true
 		}
 		if n == 1 {
@@ -312,6 +314,7 @@ func parseCommand(cmdBytes []byte) (cmd string, params string, jsonData map[stri
 			}
 		}
 	}
+
 	return cmd, params, jsonData, err
 }
 

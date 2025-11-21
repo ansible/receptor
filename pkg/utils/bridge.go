@@ -1,8 +1,9 @@
 package utils
 
 import (
+	"errors"
 	"io"
-	"strings"
+	"net"
 
 	"github.com/ansible/receptor/pkg/logger"
 )
@@ -11,33 +12,33 @@ import (
 const NormalBufferSize = 65536
 
 // BridgeConns bridges two connections, like netcat.
-func BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, logger *logger.ReceptorLogger) {
+func BridgeConns(connection1 io.ReadWriteCloser, connection1Name string, connection2 io.ReadWriteCloser, connection2Name string, logger *logger.ReceptorLogger) {
 	doneChan := make(chan bool)
-	go bridgeHalf(c1, c1Name, c2, c2Name, doneChan, logger)
-	go bridgeHalf(c2, c2Name, c1, c1Name, doneChan, logger)
+	go bridgeHalf(connection1, connection1Name, connection2, connection2Name, doneChan, logger)
+	go bridgeHalf(connection2, connection2Name, connection1, connection1Name, doneChan, logger)
 	<-doneChan
 	<-doneChan
 }
 
-// BridgeHalf bridges the read side of c1 to the write side of c2.
-func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2Name string, done chan bool, logger *logger.ReceptorLogger) {
-	logger.Trace("    Bridging %s to %s\n", c1Name, c2Name)
+// BridgeHalf bridges the read side of sourceConnection to the write side of destinationConnection.
+func bridgeHalf(sourceConnection io.ReadWriteCloser, sourceConnectionName string, destinationConnection io.ReadWriteCloser, destinationConnectionName string, done chan bool, logger *logger.ReceptorLogger) {
+	logger.Trace("    Bridging %s to %s\n", sourceConnectionName, destinationConnectionName)
 	defer func() {
 		done <- true
 	}()
 	buf := make([]byte, NormalBufferSize)
 	shouldClose := false
 	for {
-		n, err := c1.Read(buf)
+		n, err := sourceConnection.Read(buf)
 		if err != nil {
-			if err.Error() != "EOF" && !strings.Contains(err.Error(), "use of closed network connection") {
+			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
 				logger.Error("Connection read error: %s\n", err)
 			}
 			shouldClose = true
 		}
 		if n > 0 {
-			logger.Trace("    Copied %d bytes from %s to %s\n", n, c1Name, c2Name)
-			wn, err := c2.Write(buf[:n])
+			logger.Trace("    Copied %d bytes from %s to %s\n", n, sourceConnectionName, destinationConnectionName)
+			wn, err := destinationConnection.Write(buf[:n])
 			if err != nil {
 				logger.Error("Connection write error: %s\n", err)
 				shouldClose = true
@@ -48,8 +49,10 @@ func bridgeHalf(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2N
 			}
 		}
 		if shouldClose {
-			logger.Trace("    Stopping bridge %s to %s\n", c1Name, c2Name)
-			_ = c2.Close()
+			logger.Trace("    Stopping bridge %s to %s\n", sourceConnectionName, destinationConnectionName)
+			if err := destinationConnection.Close(); err != nil {
+				logger.Error("Error closing %s: %s\n", destinationConnectionName, err)
+			}
 
 			return
 		}

@@ -401,11 +401,11 @@ sequenceDiagram
     alt Resume existing pod
         KubeUnit->>KubeAPI: Get pod by name
         KubeAPI-->>KubeUnit: Existing pod
-        Note over KubeUnit: skipStdin = true
+        Note over KubeUnit: skipStdin = true<br/>(stdin already sent in initial run,<br/>only need to reconnect to stdout logs)
     else Create new pod
         KubeUnit->>KubeAPI: CreatePod()
         KubeAPI-->>KubeUnit: Pod created
-        Note over KubeUnit: skipStdin = false
+        Note over KubeUnit: skipStdin = false<br/>(must send stdin to new pod)
     end
 
     alt !skipStdin (new pod)

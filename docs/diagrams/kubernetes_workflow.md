@@ -703,7 +703,6 @@ flowchart TD
     AuthErrors --> ClusterError[InCluster Error:<br/>Not running in cluster]
 
     TimeoutErrors --> PodPendingTimeout[Pod Pending Timeout:<br/>Pod didn't become ready]
-    TimeoutErrors --> LogStreamTimeout[4-hour Log Stream Timeout:<br/>Kubernetes API closes stream]
 
     PodFailed --> HandlePodFailed[Handle: Return error with details]
 
@@ -748,9 +747,6 @@ flowchart TD
     ClusterError --> FailAuth
     
     PodPendingTimeout --> FailTimeout[Mark as Failed:<br/>Pod didn't become ready]
-    LogStreamTimeout --> ReconnectLogs
-    
-    ReconnectLogs --> MainLoop[Continue main loop]
 ```
 
 ## Key Features

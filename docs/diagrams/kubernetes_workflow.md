@@ -694,7 +694,8 @@ flowchart TD
     PodErrors --> ImagePullBack[ErrImagePullBackOff:<br/>Container waiting - ImagePullBackOff]
     PodErrors --> NotFound[Pod NotFound:<br/>Pod deleted during startup<br/>or doesn't exist]
 
-    StreamErrors --> StdinError[Stdin Stream Error:<br/>SPDY executor failure]
+    StreamErrors --> SPDYCreationError[SPDY Executor Creation Error:<br/>Cannot create executor]
+    StreamErrors --> StdinStreamError[Stdin Streaming Error:<br/>Error streaming to pod]
     StreamErrors --> StdoutError[Stdout Stream Error:<br/>Log stream EOF/timeout]
     StreamErrors --> NonEOFError[Non-EOF Error:<br/>Unexpected stream error]
 
@@ -711,9 +712,11 @@ flowchart TD
     ImagePullBack --> HandleImagePull[Handle:<br/>1. Retry check 3 times<br/>2. If still failing, return ErrImagePullBackOff]
 
     NotFound --> HandleNotFound[Handle: Return error with details]
-    
-    StdinError --> RetryStdin{Retries<br/>remaining?}
-    RetryStdin -->|Yes| RetryStdinAction[Retry with 200ms delay<br/>Max: GetKubeRetryCount times]
+
+    SPDYCreationError --> FailSPDY[Handle:<br/>Mark work as Failed immediately<br/>No retries]
+
+    StdinStreamError --> RetryStdin{Retries<br/>remaining?}
+    RetryStdin -->|Yes| RetryStdinAction[Retry StreamWithContext<br/>200ms delay between retries<br/>Max: GetKubeRetryCount times]
     RetryStdinAction --> RetryStdin
     RetryStdin -->|No| FailStdin[Mark work as Failed<br/>Signal stdout to stop]
     

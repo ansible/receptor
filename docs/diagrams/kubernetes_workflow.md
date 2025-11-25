@@ -582,7 +582,7 @@ flowchart TD
     WriteLast --> Exit10([Exit - normal completion])
     CheckLastLine -->|No| Exit10
 
-    CheckState2 -->|Unknown| LogUnknown[Debug log: "Will continue"<br/>Misleading: actually fails immediately<br/>Mark as Failed + set stdoutErr]
+    CheckState2 -->|Unknown| LogUnknown[Debug log: Will continue<br/>Misleading: actually fails immediately<br/>Mark as Failed + set stdoutErr]
     LogUnknown --> Exit11([Exit - job failed])
 ```
 

@@ -32,9 +32,15 @@ RUN dnf -y update && \
 
 COPY --from=builder /source/receptor /usr/bin/receptor
 
+RUN groupadd -r receptor && \
+    useradd -r -g receptor -s /sbin/nologin receptor && \
+    chown -R receptor:receptor /etc/receptor
+
 ENV RECEPTORCTL_SOCKET=/tmp/receptor.sock
 
 EXPOSE 7323
+
+USER receptor
 
 ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
 CMD ["/usr/bin/receptor", "-c", "/etc/receptor/receptor.conf"]

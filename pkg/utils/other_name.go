@@ -20,28 +20,28 @@ type OtherNameDecode struct {
 }
 
 // decodeReceptorName decodes a single ASN.1 value and extracts the Receptor name if present.
-func decodeReceptorName(value asn1.RawValue) (string, bool, error) {
+func decodeReceptorName(value asn1.RawValue) (string, error) {
 	if value.Tag != 0 {
-		return "", false, nil
+		return "", nil
 	}
 
 	on := OtherNameDecode{}
 	_, err := asn1.UnmarshalWithParams(value.FullBytes, &on, "tag:0")
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
 	if !on.ID.Equal(OIDReceptorName) {
-		return "", false, nil
+		return "", nil
 	}
 
 	var name string
 	_, err = asn1.Unmarshal(on.Value.Bytes, &name)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 
-	return name, true, nil
+	return name, nil
 }
 
 // extractNamesFromExtension extracts Receptor names from a single extension.
@@ -58,11 +58,11 @@ func extractNamesFromExtension(extension pkix.Extension) ([]string, error) {
 
 	names := make([]string, 0)
 	for _, value := range values {
-		name, found, err := decodeReceptorName(value)
+		name, err := decodeReceptorName(value)
 		if err != nil {
 			return nil, err
 		}
-		if found {
+		if len(name) > 0 {
 			names = append(names, name)
 		}
 	}

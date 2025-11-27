@@ -209,9 +209,9 @@ func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID qu
 		}
 
 		return qlog.NewConnectionTracer(f, p, connID)
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 // Listen returns a stream listener compatible with Go's net.Listener.

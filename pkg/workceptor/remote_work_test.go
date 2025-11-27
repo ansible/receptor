@@ -40,9 +40,9 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 			copy(b, msg)
 
 			return len(msg), nil
-		} else {
-			return 0, ctx.Err()
 		}
+
+		return 0, ctx.Err()
 	})
 	if anytimes {
 		readExpectation.AnyTimes()

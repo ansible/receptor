@@ -2324,13 +2324,12 @@ func TestRetryGetLogStreamResetValidation(t *testing.T) {
 							StatusCode: http.StatusOK,
 							Body:       &eofReadCloser{content: responseBody, hasRead: false},
 						}, nil
-					} else {
-						// Second connection: return remaining data
-						return &http.Response{
-							StatusCode: http.StatusOK,
-							Body:       io.NopCloser(strings.NewReader(responseBody)),
-						}, nil
 					}
+					// Second connection: return remaining data
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(responseBody)),
+					}, nil
 				}),
 				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 			}
@@ -2522,13 +2521,12 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 							StatusCode: http.StatusOK,
 							Body:       &eofReadCloser{content: responseBody, hasRead: false},
 						}, nil
-					} else {
-						// Second connection: return remaining data
-						return &http.Response{
-							StatusCode: http.StatusOK,
-							Body:       io.NopCloser(strings.NewReader(responseBody)),
-						}, nil
 					}
+					// Second connection: return remaining data
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(responseBody)),
+					}, nil
 				}),
 				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 			}

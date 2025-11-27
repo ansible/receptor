@@ -1072,13 +1072,12 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
 
 					continue podLoop
-				} else {
-					errMsg := fmt.Sprintf("Container in %s pod is not running container state unknown, retries exhausted", podName)
-					kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
-					kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-
-					return
 				}
+				errMsg := fmt.Sprintf("Container in %s pod is not running container state unknown, retries exhausted", podName)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
+				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+				return
 			}
 		}
 

@@ -33,7 +33,7 @@ func init() {
 func validateVersion() string {
 	if Version == "" {
 		return "Version unknown"
-	} else {
-		return Version
 	}
+
+	return Version
 }

@@ -42,7 +42,7 @@ func TestNewPacketConn(t *testing.T) {
 
 	mockNetceptorForPacketConn := mock_netceptor.NewMockNetcForPacketConn(ctrl)
 	mockNetceptorForPacketConn.EXPECT().MaxForwardingHops().Return(byte(1))
-	mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+	mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 	mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 	mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
 
@@ -129,7 +129,7 @@ func TestPacketConn(t *testing.T) {
 			"GetLocalService Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			},
 			func(pc netceptor.PacketConner) interface{} {
@@ -142,7 +142,7 @@ func TestPacketConn(t *testing.T) {
 			"GetLogger Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test"))
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{}))).Times(4)
 			},
@@ -156,7 +156,7 @@ func TestPacketConn(t *testing.T) {
 			"ReadFrom Error",
 			"",
 			func(ctx context.Context) {
-				newCtx, ctxCancel := context.WithCancel(context.Background())
+				newCtx, ctxCancel := context.WithCancel(ctx)
 				time.AfterFunc(time.Microsecond*200, ctxCancel)
 				mockNetceptorForPacketConn.EXPECT().Context().Return(newCtx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(newCtx, reflect.TypeOf(netceptor.UnreachableNotification{})))
@@ -173,7 +173,7 @@ func TestPacketConn(t *testing.T) {
 			"SetHopsToLive Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			},
 			func(pc netceptor.PacketConner) interface{} {
@@ -188,7 +188,7 @@ func TestPacketConn(t *testing.T) {
 			"LocalAddr Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 				mockNetceptorForPacketConn.EXPECT().GetNetworkName().Return("test")
 				mockNetceptorForPacketConn.EXPECT().NodeID().Return("test")
@@ -203,7 +203,7 @@ func TestPacketConn(t *testing.T) {
 			"Close Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 				mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
 				mockNetceptorForPacketConn.EXPECT().GetListenerRegistry().Return(map[string]*netceptor.PacketConn{})
@@ -218,7 +218,7 @@ func TestPacketConn(t *testing.T) {
 			closeErrorString,
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().RemoveLocalServiceAdvertisement("test").Return(errors.New(closeErrorString))
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 				mockNetceptorForPacketConn.EXPECT().GetListenerLock().Return(&sync.RWMutex{}).Times(2)
@@ -234,7 +234,7 @@ func TestPacketConn(t *testing.T) {
 			"SetDeadline Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			},
 			func(pc netceptor.PacketConner) interface{} {
@@ -247,7 +247,7 @@ func TestPacketConn(t *testing.T) {
 			"SetReadDeadline Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			},
 			func(pc netceptor.PacketConner) interface{} {
@@ -260,7 +260,7 @@ func TestPacketConn(t *testing.T) {
 			"SetWriteDeadline Success",
 			"test",
 			func(ctx context.Context) {
-				mockNetceptorForPacketConn.EXPECT().Context().Return(context.Background())
+				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{})))
 			},
 			func(pc netceptor.PacketConner) interface{} {

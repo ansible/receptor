@@ -29,7 +29,8 @@ func TestMainInitNodeID(t *testing.T) {
 	for _, testCase := range mainInitNodeIDTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			cfg := NodeCfg{
-				ID: testCase.nodeID,
+				ID:      testCase.nodeID,
+				DataDir: "/tmp/test-receptor",
 			}
 			err := cfg.Init()
 			if err == nil && testCase.expectedErr != "" {
@@ -58,7 +59,8 @@ func TestNodeCfgInitEmptyID(t *testing.T) {
 
 func TestNodeCfgInitReservedID(t *testing.T) {
 	cfg := NodeCfg{
-		ID: "localhost",
+		ID:      "localhost",
+		DataDir: "/tmp/test-receptor",
 	}
 
 	err := cfg.Init()

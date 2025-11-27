@@ -60,7 +60,7 @@ func startNetceptorNodeWithWorkceptor() (*workceptor.KubeUnit, error) {
 		return kw, err
 	}
 
-	w, err := workceptor.New(context.Background(), n1, "")
+	w, err := workceptor.New(context.Background(), n1, "/tmp")
 	if err != nil {
 		return kw, err
 	}

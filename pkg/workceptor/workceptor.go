@@ -70,17 +70,19 @@ type workType struct {
 }
 
 // New constructs a new Workceptor instance.
-func New(ctx context.Context, nc NetceptorForWorkceptor, dataDir string) (*Workceptor, error) {
-	if dataDir == "" {
-		dataDir = path.Join(os.TempDir(), "receptor")
+// baseDir is the parent directory where node-specific work directories will be created.
+// A node-specific subdirectory will be created under baseDir using the node ID.
+func New(ctx context.Context, nc NetceptorForWorkceptor, baseDir string) (*Workceptor, error) {
+	if baseDir == "" {
+		return nil, fmt.Errorf("baseDir must be provided")
 	}
-	dataDir = path.Join(dataDir, nc.NodeID())
+	nodeDataDir := path.Join(baseDir, nc.NodeID())
 	c, cancel := context.WithCancel(ctx)
 	w := &Workceptor{
 		ctx:               c,
 		Cancel:            cancel,
 		nc:                nc,
-		dataDir:           dataDir,
+		dataDir:           nodeDataDir,
 		workTypesLock:     &sync.RWMutex{},
 		workTypes:         make(map[string]*workType),
 		activeUnitsLock:   &sync.RWMutex{},

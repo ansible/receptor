@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
+	"go.uber.org/mock/gomock"
 )
 
 func TestNewExternalBackend(t *testing.T) {
@@ -45,6 +47,9 @@ func TestExternalBackendStart(t *testing.T) {
 func TestExternalBackendNewConnection(t *testing.T) {
 	t.Parallel()
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	backend, err := netceptor.NewExternalBackend()
 	if err != nil {
 		t.Fatalf("Failed to create external backend: %v", err)
@@ -57,8 +62,8 @@ func TestExternalBackendNewConnection(t *testing.T) {
 		t.Fatalf("Failed to start backend: %v", err)
 	}
 
-	// Create a mock MessageConn for testing
-	mockConn := &mockMessageConn{}
+	// Create a mock MessageConn using the existing mock
+	mockConn := mock_netceptor.NewMockMessageConn(ctrl)
 
 	// Start a goroutine to receive the session
 	done := make(chan bool)
@@ -83,23 +88,4 @@ func TestExternalBackendNewConnection(t *testing.T) {
 
 	// Wait for the session to be received
 	<-done
-}
-
-// mockMessageConn is a simple mock implementation of MessageConn for testing.
-type mockMessageConn struct{}
-
-func (m *mockMessageConn) WriteMessage(_ context.Context, _ []byte) error {
-	return nil
-}
-
-func (m *mockMessageConn) ReadMessage(_ context.Context, _ time.Duration) ([]byte, error) {
-	return []byte{}, nil
-}
-
-func (m *mockMessageConn) SetReadDeadline(_ time.Time) error {
-	return nil
-}
-
-func (m *mockMessageConn) Close() error {
-	return nil
 }

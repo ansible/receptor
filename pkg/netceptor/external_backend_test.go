@@ -11,6 +11,18 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// setupExternalBackend is a helper function that creates a new external backend for testing.
+func setupExternalBackend(t *testing.T) *netceptor.ExternalBackend {
+	t.Helper()
+
+	backend, err := netceptor.NewExternalBackend()
+	if err != nil {
+		t.Fatalf("Failed to create external backend: %v", err)
+	}
+
+	return backend
+}
+
 func TestNewExternalBackend(t *testing.T) {
 	t.Parallel()
 
@@ -26,10 +38,7 @@ func TestNewExternalBackend(t *testing.T) {
 func TestExternalBackendStart(t *testing.T) {
 	t.Parallel()
 
-	backend, err := netceptor.NewExternalBackend()
-	if err != nil {
-		t.Fatalf("Failed to create external backend: %v", err)
-	}
+	backend := setupExternalBackend(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -50,10 +59,7 @@ func TestExternalBackendNewConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	backend, err := netceptor.NewExternalBackend()
-	if err != nil {
-		t.Fatalf("Failed to create external backend: %v", err)
-	}
+	backend := setupExternalBackend(t)
 
 	ctx := context.Background()
 	var wg sync.WaitGroup

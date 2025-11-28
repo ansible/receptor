@@ -17,12 +17,18 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Log in to GHCR
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
 
       - name: Log in to Quay
-        run: |
-          echo ${{ secrets.QUAY_TOKEN }} | docker login quay.io -u ${{ secrets.QUAY_USER }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+          registry: quay.io
 
       - name: Copy Image to Quay
         uses: akhilerm/tag-push-action@v2.2.0
@@ -67,12 +73,15 @@ jobs:
 
       - name: Build receptorctl and upload to pypi
         if: ${{ env.RECEPTORCTL_PYPI_VERSION != env.TAG }}
+        env:
+          PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           make receptorctl_wheel receptorctl_sdist VERSION=$TAG
           twine upload \
             -r ${{ env.pypi_repo }} \
-            -u ${{ secrets.PYPI_USERNAME }} \
-            -p ${{ secrets.PYPI_PASSWORD }} \
+            -u "$PYPI_USERNAME" \
+            -p "$PYPI_PASSWORD" \
             receptorctl/dist/*
 
   publish:

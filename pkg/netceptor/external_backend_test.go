@@ -23,18 +23,6 @@ func setupExternalBackend(t *testing.T) *netceptor.ExternalBackend {
 	return backend
 }
 
-func TestNewExternalBackend(t *testing.T) {
-	t.Parallel()
-
-	backend, err := netceptor.NewExternalBackend()
-	if err != nil {
-		t.Errorf("NewExternalBackend() returned unexpected error: %v", err)
-	}
-	if backend == nil {
-		t.Error("NewExternalBackend() returned nil backend")
-	}
-}
-
 func TestExternalBackendStart(t *testing.T) {
 	t.Parallel()
 

@@ -90,7 +90,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 	go func() {
 		err := server.ServeTLS(li, "", "")
 		if err != nil {
-			t.Fatalf("Error in web server: %s", err)
+			t.Errorf("Error in web server: %s", err)
 		}
 	}()
 

@@ -5,6 +5,7 @@ package workceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -33,6 +34,7 @@ func TestStatusFileLock(t *testing.T) {
 		waitTime := time.Duration(i) * baseWaitTime
 		totalWaitTime += waitTime
 		go func(iter int, waitTime time.Duration) {
+			defer wg.Done()
 			sfd := StatusFileData{}
 			sfd.UpdateFullStatus(statusFilename, func(status *StatusFileData) {
 				time.Sleep(waitTime)
@@ -40,20 +42,19 @@ func TestStatusFileLock(t *testing.T) {
 				status.StdoutSize = int64(iter)
 				status.Detail = fmt.Sprintf("%d", iter)
 			})
-			wg.Done()
 		}(i, waitTime)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	wg2 := sync.WaitGroup{}
 	wg2.Add(numReaderThreads)
+	errChan := make(chan error, numReaderThreads)
 	for i := 0; i < numReaderThreads; i++ {
 		go func() {
+			defer wg2.Done()
 			sfd := StatusFileData{}
 			fileHasExisted := false
 			for {
 				if ctx.Err() != nil {
-					wg2.Done()
-
 					return
 				}
 				err := sfd.Load(statusFilename)
@@ -62,15 +63,24 @@ func TestStatusFileLock(t *testing.T) {
 				}
 				fileHasExisted = true
 				if err != nil {
-					t.Fatalf("Error loading status file: %s", err)
+					errChan <- fmt.Errorf("Error loading status file: %w", err)
+					cancel()
+
+					return
 				}
 				detailIter, err := strconv.Atoi(sfd.Detail)
 				if err != nil {
-					t.Fatalf("Error converting status detail to int: %s", err)
+					errChan <- fmt.Errorf("Error converting status detail to int: %w", err)
+					cancel()
+
+					return
 				}
 				if detailIter >= 0 {
 					if int64(sfd.State) != sfd.StdoutSize || sfd.State != detailIter {
-						t.Fatal("Mismatched data in struct")
+						errChan <- errors.New("Mismatched data in struct")
+						cancel()
+
+						return
 					}
 				}
 			}
@@ -83,4 +93,13 @@ func TestStatusFileLock(t *testing.T) {
 		t.Fatal("File locks apparently not locking")
 	}
 	wg2.Wait()
+	close(errChan)
+	// Collect errors
+	errs := make([]error, 0, numReaderThreads)
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+	if err := errors.Join(errs...); err != nil {
+		t.Fatal(err)
+	}
 }

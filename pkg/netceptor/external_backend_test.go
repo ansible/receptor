@@ -30,7 +30,6 @@ func TestExternalBackendStart(t *testing.T) {
 
 	var wg sync.WaitGroup
 	sessChan, err := backend.Start(ctx, &wg)
-
 	if err != nil {
 		t.Errorf("Start() returned unexpected error: %v", err)
 	}
@@ -80,7 +79,7 @@ func TestExternalBackendNewConnection(t *testing.T) {
 	<-done
 }
 
-// mockMessageConn is a simple mock implementation of MessageConn for testing
+// mockMessageConn is a simple mock implementation of MessageConn for testing.
 type mockMessageConn struct{}
 
 func (m *mockMessageConn) WriteMessage(_ context.Context, _ []byte) error {

@@ -10,6 +10,8 @@ import (
 )
 
 func TestOsWrapperReadFile(t *testing.T) {
+	t.Parallel()
+
 	// Create a temporary file for testing
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
@@ -40,7 +42,10 @@ func TestOsWrapperReadFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			wrapper := &certificates.OsWrapper{}
 			content, err := wrapper.ReadFile(tt.filename)
 
@@ -61,6 +66,8 @@ func TestOsWrapperReadFile(t *testing.T) {
 }
 
 func TestOsWrapperWriteFile(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 
 	tests := []struct {
@@ -87,7 +94,10 @@ func TestOsWrapperWriteFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			wrapper := &certificates.OsWrapper{}
 			err := wrapper.WriteFile(tt.filename, tt.content, tt.perm)
 

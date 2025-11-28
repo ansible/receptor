@@ -10,6 +10,8 @@ import (
 )
 
 func TestNewExternalBackend(t *testing.T) {
+	t.Parallel()
+
 	backend, err := netceptor.NewExternalBackend()
 	if err != nil {
 		t.Errorf("NewExternalBackend() returned unexpected error: %v", err)
@@ -20,6 +22,8 @@ func TestNewExternalBackend(t *testing.T) {
 }
 
 func TestExternalBackendStart(t *testing.T) {
+	t.Parallel()
+
 	backend, err := netceptor.NewExternalBackend()
 	if err != nil {
 		t.Fatalf("Failed to create external backend: %v", err)
@@ -39,6 +43,8 @@ func TestExternalBackendStart(t *testing.T) {
 }
 
 func TestExternalBackendNewConnection(t *testing.T) {
+	t.Parallel()
+
 	backend, err := netceptor.NewExternalBackend()
 	if err != nil {
 		t.Fatalf("Failed to create external backend: %v", err)

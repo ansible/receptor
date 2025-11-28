@@ -9,6 +9,8 @@ import (
 )
 
 func TestMakeUnixSocketError(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		err            error
@@ -42,7 +44,10 @@ func TestMakeUnixSocketError(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := utils.MakeUnixSocketError(tt.err, tt.underlyingErr)
 			if result == nil {
 				t.Error("Expected an error but got nil")
@@ -55,6 +60,8 @@ func TestMakeUnixSocketError(t *testing.T) {
 }
 
 func TestMakeWindowsSocketError(t *testing.T) {
+	t.Parallel()
+
 	err := utils.MakeWindowsSocketError()
 	if err == nil {
 		t.Error("Expected an error but got nil")
@@ -69,6 +76,8 @@ func TestMakeWindowsSocketError(t *testing.T) {
 }
 
 func TestUnixSocketErrorConstants(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		err         error
@@ -102,7 +111,10 @@ func TestUnixSocketErrorConstants(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tt.err == nil {
 				t.Error("Error constant is nil")
 			}

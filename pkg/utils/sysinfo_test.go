@@ -17,10 +17,16 @@ func TestGetSysCPUCount(t *testing.T) {
 	}
 
 	if runtime.GOOS == "linux" {
-		commandOutput, _ := exec.Command("nproc").CombinedOutput()
+		commandOutput, err := exec.Command("nproc").CombinedOutput()
+		if err != nil {
+			t.Fatalf("Failed to execute nproc command: %v", err)
+		}
 
 		commandOutputWithout := strings.TrimSpace(string(commandOutput))
-		want, _ := strconv.Atoi(commandOutputWithout)
+		want, err := strconv.Atoi(commandOutputWithout)
+		if err != nil {
+			t.Fatalf("Failed to parse CPU count: %v", err)
+		}
 
 		if got != want {
 			t.Errorf("Expected CPU count: %d, got %d\n", want, got)
@@ -35,10 +41,16 @@ func TestGetSysMemoryMiB(t *testing.T) {
 	}
 
 	if runtime.GOOS == "linux" {
-		commandOutput, _ := exec.Command("sed", "-n", "s/^MemTotal:[[:space:]]*\\([[:digit:]]*\\).*/\\1/p", "/proc/meminfo").CombinedOutput()
+		commandOutput, err := exec.Command("sed", "-n", "s/^MemTotal:[[:space:]]*\\([[:digit:]]*\\).*/\\1/p", "/proc/meminfo").CombinedOutput()
+		if err != nil {
+			t.Fatalf("Failed to execute sed command: %v", err)
+		}
 
 		commandOutputWithout := strings.TrimSpace(string(commandOutput))
-		wantKb, _ := strconv.ParseUint(commandOutputWithout, 10, 64)
+		wantKb, err := strconv.ParseUint(commandOutputWithout, 10, 64)
+		if err != nil {
+			t.Fatalf("Failed to parse memory size: %v", err)
+		}
 
 		want := wantKb / 1024
 		if got != want {

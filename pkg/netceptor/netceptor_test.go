@@ -301,6 +301,8 @@ func TestLotsOfPings(t *testing.T) {
 					buf := []byte("test")
 					rAddr := sender.NewAddr(recipient.nodeID, "ping")
 					for {
+						// Ignore write errors - routes may not be established yet.
+						// The loop will keep retrying until the ping succeeds.
 						_, _ = pc.WriteTo(buf, rAddr)
 						select {
 						case <-ctx.Done():
@@ -848,7 +850,10 @@ func TestSetMaxConnectionIdleTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time, _ := time.ParseDuration("60s")
+	time, err := time.ParseDuration("60s")
+	if err != nil {
+		t.Fatalf("Failed to parse duration: %v", err)
+	}
 	if node.MaxConnectionIdleTime() != time {
 		t.Fatal("setter behaved incorrectly")
 	}
@@ -967,6 +972,9 @@ func TestTracerCreatesNonEmptyFiles(t *testing.T) {
 	// Create a netceptor instance and attempt to dial a service that does not exist
 	node1 := New(context.Background(), "node1")
 
+	// Dial error is expected and ignored - the test only verifies qlog file creation.
+	// The service "testsvc" does not exist, so the dial may fail, but qlog files
+	// should still be created during the connection attempt.
 	conn, _ := node1.Dial("node1", "testsvc", nil)
 	if conn != nil {
 		conn.Close()

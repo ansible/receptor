@@ -331,9 +331,12 @@ func TestVerifyPinnedFingerprint(t *testing.T) {
 		t.Fatalf("Failed to read cert: %v", err)
 	}
 
-	block, _ := pem.Decode(certPEMBytes)
+	block, rest := pem.Decode(certPEMBytes)
 	if block == nil {
 		t.Fatal("Failed to decode PEM certificate")
+	}
+	if len(rest) != 0 {
+		t.Fatalf("Unexpected remaining bytes after PEM decode: %d bytes", len(rest))
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
@@ -457,7 +460,10 @@ func TestHashAlgorithms(t *testing.T) {
 					t.Errorf("expected hash length %d, got %d", tt.expectedHashLen, len(hash))
 				}
 				// Verify hash is deterministic.
-				hash2, _ := computeHashForFingerprint(certData, tt.fingerprintLen, algorithms)
+				hash2, valid2 := computeHashForFingerprint(certData, tt.fingerprintLen, algorithms)
+				if !valid2 {
+					t.Error("second hash computation should be valid")
+				}
 				if !bytes.Equal(hash, hash2) {
 					t.Error("hash computation should be deterministic")
 				}
@@ -566,9 +572,12 @@ func TestVerifyReceptorNodeID(t *testing.T) {
 		t.Fatalf("Failed to read cert: %v", err)
 	}
 
-	block, _ := pem.Decode(certPEMBytes)
+	block, rest := pem.Decode(certPEMBytes)
 	if block == nil {
 		t.Fatal("Failed to decode PEM certificate")
+	}
+	if len(rest) != 0 {
+		t.Fatalf("Unexpected remaining bytes after PEM decode: %d bytes", len(rest))
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
@@ -633,9 +642,12 @@ func TestAddIntermediateCerts(t *testing.T) {
 		t.Fatalf("Failed to read cert: %v", err)
 	}
 
-	block, _ := pem.Decode(certPEMBytes)
+	block, rest := pem.Decode(certPEMBytes)
 	if block == nil {
 		t.Fatal("Failed to decode PEM certificate")
+	}
+	if len(rest) != 0 {
+		t.Fatalf("Unexpected remaining bytes after PEM decode: %d bytes", len(rest))
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
@@ -681,9 +693,12 @@ func TestReceptorVerifyFunc(t *testing.T) {
 		t.Fatalf("Failed to read cert: %v", err)
 	}
 
-	block, _ := pem.Decode(certPEMBytes)
+	block, rest := pem.Decode(certPEMBytes)
 	if block == nil {
 		t.Fatal("Failed to decode PEM certificate")
+	}
+	if len(rest) != 0 {
+		t.Fatalf("Unexpected remaining bytes after PEM decode: %d bytes", len(rest))
 	}
 
 	rootCAs := x509.NewCertPool()

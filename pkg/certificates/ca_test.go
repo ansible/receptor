@@ -353,8 +353,11 @@ IemSZj8QaR2JNPwXEbBEh8uPDhNvPBQFrw==
 }
 
 // Incompatible certificate with receptor as it is missing `DNSNames`, `IPAddresses`, `NodeIDs` fields.
-func setupBadCertificateRequestPEMData() []byte {
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+func setupBadCertificateRequestPEMData() ([]byte, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
 	certRequestTemplate := x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   "Example",
@@ -362,13 +365,16 @@ func setupBadCertificateRequestPEMData() []byte {
 		},
 		SignatureAlgorithm: x509.SHA256WithRSA,
 	}
-	certRequestBytes, _ := x509.CreateCertificateRequest(rand.Reader, &certRequestTemplate, privateKey)
+	certRequestBytes, err := x509.CreateCertificateRequest(rand.Reader, &certRequestTemplate, privateKey)
+	if err != nil {
+		return nil, err
+	}
 	certRequestPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE REQUEST",
 		Bytes: certRequestBytes,
 	})
 
-	return certRequestPEM
+	return certRequestPEM, nil
 }
 
 func setupGoodCertificateRequestRsaPrivateKey() (*rsa.PrivateKey, error) {
@@ -641,7 +647,10 @@ func TestCreateCAValid(t *testing.T) {
 					},
 				)
 
-			got, _ := certificates.CreateCA(tt.args.opts, mockRsa)
+			got, err := certificates.CreateCA(tt.args.opts, mockRsa)
+			if err != nil {
+				t.Fatalf("CreateCA() unexpected error = %v", err)
+			}
 			if !reflect.DeepEqual(got.PrivateKey, tt.want.PrivateKey) {
 				t.Errorf("CreateCA() Private Key got = %+v, want = %+v", got.PrivateKey, tt.want.PrivateKey)
 

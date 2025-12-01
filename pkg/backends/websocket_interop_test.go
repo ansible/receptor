@@ -114,7 +114,8 @@ func TestWebsocketExternalInterop(t *testing.T) {
 	}
 
 	// Wait for the nodes to establish routing to each other
-	timeout, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	timeout, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	for {
 		if timeout.Err() != nil {
 			t.Fatal(timeout.Err())

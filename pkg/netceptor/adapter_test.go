@@ -253,7 +253,13 @@ func TestQuicConnAdapterAcceptStream(t *testing.T) {
 			adapter := &netceptor.QuicListenerAdapter{Listener: listener}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			conn, _ := adapter.Accept(ctx)
+			conn, err := adapter.Accept(ctx)
+			if err != nil {
+				t.Errorf("Failed to accept connection: %v", err)
+				close(serverChan)
+
+				return
+			}
 			serverChan <- conn
 		}()
 
@@ -289,7 +295,11 @@ func TestQuicConnAdapterAcceptStream(t *testing.T) {
 			adapter := &netceptor.QuicListenerAdapter{Listener: listener}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			serverConn, _ = adapter.Accept(ctx)
+			var err error
+			serverConn, err = adapter.Accept(ctx)
+			if err != nil {
+				t.Errorf("Failed to accept connection: %v", err)
+			}
 		}()
 
 		// Create client but don't open stream

@@ -109,7 +109,10 @@ func TestTracerouteControlFunc(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			testCase.expectedCalls()
 
-			cfr, _ := tracerouteCommand.ControlFunc(context.Background(), mockNetceptor, mockControlFunc)
+			cfr, funcErr := tracerouteCommand.ControlFunc(context.Background(), mockNetceptor, mockControlFunc)
+			if funcErr != nil {
+				t.Errorf("ControlFunc returned unexpected error: %v", funcErr)
+			}
 			err, ok := cfr["Error"]
 
 			if testCase.expectedError && testCase.errorMessage != err {

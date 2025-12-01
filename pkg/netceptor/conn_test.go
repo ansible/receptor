@@ -813,7 +813,10 @@ func TestNeceptorListen(t *testing.T) {
 		ctx := context.Background()
 		mockNetC := netceptor.New(ctx, "node1")
 		wantErr := errors.New("service node1 is already listening")
-		_, _ = mockNetC.Listen("node1", &tls.Config{})
+		_, err := mockNetC.Listen("node1", &tls.Config{})
+		if err != nil {
+			t.Fatalf("Failed to create first listener: %v", err)
+		}
 		_, gotErr := mockNetC.Listen("node1", &tls.Config{})
 		if gotErr.Error() != wantErr.Error() {
 			t.Errorf("Wanted %v, got %v", wantErr, gotErr)
@@ -825,7 +828,10 @@ func TestNeceptorListen(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mockNetC := netceptor.New(ctx, "nodecc")
-		_, _ = mockNetC.Listen("nodecc", &tls.Config{})
+		_, err := mockNetC.Listen("nodecc", &tls.Config{})
+		if err != nil {
+			t.Fatalf("Failed to create listener: %v", err)
+		}
 		// Assert cancelling netceptor context doesn't create panic
 		assert.NotPanics(t, func() { time.AfterFunc(500*time.Millisecond, cancel) })
 	})

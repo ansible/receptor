@@ -52,17 +52,32 @@ nnG0JqlerSVvSPSiZ2kdn4OwzV2eA3Gj3uyTSGsjjoj82bhhRwKaSWmUh+AJByQ9
 kE6r/6za1Hvm+i/mz8f1cTUxFjF5pKzrprNRz5NMzs6NkQ0pg+mq5CNzav1ATSyv
 Bdt96MbGrC0=
 -----END CERTIFICATE-----`
-	goodBlock, _ := pem.Decode([]byte(testGoodCertPEMData))
-	testGoodCert, _ := x509.ParseCertificate(goodBlock.Bytes)
+	goodBlock, rest := pem.Decode([]byte(testGoodCertPEMData))
+	if len(rest) != 0 {
+		t.Fatalf("Unexpected remaining bytes after PEM decode: %d bytes", len(rest))
+	}
+	testGoodCert, err := x509.ParseCertificate(goodBlock.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
 
 	extSubjectAltName := pkix.Extension{}
 	extSubjectAltName.Id = asn1.ObjectIdentifier{2, 5, 29, 17}
 	extSubjectAltName.Critical = false
 
-	testUglyCert, _ := x509.ParseCertificate(goodBlock.Bytes)
+	testUglyCert, err := x509.ParseCertificate(goodBlock.Bytes)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
 
-	pi, _ := new(big.Int).SetString("3.14159", 10)
-	extSubjectAltName.Value, _ = asn1.Marshal(pi)
+	pi, ok := new(big.Int).SetString("314159", 10)
+	if !ok {
+		t.Fatalf("Failed to parse big.Int from string")
+	}
+	extSubjectAltName.Value, err = asn1.Marshal(pi)
+	if err != nil {
+		t.Fatalf("Failed to marshal ASN.1 value: %v", err)
+	}
 
 	testUglyCert.Extensions = append(testUglyCert.Extensions, extSubjectAltName)
 	var uglyWant1 []string

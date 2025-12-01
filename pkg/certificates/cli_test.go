@@ -530,10 +530,14 @@ func TestSignReq(t *testing.T) {
 						Return([]byte{}, nil).
 						AnyTimes()
 				case "No names in Req file":
+					badCertReqPEM, err := setupBadCertificateRequestPEMData()
+					if err != nil {
+						t.Fatalf("Failed to setup bad certificate request PEM data: %v", err)
+					}
 					o.
 						EXPECT().
 						ReadFile(gomock.Eq(negativeReqPath)).
-						Return(setupBadCertificateRequestPEMData(), nil).
+						Return(badCertReqPEM, nil).
 						AnyTimes()
 				}
 			default:

@@ -117,9 +117,9 @@ class TestCLI:
         unit_id = work.pop("unitid")
 
         # Wait for work to complete
-        timeout_seconds = 10
+        max_retries = 10
         work_completed = False
-        for _ in range(timeout_seconds):
+        for _ in range(max_retries):
             status = node1_controller.simple_command(f"work status {unit_id}")
             if status.get("StateName") == "Succeeded" and status.get("Detail") == "exit status 0":
                 work_completed = True

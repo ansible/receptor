@@ -153,11 +153,8 @@ func (pyroscopeCfg ReceptorPyroscopeCfg) Init() error {
 		DisableGCRuns:     pyroscopeCfg.DisableGCRuns,
 		HTTPHeaders:       pyroscopeCfg.HTTPHeaders,
 	})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func getUploadRate(cfg ReceptorPyroscopeCfg) time.Duration {

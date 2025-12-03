@@ -106,7 +106,7 @@ func initConfig() {
 	}
 }
 
-func handleRootCommand(cmd *cobra.Command, args []string) {
+func handleRootCommand(_ *cobra.Command, _ []string) {
 	if version {
 		fmt.Println(receptorVersion.Version)
 		os.Exit(0)
@@ -117,19 +117,19 @@ func handleRootCommand(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	receptorConfig, err := ParseReceptorConfig(cfgFile)
+	receptorConfig, err := ParseReceptorConfig()
 	if err != nil {
 		fmt.Printf(errMsgUnableToDecode, err)
 		os.Exit(1)
 	}
 
-	certifcatesConfig, err := ParseCertificatesConfig(cfgFile)
+	certifcatesConfig, err := ParseCertificatesConfig()
 	if err != nil {
 		fmt.Printf(errMsgUnableToDecode, err)
 		os.Exit(1)
 	}
 
-	backendConfig, err = ParseBackendConfig(cfgFile)
+	backendConfig, err = ParseBackendConfig()
 	if err != nil {
 		fmt.Printf(errMsgUnableToDecode, err)
 		os.Exit(1)

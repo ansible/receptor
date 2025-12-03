@@ -74,7 +74,7 @@ func PrintPhaseErrorMessage(configName string, phase string, err error) {
 	fmt.Printf("ERROR: %s for %s on %s phase\n", err, configName, phase)
 }
 
-func ParseReceptorConfig(configFile string) (*ReceptorConfig, error) {
+func ParseReceptorConfig() (*ReceptorConfig, error) {
 	var receptorConfig ReceptorConfig
 	err := viper.Unmarshal(&receptorConfig)
 	if err != nil {
@@ -84,7 +84,7 @@ func ParseReceptorConfig(configFile string) (*ReceptorConfig, error) {
 	return &receptorConfig, nil
 }
 
-func ParseCertificatesConfig(configFile string) (*CertificatesConfig, error) {
+func ParseCertificatesConfig() (*CertificatesConfig, error) {
 	var certifcatesConfig CertificatesConfig
 	err := viper.Unmarshal(&certifcatesConfig)
 	if err != nil {
@@ -94,7 +94,7 @@ func ParseCertificatesConfig(configFile string) (*CertificatesConfig, error) {
 	return &certifcatesConfig, nil
 }
 
-func ParseBackendConfig(configFile string) (*BackendConfig, error) {
+func ParseBackendConfig() (*BackendConfig, error) {
 	var backendConfig BackendConfig
 	err := viper.Unmarshal(&backendConfig)
 	if err != nil {

@@ -6,15 +6,20 @@ Have questions about this document or anything not covered here? Create a topic 
 
 ## Table of contents
 
-- [Things to know prior to submitting code](#things-to-know-prior-to-submitting-code)
-- [Setting up your development environment](#setting-up-your-development-environment)
-  - [Fork and clone the Receptor repo](#fork-and-clone-the-receptor-repo)
-  - [Development Requirements](#development-requirements)
-  - [Build and Run the Development Environment](#build-and-run-the-development-environment)
-- [What should I work on?](#what-should-i-work-on)
-- [Submitting Pull Requests](#submitting-pull-requests)
-- [Reporting Issues](#reporting-issues)
-- [Getting Help](#getting-help)
+- [Receptor](#receptor)
+  - [Table of contents](#table-of-contents)
+  - [Things to know prior to submitting code](#things-to-know-prior-to-submitting-code)
+  - [Setting up your development environment](#setting-up-your-development-environment)
+    - [Fork and clone the Receptor repo](#fork-and-clone-the-receptor-repo)
+    - [Development Requirements](#development-requirements)
+    - [Build and Run the Development Environment](#build-and-run-the-development-environment)
+      - [Building Receptor](#building-receptor)
+      - [Building container images](#building-container-images)
+      - [Running tests](#running-tests)
+  - [What should I work on?](#what-should-i-work-on)
+  - [Submitting Pull Requests](#submitting-pull-requests)
+  - [Reporting Issues](#reporting-issues)
+  - [Getting Help](#getting-help)
 
 ## Things to know prior to submitting code
 
@@ -45,6 +50,13 @@ If you have not done so already, you'll need to fork the Receptor repo on GitHub
 #### Building Receptor
 `make build-all`
 
+#### Building container images
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install build
+make container
+```
 #### Running tests
 `make test`
 

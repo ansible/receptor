@@ -239,8 +239,4 @@ $(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	$(CONTAINERCMD) build $(EXTRA_OPTS) packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
 	touch $@
 
-tc-image: container
-	@cp receptor packaging/tc-image/
-	@$(CONTAINERCMD) build packaging/tc-image -t receptor-tc
-
 .PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest

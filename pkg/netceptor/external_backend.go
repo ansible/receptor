@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const errSessionClosed = "session closed: %s"
+
 // ExternalBackend is a backend implementation for the situation when non-Receptor code
 // is initiating connections, outside the control of a Receptor-managed accept loop.
 type ExternalBackend struct {
@@ -36,7 +38,7 @@ func MessageConnFromNetConn(conn net.Conn) MessageConn {
 // WriteMessage writes a message to the connection.
 func (mc *netMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if ctx.Err() != nil {
-		return fmt.Errorf("session closed: %s", ctx.Err())
+		return fmt.Errorf(errSessionClosed, ctx.Err())
 	}
 	buf := mc.framer.SendData(data)
 	n, err := mc.conn.Write(buf)
@@ -59,7 +61,7 @@ func (mc *netMessageConn) ReadMessage(ctx context.Context, timeout time.Duration
 	}
 	for {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("session closed: %s", ctx.Err())
+			return nil, fmt.Errorf(errSessionClosed, ctx.Err())
 		}
 		if mc.framer.MessageReady() {
 			break
@@ -108,7 +110,7 @@ func MessageConnFromWebsocketConn(conn *websocket.Conn) MessageConn {
 // WriteMessage writes a message to the connection.
 func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) error {
 	if ctx.Err() != nil {
-		return fmt.Errorf("session closed: %s", ctx.Err())
+		return fmt.Errorf(errSessionClosed, ctx.Err())
 	}
 
 	return mc.conn.WriteMessage(websocket.BinaryMessage, data)
@@ -117,7 +119,7 @@ func (mc *websocketMessageConn) WriteMessage(ctx context.Context, data []byte) e
 // ReadMessage reads a message from the connection.
 func (mc *websocketMessageConn) ReadMessage(ctx context.Context, _ time.Duration) ([]byte, error) {
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("session closed: %s", ctx.Err())
+		return nil, fmt.Errorf(errSessionClosed, ctx.Err())
 	}
 	messageType, data, err := mc.conn.ReadMessage()
 	if messageType != websocket.BinaryMessage {

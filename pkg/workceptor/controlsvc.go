@@ -24,6 +24,18 @@ type workceptorCommand struct {
 	params     map[string]interface{}
 }
 
+const (
+	errFieldMissing = "field %s missing"
+)
+
+const (
+	cmdCancel       = "cancel"
+	cmdRelease      = "release"
+	cmdForceRelease = "force-release"
+	cmdStatus       = "status"
+	cmdList         = "list"
+)
+
 func (t *workceptorCommandType) InitFromString(params string) (controlsvc.ControlCommand, error) {
 	tokens := strings.Split(params, " ")
 	if len(tokens) == 0 {
@@ -44,11 +56,11 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 		if len(tokens) > 3 {
 			c.params["params"] = strings.Join(tokens[3:], " ")
 		}
-	case "list":
+	case cmdList:
 		if len(tokens) > 1 {
 			c.params["unitid"] = tokens[1]
 		}
-	case "status", "cancel", "release", "force-release":
+	case cmdStatus, cmdCancel, cmdRelease, cmdForceRelease:
 		if len(tokens) < 2 {
 			return nil, fmt.Errorf("work %s requires a unit ID", c.subcommand)
 		}
@@ -82,7 +94,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 func strFromMap(config map[string]interface{}, name string) (string, error) {
 	value, ok := config[name]
 	if !ok {
-		return "", fmt.Errorf("field %s missing", name)
+		return "", fmt.Errorf(errFieldMissing, name)
 	}
 	valueStr, ok := value.(string)
 	if !ok {
@@ -96,7 +108,7 @@ func strFromMap(config map[string]interface{}, name string) (string, error) {
 func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	value, ok := config[name]
 	if !ok {
-		return 0, fmt.Errorf("field %s missing", name)
+		return 0, fmt.Errorf(errFieldMissing, name)
 	}
 	valueInt, ok := value.(int64)
 	if ok {
@@ -120,7 +132,7 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 func boolFromMap(config map[string]interface{}, name string) (bool, error) {
 	value, ok := config[name]
 	if !ok {
-		return false, fmt.Errorf("field %s missing", name)
+		return false, fmt.Errorf(errFieldMissing, name)
 	}
 	valueBoolStr, ok := value.(string)
 	if !ok {
@@ -163,7 +175,7 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err != nil {
 			return nil, err
 		}
-	case "status", "cancel", "release", "force-release":
+	case cmdStatus, cmdCancel, cmdRelease, cmdForceRelease:
 		c.params["unitid"], err = strFromMap(config, "unitid")
 		if err != nil {
 			return nil, err
@@ -172,7 +184,7 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		if err == nil {
 			c.params["signature"] = signature
 		}
-	case "list":
+	case cmdList:
 		unitID, err := strFromMap(config, "unitid")
 		if err == nil {
 			c.params["unitid"] = unitID
@@ -327,7 +339,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 
 		return cfr, nil
-	case "list":
+	case cmdList:
 		var unitList []string
 		targetUnitID, ok := c.params["unitid"].(string)
 		if ok {
@@ -346,7 +358,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 
 		return cfr, nil
-	case "status":
+	case cmdStatus:
 		unitid, err := strFromMap(c.params, "unitid")
 		if err != nil {
 			return nil, err
@@ -357,7 +369,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 
 		return cfr, nil
-	case "cancel", "release", "force-release":
+	case cmdCancel, cmdRelease, cmdForceRelease:
 		unitid, err := strFromMap(c.params, "unitid")
 		if err != nil {
 			return nil, err
@@ -369,7 +381,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		cfr := make(map[string]interface{})
 		var pendingMsg string
 		var completeMsg string
-		if c.subcommand == "cancel" {
+		if c.subcommand == cmdCancel {
 			pendingMsg = "cancel pending"
 			completeMsg = "cancelled"
 		} else {
@@ -388,10 +400,10 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if err != nil {
 			return nil, err
 		}
-		if c.subcommand == "cancel" {
+		if c.subcommand == cmdCancel {
 			err = unit.Cancel()
 		} else {
-			err = unit.Release(c.subcommand == "force-release")
+			err = unit.Release(c.subcommand == cmdForceRelease)
 		}
 		if err != nil && !IsPending(err) {
 			return nil, err

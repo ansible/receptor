@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -41,6 +42,8 @@ const defaultMaxForwardingHops = 30
 
 // defaultMaxConnectionIdleTime is the maximum time a connection can go without data before we consider it failed.
 const defaultMaxConnectionIdleTime = 2*defaultRouteUpdateTime + 1*time.Second
+
+const errMustProvideName = "must provide a name"
 
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function.
 var MainInstance *Netceptor
@@ -932,7 +935,7 @@ func (s *Netceptor) GetServerTLSConfig(name string) (*tls.Config, error) {
 // AddWorkCommand records a work command so it can be included in service announcements.
 func (s *Netceptor) AddWorkCommand(command string, secure bool) error {
 	if command == "" {
-		return fmt.Errorf("must provide a name")
+		return errors.New(errMustProvideName)
 	}
 	wC := WorkCommand{WorkType: command, Secure: secure}
 	s.workCommandsLock.Lock()
@@ -945,7 +948,7 @@ func (s *Netceptor) AddWorkCommand(command string, secure bool) error {
 // SetServerTLSConfig stores a server TLS config by name.
 func (s *Netceptor) SetServerTLSConfig(name string, config *tls.Config) error {
 	if name == "" {
-		return fmt.Errorf("must provide a name")
+		return errors.New(errMustProvideName)
 	}
 	s.serverTLSConfigs[name] = config
 
@@ -984,7 +987,7 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 // SetClientTLSConfig stores a client TLS config by name.
 func (s *Netceptor) SetClientTLSConfig(name string, config *tls.Config, pinnedFingerprints [][]byte) error {
 	if name == "" {
-		return fmt.Errorf("must provide a name")
+		return errors.New(errMustProvideName)
 	}
 	s.clientTLSConfigs[name] = config
 	s.clientPinnedFingerprints[name] = pinnedFingerprints

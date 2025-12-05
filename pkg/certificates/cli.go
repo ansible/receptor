@@ -15,6 +15,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const receptorCertificatesAppName = "receptor-certificates"
+
 // InitCA Initialize Certificate Authority.
 func InitCA(opts *CertOptions, certOut, keyOut string, osWrapper Oser) error {
 	ca, err := CreateCA(opts, &RsaWrapper{})
@@ -273,10 +275,10 @@ func init() {
 	if version > 1 {
 		return
 	}
-	cmdline.RegisterConfigTypeForApp("receptor-certificates",
+	cmdline.RegisterConfigTypeForApp(receptorCertificatesAppName,
 		"cert-init", "Initialize PKI CA", InitCAConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
-	cmdline.RegisterConfigTypeForApp("receptor-certificates",
+	cmdline.RegisterConfigTypeForApp(receptorCertificatesAppName,
 		"cert-makereq", "Create certificate request", MakeReqConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
-	cmdline.RegisterConfigTypeForApp("receptor-certificates",
+	cmdline.RegisterConfigTypeForApp(receptorCertificatesAppName,
 		"cert-signreq", "Sign request and produce certificate", SignReqConfig{}, cmdline.Exclusive, cmdline.Section(certSection))
 }

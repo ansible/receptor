@@ -89,7 +89,7 @@ func (frd FirewallRuleData) ParseFirewallRule() (FirewallRuleFunc, error) {
 		case "toservice":
 			fr.ToService = val
 		default:
-			return nil, fmt.Errorf("invalid filewall rule. unknown key: %s", key)
+			return nil, fmt.Errorf("invalid firewall rule. unknown key: %s", key)
 		}
 	}
 

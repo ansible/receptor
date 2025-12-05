@@ -263,22 +263,22 @@ func TestRegexCompare(t *testing.T) {
 	}{
 		// Test with invalid regex patterns
 		{
-			name:            "unclosed bracket",
-			field:           "fromnode",
-			value:           "/[unclosed/",
-			wantErr:         true,
+			name: "unclosed bracket",
+			field: "fromnode",
+			value: "/[unclosed/",
+			wantErr: true,
 		},
 		{
-			name:            "invalid escape",
-			field:           "fromnode",
-			value:           "/node\\k/",
-			wantErr:         true,
+			name: "invalid escape",
+			field: "fromnode",
+			value: "/node\\k/",
+			wantErr: true,
 		},
 		{
-			name:            "bad repetition range",
-			field:           "fromnode",
-			value:           "/node{5,2}/",
-			wantErr:         true,
+			name: "bad repetition range",
+			field: "fromnode",
+			value: "/node{5,2}/",
+			wantErr: true,
 		},
 		{
 			name: "not enclosed in slashes",
@@ -288,9 +288,9 @@ func TestRegexCompare(t *testing.T) {
 		},
 		// Test with empty regex pattern string
 		{
-			name:    "matches only empty strings",
-			field:   "toservice",
-			value:   "//",
+			name: "matches only empty strings",
+			field: "toservice",
+			value: "//",
 			wantErr: false,
 			testCases: []struct {
 				desc      string
@@ -298,22 +298,22 @@ func TestRegexCompare(t *testing.T) {
 				wantMatch bool
 			}{
 				{
-					desc:      "matches empty string",
-					data:      &MessageData{ToService: ""},
+					desc: "matches empty string",
+					data: &MessageData{ToService: ""},
 					wantMatch: true,
 				},
 				{
-					desc:      "does not match non-empty string",
-					data:      &MessageData{ToService: "343.236"},
+					desc: "does not match non-empty string",
+					data: &MessageData{ToService: "343.236"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test with complex regex patterns
 		{
-			name:    "exactly 3 digits",
-			field:   "fromnode",
-			value:   "/node-[0-9]{3}/",
+			name: "exactly 3 digits",
+			field: "fromnode",
+			value: "/node-[0-9]{3}/",
 			wantErr: false,
 			testCases: []struct {
 				desc      string
@@ -321,27 +321,27 @@ func TestRegexCompare(t *testing.T) {
 				wantMatch bool
 			}{
 				{
-					desc:      "matches node-123",
-					data:      &MessageData{FromNode: "node-123"},
+					desc: "matches node-123",
+					data: &MessageData{FromNode: "node-123"},
 					wantMatch: true,
 				},
 				{
-					desc:      "does not match node-12",
-					data:      &MessageData{FromNode: "node-12"},
+					desc: "does not match node-12",
+					data: &MessageData{FromNode: "node-12"},
 					wantMatch: false,
 				},
 				{
-					desc:      "does not match node-1234",
-					data:      &MessageData{FromNode: "node-1234"},
+					desc: "does not match node-1234",
+					data: &MessageData{FromNode: "node-1234"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test regex matching with special characters
 		{
-			name:    "escaped dots for IP address",
-			field:   "fromnode",
-			value:   "/192\\.168\\.1\\.1/",
+			name: "escaped dots for IP address",
+			field: "fromnode",
+			value: "/192\\.168\\.1\\.1/",
 			wantErr: false,
 			testCases: []struct {
 				desc      string
@@ -349,57 +349,57 @@ func TestRegexCompare(t *testing.T) {
 				wantMatch bool
 			}{
 				{
-					desc:      "matches exact IP",
-					data:      &MessageData{FromNode: "192.168.1.1"},
+					desc: "matches exact IP",
+					data: &MessageData{FromNode: "192.168.1.1"},
 					wantMatch: true,
 				},
 				{
-					desc:      "does not match with other chars",
-					data:      &MessageData{FromNode: "192X168Y1Z1"},
+					desc: "does not match with other chars",
+					data: &MessageData{FromNode: "192X168Y1Z1"},
 					wantMatch: false,
 				},
 			},
 		},
 		{
-			name:    "escaped parentheses",
-			field:   "fromservice",
-			value:   "/api-v2\\.0\\(prod\\)/",
+			name: "escaped parentheses",
+			field: "fromservice",
+			value: "/api-v2\\.0\\(prod\\)/",
 			wantErr: false,
 			testCases: []struct {
-				desc      string
-				data      *MessageData
+				desc string
+				data *MessageData
 				wantMatch bool
 			}{
 				{
-					desc:      "matches api-v2.0(prod)",
-					data:      &MessageData{FromService: "api-v2.0(prod)"},
+					desc: "matches api-v2.0(prod)",
+					data: &MessageData{FromService: "api-v2.0(prod)"},
 					wantMatch: true,
 				},
 				{
-					desc:      "does not match without parentheses",
-					data:      &MessageData{FromService: "api-v2.0"},
+					desc: "does not match without parentheses",
+					data: &MessageData{FromService: "api-v2.0"},
 					wantMatch: false,
 				},
 			},
 		},
 		{
-			name:    "escaped brackets",
-			field:   "tonode",
-			value:   "/server\\[prod\\]/",
+			name: "escaped brackets",
+			field: "tonode",
+			value: "/server\\[prod\\]/",
 			wantErr: false,
 			testCases: []struct {
-				desc      string
-				data      *MessageData
+				desc string
+				data *MessageData
 				wantMatch bool
 			}{
 				{
-					desc:      "matches server[prod]",
-					data:      &MessageData{ToNode: "server[prod]"},
+					desc: "matches server[prod]",
+					data: &MessageData{ToNode: "server[prod]"},
 					wantMatch: true,
 				},
 				{
-					desc:      "does not match server(prod)",
-					data:      &MessageData{ToNode: "server(prod)"},
+					desc: "does not match server(prod)",
+					data: &MessageData{ToNode: "server(prod)"},
 					wantMatch: false,
 				},
 			},
@@ -429,13 +429,13 @@ func TestRegexCompare(t *testing.T) {
 
 func TestStringCompare(t *testing.T){
 	tests := []struct {
-		name            string
-		field           string
-		value           string
-		wantErr         bool
-		testCases       []struct {
-			desc      string
-			data      *MessageData
+		name string
+		field string
+		value string
+		wantErr bool
+		testCases []struct {
+			desc string
+			data *MessageData
 			wantMatch bool
 		}
 	}{

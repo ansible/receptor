@@ -550,6 +550,10 @@ type errorReadCloser struct {
 	maxReads  int
 }
 
+func (e *errorReadCloser) Error() string {
+	return "network connection reset"
+}
+
 func (e *errorReadCloser) Read(p []byte) (int, error) {
 	e.readCount++
 	if e.readCount <= e.maxReads {
@@ -559,7 +563,7 @@ func (e *errorReadCloser) Read(p []byte) (int, error) {
 		return copy(p, []byte(content)), nil
 	}
 	// After maxReads, return a network error (not EOF)
-	return 0, errors.New("network connection reset")
+	return 0, e
 }
 
 func (e *errorReadCloser) Close() error {

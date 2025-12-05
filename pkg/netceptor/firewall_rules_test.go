@@ -225,19 +225,19 @@ func TestParseFirewallRules(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ParseFirewallRules() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			// Check error message
 			if tt.wantErrContains != "" && err != nil {
 				if !strings.Contains(err.Error(), tt.wantErrContains) {
 					t.Errorf("ParseFirewallRules() error = %v, want error containing %q", err, tt.wantErrContains)
 				}
 			}
-			
+
 			// Check number of rules
 			if len(rules) != tt.wantCount {
 				t.Errorf("ParseFirewallRules() returned %d rules, want %d", len(rules), tt.wantCount)
 			}
-			
+
 			// Run test cases
 			for _, tc := range tt.testCases {
 				got := rules[tc.ruleIndex](tc.data)
@@ -251,11 +251,11 @@ func TestParseFirewallRules(t *testing.T) {
 
 func TestRegexCompare(t *testing.T) {
 	tests := []struct {
-		name            string
-		field           string
-		value           string
-		wantErr         bool
-		testCases       []struct {
+		name      string
+		field     string
+		value     string
+		wantErr   bool
+		testCases []struct {
 			desc      string
 			data      *MessageData
 			wantMatch bool
@@ -263,34 +263,34 @@ func TestRegexCompare(t *testing.T) {
 	}{
 		// Test with invalid regex patterns
 		{
-			name: "unclosed bracket",
-			field: "fromnode",
-			value: "/[unclosed/",
+			name:    "unclosed bracket",
+			field:   "fromnode",
+			value:   "/[unclosed/",
 			wantErr: true,
 		},
 		{
-			name: "invalid escape",
-			field: "fromnode",
-			value: "/node\\k/",
+			name:    "invalid escape",
+			field:   "fromnode",
+			value:   "/node\\k/",
 			wantErr: true,
 		},
 		{
-			name: "bad repetition range",
-			field: "fromnode",
-			value: "/node{5,2}/",
+			name:    "bad repetition range",
+			field:   "fromnode",
+			value:   "/node{5,2}/",
 			wantErr: true,
 		},
 		{
-			name: "not enclosed in slashes",
-			field: "fromnode",
-			value: "node.*",
+			name:    "not enclosed in slashes",
+			field:   "fromnode",
+			value:   "node.*",
 			wantErr: true,
 		},
 		// Test with empty regex pattern string
 		{
-			name: "matches only empty strings",
-			field: "toservice",
-			value: "//",
+			name:    "matches only empty strings",
+			field:   "toservice",
+			value:   "//",
 			wantErr: false,
 			testCases: []struct {
 				desc      string
@@ -298,22 +298,22 @@ func TestRegexCompare(t *testing.T) {
 				wantMatch bool
 			}{
 				{
-					desc: "matches empty string",
-					data: &MessageData{ToService: ""},
+					desc:      "matches empty string",
+					data:      &MessageData{ToService: ""},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match non-empty string",
-					data: &MessageData{ToService: "343.236"},
+					desc:      "does not match non-empty string",
+					data:      &MessageData{ToService: "343.236"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test with complex regex patterns
 		{
-			name: "exactly 3 digits",
-			field: "fromnode",
-			value: "/node-[0-9]{3}/",
+			name:    "exactly 3 digits",
+			field:   "fromnode",
+			value:   "/node-[0-9]{3}/",
 			wantErr: false,
 			testCases: []struct {
 				desc      string
@@ -321,27 +321,27 @@ func TestRegexCompare(t *testing.T) {
 				wantMatch bool
 			}{
 				{
-					desc: "matches node-123",
-					data: &MessageData{FromNode: "node-123"},
+					desc:      "matches node-123",
+					data:      &MessageData{FromNode: "node-123"},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match node-12",
-					data: &MessageData{FromNode: "node-12"},
+					desc:      "does not match node-12",
+					data:      &MessageData{FromNode: "node-12"},
 					wantMatch: false,
 				},
 				{
-					desc: "does not match node-1234",
-					data: &MessageData{FromNode: "node-1234"},
+					desc:      "does not match node-1234",
+					data:      &MessageData{FromNode: "node-1234"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test regex matching with special characters
 		{
-			name: "escaped dots for IP address",
-			field: "fromnode",
-			value: "/192\\.168\\.1\\.1/",
+			name:    "escaped dots for IP address",
+			field:   "fromnode",
+			value:   "/192\\.168\\.1\\.1/",
 			wantErr: false,
 			testCases: []struct {
 				desc      string
@@ -349,57 +349,57 @@ func TestRegexCompare(t *testing.T) {
 				wantMatch bool
 			}{
 				{
-					desc: "matches exact IP",
-					data: &MessageData{FromNode: "192.168.1.1"},
+					desc:      "matches exact IP",
+					data:      &MessageData{FromNode: "192.168.1.1"},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match with other chars",
-					data: &MessageData{FromNode: "192X168Y1Z1"},
+					desc:      "does not match with other chars",
+					data:      &MessageData{FromNode: "192X168Y1Z1"},
 					wantMatch: false,
 				},
 			},
 		},
 		{
-			name: "escaped parentheses",
-			field: "fromservice",
-			value: "/api-v2\\.0\\(prod\\)/",
+			name:    "escaped parentheses",
+			field:   "fromservice",
+			value:   "/api-v2\\.0\\(prod\\)/",
 			wantErr: false,
 			testCases: []struct {
-				desc string
-				data *MessageData
+				desc      string
+				data      *MessageData
 				wantMatch bool
 			}{
 				{
-					desc: "matches api-v2.0(prod)",
-					data: &MessageData{FromService: "api-v2.0(prod)"},
+					desc:      "matches api-v2.0(prod)",
+					data:      &MessageData{FromService: "api-v2.0(prod)"},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match without parentheses",
-					data: &MessageData{FromService: "api-v2.0"},
+					desc:      "does not match without parentheses",
+					data:      &MessageData{FromService: "api-v2.0"},
 					wantMatch: false,
 				},
 			},
 		},
 		{
-			name: "escaped brackets",
-			field: "tonode",
-			value: "/server\\[prod\\]/",
+			name:    "escaped brackets",
+			field:   "tonode",
+			value:   "/server\\[prod\\]/",
 			wantErr: false,
 			testCases: []struct {
-				desc string
-				data *MessageData
+				desc      string
+				data      *MessageData
 				wantMatch bool
 			}{
 				{
-					desc: "matches server[prod]",
-					data: &MessageData{ToNode: "server[prod]"},
+					desc:      "matches server[prod]",
+					data:      &MessageData{ToNode: "server[prod]"},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match server(prod)",
-					data: &MessageData{ToNode: "server(prod)"},
+					desc:      "does not match server(prod)",
+					data:      &MessageData{ToNode: "server(prod)"},
 					wantMatch: false,
 				},
 			},
@@ -413,7 +413,7 @@ func TestRegexCompare(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("regexCompare() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			// Run test cases
 			if !tt.wantErr && comp != nil {
 				for _, tc := range tt.testCases {
@@ -427,138 +427,137 @@ func TestRegexCompare(t *testing.T) {
 	}
 }
 
-func TestStringCompare(t *testing.T){
+func TestStringCompare(t *testing.T) {
 	tests := []struct {
-		name 		string
-		field 		string
-		value 		string
-		wantErr 	bool
-		testCases 	[]struct {
-			desc string
-			data *MessageData
+		name      string
+		field     string
+		value     string
+		wantErr   bool
+		testCases []struct {
+			desc      string
+			data      *MessageData
 			wantMatch bool
 		}
 	}{
 		// Test with empty value string
 		{
-			name: "empty value string",
-			field: "fromnode",
-			value: "",
+			name:    "empty value string",
+			field:   "fromnode",
+			value:   "",
 			wantErr: false,
-			testCases: []struct{
-				desc string
-				data *MessageData
+			testCases: []struct {
+				desc      string
+				data      *MessageData
 				wantMatch bool
 			}{
 				{
-					desc: "matches empty FromNode",
-					data: &MessageData{FromNode: ""},
+					desc:      "matches empty FromNode",
+					data:      &MessageData{FromNode: ""},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match empty FromNode",
-					data: &MessageData{FromNode: "node-1"},
+					desc:      "does not match empty FromNode",
+					data:      &MessageData{FromNode: "node-1"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test with empty field string
 		{
-			name: "empty field string",
-			field: "",
-			value: "tonode",
+			name:    "empty field string",
+			field:   "",
+			value:   "tonode",
 			wantErr: true,
-
 		},
 		// Test with empty field and empty value string
 		{
-			name: "empty field and value string",
-			field: "",
-			value: "",
+			name:    "empty field and value string",
+			field:   "",
+			value:   "",
 			wantErr: true,
 		},
 		// Test with special characters in field string
 		{
-			name: "special characters in field string",
-			field: "toservice!",
-			value: "production",
+			name:    "special characters in field string",
+			field:   "toservice!",
+			value:   "production",
 			wantErr: true,
 		},
 		// Test with special characters in value string
 		{
-			name: "special characters in value string",
-			field: "tonode",
-			value: "node-123&",
+			name:    "special characters in value string",
+			field:   "tonode",
+			value:   "node-123&",
 			wantErr: false,
-			testCases: []struct{
-				desc string
-				data *MessageData
+			testCases: []struct {
+				desc      string
+				data      *MessageData
 				wantMatch bool
 			}{
 				{
-					desc: "matches value with special characters",
-					data: &MessageData{ToNode: "node-123&"},
+					desc:      "matches value with special characters",
+					data:      &MessageData{ToNode: "node-123&"},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match value with special characters",
-					data: &MessageData{ToNode: "node123"},
+					desc:      "does not match value with special characters",
+					data:      &MessageData{ToNode: "node123"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test mixed case characters
 		{
-			name: "mixed cases in field string",
-			field: "ToService",
-			value: "Prod-123",
+			name:    "mixed cases in field string",
+			field:   "ToService",
+			value:   "Prod-123",
 			wantErr: false,
-			testCases: []struct{
-				desc string
-				data *MessageData
+			testCases: []struct {
+				desc      string
+				data      *MessageData
 				wantMatch bool
 			}{
 				{
-					desc: "matches field with mixed case characters",
-					data: &MessageData{ToService: "Prod-123"},
+					desc:      "matches field with mixed case characters",
+					data:      &MessageData{ToService: "Prod-123"},
 					wantMatch: true,
 				},
 				{
-					desc: "does not match value with lower-case characters",
-					data: &MessageData{ToService: "prod-123"},
+					desc:      "does not match value with lower-case characters",
+					data:      &MessageData{ToService: "prod-123"},
 					wantMatch: false,
 				},
 			},
 		},
 		// Test uppercase characters
 		{
-			name: "upper case in field string",
-			field: "FROMSERVICE",
-			value: "dev.83",
+			name:    "upper case in field string",
+			field:   "FROMSERVICE",
+			value:   "dev.83",
 			wantErr: false,
-			testCases: []struct{
-				desc string
-				data *MessageData
+			testCases: []struct {
+				desc      string
+				data      *MessageData
 				wantMatch bool
 			}{
 				{
-					desc: "matches field with upper-case characters",
-					data: &MessageData{FromService: "dev.83"},
+					desc:      "matches field with upper-case characters",
+					data:      &MessageData{FromService: "dev.83"},
 					wantMatch: true,
 				},
 			},
 		},
 		// Test unknown field name
 		{
-			name: "unknown field name",
-			field: "unknown",
-			value: "node-85",
+			name:    "unknown field name",
+			field:   "unknown",
+			value:   "node-85",
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T){
+		t.Run(tt.name, func(t *testing.T) {
 			comp, err := stringCompare(tt.field, tt.value)
 			// Check error expectations
 			if (err != nil) != tt.wantErr {

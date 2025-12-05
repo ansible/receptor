@@ -429,11 +429,11 @@ func TestRegexCompare(t *testing.T) {
 
 func TestStringCompare(t *testing.T){
 	tests := []struct {
-		name string
-		field string
-		value string
-		wantErr bool
-		testCases []struct {
+		name 		string
+		field 		string
+		value 		string
+		wantErr 	bool
+		testCases 	[]struct {
 			desc string
 			data *MessageData
 			wantMatch bool

@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+type firewallRuleTestCase struct {
+	desc      string
+	ruleIndex int
+	data      *MessageData
+	want      FirewallResult
+}
+
+type compareTestCase struct {
+	desc      string
+	data      *MessageData
+	wantMatch bool
+}
+
 func TestFirewallRules(t *testing.T) {
 	var frd FirewallRuleData
 
@@ -92,12 +105,7 @@ func TestParseFirewallRules(t *testing.T) {
 		wantErr         bool
 		wantErrContains string
 		wantCount       int
-		testCases       []struct {
-			desc      string
-			ruleIndex int
-			data      *MessageData
-			want      FirewallResult
-		}
+		testCases       []firewallRuleTestCase
 	}{
 		// Test with empty rules slice
 		{
@@ -117,12 +125,7 @@ func TestParseFirewallRules(t *testing.T) {
 			},
 			wantErr:   false,
 			wantCount: 1,
-			testCases: []struct {
-				desc      string
-				ruleIndex int
-				data      *MessageData
-				want      FirewallResult
-			}{
+			testCases: []firewallRuleTestCase{
 				{
 					desc:      "rule 0 accepts matching node1",
 					ruleIndex: 0,
@@ -152,12 +155,7 @@ func TestParseFirewallRules(t *testing.T) {
 			},
 			wantErr:   false,
 			wantCount: 2,
-			testCases: []struct {
-				desc      string
-				ruleIndex int
-				data      *MessageData
-				want      FirewallResult
-			}{
+			testCases: []firewallRuleTestCase{
 				{
 					desc:      "rule 0 accepts matching node1",
 					ruleIndex: 0,
@@ -255,11 +253,7 @@ func TestRegexCompare(t *testing.T) {
 		field     string
 		value     string
 		wantErr   bool
-		testCases []struct {
-			desc      string
-			data      *MessageData
-			wantMatch bool
-		}
+		testCases []compareTestCase
 	}{
 		// Test with invalid regex patterns
 		{
@@ -292,11 +286,7 @@ func TestRegexCompare(t *testing.T) {
 			field:   "toservice",
 			value:   "//",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches empty string",
 					data:      &MessageData{ToService: ""},
@@ -315,11 +305,7 @@ func TestRegexCompare(t *testing.T) {
 			field:   "fromnode",
 			value:   "/node-[0-9]{3}/",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches node-123",
 					data:      &MessageData{FromNode: "node-123"},
@@ -343,11 +329,7 @@ func TestRegexCompare(t *testing.T) {
 			field:   "fromnode",
 			value:   "/192\\.168\\.1\\.1/",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches exact IP",
 					data:      &MessageData{FromNode: "192.168.1.1"},
@@ -365,11 +347,7 @@ func TestRegexCompare(t *testing.T) {
 			field:   "fromservice",
 			value:   "/api-v2\\.0\\(prod\\)/",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches api-v2.0(prod)",
 					data:      &MessageData{FromService: "api-v2.0(prod)"},
@@ -387,11 +365,7 @@ func TestRegexCompare(t *testing.T) {
 			field:   "tonode",
 			value:   "/server\\[prod\\]/",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches server[prod]",
 					data:      &MessageData{ToNode: "server[prod]"},
@@ -433,11 +407,7 @@ func TestStringCompare(t *testing.T) {
 		field     string
 		value     string
 		wantErr   bool
-		testCases []struct {
-			desc      string
-			data      *MessageData
-			wantMatch bool
-		}
+		testCases []compareTestCase
 	}{
 		// Test with empty value string
 		{
@@ -445,11 +415,7 @@ func TestStringCompare(t *testing.T) {
 			field:   "fromnode",
 			value:   "",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches empty FromNode",
 					data:      &MessageData{FromNode: ""},
@@ -489,11 +455,7 @@ func TestStringCompare(t *testing.T) {
 			field:   "tonode",
 			value:   "node-123&",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches value with special characters",
 					data:      &MessageData{ToNode: "node-123&"},
@@ -512,11 +474,7 @@ func TestStringCompare(t *testing.T) {
 			field:   "ToService",
 			value:   "Prod-123",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches field with mixed case characters",
 					data:      &MessageData{ToService: "Prod-123"},
@@ -535,11 +493,7 @@ func TestStringCompare(t *testing.T) {
 			field:   "FROMSERVICE",
 			value:   "dev.83",
 			wantErr: false,
-			testCases: []struct {
-				desc      string
-				data      *MessageData
-				wantMatch bool
-			}{
+			testCases: []compareTestCase{
 				{
 					desc:      "matches field with upper-case characters",
 					data:      &MessageData{FromService: "dev.83"},

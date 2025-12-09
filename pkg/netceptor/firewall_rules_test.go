@@ -182,17 +182,7 @@ func TestParseFirewallRules(t *testing.T) {
 				},
 			},
 		},
-		// Test wiith invalid rule data
-		{
-			name: "invalid rule",
-			rules: []FirewallRuleData{
-				{
-					"action": "",
-				},
-			},
-			wantErr:   true,
-			wantCount: 0,
-		},
+
 		// Test that error message includes the rule index number
 		{
 			name: "error message includes rule index",
@@ -212,6 +202,58 @@ func TestParseFirewallRules(t *testing.T) {
 			},
 			wantErr:         true,
 			wantErrContains: "error in rule 1",
+			wantCount:       0,
+		},
+		// Test with invalid rule data
+		{
+			name: "empty value",
+			rules: []FirewallRuleData{
+				{
+					"action": "",
+				},
+			},
+			wantErr:         true,
+			wantCount:       0,
+			wantErrContains: "unknown action",
+		},
+		{
+			name: "error message for invalid key",
+			rules: []FirewallRuleData{
+				{
+					"invalidkey": "value",
+				},
+			},
+			wantErr:         true,
+			wantErrContains: "invalid firewall rule. unknown key: invalidkey",
+			wantCount:       0,
+		},
+		{
+			name: "empty map with no action",
+			rules: []FirewallRuleData{
+				{},
+			},
+			wantErr:         true,
+			wantErrContains: "unknown action",
+			wantCount:       0,
+		},
+		{
+			name: "nil map",
+			rules: []FirewallRuleData{
+				nil,
+			},
+			wantErr:         true,
+			wantErrContains: "unknown action",
+			wantCount:       0,
+		},
+		{
+			name: "non-string value",
+			rules: []FirewallRuleData{
+				{
+					493: 123,
+				},
+			},
+			wantErr:         true,
+			wantErrContains: "invalid firewall rule. <int Value> must be a string",
 			wantCount:       0,
 		},
 	}

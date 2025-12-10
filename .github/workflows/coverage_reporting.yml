@@ -58,7 +58,7 @@ jobs:
         working-directory: ./receptorctl
 
       - name: SonarCube Static Scans (on push)
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@v7
         if: github.event_name == 'push' && github.repository == 'ansible/receptor'
         env:
           SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}

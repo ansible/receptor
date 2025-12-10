@@ -96,10 +96,6 @@ func (b *TCPListener) GetAddr() string {
 	return b.li.Addr().String()
 }
 
-func (b *TCPListener) GetCost() string {
-	return b.li.Addr().String()
-}
-
 func (b *TCPListener) GetTLS() *tls.Config {
 	return b.TLS
 }

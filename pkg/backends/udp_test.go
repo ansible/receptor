@@ -244,6 +244,8 @@ func checkTestError(t *testing.T, err error, wantErr bool, errMsg, funcName stri
 }
 
 func TestUDPDialer_GetAddr(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		address string
@@ -263,6 +265,8 @@ func TestUDPDialer_GetAddr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			b, err := NewUDPDialer(tt.address, true, nil)
 			if err != nil {
 				t.Errorf("NewUDPDialer() error = %v", err)
@@ -277,6 +281,8 @@ func TestUDPDialer_GetAddr(t *testing.T) {
 }
 
 func TestUDPDialer_GetTLS(t *testing.T) {
+	t.Parallel()
+	
 	b := &UDPDialer{}
 
 	if got := b.GetTLS(); got != nil {
@@ -285,6 +291,8 @@ func TestUDPDialer_GetTLS(t *testing.T) {
 }
 
 func TestNewUDPDialer(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		address string
 		redial  bool
@@ -317,6 +325,8 @@ func TestNewUDPDialer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := NewUDPDialer(tt.args.address, tt.args.redial, tt.args.logger)
 			checkTestError(t, err, tt.wantErr, "", "NewUDPDialer()")
 
@@ -344,6 +354,8 @@ type udpDialerSessionTest struct {
 }
 
 func TestUDPDialerSession_Send(t *testing.T) {
+	t.Parallel()
+
 	tests := []udpDialerSessionTest{
 		{
 			name:      "Send normal message",
@@ -369,6 +381,8 @@ func TestUDPDialerSession_Send(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cleanup, serverConn, udpClientConn, session := setupUDPDialerSessionTest(t)
 			defer cleanup()
 
@@ -394,6 +408,8 @@ func TestUDPDialerSession_Send(t *testing.T) {
 }
 
 func TestUDPDialerSession_Recv(t *testing.T) {
+	t.Parallel()
+
 	tests := []udpDialerSessionTest{
 		{
 			name:       "Receive data successfully",
@@ -433,6 +449,8 @@ func TestUDPDialerSession_Recv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cleanup, serverConn, udpClientConn, session := setupUDPDialerSessionTest(t)
 			defer cleanup()
 
@@ -476,6 +494,8 @@ func TestUDPDialerSession_Recv(t *testing.T) {
 }
 
 func TestUDPDialerSession_Close(t *testing.T) {
+	t.Parallel()
+
 	tests := []udpDialerSessionTest{
 		{
 			name:    "Close successfully",
@@ -490,6 +510,8 @@ func TestUDPDialerSession_Close(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cleanup, _, _, session := setupUDPDialerSessionTest(t)
 			defer cleanup()
 

@@ -282,7 +282,7 @@ func TestUDPDialer_GetAddr(t *testing.T) {
 
 func TestUDPDialer_GetTLS(t *testing.T) {
 	t.Parallel()
-	
+
 	b := &UDPDialer{}
 
 	if got := b.GetTLS(); got != nil {

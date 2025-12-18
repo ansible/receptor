@@ -210,7 +210,7 @@ func newTestUDPDialerSession(clientConn *net.UDPConn) *UDPDialerSession {
 	}
 }
 
-// setupUDPDialerSessionTest sets up a complete test environment with server, client, and session
+// setupUDPDialerSessionTest sets up a complete test environment with server, client, and session.
 func setupUDPDialerSessionTest(t *testing.T) (func(), *net.UDPConn, *net.UDPConn, *UDPDialerSession) {
 	t.Helper()
 
@@ -232,6 +232,7 @@ func checkTestError(t *testing.T, err error, wantErr bool, errMsg, funcName stri
 
 	if (err != nil) != wantErr {
 		t.Errorf("%s error = %v, wantErr %v", funcName, err, wantErr)
+
 		return
 	}
 
@@ -265,6 +266,7 @@ func TestUDPDialer_GetAddr(t *testing.T) {
 			b, err := NewUDPDialer(tt.address, true, nil)
 			if err != nil {
 				t.Errorf("NewUDPDialer() error = %v", err)
+
 				return
 			}
 			if got := b.GetAddr(); got != tt.address {

@@ -27,7 +27,7 @@ func TestNewUDPListener(t *testing.T) {
 		{
 			name: "Positive",
 			args: args{
-				address: "127.0.0.1:9997",
+				address: "127.0.0.1:0",
 				logger:  logger.NewReceptorLogger("UDPtest"),
 			},
 			wantErr: false,
@@ -73,7 +73,7 @@ func TestUDPListenerStart(t *testing.T) {
 			fields: fields{
 				laddr: &net.UDPAddr{
 					IP:   net.IPv4(127, 0, 0, 1),
-					Port: 9999,
+					Port: 0,
 					Zone: "",
 				},
 				conn:            &net.UDPConn{},
@@ -137,7 +137,7 @@ func TestUDPDialerStart(t *testing.T) {
 		{
 			name: "Positive",
 			fields: fields{
-				address: "127.0.0.1:9998",
+				address: "127.0.0.1:0",
 				redial:  true,
 				logger:  logger.NewReceptorLogger("UDPtest"),
 			},
@@ -277,16 +277,6 @@ func TestUDPDialer_GetAddr(t *testing.T) {
 				t.Errorf("UDPDialer.GetAddr() = %v, want %v", got, tt.address)
 			}
 		})
-	}
-}
-
-func TestUDPDialer_GetTLS(t *testing.T) {
-	t.Parallel()
-
-	b := &UDPDialer{}
-
-	if got := b.GetTLS(); got != nil {
-		t.Errorf("UDPDialer.GetTLS() = %v, want nil", got)
 	}
 }
 

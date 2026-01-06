@@ -460,9 +460,14 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		// Verify the certificate chain.
 		_, err = certs[0].Verify(opts)
 		if err != nil {
-			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", err, tlscfg.RootCAs, tlscfg.ServerName)
+			var hostnameError x509.HostnameError
+			handledError := err
+			if errors.As(err, &hostnameError) {
+				handledError = handleHostnameError(hostnameError)
+			}
+			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", handledError, tlscfg.RootCAs, tlscfg.ServerName)
 
-			return err
+			return handledError
 		}
 
 		// Verify Receptor node ID if required.

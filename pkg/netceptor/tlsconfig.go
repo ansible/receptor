@@ -469,8 +469,6 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", handledError, tlscfg.RootCAs, tlscfg.ServerName)
 
 			return handledError
-
-			return err
 		}
 
 		// Verify Receptor node ID if required.
@@ -495,10 +493,6 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 func handleHostnameError(h x509.HostnameError) error {
 	c := h.Certificate
 	maxNamesIncluded := 100
-
-	// if !c.hasSANExtension() && matchHostnames(c.Subject.CommonName, h.Host) {
-	// 	return "x509: certificate relies on legacy Common Name field, use SANs instead"
-	// }
 
 	var valid strings.Builder
 	if ip := net.ParseIP(h.Host); ip != nil {

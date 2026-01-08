@@ -21,7 +21,7 @@ func handleHostnameError(h x509.HostnameError) error {
 	maxNamesIncluded := 100
 
 	var valid strings.Builder
-	if ip := net.ParseIP(h.Host); ip != nil {
+	if net.ParseIP(h.Host) != nil {
 		// Trying to validate an IP
 		if len(c.IPAddresses) == 0 {
 			return errors.New("x509: cannot validate certificate for " + h.Host + " because it doesn't contain any IP SANs")

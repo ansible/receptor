@@ -45,5 +45,6 @@ func handleHostnameError(h x509.HostnameError) error {
 	if valid.Len() == 0 {
 		return errors.New("x509: certificate is not valid for any names, but wanted to match " + h.Host)
 	}
+
 	return errors.New("x509: certificate is valid for " + valid.String() + ", not " + h.Host)
 }

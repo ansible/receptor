@@ -1,11 +1,13 @@
-//go:build go1.23
-
 package netceptor
 
 import (
+	"context"
+	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"testing"
 )
@@ -118,5 +120,54 @@ func TestTLSConfigCertCount(t *testing.T) {
 				t.Fatalf("Error message should contain %q, got %q", tt.expectedError, errMsg)
 			}
 		})
+	}
+}
+
+func TestHostnameErrorHandlerCalled(t *testing.T) {
+	hostnameToMatch := "MyHostname"
+	expectedError := "x509: certificate is not valid for any names, but wanted to match MyHostname"
+
+	caCertFilename, certFilename, _, teardownFunc := useUtilsSetupSuiteWithGenerateWithCA(t, hostnameToMatch)
+	defer teardownFunc(t)
+
+	// Read CA certificate.
+	caBytes, err := os.ReadFile(caCertFilename)
+	if err != nil {
+		t.Fatalf("failed to read CA certificate file: %v", err)
+	}
+	rootCA := x509.NewCertPool()
+	rootCA.AppendCertsFromPEM(caBytes)
+
+	// Read regular certificate.
+	certBytes, err := os.ReadFile(certFilename)
+	if err != nil {
+		t.Fatalf("failed to read certificate file: %v", err)
+	}
+	block, rest := pem.Decode(certBytes)
+	if block == nil {
+		t.Fatal("failed to decode PEM certificate")
+	}
+	if len(rest) != 0 {
+		t.Fatalf("unexpected remaining bytes after PEM decode: %d bytes remaining", len(rest))
+	}
+
+	cfg := &tls.Config{
+		RootCAs:            rootCA,
+		InsecureSkipVerify: true,
+	}
+
+	MainInstance = New(context.Background(), "testnode")
+	verifyFunc := ReceptorVerifyFunc(cfg, nil, hostnameToMatch, ExpectedHostnameTypeDNS, VerifyServer, MainInstance.Logger)
+
+	rawCerts := [][]byte{block.Bytes}
+	err = verifyFunc(rawCerts, nil)
+
+	if err == nil {
+		t.Fatalf("Expected an error but received none")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, expectedError) {
+		t.Fatalf("Error message should contain %q, got %q", expectedError, errMsg)
 	}
 }

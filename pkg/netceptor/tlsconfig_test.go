@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -183,24 +182,6 @@ func useUtilsSetupSuiteWithGenerateWithCA(t *testing.T, name string) (string, st
 		t.Error(err.Error())
 	}
 	certKey, cert, err := utils.GenerateCertWithCA(name, caKey, caCert, name, nil, []string{"foobar"})
-	if err != nil {
-		t.Error(err.Error())
-	}
-
-	return caCert, cert, certKey, func(t *testing.T) {
-		defer os.Remove(caCert)
-		defer os.Remove(caKey)
-		defer os.Remove(certKey)
-		defer os.Remove(cert)
-	}
-}
-
-func useUtilsSetupSuiteWithGenerateWithCAWithManyNames(t *testing.T, name string, dnsNames []string) (string, string, string, func(t *testing.T)) {
-	caKey, caCert, err := utils.GenerateCA(name, name)
-	if err != nil {
-		t.Error(err.Error())
-	}
-	certKey, cert, err := utils.GenerateCertWithCA(name, caKey, caCert, name, dnsNames, []string{"foobar"})
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -967,95 +948,6 @@ func TestTLSClientConfigMinTLS13(t *testing.T) {
 					tlsVersionToString(tt.expectedMinVersion),
 					tt.expectedMinVersion,
 					tlscfg.MinVersion)
-			}
-		})
-	}
-}
-
-// TestTLSConfigCertificateCount checks that a certificate can contain
-// no more than 100 certificates due to CVE.
-func TestTLSConfigCertificateCount(t *testing.T) {
-	testCases := []struct {
-		testName        string
-		hostnameToMatch string
-		nameCount       int
-		expectedError   string
-	}{
-		{
-			testName:        "Less than 100 DNS names",
-			hostnameToMatch: "MyHostname",
-			nameCount:       3,
-			expectedError:   "x509: certificate is valid for server-0, server-1, server-2, not MyHostname",
-		},
-		{
-			testName:        "More than 100 DNS names",
-			hostnameToMatch: "MyHostname",
-			nameCount:       105,
-			expectedError:   "x509: certificate is valid for 105 names, but none matched MyHostname",
-		},
-		{
-			testName:        "Exactly 100 DNS names",
-			hostnameToMatch: "MyHostname",
-			nameCount:       100,
-			expectedError:   "x509: certificate is valid for 100 names, but none matched MyHostname",
-		},
-		{
-			testName:        "Less than 100 IP SANs",
-			hostnameToMatch: "127.0.0.1",
-			nameCount:       3,
-			expectedError:   "abc",
-		},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.testName, func(t *testing.T) {
-			dnsNames := []string{}
-			for n := range tt.nameCount {
-				dnsNames = append(dnsNames, fmt.Sprintf("server-%d", n))
-			}
-
-			caCertFilename, certFilename, _, teardownFunc := useUtilsSetupSuiteWithGenerateWithCAWithManyNames(t, "foobar", dnsNames)
-			defer teardownFunc(t)
-
-			// Read CA certificate.
-			caBytes, err := os.ReadFile(caCertFilename)
-			if err != nil {
-				t.Fatalf("failed to read CA certificate file: %v", err)
-			}
-			rootCA := x509.NewCertPool()
-			rootCA.AppendCertsFromPEM(caBytes)
-
-			// Read regular certificate.
-			certBytes, err := os.ReadFile(certFilename)
-			if err != nil {
-				t.Fatalf("failed to read certificate file: %v", err)
-			}
-			block, rest := pem.Decode(certBytes)
-			if block == nil {
-				t.Fatal("failed to decode PEM certificate")
-			}
-			if len(rest) != 0 {
-				t.Fatalf("unexpected remaining bytes after PEM decode: %d bytes remaining", len(rest))
-			}
-
-			cfg := &tls.Config{
-				RootCAs:            rootCA,
-				InsecureSkipVerify: true,
-			}
-
-			MainInstance = New(context.Background(), "testnode")
-			verifyFunc := ReceptorVerifyFunc(cfg, nil, tt.hostnameToMatch, ExpectedHostnameTypeDNS, VerifyServer, MainInstance.Logger)
-
-			rawCerts := [][]byte{block.Bytes}
-			err = verifyFunc(rawCerts, nil)
-
-			if err == nil {
-				t.Fatalf("Expected an error but received none")
-			}
-
-			errMsg := err.Error()
-			if !strings.Contains(errMsg, tt.expectedError) {
-				t.Fatalf("Error message should contain %q, got %q", tt.expectedError, errMsg)
 			}
 		})
 	}

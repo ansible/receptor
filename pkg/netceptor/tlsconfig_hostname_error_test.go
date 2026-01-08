@@ -28,6 +28,13 @@ func TestTLSConfigCertCount(t *testing.T) {
 		expectedError   string
 	}{
 		{
+			testName:        "Zero DNS names",
+			testType:        dnsName,
+			hostnameToMatch: "MyHostname",
+			itemCount:       0,
+			expectedError:   "x509: certificate is not valid for any names, but wanted to match MyHostname",
+		},
+		{
 			testName:        "Less than 100 DNS names",
 			testType:        dnsName,
 			hostnameToMatch: "MyHostname",
@@ -47,6 +54,13 @@ func TestTLSConfigCertCount(t *testing.T) {
 			hostnameToMatch: "MyHostname",
 			itemCount:       100,
 			expectedError:   "x509: certificate is valid for 100 names, but none matched MyHostname",
+		},
+		{
+			testName:        "Zero IP SANs",
+			testType:        ipAddress,
+			hostnameToMatch: "127.0.0.1",
+			itemCount:       0,
+			expectedError:   "x509: cannot validate certificate for 127.0.0.1 because it doesn't contain any IP SANs",
 		},
 		{
 			testName:        "Less than 100 IP SANs",

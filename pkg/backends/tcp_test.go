@@ -115,6 +115,7 @@ func TestTCPDialerStart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			testLogger := logger.NewReceptorLogger("TCPtest")
 
 			address := tt.address
@@ -310,15 +311,15 @@ func TestTCPListener_GetTLS(t *testing.T) {
 func TestTCPListenerStart(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name          string
-		address       string
-		tls           *tls.Config
+		name           string
+		address        string
+		tls            *tls.Config
 		makeConnection bool
 	}{
 		{
-			name:          "Non-TLS listener with connection",
-			address:       "127.0.0.1:0",
-			tls:           nil,
+			name:           "Non-TLS listener with connection",
+			address:        "127.0.0.1:0",
+			tls:            nil,
 			makeConnection: true,
 		},
 		{
@@ -329,6 +330,7 @@ func TestTCPListenerStart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			b, err := NewTCPListener(tt.address, tt.tls, logger.NewReceptorLogger("TCPtest"))
 			if err != nil {
 				t.Errorf("NewTCPListener() error = %v", err)
@@ -930,6 +932,7 @@ func TestTCPDialerCfg_Run(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			netceptor.MainInstance = netceptor.New(context.Background(), "tcp_dialer_run_test")
 			err := tt.cfg.Run()
 			if (err != nil) != tt.wantErr {
@@ -1022,6 +1025,7 @@ func TestTCPListenerCfg_Run(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			netceptor.MainInstance = netceptor.New(context.Background(), "tcp_listener_run_test")
 			err := tt.cfg.Run()
 			if (err != nil) != tt.wantErr {
@@ -1044,5 +1048,3 @@ func TestTCPListenerCfg_Reload(t *testing.T) {
 		t.Errorf("TCPListenerCfg.Reload() error = %v", err)
 	}
 }
-
-

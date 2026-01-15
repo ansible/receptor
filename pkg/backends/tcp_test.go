@@ -10,7 +10,22 @@ import (
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
+
+type tcpDialerCfgTest struct {
+	name    string
+	cfg     TCPDialerCfg
+	wantErr bool
+	errMsg  string
+}
+
+type tcpListenerCfgTest struct {
+	name    string
+	cfg     TCPListenerCfg
+	wantErr bool
+	errMsg  string
+}
 
 func TestTCPDialer_GetAddr(t *testing.T) {
 	tests := []struct {
@@ -79,24 +94,49 @@ func TestTCPDialer_GetTLS(t *testing.T) {
 }
 
 func TestTCPDialerStart(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		name    string
-		address string
-		redial  bool
-		tls     *tls.Config
-		wantErr bool
+		name          string
+		address       string
+		tls           *tls.Config
+		setupListener bool
 	}{
 		{
-			name:    "Successful start",
-			address: "127.0.0.1:0",
-			redial:  true,
-			tls:     nil,
-			wantErr: false,
+			name:          "Successful non-TLS connection",
+			address:       "",
+			tls:           nil,
+			setupListener: true,
+		},
+		{
+			name:    "TLS connection failure",
+			address: "127.0.0.1:1",
+			tls:     &tls.Config{MinVersion: tls.VersionTLS12},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := NewTCPDialer(tt.address, tt.redial, tt.tls, logger.NewReceptorLogger("TCPtest"))
+			testLogger := logger.NewReceptorLogger("TCPtest")
+
+			address := tt.address
+			var listener net.Listener
+			if tt.setupListener {
+				var err error
+				listener, err = net.Listen("tcp", "127.0.0.1:0")
+				if err != nil {
+					t.Fatalf("Failed to create test listener: %v", err)
+				}
+				defer listener.Close()
+				address = listener.Addr().String()
+
+				go func() {
+					conn, _ := listener.Accept()
+					if conn != nil {
+						conn.Close()
+					}
+				}()
+			}
+
+			b, err := NewTCPDialer(address, false, tt.tls, testLogger)
 			if err != nil {
 				t.Errorf("NewTCPDialer() error = %v", err)
 
@@ -111,14 +151,17 @@ func TestTCPDialerStart(t *testing.T) {
 			}()
 
 			got, err := b.Start(ctx, wg)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("TCPDialer.Start() error = %v, wantErr %v", err, tt.wantErr)
+			if err != nil {
+				t.Errorf("TCPDialer.Start() error = %v", err)
 
 				return
 			}
 			if got == nil {
 				t.Errorf("TCPDialer.Start() returned nil channel")
 			}
+
+			// Allow time for connection attempt to complete before context cancellation
+			time.Sleep(10 * time.Millisecond)
 		})
 	}
 }
@@ -265,17 +308,23 @@ func TestTCPListener_GetTLS(t *testing.T) {
 }
 
 func TestTCPListenerStart(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		name    string
-		address string
-		tls     *tls.Config
-		wantErr bool
+		name          string
+		address       string
+		tls           *tls.Config
+		makeConnection bool
 	}{
 		{
-			name:    "Successful start",
+			name:          "Non-TLS listener with connection",
+			address:       "127.0.0.1:0",
+			tls:           nil,
+			makeConnection: true,
+		},
+		{
+			name:    "TLS listener",
 			address: "127.0.0.1:0",
-			tls:     nil,
-			wantErr: false,
+			tls:     &tls.Config{MinVersion: tls.VersionTLS12},
 		},
 	}
 	for _, tt := range tests {
@@ -295,14 +344,26 @@ func TestTCPListenerStart(t *testing.T) {
 			}()
 
 			got, err := b.Start(ctx, wg)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("TCPListener.Start() error = %v, wantErr %v", err, tt.wantErr)
+			if err != nil {
+				t.Errorf("TCPListener.Start() error = %v", err)
 
 				return
 			}
 			if got == nil {
 				t.Errorf("TCPListener.Start() returned nil channel")
 			}
+
+			if tt.makeConnection {
+				// Make a connection to trigger accept path
+				conn, err := net.Dial("tcp", b.GetAddr())
+				if err != nil {
+					t.Errorf("Failed to connect to listener: %v", err)
+				} else {
+					conn.Close()
+				}
+			}
+
+			time.Sleep(10 * time.Millisecond)
 		})
 	}
 }
@@ -544,10 +605,7 @@ func TestTCPSession_Close(t *testing.T) {
 }
 
 func TestTCPListenerCfg_GetCost(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  TCPListenerCfg
-	}{
+	tests := []tcpListenerCfgTest{
 		{
 			name: "Positive cost",
 			cfg: TCPListenerCfg{
@@ -577,10 +635,7 @@ func TestTCPListenerCfg_GetCost(t *testing.T) {
 }
 
 func TestTCPListenerCfg_GetNodeCost(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  TCPListenerCfg
-	}{
+	tests := []tcpListenerCfgTest{
 		{
 			name: "No node costs",
 			cfg: TCPListenerCfg{
@@ -622,10 +677,7 @@ func TestTCPListenerCfg_GetNodeCost(t *testing.T) {
 }
 
 func TestTCPListenerCfg_GetAddr(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  TCPListenerCfg
-	}{
+	tests := []tcpListenerCfgTest{
 		{
 			name: "Empty address",
 			cfg: TCPListenerCfg{
@@ -661,10 +713,7 @@ func TestTCPListenerCfg_GetAddr(t *testing.T) {
 }
 
 func TestTCPListenerCfg_GetTLS(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  TCPListenerCfg
-	}{
+	tests := []tcpListenerCfgTest{
 		{
 			name: "Empty TLS",
 			cfg: TCPListenerCfg{
@@ -688,12 +737,7 @@ func TestTCPListenerCfg_GetTLS(t *testing.T) {
 }
 
 func TestTCPListenerCfg_Prepare(t *testing.T) {
-	tests := []struct {
-		name    string
-		cfg     TCPListenerCfg
-		wantErr bool
-		errMsg  string
-	}{
+	tests := []tcpListenerCfgTest{
 		{
 			name: "Valid config with positive cost",
 			cfg: TCPListenerCfg{
@@ -779,12 +823,7 @@ func TestTCPListenerCfg_Prepare(t *testing.T) {
 }
 
 func TestTCPDialerCfg_Prepare(t *testing.T) {
-	tests := []struct {
-		name    string
-		cfg     TCPDialerCfg
-		wantErr bool
-		errMsg  string
-	}{
+	tests := []tcpDialerCfgTest{
 		{
 			name: "Valid config with positive cost",
 			cfg: TCPDialerCfg{
@@ -823,3 +862,187 @@ func TestTCPDialerCfg_Prepare(t *testing.T) {
 		})
 	}
 }
+
+func TestTCPDialerCfg_PreReload(t *testing.T) {
+	tests := []tcpDialerCfgTest{
+		{
+			name: "Valid config with positive cost",
+			cfg: TCPDialerCfg{
+				Cost: 1.0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid: zero cost",
+			cfg: TCPDialerCfg{
+				Cost: 0.0,
+			},
+			wantErr: true,
+			errMsg:  "connection cost must be positive",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.PreReload()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TCPDialerCfg.PreReload() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if tt.wantErr && err.Error() != tt.errMsg {
+				t.Errorf("TCPDialerCfg.PreReload() error message = %v, want %v", err.Error(), tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestTCPDialerCfg_Run(t *testing.T) {
+	t.Parallel()
+	tests := []tcpDialerCfgTest{
+		{
+			name: "Valid config",
+			cfg: TCPDialerCfg{
+				Address: "127.0.0.1:8080",
+				Redial:  true,
+				Cost:    1.0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid address format - missing port",
+			cfg: TCPDialerCfg{
+				Address: "127.0.0.1",
+				Redial:  true,
+				Cost:    1.0,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid TLS config name",
+			cfg: TCPDialerCfg{
+				Address: "127.0.0.1:8080",
+				Redial:  true,
+				Cost:    1.0,
+				TLS:     "nonexistent-tls-config",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			netceptor.MainInstance = netceptor.New(context.Background(), "tcp_dialer_run_test")
+			err := tt.cfg.Run()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TCPDialerCfg.Run() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTCPDialerCfg_Reload(t *testing.T) {
+	t.Parallel()
+	cfg := TCPDialerCfg{
+		Address: "127.0.0.1:8080",
+		Redial:  true,
+		Cost:    1.0,
+	}
+	netceptor.MainInstance = netceptor.New(context.Background(), "tcp_dialer_reload_test")
+	err := cfg.Reload()
+	if err != nil {
+		t.Errorf("TCPDialerCfg.Reload() error = %v", err)
+	}
+}
+
+func TestTCPListenerCfg_PreReload(t *testing.T) {
+	tests := []tcpListenerCfgTest{
+		{
+			name: "Valid config with positive cost",
+			cfg: TCPListenerCfg{
+				Cost: 1.0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid: zero cost",
+			cfg: TCPListenerCfg{
+				Cost: 0.0,
+			},
+			wantErr: true,
+			errMsg:  "connection cost must be positive",
+		},
+		{
+			name: "Invalid: negative node cost",
+			cfg: TCPListenerCfg{
+				Cost: 1.0,
+				NodeCost: map[string]float64{
+					"node1": -1.0,
+				},
+			},
+			wantErr: true,
+			errMsg:  "connection cost must be positive for node1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.PreReload()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TCPListenerCfg.PreReload() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+			if tt.wantErr && err.Error() != tt.errMsg {
+				t.Errorf("TCPListenerCfg.PreReload() error message = %v, want %v", err.Error(), tt.errMsg)
+			}
+		})
+	}
+}
+
+func TestTCPListenerCfg_Run(t *testing.T) {
+	t.Parallel()
+	tests := []tcpListenerCfgTest{
+		{
+			name: "Valid config",
+			cfg: TCPListenerCfg{
+				BindAddr: "127.0.0.1",
+				Port:     0,
+				Cost:     1.0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid TLS config name",
+			cfg: TCPListenerCfg{
+				BindAddr: "127.0.0.1",
+				Port:     0,
+				Cost:     1.0,
+				TLS:      "nonexistent-tls-config",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			netceptor.MainInstance = netceptor.New(context.Background(), "tcp_listener_run_test")
+			err := tt.cfg.Run()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TCPListenerCfg.Run() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTCPListenerCfg_Reload(t *testing.T) {
+	t.Parallel()
+	cfg := TCPListenerCfg{
+		BindAddr: "127.0.0.1",
+		Port:     0,
+		Cost:     1.0,
+	}
+	netceptor.MainInstance = netceptor.New(context.Background(), "tcp_listener_reload_test")
+	err := cfg.Reload()
+	if err != nil {
+		t.Errorf("TCPListenerCfg.Reload() error = %v", err)
+	}
+}
+
+

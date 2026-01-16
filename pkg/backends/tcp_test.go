@@ -158,12 +158,13 @@ func TestTCPDialerStart(t *testing.T) {
 			if got == nil {
 				t.Errorf("TCPDialer.Start() returned nil channel")
 			}
-
-			// Allow time for connection attempt to complete before context cancellation
+			
+			// Wait for connection with 10ms timeout. This is sufficient for loopback
+			// connections (typical datacenter RTT is 0.5ms) while keeping tests fast.
 			select {
 			case <-got:
 				// Connection received
-			case <-time.After(1 * time.Second):
+			case <-time.After(10 * time.Millisecond):
 				t.Fatal("timeout waiting for connection")
 			}
 		})
@@ -364,6 +365,9 @@ func TestTCPListenerStart(t *testing.T) {
 				} else {
 					conn.Close()
 				}
+				
+				// Wait for connection with 10ms timeout. This is sufficient for loopback
+			    // connections (typical datacenter RTT is 0.5ms) while keeping tests fast.
 				select {
 				case <-got:
 					// Connection received

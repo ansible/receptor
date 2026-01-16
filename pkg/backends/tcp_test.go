@@ -94,7 +94,6 @@ func TestTCPDialer_GetTLS(t *testing.T) {
 }
 
 func TestTCPDialerStart(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name          string
 		address       string
@@ -115,7 +114,6 @@ func TestTCPDialerStart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			testLogger := logger.NewReceptorLogger("TCPtest")
 
 			address := tt.address
@@ -162,7 +160,12 @@ func TestTCPDialerStart(t *testing.T) {
 			}
 
 			// Allow time for connection attempt to complete before context cancellation
-			time.Sleep(10 * time.Millisecond)
+			select {
+			case <-got:
+				// Connection received
+			case <-time.After(1 * time.Second):
+				t.Fatal("timeout waiting for connection")
+			}
 		})
 	}
 }
@@ -309,7 +312,6 @@ func TestTCPListener_GetTLS(t *testing.T) {
 }
 
 func TestTCPListenerStart(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name           string
 		address        string
@@ -330,7 +332,6 @@ func TestTCPListenerStart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			b, err := NewTCPListener(tt.address, tt.tls, logger.NewReceptorLogger("TCPtest"))
 			if err != nil {
 				t.Errorf("NewTCPListener() error = %v", err)
@@ -363,9 +364,13 @@ func TestTCPListenerStart(t *testing.T) {
 				} else {
 					conn.Close()
 				}
+				select {
+				case <-got:
+					// Connection received
+				case <-time.After(10 * time.Millisecond):
+					t.Fatal("timeout waiting for connection")
+				}
 			}
-
-			time.Sleep(10 * time.Millisecond)
 		})
 	}
 }
@@ -899,7 +904,6 @@ func TestTCPDialerCfg_PreReload(t *testing.T) {
 }
 
 func TestTCPDialerCfg_Run(t *testing.T) {
-	t.Parallel()
 	tests := []tcpDialerCfgTest{
 		{
 			name: "Valid config",
@@ -932,7 +936,6 @@ func TestTCPDialerCfg_Run(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			netceptor.MainInstance = netceptor.New(context.Background(), "tcp_dialer_run_test")
 			err := tt.cfg.Run()
 			if (err != nil) != tt.wantErr {
@@ -943,7 +946,6 @@ func TestTCPDialerCfg_Run(t *testing.T) {
 }
 
 func TestTCPDialerCfg_Reload(t *testing.T) {
-	t.Parallel()
 	cfg := TCPDialerCfg{
 		Address: "127.0.0.1:8080",
 		Redial:  true,
@@ -1001,7 +1003,6 @@ func TestTCPListenerCfg_PreReload(t *testing.T) {
 }
 
 func TestTCPListenerCfg_Run(t *testing.T) {
-	t.Parallel()
 	tests := []tcpListenerCfgTest{
 		{
 			name: "Valid config",
@@ -1025,7 +1026,6 @@ func TestTCPListenerCfg_Run(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			netceptor.MainInstance = netceptor.New(context.Background(), "tcp_listener_run_test")
 			err := tt.cfg.Run()
 			if (err != nil) != tt.wantErr {
@@ -1036,7 +1036,6 @@ func TestTCPListenerCfg_Run(t *testing.T) {
 }
 
 func TestTCPListenerCfg_Reload(t *testing.T) {
-	t.Parallel()
 	cfg := TCPListenerCfg{
 		BindAddr: "127.0.0.1",
 		Port:     0,

@@ -33,6 +33,8 @@ jobs:
     permissions:
       packages: write
       contents: write
+    env:
+      REF: ${{ github.event.inputs.ref }}
     steps:
       - name: Verify inputs
         run: |
@@ -53,7 +55,7 @@ jobs:
       - name: Checkout receptor
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.ref }}
+          ref: ${{ env.REF }}
 
       - name: Install python
         uses: actions/setup-python@v6

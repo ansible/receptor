@@ -82,7 +82,7 @@ jobs:
 
       - name: Lowercase github owner
         run: |
-          echo "OWNER=$(echo 'console.log("${{ github.repository_owner }}".toLowerCase())' | node -)" >> $GITHUB_ENV
+          echo "OWNER=$(echo $GITHUB_REPOSITORY_OWNER | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Build container image
         run: |

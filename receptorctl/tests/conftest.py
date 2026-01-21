@@ -149,7 +149,8 @@ def receptor_bin_path():
 
 @pytest.fixture(scope="class")
 def default_socket_tcp():
-    return "tcp://localhost:11112"
+    #return "tcp://localhost:11112"
+    return "tls://localhost:11112"
 
 
 @pytest.fixture(scope="class")

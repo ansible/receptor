@@ -38,6 +38,7 @@ class ReceptorControl:
         self._key = key
         self._cert = cert
         self._insecureskipverify = insecureskipverify
+        self._tls_minimum_version = ssl.TLSVersion.TLSv1_2
         if config and tlsclient:
             self.readconfig(config, tlsclient)
 
@@ -125,7 +126,7 @@ class ReceptorControl:
                                 purpose=ssl.Purpose.SERVER_AUTH,
                                 cafile=self._rootcas,
                             )
-                            context.minimum_version = ssl.TLSVersion.TLSv1_2
+                            context.minimum_version = self._tls_minimum_version
 
                             if self._key and self._cert:
                                 context.load_cert_chain(certfile=self._cert, keyfile=self._key)

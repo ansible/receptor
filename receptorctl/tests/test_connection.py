@@ -1,4 +1,5 @@
 import os
+import ssl
 import tempfile
 
 import pytest
@@ -73,6 +74,8 @@ class TestReceptorCtlConnection:
             )
             - status.keys()
         )
+
+        assert node1_controller._tls_minimum_version == ssl.TLSVersion.TLSv1_2
 
 
 class TestReceptorCtlConfig:

@@ -644,7 +644,7 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 // InsecureSkipVerify is intentionally true here because:
 // 1. This path is for non-TLS mode where the server uses auto-generated self-signed certs
 // 2. Custom verification is still performed via VerifyPeerCertificate callback
-// 3. The callback (verifyServerCertificate) checks for the insecure connection marker
+// 3. The callback (verifyServerCertificate) checks for the insecure connection marker.
 func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		//nolint:gosec // G402: InsecureSkipVerify is intentional for non-TLS mode; see function comment above

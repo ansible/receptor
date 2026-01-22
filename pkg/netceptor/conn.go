@@ -421,7 +421,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 
 	if tlscfg == nil {
-		tlscfg = generateClientTLSConfig(s.NodeID())
+		tlscfg = generateClientTLSConfig(s.NodeID(), false)
 	} else {
 		tlscfg = tlscfg.Clone()
 		tlscfg.NextProtos = []string{"netceptor"}
@@ -637,10 +637,9 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	return fmt.Errorf("insecure connection to secure service")
 }
 
-func generateClientTLSConfig(host string) *tls.Config {
+func generateClientTLSConfig(host string, insecureSkipVerify bool) *tls.Config {
 	return &tls.Config{
-		// #nosec G402 -- InsecureSkipVerify is set true in test context only; production usage is config-driven.
-		InsecureSkipVerify:    true,
+		InsecureSkipVerify:    insecureSkipVerify,
 		VerifyPeerCertificate: verifyServerCertificate,
 		NextProtos:            []string{"netceptor"},
 		ServerName:            host,

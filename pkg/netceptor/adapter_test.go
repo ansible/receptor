@@ -598,7 +598,11 @@ func TestDialContextWithAdapters(t *testing.T) {
 		dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		conn, err := n2.DialContext(dialCtx, "node1", "echo", nil)
+		// Use InsecureSkipVerify for tests since test certificates don't have valid SANs
+		tlsCfg := &tls.Config{
+			InsecureSkipVerify: true, //nolint:gosec // test-only config
+		}
+		conn, err := n2.DialContext(dialCtx, "node1", "echo", tlsCfg)
 		if err != nil {
 			t.Fatalf("Failed to dial: %v", err)
 		}

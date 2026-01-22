@@ -81,7 +81,7 @@ func TestServerCertVerification(t *testing.T) {
 func TestClientTLSConfig(t *testing.T) {
 	// Call the function
 	host := "test-host"
-	config := generateClientTLSConfig(host)
+	config := generateClientTLSConfig(host, true)
 
 	// Verify the result
 	if config == nil {

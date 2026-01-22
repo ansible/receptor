@@ -80,6 +80,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
 
+      # Image repository names must be lowercase, so get lowercase repo owner for ghcr.io
+      # See https://github.com/orgs/community/discussions/27086.
       - name: Lowercase github owner
         run: |
           echo "OWNER=$(echo $GITHUB_REPOSITORY_OWNER | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV

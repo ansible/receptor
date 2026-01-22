@@ -590,6 +590,16 @@ func (c *Conn) Context() context.Context {
 
 const insecureCommonName = "netceptor-insecure-common-name"
 
+// generateServerTLSConfig creates a TLS config with an auto-generated self-signed
+// certificate for QUIC service-layer connections when no user-provided TLS
+// configuration is specified.
+//
+// The generated certificate uses a marker CommonName ("netceptor-insecure-common-name")
+// that the client-side callback (verifyServerCertificate) checks for. This ensures
+// that auto-cert mode clients only connect to auto-cert mode servers.
+//
+// To use user-provided certificates, define a tls-server config and reference it
+// via the tls field in control-service.
 func generateServerTLSConfig() *tls.Config {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -637,14 +647,22 @@ func verifyServerCertificate(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 	return fmt.Errorf("insecure connection to secure service")
 }
 
-// generateClientTLSConfig creates a TLS config for non-TLS mode connections.
-// This is only called when no TLS configuration is provided (see DialContext).
-// Receptor supports both TLS and non-TLS connections per the documentation.
-// When TLS is configured, users provide their own tls.Config via GetClientTLSConfig.
+// generateClientTLSConfig creates a TLS config for QUIC service-layer connections
+// when no user-provided TLS configuration is specified (see DialContext).
+//
+// QUIC always requires TLS at the protocol level. This function provides a default
+// TLS config for simple deployments where users haven't configured custom certificates.
+// The server side (generateServerTLSConfig) creates a corresponding self-signed cert
+// with a marker CommonName.
+//
 // InsecureSkipVerify is intentionally true here because:
-// 1. This path is for non-TLS mode where the server uses auto-generated self-signed certs
-// 2. Custom verification is still performed via VerifyPeerCertificate callback
-// 3. The callback (verifyServerCertificate) checks for the insecure connection marker.
+//  1. Standard CA validation would reject the auto-generated self-signed certs
+//  2. Custom verification is still performed via the VerifyPeerCertificate callback
+//  3. The callback (verifyServerCertificate) ensures we only connect to servers
+//     using matching auto-generated certs (by checking for the marker CommonName)
+//
+// To use user-provided certificates, define a tls-client config and reference it
+// via the --tls-client flag in receptorctl commands (e.g., work submit, connect).
 func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		//nolint:gosec // G402: InsecureSkipVerify is intentional for non-TLS mode; see function comment above

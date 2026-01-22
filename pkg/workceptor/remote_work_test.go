@@ -307,6 +307,12 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 			errorContains: "remote work had not previously started",
 		},
 		{
+			name:          "restart_local_cancelled",
+			operation:     "restart",
+			remoteStarted: true,
+			expectError:   false,
+		},
+		{
 			name:          "restart_unknown_work_unit",
 			operation:     "restart",
 			remoteStarted: true,
@@ -407,6 +413,22 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 				err = wu.Restart()
 			case "restart_local_released":
 				remoteExtraData.LocalReleased = true
+				err = wu.Restart()
+			case "restart_local_cancelled":
+				// This test verifies that when LocalCancelled=true but LocalReleased=false,
+				// the work unit directory is NOT deleted (Release is not called).
+				// This was a bug fix: previously forRelease was hardcoded to true,
+				// causing premature deletion of cancelled-but-not-released work units.
+				remoteExtraData.LocalCancelled = true
+				remoteExtraData.LocalReleased = false
+				messages := []string{
+					"execution\n", // Hello message with remote node ID
+					"{\"State\": 4, \"Detail\": \"Cancelled\", \"StdoutSize\": 0}\n", // Response to cancel command
+				}
+				anyTimes := true
+				createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, anyTimes)
+				// Note: We do NOT expect mockBaseWorkUnit.Release() to be called.
+				// If Release() were called, gomock would fail with an unexpected call error.
 				err = wu.Restart()
 			case "restart_unknown_work_unit":
 				messages := []string{

@@ -646,7 +646,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 
 		return rw.runAndMonitor(rw.topJC, false, rw.StartRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
-		return rw.runAndMonitor(rw.topJC, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+		return rw.runAndMonitor(rw.topJC, red.LocalReleased, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased)
 		})
 	}

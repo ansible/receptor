@@ -55,7 +55,10 @@ jobs:
         run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind
 
       - name: Create k8s cluster
-        run: ./kind create cluster
+        run: ./kind create cluster --wait 60s
+
+      - name: Wait for nodes to be ready
+        run: kubectl wait --for=condition=Ready nodes --all --timeout=60s
 
       - name: Interact with the cluster
         run: kubectl get nodes

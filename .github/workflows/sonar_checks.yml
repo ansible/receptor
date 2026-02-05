@@ -7,9 +7,12 @@ on:
     types:
       - completed
 
-permissions: read-all
 jobs:
   sonarcloud:
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
     name: SonarQube Static Scans (PR)
     runs-on: ubuntu-latest
     env:

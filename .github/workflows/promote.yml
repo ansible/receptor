@@ -4,9 +4,6 @@ on:  # yamllint disable-line rule:truthy
   release:
     types: [published]
 
-permissions:
-  contents: write
-
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -86,6 +83,8 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       VERSION: ${{github.event.release.tag_name}}
     steps:

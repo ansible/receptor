@@ -108,10 +108,7 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	}
 	valueStr, ok := value.(string)
 	if ok {
-		valueInt, err := strconv.ParseInt(valueStr, 10, 64)
-		if err != nil {
-			return valueInt, err
-		}
+		return strconv.ParseInt(valueStr, 10, 64)
 	}
 
 	return 0, fmt.Errorf("field %s value %s is not convertible to an int", name, value)

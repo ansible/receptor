@@ -92,7 +92,9 @@ func strFromMap(config map[string]interface{}, name string) (string, error) {
 	return valueStr, nil
 }
 
-// intFromMap extracts an int64 from a map[string]interface{}, handling errors.
+// intFromMap extracts the named field from the map and returns it as an int64.
+// It returns an error if the field is missing or cannot be converted.
+// The value may be an int64, a float64 (converted by truncation to int64), or a base-10 string parsed with strconv.ParseInt; other types produce an error.
 func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	value, ok := config[name]
 	if !ok {

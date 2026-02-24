@@ -174,42 +174,35 @@ func RunPhases(phase string, v reflect.Value) {
 	}
 }
 
+// reloadItem attempts to reload a single service item if it implements the Reloader interface.
+func reloadItem(item interface{}, typeName string) {
+	if reloader, ok := item.(Reloader); ok {
+		if err := reloader.Reload(); err != nil {
+			PrintPhaseErrorMessage(typeName, "reload", err)
+		}
+	}
+}
+
 // ReloadServices iterates through key/values calling reload on applicable services.
 func ReloadServices(v reflect.Value) {
+	typeName := v.Type().Name()
+
 	for i := 0; i < v.NumField(); i++ {
-		// if the services is not initialised, skip
-		if reflect.Value.IsZero(v.Field(i)) {
+		field := v.Field(i)
+
+		// if the service is not initialised, skip
+		if reflect.Value.IsZero(field) {
 			continue
 		}
 
-		var err error
-		switch v.Field(i).Kind() {
-		case reflect.Slice:
+		if field.Kind() == reflect.Slice {
 			// iterate over all the type fields
-			for j := 0; j < v.Field(i).Len(); j++ {
-				serviceItem := v.Field(i).Index(j).Interface()
-				switch c := serviceItem.(type) {
-				// check to see if the selected type field satisfies reload
-				// call reload on cfg object
-				case Reloader:
-					err = c.Reload()
-					if err != nil {
-						PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
-					}
-				// if cfg object does not satisfy, do nothing
-				default:
-				}
+			for j := 0; j < field.Len(); j++ {
+				reloadItem(field.Index(j).Interface(), typeName)
 			}
-		// runs for non slice fields
-		default:
-			switch c := v.Field(i).Interface().(type) {
-			case Reloader:
-				err = c.Reload()
-				if err != nil {
-					PrintPhaseErrorMessage(v.Type().Name(), "reload", err)
-				}
-			default:
-			}
+		} else {
+			// runs for non-slice fields
+			reloadItem(field.Interface(), typeName)
 		}
 	}
 }

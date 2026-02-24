@@ -142,35 +142,23 @@ func RunPhases(phase string, v reflect.Value) {
 	cmd := v.Interface()
 	var err error
 
-	if phase == "Init" {
-		switch c := cmd.(type) {
-		case Initer:
-			err = c.Init()
-			if err != nil {
-				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
-			}
-		default:
+	switch phase {
+	case "Init":
+		if initer, ok := cmd.(Initer); ok {
+			err = initer.Init()
+		}
+	case "Prepare":
+		if preparer, ok := cmd.(Preparer); ok {
+			err = preparer.Prepare()
+		}
+	case "Run":
+		if runer, ok := cmd.(Runer); ok {
+			err = runer.Run()
 		}
 	}
-	if phase == "Prepare" {
-		switch c := cmd.(type) {
-		case Preparer:
-			err = c.Prepare()
-			if err != nil {
-				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
-			}
-		default:
-		}
-	}
-	if phase == "Run" {
-		switch c := cmd.(type) {
-		case Runer:
-			err = c.Run()
-			if err != nil {
-				PrintPhaseErrorMessage(v.Type().Name(), phase, err)
-			}
-		default:
-		}
+
+	if err != nil {
+		PrintPhaseErrorMessage(v.Type().Name(), phase, err)
 	}
 }
 

@@ -555,6 +555,22 @@ func (s *Server) startListeners(ctx context.Context, listeners ...net.Listener) 
 	}
 }
 
+// cleanupOnError cleans up any opened listeners and locks when setup fails.
+func cleanupOnError(unixListener, tcpListener net.Listener, lock *utils.FLock, netceptorListener *netceptor.Listener) {
+	if unixListener != nil {
+		_ = unixListener.Close()
+		if lock != nil {
+			_ = lock.Unlock()
+		}
+	}
+	if tcpListener != nil {
+		_ = tcpListener.Close()
+	}
+	if netceptorListener != nil {
+		_ = netceptorListener.Close()
+	}
+}
+
 // RunControlSvc runs the main accept loop of the control service.
 func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
 	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
@@ -566,15 +582,18 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 
 	tcpListener, err := s.setupTCPListener(tcpListen, tcptls)
 	if err != nil {
+		cleanupOnError(unixListener, nil, lock, nil)
 		return err
 	}
 
 	netceptorListener, err := s.setupNetceptorListener(service, tlscfg)
 	if err != nil {
+		cleanupOnError(unixListener, tcpListener, lock, nil)
 		return err
 	}
 
 	if err := validateListeners(unixListener, tcpListener, netceptorListener); err != nil {
+		cleanupOnError(unixListener, tcpListener, lock, netceptorListener)
 		return err
 	}
 

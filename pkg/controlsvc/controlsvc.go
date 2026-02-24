@@ -318,6 +318,88 @@ func parseCommand(cmdBytes []byte) (cmd string, params string, jsonData map[stri
 	return cmd, params, jsonData, err
 }
 
+// sendGreeting sends the initial greeting message to the client.
+func (s *Server) sendGreeting(conn net.Conn) bool {
+	writeMsg := fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())
+	logMsg := "Could not write in control service"
+
+	return writeToConnWithLog(conn, s.nc, writeMsg, logMsg)
+}
+
+// findControlType looks up the control command type for the given command.
+func (s *Server) findControlType(cmd string) ControlCommandType {
+	s.controlFuncLock.RLock()
+	defer s.controlFuncLock.RUnlock()
+
+	return s.controlTypes[cmd]
+}
+
+// initControlCommand initializes a control command from either string params or JSON data.
+func initControlCommand(ct ControlCommandType, params string, jsonData map[string]interface{}) (ControlCommand, error) {
+	if jsonData == nil {
+		return ct.InitFromString(params)
+	}
+
+	return ct.InitFromJSON(jsonData)
+}
+
+// executeControlCommand executes the control command and returns the response.
+func executeControlCommand(cc ControlCommand, nc NetceptorForControlsvc, cfo *SockControl) (map[string]interface{}, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	return cc.ControlFunc(ctx, nc, cfo)
+}
+
+// writeErrorResponse writes an error message to the connection.
+func writeErrorResponse(conn net.Conn, nc NetceptorForControlsvc, err error) bool {
+	errorNormal(nc, "", err)
+	writeMsg := fmt.Sprintf("ERROR: %s\n", err)
+
+	return writeToConnWithLog(conn, nc, writeMsg, writeControlServiceError)
+}
+
+// writeJSONResponse marshals and writes a JSON response to the connection.
+func writeJSONResponse(conn net.Conn, nc NetceptorForControlsvc, response map[string]interface{}) bool {
+	rbytes, err := json.Marshal(response)
+	if err != nil {
+		writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
+
+		return writeToConnWithLog(conn, nc, writeMsg, writeControlServiceError)
+	}
+	rbytes = append(rbytes, '\n')
+	writeMsg := string(rbytes)
+
+	return writeToConnWithLog(conn, nc, writeMsg, writeControlServiceError)
+}
+
+// handleCommand processes a single command and writes the response.
+func (s *Server) handleCommand(conn net.Conn, cmd string, params string, jsonData map[string]interface{}) bool {
+	ct := s.findControlType(cmd)
+	if ct == nil {
+		writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
+
+		return writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError)
+	}
+
+	cfo := NewSockControl(conn)
+	cc, err := initControlCommand(ct, params, jsonData)
+	if err != nil {
+		return writeErrorResponse(conn, s.nc, err)
+	}
+
+	response, err := executeControlCommand(cc, s.nc, cfo)
+	if err != nil {
+		return writeErrorResponse(conn, s.nc, err)
+	}
+
+	if response != nil {
+		return writeJSONResponse(conn, s.nc, response)
+	}
+
+	return false
+}
+
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
 	s.nc.GetLogger().Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
@@ -331,16 +413,12 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		}
 	}()
 
-	writeMsg := fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())
-	logMsg := "Could not write in control service"
-	if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+	if s.sendGreeting(conn) {
 		return
 	}
 
 	done := false
 	for !done {
-		// Inefficiently read one line from the socket - we can't use bufio
-		// because we cannot read ahead beyond the newline character
 		cmdBytes, hitEOF, shouldClose := readCommandBytes(conn, s.nc)
 		if shouldClose {
 			return
@@ -356,59 +434,12 @@ func (s *Server) RunControlSession(conn net.Conn) {
 			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
 				return
 			}
+
+			continue
 		}
-		s.controlFuncLock.RLock()
-		var ct ControlCommandType
-		for f := range s.controlTypes {
-			if f == cmd {
-				ct = s.controlTypes[f]
 
-				break
-			}
-		}
-		s.controlFuncLock.RUnlock()
-		if ct != nil {
-			cfo := NewSockControl(conn)
-
-			var cfr map[string]interface{}
-			var cc ControlCommand
-			var err error
-			if jsonData == nil {
-				cc, err = ct.InitFromString(params)
-			} else {
-				cc, err = ct.InitFromJSON(jsonData)
-			}
-			if err == nil {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
-			}
-			if err != nil {
-				errorNormal(s.nc, "", err)
-
-				writeMsg := fmt.Sprintf("ERROR: %s\n", err)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			} else if cfr != nil {
-				rbytes, err := json.Marshal(cfr)
-				if err != nil {
-					writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
-					if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-						return
-					}
-				}
-				rbytes = append(rbytes, '\n')
-				writeMsg := string(rbytes)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			}
-		} else {
-			writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
-			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-				return
-			}
+		if s.handleCommand(conn, cmd, params, jsonData) {
+			return
 		}
 	}
 }

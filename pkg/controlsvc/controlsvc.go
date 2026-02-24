@@ -419,6 +419,8 @@ func (s *Server) RunControlSession(conn net.Conn) {
 
 	done := false
 	for !done {
+		// Inefficiently read one line from the socket - we can't use bufio
+		// because we cannot read ahead beyond the newline character
 		cmdBytes, hitEOF, shouldClose := readCommandBytes(conn, s.nc)
 		if shouldClose {
 			return

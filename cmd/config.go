@@ -176,6 +176,16 @@ func RunPhases(phase string, v reflect.Value) {
 
 // reloadItem attempts to reload a single service item if it implements the Reloader interface.
 func reloadItem(item interface{}, typeName string) {
+	if item == nil {
+		return
+	}
+
+	// Check if the item is a nil pointer using reflection
+	v := reflect.ValueOf(item)
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		return
+	}
+
 	if reloader, ok := item.(Reloader); ok {
 		if err := reloader.Reload(); err != nil {
 			PrintPhaseErrorMessage(typeName, "reload", err)

@@ -583,17 +583,20 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 	tcpListener, err := s.setupTCPListener(tcpListen, tcptls)
 	if err != nil {
 		cleanupOnError(unixListener, nil, lock, nil)
+
 		return err
 	}
 
 	netceptorListener, err := s.setupNetceptorListener(service, tlscfg)
 	if err != nil {
 		cleanupOnError(unixListener, tcpListener, lock, nil)
+
 		return err
 	}
 
 	if err := validateListeners(unixListener, tcpListener, netceptorListener); err != nil {
 		cleanupOnError(unixListener, tcpListener, lock, netceptorListener)
+
 		return err
 	}
 

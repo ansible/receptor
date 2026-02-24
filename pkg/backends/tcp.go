@@ -100,58 +100,75 @@ func (b *TCPListener) GetTLS() *tls.Config {
 	return b.TLS
 }
 
+// setupListener initializes the TCP listener with optional TLS.
+func (b *TCPListener) setupListener(ctx context.Context) error {
+	lc := net.ListenConfig{}
+	li, err := lc.Listen(ctx, "tcp", b.address)
+	if err != nil {
+		return err
+	}
+
+	tli, ok := li.(*net.TCPListener)
+	if !ok {
+		return fmt.Errorf("listen returned a non-TCP listener")
+	}
+
+	if b.TLS == nil {
+		b.li = li
+		b.innerLi = tli
+	} else {
+		tlsLi := tls.NewListener(tli, b.TLS)
+		b.li = tlsLi
+		b.innerLi = tli
+	}
+
+	return nil
+}
+
+// acceptConnection accepts a connection with timeout and context cancellation support.
+func (b *TCPListener) acceptConnection(ctx context.Context) (net.Conn, error) {
+	for {
+		if err := b.innerLi.SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
+			return nil, err
+		}
+
+		conn, err := b.li.Accept()
+
+		// Check if context was cancelled
+		select {
+		case <-ctx.Done():
+			return nil, io.EOF
+		default:
+		}
+
+		// Handle timeout errors by retrying
+		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+			continue
+		}
+
+		// Return connection or error
+		return conn, err
+	}
+}
+
 // Start runs the given session function over the TCPListener backend.
 func (b *TCPListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan netceptor.BackendSession, error) {
 	sessChan, err := listenerSession(ctx, wg, b.logger,
 		func() error {
-			var err error
-			lc := net.ListenConfig{}
-			li, err := lc.Listen(ctx, "tcp", b.address)
+			return b.setupListener(ctx)
+		},
+		func() (netceptor.BackendSession, error) {
+			conn, err := b.acceptConnection(ctx)
 			if err != nil {
-				return err
-			}
-			var ok bool
-			tli, ok := li.(*net.TCPListener)
-			if !ok {
-				return fmt.Errorf("listen returned a non-TCP listener")
-			}
-			if b.TLS == nil {
-				b.li = li
-				b.innerLi = tli
-			} else {
-				tlsLi := tls.NewListener(tli, b.TLS)
-				b.li = tlsLi
-				b.innerLi = tli
+				return nil, err
 			}
 
-			return nil
-		}, func() (netceptor.BackendSession, error) {
-			var c net.Conn
-			for {
-				err := b.innerLi.SetDeadline(time.Now().Add(1 * time.Second))
-				if err != nil {
-					return nil, err
-				}
-				c, err = b.li.Accept()
-				select {
-				case <-ctx.Done():
-					return nil, io.EOF
-				default:
-				}
-				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-					continue
-				}
-				if err != nil {
-					return nil, err
-				}
-
-				break
-			}
-
-			return newTCPSession(c, nil), nil
-		}, func() {
+			return newTCPSession(conn, nil), nil
+		},
+		func() {
 			_ = b.li.Close()
 		})
+
 	if err == nil {
 		b.logger.Debug("Listening on TCP %s\n", b.GetAddr())
 	}

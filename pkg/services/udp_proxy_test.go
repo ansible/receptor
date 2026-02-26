@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -472,6 +473,194 @@ func TestRunUDPProxyServiceOutbound(t *testing.T) {
 
 			if result != tt.expectContinue {
 				t.Errorf("Expected runUDPProxyServiceOutbound to return %v, but got %v", tt.expectContinue, result)
+			}
+		})
+	}
+}
+
+func TestNetUDPWrapper_ResolveUDPAddr(t *testing.T) {
+	wrapper := &NetUDPWrapper{}
+
+	t.Run("Valid address resolution", func(t *testing.T) {
+		addr, err := wrapper.ResolveUDPAddr("udp", "localhost:8080")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if addr == nil {
+			t.Fatal("expected non-nil address")
+		}
+		if addr.Port != 8080 {
+			t.Errorf("expected port 8080, got %d", addr.Port)
+		}
+	})
+
+	t.Run("Invalid address resolution", func(t *testing.T) {
+		_, err := wrapper.ResolveUDPAddr("udp", "invalid::address::format")
+		if err == nil {
+			t.Fatal("expected error for invalid address, got nil")
+		}
+	})
+
+	t.Run("IPv4 address resolution", func(t *testing.T) {
+		addr, err := wrapper.ResolveUDPAddr("udp", "127.0.0.1:9999")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if addr == nil {
+			t.Fatal("expected non-nil address")
+		}
+		if addr.IP.String() != "127.0.0.1" {
+			t.Errorf("expected IP 127.0.0.1, got %s", addr.IP.String())
+		}
+	})
+}
+
+func TestNetUDPWrapper_ListenUDP(t *testing.T) {
+	wrapper := &NetUDPWrapper{}
+
+	t.Run("Successful listen on random port", func(t *testing.T) {
+		addr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
+		conn, err := wrapper.ListenUDP("udp", addr)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if conn == nil {
+			t.Fatal("expected non-nil connection")
+		}
+		defer conn.Close()
+
+		localAddr := conn.LocalAddr()
+		if localAddr == nil {
+			t.Fatal("expected non-nil local address")
+		}
+	})
+
+	t.Run("Listen on IPv6", func(t *testing.T) {
+		addr := &net.UDPAddr{IP: net.IPv6loopback, Port: 0}
+		conn, err := wrapper.ListenUDP("udp", addr)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if conn == nil {
+			t.Fatal("expected non-nil connection")
+		}
+		defer conn.Close()
+	})
+}
+
+func TestNetUDPWrapper_DialUDP(t *testing.T) {
+	wrapper := &NetUDPWrapper{}
+
+	t.Run("Successful dial", func(t *testing.T) {
+		raddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9999}
+		conn, err := wrapper.DialUDP("udp", nil, raddr)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if conn == nil {
+			t.Fatal("expected non-nil connection")
+		}
+		defer conn.Close()
+
+		remoteAddr := conn.RemoteAddr()
+		if remoteAddr == nil {
+			t.Fatal("expected non-nil remote address")
+		}
+	})
+
+	t.Run("Dial with local address", func(t *testing.T) {
+		laddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
+		raddr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9998}
+		conn, err := wrapper.DialUDP("udp", laddr, raddr)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if conn == nil {
+			t.Fatal("expected non-nil connection")
+		}
+		defer conn.Close()
+	})
+}
+
+func TestUDPProxyInboundCfgRun(t *testing.T) {
+	type testCase struct {
+		name        string
+		expectError bool
+		configObj   UDPProxyInboundCfg
+	}
+
+	testCases := []testCase{
+		{
+			name: "Valid UDP proxy inbound configuration",
+			configObj: UDPProxyInboundCfg{
+				Port:          8080,
+				BindAddr:      "127.0.0.1",
+				RemoteNode:    "node1",
+				RemoteService: "service1",
+			},
+		},
+		{
+			name: "Valid UDP proxy inbound with default bind address",
+			configObj: UDPProxyInboundCfg{
+				Port:          8081,
+				BindAddr:      "0.0.0.0",
+				RemoteNode:    "node2",
+				RemoteService: "service2",
+			},
+		},
+	}
+
+	netceptor.MainInstance = netceptor.New(context.Background(), "test_udp_proxy_inbound_cfg_run")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.configObj.Run()
+			if tc.expectError {
+				if err == nil {
+					t.Error("expected error but got nil")
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestUDPProxyOutboundCfgRun(t *testing.T) {
+	type testCase struct {
+		name        string
+		expectError bool
+		configObj   UDPProxyOutboundCfg
+	}
+
+	testCases := []testCase{
+		{
+			name: "Valid UDP proxy outbound configuration",
+			configObj: UDPProxyOutboundCfg{
+				Service: "udp1",
+				Address: "127.0.0.1:9090",
+			},
+		},
+		{
+			name: "Valid UDP proxy outbound with different address",
+			configObj: UDPProxyOutboundCfg{
+				Service: "udp2",
+				Address: "localhost:9091",
+			},
+		},
+	}
+
+	netceptor.MainInstance = netceptor.New(context.Background(), "test_udp_proxy_outbound_cfg_run")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.configObj.Run()
+			if tc.expectError {
+				if err == nil {
+					t.Error("expected error but got nil")
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

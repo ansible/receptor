@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"testing"
@@ -96,6 +97,60 @@ func TestCommandService(t *testing.T) {
 				}()
 			}
 			CommandService(mockNetceptor, tt.service, &tls.Config{}, tt.command, mockUtilsLib)
+		})
+	}
+}
+
+func TestCommandSvcCfgRun(t *testing.T) {
+	type testCase struct {
+		name                 string
+		expectError          bool
+		expectedErrorMessage string
+		configObj            CommandSvcCfg
+	}
+
+	testCases := []testCase{
+		{
+			name: "Valid command service configuration",
+			configObj: CommandSvcCfg{
+				Service: "cmd1",
+				Command: "echo hello",
+			},
+		},
+		{
+			name: "Valid command service with TLS",
+			configObj: CommandSvcCfg{
+				Service: "cmd2",
+				Command: "ls -la",
+				TLS:     "",
+			},
+		},
+		{
+			name:                 "Invalid TLS configuration",
+			expectError:          true,
+			expectedErrorMessage: "unknown TLS config invalid-tls",
+			configObj: CommandSvcCfg{
+				Service: "cmd3",
+				Command: "echo test",
+				TLS:     "invalid-tls",
+			},
+		},
+	}
+
+	netceptor.MainInstance = netceptor.New(context.Background(), "test_command_svc_cfg_run")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.configObj.Run()
+			if tc.expectError {
+				if err == nil {
+					t.Error("expected error but got nil")
+				} else if tc.expectedErrorMessage != "" && tc.expectedErrorMessage != err.Error() {
+					t.Errorf("expected error message '%s', but got '%s'", tc.expectedErrorMessage, err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 		})
 	}
 }

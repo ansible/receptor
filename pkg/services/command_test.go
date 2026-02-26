@@ -137,7 +137,14 @@ func TestCommandSvcCfgRun(t *testing.T) {
 		},
 	}
 
-	netceptor.MainInstance = netceptor.New(context.Background(), "test_command_svc_cfg_run")
+	// Save original instance and create cancellable context
+	originalInstance := netceptor.MainInstance
+	ctx, cancel := context.WithCancel(context.Background())
+	netceptor.MainInstance = netceptor.New(ctx, "test_command_svc_cfg_run")
+	defer func() {
+		cancel()
+		netceptor.MainInstance = originalInstance
+	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

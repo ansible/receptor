@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -539,6 +541,16 @@ func TestNetUDPWrapper_ListenUDP(t *testing.T) {
 		addr := &net.UDPAddr{IP: net.IPv6loopback, Port: 0}
 		conn, err := wrapper.ListenUDP("udp", addr)
 		if err != nil {
+			// Skip if IPv6 is not available (check for specific syscall errors)
+			if opErr, ok := err.(*net.OpError); ok {
+				if sysErr, ok := opErr.Err.(*os.SyscallError); ok {
+					if errno, ok := sysErr.Err.(syscall.Errno); ok {
+						if errno == syscall.EAFNOSUPPORT || errno == syscall.EADDRNOTAVAIL {
+							t.Skipf("IPv6 not available: %v", err)
+						}
+					}
+				}
+			}
 			t.Fatalf("expected no error, got %v", err)
 		}
 		if conn == nil {
@@ -593,7 +605,7 @@ func TestUDPProxyInboundCfgRun(t *testing.T) {
 		{
 			name: "Valid UDP proxy inbound configuration",
 			configObj: UDPProxyInboundCfg{
-				Port:          8080,
+				Port:          0, // Use ephemeral port
 				BindAddr:      "127.0.0.1",
 				RemoteNode:    "node1",
 				RemoteService: "service1",
@@ -602,7 +614,7 @@ func TestUDPProxyInboundCfgRun(t *testing.T) {
 		{
 			name: "Valid UDP proxy inbound with default bind address",
 			configObj: UDPProxyInboundCfg{
-				Port:          8081,
+				Port:          0, // Use ephemeral port
 				BindAddr:      "0.0.0.0",
 				RemoteNode:    "node2",
 				RemoteService: "service2",
@@ -610,7 +622,14 @@ func TestUDPProxyInboundCfgRun(t *testing.T) {
 		},
 	}
 
-	netceptor.MainInstance = netceptor.New(context.Background(), "test_udp_proxy_inbound_cfg_run")
+	// Save original instance and create cancellable context
+	originalInstance := netceptor.MainInstance
+	ctx, cancel := context.WithCancel(context.Background())
+	netceptor.MainInstance = netceptor.New(ctx, "test_udp_proxy_inbound_cfg_run")
+	defer func() {
+		cancel()
+		netceptor.MainInstance = originalInstance
+	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -650,7 +669,14 @@ func TestUDPProxyOutboundCfgRun(t *testing.T) {
 		},
 	}
 
-	netceptor.MainInstance = netceptor.New(context.Background(), "test_udp_proxy_outbound_cfg_run")
+	// Save original instance and create cancellable context
+	originalInstance := netceptor.MainInstance
+	ctx, cancel := context.WithCancel(context.Background())
+	netceptor.MainInstance = netceptor.New(ctx, "test_udp_proxy_outbound_cfg_run")
+	defer func() {
+		cancel()
+		netceptor.MainInstance = originalInstance
+	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

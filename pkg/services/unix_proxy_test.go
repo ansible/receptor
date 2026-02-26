@@ -83,50 +83,69 @@ func TestUnixProxyInboundCfgRun(t *testing.T) {
 		name                 string
 		expectError          bool
 		expectedErrorMessage string
-		configObj            UnixProxyInboundCfg
+		getConfigObj         func(sockPath string) UnixProxyInboundCfg
 	}
 
 	testCases := []testCase{
 		{
 			name: "Valid unix proxy inbound configuration",
-			configObj: UnixProxyInboundCfg{
-				Filename:      "/tmp/test-receptor-unix-inbound.sock",
-				Permissions:   0600,
-				RemoteNode:    "node1",
-				RemoteService: "service1",
+			getConfigObj: func(sockPath string) UnixProxyInboundCfg {
+				return UnixProxyInboundCfg{
+					Filename:      sockPath,
+					Permissions:   0o600,
+					RemoteNode:    "node1",
+					RemoteService: "service1",
+				}
 			},
 		},
 		{
 			name: "Valid unix proxy inbound with custom permissions",
-			configObj: UnixProxyInboundCfg{
-				Filename:      "/tmp/test-receptor-unix-inbound2.sock",
-				Permissions:   0660,
-				RemoteNode:    "node2",
-				RemoteService: "service2",
+			getConfigObj: func(sockPath string) UnixProxyInboundCfg {
+				return UnixProxyInboundCfg{
+					Filename:      sockPath,
+					Permissions:   0o660,
+					RemoteNode:    "node2",
+					RemoteService: "service2",
+				}
 			},
 		},
 		{
 			name:                 "Invalid TLS configuration",
 			expectError:          true,
 			expectedErrorMessage: "unknown TLS config invalid-tls",
-			configObj: UnixProxyInboundCfg{
-				Filename:      "/tmp/test-receptor-unix-inbound3.sock",
-				Permissions:   0600,
-				RemoteNode:    "node3",
-				RemoteService: "service3",
-				TLS:           "invalid-tls",
+			getConfigObj: func(sockPath string) UnixProxyInboundCfg {
+				return UnixProxyInboundCfg{
+					Filename:      sockPath,
+					Permissions:   0o600,
+					RemoteNode:    "node3",
+					RemoteService: "service3",
+					TLS:           "invalid-tls",
+				}
 			},
 		},
 	}
 
-	netceptor.MainInstance = netceptor.New(context.Background(), "test_unix_proxy_inbound_cfg_run")
+	// Save original instance and create cancellable context
+	originalInstance := netceptor.MainInstance
+	ctx, cancel := context.WithCancel(context.Background())
+	netceptor.MainInstance = netceptor.New(ctx, "test_unix_proxy_inbound_cfg_run")
+	defer func() {
+		cancel()
+		netceptor.MainInstance = originalInstance
+	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Clean up socket file if it exists
-			defer os.Remove(tc.configObj.Filename)
+			// Create unique socket path for this subtest
+			tmpDir := t.TempDir()
+			sockPath := tmpDir + "/test.sock"
+			configObj := tc.getConfigObj(sockPath)
 
-			err := tc.configObj.Run()
+			// Clean up socket file if it exists before and after
+			os.Remove(sockPath)
+			defer os.Remove(sockPath)
+
+			err := configObj.Run()
 			if tc.expectError {
 				if err == nil {
 					t.Error("expected error but got nil")
@@ -145,41 +164,59 @@ func TestUnixProxyOutboundCfgRun(t *testing.T) {
 		name                 string
 		expectError          bool
 		expectedErrorMessage string
-		configObj            UnixProxyOutboundCfg
+		getConfigObj         func(sockPath string) UnixProxyOutboundCfg
 	}
 
 	testCases := []testCase{
 		{
 			name: "Valid unix proxy outbound configuration",
-			configObj: UnixProxyOutboundCfg{
-				Service:  "unix1",
-				Filename: "/tmp/test-receptor-unix-outbound.sock",
+			getConfigObj: func(sockPath string) UnixProxyOutboundCfg {
+				return UnixProxyOutboundCfg{
+					Service:  "unix1",
+					Filename: sockPath,
+				}
 			},
 		},
 		{
 			name: "Valid unix proxy outbound with different socket",
-			configObj: UnixProxyOutboundCfg{
-				Service:  "unix2",
-				Filename: "/tmp/test-receptor-unix-outbound2.sock",
+			getConfigObj: func(sockPath string) UnixProxyOutboundCfg {
+				return UnixProxyOutboundCfg{
+					Service:  "unix2",
+					Filename: sockPath,
+				}
 			},
 		},
 		{
 			name:                 "Invalid TLS configuration",
 			expectError:          true,
 			expectedErrorMessage: "unknown TLS config invalid-tls",
-			configObj: UnixProxyOutboundCfg{
-				Service:  "unix3",
-				Filename: "/tmp/test-receptor-unix-outbound3.sock",
-				TLS:      "invalid-tls",
+			getConfigObj: func(sockPath string) UnixProxyOutboundCfg {
+				return UnixProxyOutboundCfg{
+					Service:  "unix3",
+					Filename: sockPath,
+					TLS:      "invalid-tls",
+				}
 			},
 		},
 	}
 
-	netceptor.MainInstance = netceptor.New(context.Background(), "test_unix_proxy_outbound_cfg_run")
+	// Save original instance and create cancellable context
+	originalInstance := netceptor.MainInstance
+	ctx, cancel := context.WithCancel(context.Background())
+	netceptor.MainInstance = netceptor.New(ctx, "test_unix_proxy_outbound_cfg_run")
+	defer func() {
+		cancel()
+		netceptor.MainInstance = originalInstance
+	}()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.configObj.Run()
+			// Create unique socket path for this subtest
+			tmpDir := t.TempDir()
+			sockPath := tmpDir + "/test.sock"
+			configObj := tc.getConfigObj(sockPath)
+
+			err := configObj.Run()
 			if tc.expectError {
 				if err == nil {
 					t.Error("expected error but got nil")

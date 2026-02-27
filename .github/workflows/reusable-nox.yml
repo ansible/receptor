@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Download the `receptor` binary
         if: fromJSON(inputs.download-receptor)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: receptor-${{ inputs.go-version }}
           path: /usr/local/bin/

@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch receptor coverage report
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: receptor-coverage-report
           path: .
@@ -34,7 +34,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Fetch receptorctl coverage report
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: receptorctl-coverage-report
           path: .
@@ -42,7 +42,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Fetch PR Number
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: pr_number
           path: .

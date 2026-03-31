@@ -154,6 +154,15 @@ func Test_strFromMap(t *testing.T) {
 			want:    "",
 			wantErr: true,
 		},
+      {
+      	name: "Empty string value",
+      	config: map[string]interface{}{
+      		"name": "",
+      	},
+      	field:   "name",
+      	want:    "",
+      	wantErr: false,
+      },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -239,6 +248,15 @@ func Test_intFromMap(t *testing.T) {
 			want:    0,
 			wantErr: true,
 		},
+		{
+        	name: "Empty string value",
+        	config: map[string]interface{}{
+        		"count": "",
+        	},
+        	field:   "count",
+        	want:    0,
+        	wantErr: true,
+      },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -315,13 +333,21 @@ func Test_boolFromMap(t *testing.T) {
 			want:    false,
 			wantErr: true,
 		},
+      {
+      	name: "Empty string value",
+      	config: map[string]interface{}{
+      		"enabled": "",
+      	},
+      	field:   "enabled",
+      	want:    false,
+      	wantErr: true,
+      },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := boolFromMap(tt.config, tt.field)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("boolFromMap() error = %v, wantErr %v", err, tt.wantErr)
-				
 				return
 			}
 			if got != tt.want {

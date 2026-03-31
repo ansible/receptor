@@ -348,6 +348,7 @@ func Test_boolFromMap(t *testing.T) {
 			got, err := boolFromMap(tt.config, tt.field)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("boolFromMap() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if got != tt.want {

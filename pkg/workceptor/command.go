@@ -24,7 +24,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-const errMsgStatusFileUpdate = "Error updating status file %s: %s"
+const (
+	errMsgStatusFileUpdate = "Error updating status file %s: %s"
+	receptorWorkersAppName = "receptor-workers"
+)
 
 type BaseWorkUnitForWorkUnit interface {
 	CancelContext()
@@ -537,12 +540,12 @@ func init() {
 	if version > 1 {
 		return
 	}
-	cmdline.RegisterConfigTypeForApp("receptor-workers",
+	cmdline.RegisterConfigTypeForApp(receptorWorkersAppName,
 		"work-signing", "Private key to sign work submissions", SigningKeyPrivateCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
-	cmdline.RegisterConfigTypeForApp("receptor-workers",
+	cmdline.RegisterConfigTypeForApp(receptorWorkersAppName,
 		"work-verification", "Public key to verify work submissions", VerifyingKeyPublicCfg{}, cmdline.Singleton, cmdline.Section(workersSection))
-	cmdline.RegisterConfigTypeForApp("receptor-workers",
+	cmdline.RegisterConfigTypeForApp(receptorWorkersAppName,
 		"work-command", "Run a worker using an external command", CommandWorkerCfg{}, cmdline.Section(workersSection))
-	cmdline.RegisterConfigTypeForApp("receptor-workers",
+	cmdline.RegisterConfigTypeForApp(receptorWorkersAppName,
 		"command-runner", "Wrapper around a process invocation", commandRunnerCfg{}, cmdline.Hidden)
 }

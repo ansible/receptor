@@ -179,7 +179,11 @@ var ErrPodFailed = fmt.Errorf("pod failed to start")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
-const WorkerContainerName = "worker"
+const (
+	WorkerContainerName = "worker"
+	errOpenStdout       = "Error opening stdout file: %s"
+	statusPodRunning    = "Pod Running"
+)
 
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
@@ -765,7 +769,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	} else if err != nil { // any other error besides ErrPodCompleted
 		stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 		if err2 != nil {
-			errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
+			errMsg := fmt.Sprintf(errOpenStdout, err2)
 			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
@@ -962,7 +966,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 	// open stdout writer that writes to work unit's data directory
 	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
-		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
+		errMsg := fmt.Sprintf(errOpenStdout, err)
 		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
@@ -989,7 +993,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 	streamWait.Add(2)
 
 	if skipStdin {
-		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+		kw.UpdateBasicStatus(WorkStateRunning, statusPodRunning, stdout.Size())
 		streamWait.Done()
 	} else {
 		retryCount := kw.GetKubeRetryCount()
@@ -1125,7 +1129,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				close(stdinErrChan) // signal STDOUT goroutine to stop
 			} else {
 				if stdin.Error() == io.EOF {
-					kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+					kw.UpdateBasicStatus(WorkStateRunning, statusPodRunning, stdout.Size())
 				} else {
 					// this is probably not possible...
 					errMsg := fmt.Sprintf("Error reading stdin: %s", stdin.Error())
@@ -1421,7 +1425,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	// Open stdout writer
 	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
-		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
+		errMsg := fmt.Sprintf(errOpenStdout, err)
 		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
@@ -1465,7 +1469,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		case <-stdin.Done():
 			err := stdin.Error()
 			if err == io.EOF {
-				kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+				kw.UpdateBasicStatus(WorkStateRunning, statusPodRunning, stdout.Size())
 			} else {
 				kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", err), stdout.Size())
 				cancel()

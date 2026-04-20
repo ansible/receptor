@@ -22,7 +22,10 @@ import (
 	"github.com/ansible/receptor/pkg/utils"
 )
 
-const errMsgRemoteExtraDataMissing = "remote ExtraData missing"
+const (
+	errMsgRemoteExtraDataMissing = "remote ExtraData missing"
+	errRemoteRead                = "read error reading from %s: %s"
+)
 
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
@@ -205,7 +208,7 @@ func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
-		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
+		return fmt.Errorf(errRemoteRead, red.RemoteNode, err)
 	}
 	submitIDRegex := regexp.MustCompile(`with ID ([a-zA-Z0-9]+)\.`)
 	match := submitIDRegex.FindSubmatch([]byte(response))
@@ -237,7 +240,7 @@ func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader
 	}
 	response, err = utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
-		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
+		return fmt.Errorf(errRemoteRead, red.RemoteNode, err)
 	}
 	resultErrorRegex := regexp.MustCompile("ERROR: (.*)")
 	match = resultErrorRegex.FindSubmatch([]byte(response))
@@ -286,7 +289,7 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	}
 	response, err := utils.ReadStringContext(ctx, reader, '\n')
 	if err != nil {
-		return fmt.Errorf("read error reading from %s: %s", red.RemoteNode, err)
+		return fmt.Errorf(errRemoteRead, red.RemoteNode, err)
 	}
 	if response[:5] == "ERROR" {
 		return fmt.Errorf("error cancelling remote unit: %s", response[6:])

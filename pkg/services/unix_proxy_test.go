@@ -136,16 +136,15 @@ func TestUnixProxyInboundCfgRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create unique socket path for this subtest
-			tmpDir := t.TempDir()
+			tmpDir, err := os.MkdirTemp("", "upi")
+			if err != nil {
+				t.Fatalf("failed to create temp dir: %v", err)
+			}
+			t.Cleanup(func() { os.RemoveAll(tmpDir) })
 			sockPath := tmpDir + "/test.sock"
 			configObj := tc.getConfigObj(sockPath)
 
-			// Clean up socket file if it exists before and after
-			os.Remove(sockPath)
-			defer os.Remove(sockPath)
-
-			err := configObj.Run()
+			err = configObj.Run()
 			if tc.expectError {
 				if err == nil {
 					t.Error("expected error but got nil")

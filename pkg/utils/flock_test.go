@@ -17,11 +17,11 @@ func TestTryFLock(t *testing.T) {
 		filename string
 	}
 
-	flockTemDir, err := os.MkdirTemp("", "flock-test-*")
+	flockTempDir, err := os.MkdirTemp("", "flock-test-*")
 	if err != nil {
 		t.Fatalf("Error creating flock test temporary directory: %v", err)
 	}
-	defer os.RemoveAll(flockTemDir)
+	defer os.RemoveAll(flockTempDir)
 
 	tests := []struct {
 		name    string
@@ -32,7 +32,7 @@ func TestTryFLock(t *testing.T) {
 		{
 			name: "Positive",
 			args: args{
-				filename: filepath.Join(flockTemDir, "good_flock_listener"),
+				filename: filepath.Join(flockTempDir, "good_flock_listener"),
 			},
 			want:    &utils.FLock{Fd: 0},
 			wantErr: false,

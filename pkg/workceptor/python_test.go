@@ -66,7 +66,7 @@ func createReceptorPythonWorkerScript() error {
 		return fmt.Errorf("Error writing to %s: %v", filename, err)
 	}
 
-	err = os.Chmod(absoluteFilename, 0o755)
+	err = os.Chmod(absoluteFilename, 0o750)
 	if err != nil {
 		return fmt.Errorf("Error making %s executable: %v", absoluteFilename, err)
 	}

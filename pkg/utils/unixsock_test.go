@@ -22,6 +22,12 @@ func TestUnixSocketListen(t *testing.T) {
 
 	badFilename := ""
 
+	unixSockTempDir, err := os.MkdirTemp("", "unixsock-test-*")
+	if err != nil {
+		t.Fatalf("Error creating unix socket test temporary directory: %v", err)
+	}
+	defer os.RemoveAll(unixSockTempDir)
+
 	tests := []struct {
 		name    string
 		args    args
@@ -32,7 +38,7 @@ func TestUnixSocketListen(t *testing.T) {
 		{
 			name: "Positive",
 			args: args{
-				filename:    filepath.Join(os.TempDir(), "good_unixsock_listener"),
+				filename:    filepath.Join(unixSockTempDir, "good_unixsock_listener"),
 				permissions: 0x0400,
 			},
 			wantErr: false,

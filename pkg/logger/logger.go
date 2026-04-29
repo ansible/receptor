@@ -208,7 +208,7 @@ func (rl *ReceptorLogger) DebugPayload(payloadDebug int, payload string, workUni
 		}
 	default:
 	}
-	rl.Debug(fmt.Sprintf("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage)) //nolint:govet
+	rl.Debug("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage)
 }
 
 // SanitizedDebug contains extra information helpful to developers.

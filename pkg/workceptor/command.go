@@ -486,7 +486,7 @@ func filenameExists(filename string) error {
 func (cfg SigningKeyPrivateCfg) Prepare() error {
 	duration, err := cfg.PrepareSigningKeyPrivateCfg()
 	if err != nil {
-		return fmt.Errorf(err.Error()) //nolint:govet,staticcheck
+		return err
 	}
 
 	MainInstance.SigningExpiration = *duration

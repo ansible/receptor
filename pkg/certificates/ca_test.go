@@ -1092,6 +1092,7 @@ func TestCreateCertReqWithKeyNegative(t *testing.T) {
 			wantErrs: []string{
 				"crypto/rsa: too few primes of given length to generate an RSA key",
 				"rsa: key too small",
+				"crypto/rsa: -1-bit keys are insecure (see https://go.dev/pkg/crypto/rsa#hdr-Minimum_key_size)",
 			},
 		},
 	}

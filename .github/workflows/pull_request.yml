@@ -6,7 +6,7 @@ on:  # yamllint disable-line rule:truthy
 
 env:
   DESIRED_GO_VERSION: '1.24'
-  DESIRED_GOLANGCI_LINT_VERSION: 'v2.11'
+  DESIRED_GOLANGCI_LINT_VERSION: 'v1.64'
   DESIRED_PYTHON_VERSION: '3.12'
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
           go-version: ${{ env.DESIRED_GO_VERSION }}
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v6
         with:
           version: ${{ env.DESIRED_GOLANGCI_LINT_VERSION }}
 

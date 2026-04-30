@@ -51,7 +51,7 @@ linters-settings:
           - "$all"
           - "!$test"
           - "!**/functional/**/*.go"
-          - "!tests/goroutines/*.go"
+          - "!tests/goroutines/**/*.go"
         allow:
           - "$gostd"
           - "github.com/ansible/receptor/internal/version"

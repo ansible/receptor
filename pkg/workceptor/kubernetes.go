@@ -181,6 +181,16 @@ var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
 const WorkerContainerName = "worker"
 
+// getLogger returns the logger instance for this KubeUnit.
+func (kw *KubeUnit) getLogger() interface {
+	Debug(format string, v ...interface{})
+	Info(format string, v ...interface{})
+	Warning(format string, v ...interface{})
+	Error(format string, v ...interface{})
+} {
+	return kw.GetWorkceptor().nc.GetLogger()
+}
+
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
@@ -238,16 +248,16 @@ func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 		kubeTimeoutStart, err = time.ParseDuration(envTimeout)
 		if err != nil || kubeTimeoutStart <= 0 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
+			kw.getLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
 			kubeTimeoutStart = 1 * time.Second
 		}
 		// ignore if exceeds limit, use max
 		if kubeTimeoutStart > time.Minute*1 {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
+			kw.getLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
 			kubeTimeoutStart = time.Minute * 1
 		}
 	}
-	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_TIMEOUT_START: %s", kubeTimeoutStart)
+	kw.getLogger().Debug("RECEPTOR_KUBE_TIMEOUT_START: %s", kubeTimeoutStart)
 
 	return kubeTimeoutStart
 }
@@ -262,16 +272,16 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 		kubeRetryCount, err = strconv.Atoi(envRetryCount)
 		if err != nil || kubeRetryCount < 1 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
+			kw.getLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
 			kubeRetryCount = 5
 		}
 		// ignore if exceeds limit, use max retry
 		if kubeRetryCount > 100 {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
+			kw.getLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
 			kubeRetryCount = 100
 		}
 	}
-	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
+	kw.getLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
 
 	return kubeRetryCount
 }
@@ -766,7 +776,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 		if err2 != nil {
 			errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
-			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
+			kw.getLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 			return fmt.Errorf("%s", errMsg)

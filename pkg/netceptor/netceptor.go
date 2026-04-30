@@ -293,7 +293,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		seenUpdateExpireTime:     seenUpdateExpireTime,
 		maxForwardingHops:        maxForwardingHops,
 		maxConnectionIdleTime:    maxConnectionIdleTime,
-		epoch:                    uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
+		epoch:                    uint64(time.Now().Unix())*(1<<24) + uint64(rand.Intn(1<<24)), //nolint:gosec
 		sequence:                 0,
 		sequenceLock:             &sync.RWMutex{},
 		connLock:                 &sync.RWMutex{},

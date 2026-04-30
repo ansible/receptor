@@ -10,7 +10,6 @@ linters:
     - depguard
     - dogsled
     - durationcheck
-    - exportloopref
     - gci
     - gocritic
     - godot
@@ -52,6 +51,7 @@ linters-settings:
           - "$all"
           - "!$test"
           - "!**/functional/**/*.go"
+          - "!tests/goroutines/*.go"
         allow:
           - "$gostd"
           - "github.com/ansible/receptor/internal/version"
@@ -78,10 +78,14 @@ linters-settings:
           - "k8s.io/client-go"
           - "github.com/grafana/pyroscope-go"
           - "github.com/sirupsen/logrus"
+          - "golang.org/x/net/ipv4"
+          - "golang.org/x/net/ipv6"
+          - "go.uber.org/goleak"
       tests:
         files:
           - "$test"
           - "**/functional/**/*.go"
+          - "**/goroutines/**/*.go"
         allow:
           - "$gostd"
           - "github.com/ansible/receptor/pkg"
@@ -111,6 +115,7 @@ linters-settings:
           - "go.uber.org/mock/gomock"
           - "gopkg.in/yaml.v2"
           - "golang.org/x/sys/unix"
+          - "go.uber.org/goleak"
 
 issues:
   # Dont commit the following line.

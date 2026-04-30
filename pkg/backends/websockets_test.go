@@ -10,7 +10,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 	"net/http"
@@ -107,13 +106,13 @@ func TestNewWebsocketDialer(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := backends.NewWebsocketDialer(testCase.address, testCase.tlscfg, testCase.extraHeader, testCase.redial, testCase.logger, nil)
 			if testCase.expectedErr == "" && err != nil {
-				t.Error(fmt.Sprintf(testCase.failedTestString, err))
+				t.Errorf("Expected no error, but got: %v", err)
 			}
 			if testCase.expectedErr != "" && err != nil && err.Error() != testCase.expectedErr {
-				t.Error(fmt.Sprintf(testCase.failedTestString, err))
+				t.Errorf("Expected no error, but got: %v", err)
 			}
 			if testCase.expectedErr != "" && err == nil {
-				t.Error(fmt.Sprintf(testCase.failedTestString, err))
+				t.Errorf("Expected no error, but got: %v", err)
 			}
 		})
 	}
@@ -141,7 +140,7 @@ func TestWebsocketDialerStart(t *testing.T) {
 
 	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Error(fmt.Sprintf(newWebsocketDialerError, wdErr))
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	resp := &http.Response{
 		Body: io.NopCloser(bytes.NewBufferString("Hello World")),
@@ -187,7 +186,7 @@ func TestWebsocketDialerGetAddr(t *testing.T) {
 	address := wssTestTesting
 	wd, wdErr := backends.NewWebsocketDialer(address, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Error(fmt.Sprintf(newWebsocketDialerError, wdErr))
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	add := wd.GetAddr()
 	if add != address {
@@ -201,7 +200,7 @@ func TestWebsocketDialerGetTLS(t *testing.T) {
 	blankTLS := &tls.Config{}
 	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, blankTLS, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Error(fmt.Sprintf(newWebsocketDialerError, wdErr))
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	TLS := wd.GetTLS()
 	if TLS != blankTLS {

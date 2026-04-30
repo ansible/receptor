@@ -6090,3 +6090,68 @@ func TestGetSleepDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNextFibonacciValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		m     int
+		n     int
+		wantM int
+		wantN int
+	}{
+		{
+			name:  "First Fibonacci pair",
+			m:     0,
+			n:     1,
+			wantM: 1,
+			wantN: 1,
+		},
+		{
+			name:  "At max value - should not advance",
+			m:     150,
+			n:     250,
+			wantM: 250,
+			wantN: 400,
+		},
+		{
+			name:  "Over max value - should not advance",
+			m:     200,
+			n:     300,
+			wantM: 200,
+			wantN: 300,
+		},
+		{
+			name:  "Negative m - should reset",
+			m:     -1,
+			n:     5,
+			wantM: 0,
+			wantN: 1,
+		},
+		{
+			name:  "Negative n - should reset",
+			m:     5,
+			n:     -1,
+			wantM: 0,
+			wantN: 1,
+		},
+		{
+			name:  "Both negative - should reset",
+			m:     -5,
+			n:     -10,
+			wantM: 0,
+			wantN: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotM, gotN := workceptor.GetNextFibonacciValues(tt.m, tt.n)
+			if gotM != tt.wantM {
+				t.Errorf("GetNextFibonacciValues() gotM = %v, want %v", gotM, tt.wantM)
+			}
+			if gotN != tt.wantN {
+				t.Errorf("GetNextFibonacciValues() gotN = %v, want %v", gotN, tt.wantN)
+			}
+		})
+	}
+}

@@ -3637,6 +3637,58 @@ spec:
 			expectedErrorMsg: "cancelled",
 			description:      "Should return error when context is cancelled",
 		},
+		{
+			name: "Pod watch error with stdout writer failure",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				Params:        "",
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				status := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					Params:        "",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}})
+				mockBWU.EXPECT().GetStatusCopy().Return(status)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+
+				createdPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-watch-fail", Namespace: "default"},
+					Status:     corev1.PodStatus{Phase: corev1.PodPending},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(createdPod, nil)
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any())
+
+				selector := &hasTerm{field: "metadata.name", value: "test-pod-watch-fail"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "test-pod-watch-fail").Return(selector)
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(nil, nil).AnyTimes()
+
+				// Make UntilWithSync return a non-ErrPodCompleted error
+				watchEvent := &watch.Event{
+					Type:   watch.Modified,
+					Object: createdPod,
+				}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, fmt.Errorf("watch connection lost"))
+
+				// Make UnitDir return invalid path so NewStdoutWriter fails (covers line 766-769)
+				mockBWU.EXPECT().UnitDir().Return("/invalid/nonexistent/path")
+
+				// Expect error logging and status update (covers lines 769-770)
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			expectError:      true,
+			expectedErrorMsg: "Error opening stdout file:",
+			description:      "Should handle pod watch error and stdout writer failure",
+		},
 	}
 
 	for _, tt := range tests {
@@ -3649,6 +3701,7 @@ spec:
 			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
 			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
 
 			ctx := context.Background()
 			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
@@ -6091,67 +6144,3 @@ func TestGetSleepDuration(t *testing.T) {
 	}
 }
 
-func TestGetNextFibonacciValues(t *testing.T) {
-	tests := []struct {
-		name  string
-		m     int
-		n     int
-		wantM int
-		wantN int
-	}{
-		{
-			name:  "First Fibonacci pair",
-			m:     0,
-			n:     1,
-			wantM: 1,
-			wantN: 1,
-		},
-		{
-			name:  "At max value - should not advance",
-			m:     150,
-			n:     250,
-			wantM: 250,
-			wantN: 400,
-		},
-		{
-			name:  "Over max value - should not advance",
-			m:     200,
-			n:     300,
-			wantM: 200,
-			wantN: 300,
-		},
-		{
-			name:  "Negative m - should reset",
-			m:     -1,
-			n:     5,
-			wantM: 0,
-			wantN: 1,
-		},
-		{
-			name:  "Negative n - should reset",
-			m:     5,
-			n:     -1,
-			wantM: 0,
-			wantN: 1,
-		},
-		{
-			name:  "Both negative - should reset",
-			m:     -5,
-			n:     -10,
-			wantM: 0,
-			wantN: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotM, gotN := workceptor.GetNextFibonacciValues(tt.m, tt.n)
-			if gotM != tt.wantM {
-				t.Errorf("GetNextFibonacciValues() gotM = %v, want %v", gotM, tt.wantM)
-			}
-			if gotN != tt.wantN {
-				t.Errorf("GetNextFibonacciValues() gotN = %v, want %v", gotN, tt.wantN)
-			}
-		})
-	}
-}

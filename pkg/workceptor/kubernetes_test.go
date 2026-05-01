@@ -2073,6 +2073,11 @@ func TestGetKubeRetryCount(t *testing.T) {
 			want:     100,
 		},
 		{
+			name:     "Value exceeding max",
+			envValue: "150",
+			want:     100, // Should be capped at MaxKubeRetryCount
+		},
+		{
 			name:     "Zero value",
 			envValue: "0",
 			want:     5, // Should default to 1

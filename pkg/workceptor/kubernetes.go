@@ -179,16 +179,13 @@ var ErrPodFailed = fmt.Errorf("pod failed to start")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
-const WorkerContainerName = "worker"
-
-// Kubernetes API resource names and operations.
+// Kubernetes constants and configuration values.
 const (
-	kubeResourcePods       = "pods"
-	kubeSubResourceAttach  = "attach"
-)
+	WorkerContainerName = "worker"
 
-// Default configuration values for Kubernetes operations.
-const (
+	kubeResourcePods      = "pods"
+	kubeSubResourceAttach = "attach"
+
 	DefaultKubeTimeoutStart = 1 * time.Second
 	DefaultKubeRetryCount   = 5
 	MaxKubeTimeoutStart     = 1 * time.Minute

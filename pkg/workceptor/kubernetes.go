@@ -258,12 +258,14 @@ func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 		kubeTimeoutStart, err = time.ParseDuration(envTimeout)
 		if err != nil || kubeTimeoutStart <= 0 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
+			invalidTimeoutMsg := fmt.Sprintf("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Default of %s will be used", envTimeout, DefaultKubeTimeoutStart)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", invalidTimeoutMsg)
 			kubeTimeoutStart = DefaultKubeTimeoutStart
 		}
 		// ignore if exceeds limit, use max
 		if kubeTimeoutStart > MaxKubeTimeoutStart {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
+			maxTimeoutMsg := fmt.Sprintf("RECEPTOR_KUBE_TIMEOUT_START of: %s is larger than the max timeout of %s. Max of %s will be used", kubeTimeoutStart, MaxKubeTimeoutStart, MaxKubeTimeoutStart)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", maxTimeoutMsg)
 			kubeTimeoutStart = MaxKubeTimeoutStart
 		}
 	}
@@ -281,12 +283,14 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 		kubeRetryCount, err = strconv.Atoi(envRetryCount)
 		if err != nil || kubeRetryCount < 1 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
+			defaultMsg := fmt.Sprintf("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of %d will be used", envRetryCount, DefaultKubeRetryCount)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", defaultMsg)
 			kubeRetryCount = DefaultKubeRetryCount
 		}
 		// ignore if exceeds limit, use max retry
 		if kubeRetryCount > MaxKubeRetryCount {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
+			maxMsg := fmt.Sprintf("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of %d. Retry count of %d will be used", kubeRetryCount, MaxKubeRetryCount, MaxKubeRetryCount)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", maxMsg)
 			kubeRetryCount = MaxKubeRetryCount
 		}
 	}

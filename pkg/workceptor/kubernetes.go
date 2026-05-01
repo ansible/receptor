@@ -131,7 +131,7 @@ func (ku KubeAPIWrapper) Delete(ctx context.Context, clientset kubernetes.Interf
 }
 
 func (ku KubeAPIWrapper) SubResource(clientset kubernetes.Interface, podName string, podNamespace string) *rest.Request {
-	return clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(podNamespace).SubResource("attach")
+	return clientset.CoreV1().RESTClient().Post().Resource(kubeResourcePods).Name(podName).Namespace(podNamespace).SubResource(kubeSubResourceAttach)
 }
 
 func (ku KubeAPIWrapper) InClusterConfig() (*rest.Config, error) {
@@ -181,12 +181,36 @@ var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
 const WorkerContainerName = "worker"
 
+// Kubernetes API resource names and operations.
+const (
+	kubeResourcePods       = "pods"
+	kubeSubResourceAttach  = "attach"
+)
+
+// Default configuration values for Kubernetes operations.
+const (
+	DefaultKubeTimeoutStart = 1 * time.Second
+	DefaultKubeRetryCount   = 5
+	MaxKubeTimeoutStart     = 1 * time.Minute
+	MaxKubeRetryCount       = 100
+)
+
+// formatPodCreationError creates a standardized error message for pod creation failures.
+func formatPodCreationError(err error) string {
+	return fmt.Sprintf("Error creating pod: %s", err)
+}
+
+// formatPodRetrievalError creates a standardized error message for pod retrieval failures.
+func formatPodRetrievalError(namespace, name string, err error) string {
+	return fmt.Sprintf("Error getting pod %s/%s. Error: %s", namespace, name, err)
+}
+
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
-			return false, kw.KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+			return false, kw.KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: kubeResourcePods}, "")
 		}
 		if t, ok := event.Object.(*corev1.Pod); ok {
 			switch t.Status.Phase {
@@ -230,8 +254,7 @@ func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 
 func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 	// RECEPTOR_KUBE_TIMEOUT_START
-	// default: 1 second
-	kubeTimeoutStart := 1 * time.Second
+	kubeTimeoutStart := DefaultKubeTimeoutStart
 	envTimeout := os.Getenv("RECEPTOR_KUBE_TIMEOUT_START")
 	if envTimeout != "" {
 		var err error
@@ -239,12 +262,12 @@ func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 		if err != nil || kubeTimeoutStart <= 0 {
 			// ignore error, use default
 			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
-			kubeTimeoutStart = 1 * time.Second
+			kubeTimeoutStart = DefaultKubeTimeoutStart
 		}
 		// ignore if exceeds limit, use max
-		if kubeTimeoutStart > time.Minute*1 {
+		if kubeTimeoutStart > MaxKubeTimeoutStart {
 			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
-			kubeTimeoutStart = time.Minute * 1
+			kubeTimeoutStart = MaxKubeTimeoutStart
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_TIMEOUT_START: %s", kubeTimeoutStart)
@@ -254,8 +277,7 @@ func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 
 func (kw *KubeUnit) GetKubeRetryCount() int {
 	// RECEPTOR_KUBE_RETRY_COUNT
-	// default: 5
-	kubeRetryCount := 5
+	kubeRetryCount := DefaultKubeRetryCount
 	envRetryCount := os.Getenv("RECEPTOR_KUBE_RETRY_COUNT")
 	if envRetryCount != "" {
 		var err error
@@ -263,12 +285,12 @@ func (kw *KubeUnit) GetKubeRetryCount() int {
 		if err != nil || kubeRetryCount < 1 {
 			// ignore error, use default
 			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
-			kubeRetryCount = 5
+			kubeRetryCount = DefaultKubeRetryCount
 		}
 		// ignore if exceeds limit, use max retry
-		if kubeRetryCount > 100 {
+		if kubeRetryCount > MaxKubeRetryCount {
 			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
-			kubeRetryCount = 100
+			kubeRetryCount = MaxKubeRetryCount
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
@@ -397,9 +419,9 @@ mainLoop:
 			prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 		}
 		if err != nil {
-			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
-			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg.Error())
-			*stdoutErr = errMsg
+			errMsgStr := formatPodRetrievalError(podNamespace, podName, err)
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsgStr)
+			*stdoutErr = fmt.Errorf("%s", errMsgStr)
 
 			// fail to get pod, no need to continue
 			return
@@ -833,7 +855,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 		// TODO: add retry logic to make this more resilient to transient errors
 		if err := kw.CreatePod(nil); err != nil {
 			if err != ErrPodCompleted {
-				errMsg := fmt.Sprintf("Error creating pod: %s", err)
+				errMsg := formatPodCreationError(err)
 				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
@@ -884,7 +906,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			time.Sleep(200 * time.Millisecond)
 		}
 		if err != nil {
-			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
+			errMsg := formatPodRetrievalError(podNamespace, podName, err)
 			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
@@ -1390,7 +1412,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	// Create the pod
 	err = kw.CreatePod(map[string]string{"RECEPTOR_HOST": listenHost, "RECEPTOR_PORT": listenPort})
 	if err != nil {
-		errMsg := fmt.Sprintf("Error creating pod: %s", err)
+		errMsg := formatPodCreationError(err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		cancel()

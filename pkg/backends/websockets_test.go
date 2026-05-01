@@ -63,14 +63,13 @@ func setupTLSCfg(t *testing.T) tls.Certificate {
 
 func TestNewWebsocketDialer(t *testing.T) {
 	NewWebsocketDialerTestCases := []struct {
-		name             string
-		address          string
-		redial           bool
-		tlscfg           *tls.Config
-		extraHeader      string
-		logger           *logger.ReceptorLogger
-		expectedErr      string
-		failedTestString string
+		name        string
+		address     string
+		redial      bool
+		tlscfg      *tls.Config
+		extraHeader string
+		logger      *logger.ReceptorLogger
+		expectedErr string
 	}{
 		{
 			name:    "NewWebsocketDialer wss Success ",
@@ -81,10 +80,9 @@ func TestNewWebsocketDialer(t *testing.T) {
 				MinVersion:               tls.VersionTLS12,
 				PreferServerCipherSuites: true,
 			},
-			extraHeader:      "",
-			logger:           logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
-			expectedErr:      "",
-			failedTestString: "Expected no error, but got: %v",
+			extraHeader: "",
+			logger:      logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
+			expectedErr: "",
 		},
 		{
 			name:    "NewWebsocketDialer non-wss Success ",
@@ -95,10 +93,9 @@ func TestNewWebsocketDialer(t *testing.T) {
 				MinVersion:               tls.VersionTLS12,
 				PreferServerCipherSuites: true,
 			},
-			extraHeader:      "",
-			logger:           logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
-			expectedErr:      "",
-			failedTestString: "Expected no error, but got: %v",
+			extraHeader: "",
+			logger:      logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
+			expectedErr: "",
 		},
 	}
 
@@ -109,10 +106,10 @@ func TestNewWebsocketDialer(t *testing.T) {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
 			if testCase.expectedErr != "" && err != nil && err.Error() != testCase.expectedErr {
-				t.Errorf("Expected no error, but got: %v", err)
+				t.Errorf("Expected error '%s', but got: %v", testCase.expectedErr, err)
 			}
 			if testCase.expectedErr != "" && err == nil {
-				t.Errorf("Expected no error, but got: %v", err)
+				t.Errorf("Expected error, but did not get one")
 			}
 		})
 	}

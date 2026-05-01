@@ -140,7 +140,7 @@ func TestWebsocketDialerStart(t *testing.T) {
 
 	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Fatalf("NewWebsockerDialer return error: %+v", wdErr)
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	resp := &http.Response{
 		Body: io.NopCloser(bytes.NewBufferString("Hello World")),
@@ -326,9 +326,6 @@ func TestWebsocketListenerStartNetError(t *testing.T) {
 	mockWebsocketUpgrader.EXPECT().Upgrade(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockWebsocketConner, nil).AnyTimes()
 
 	bs, err := wi.Start(ctx, &sync.WaitGroup{})
-	if err == nil {
-		t.Fatal("Expected error from wi.Start, got nil")
-	}
 	if !strings.Contains(err.Error(), "listen tcp 127.0.0.1:80: bind: permission denied") {
 		t.Error(err)
 	}

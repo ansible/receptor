@@ -58,10 +58,10 @@ class TestCLI:
     def test_cmd_traceroute_invalid_node(self, invoke):
         """Test traceroute command to a non-existent node"""
         result = invoke(commands.traceroute, ["nonexistent-node"])
-        lines = result.stdout.strip().split("\n")
+        lines = [line for line in result.stderr.strip().split("\n") if not line.startswith("Warning:")]
         assert len(lines) == 1, "Traceroute should produce a line for each node"
         assert result.exit_code == 0
-        assert "ERROR: 1: Error no route to node from node1 in " in str(result.stderr_bytes)
+        assert "ERROR: 1: Error no route to node from node1 in " in result.stderr
 
     @pytest.mark.skip(
         reason="skip code is 0 bug related here https://github.com/ansible/receptor/issues/431"

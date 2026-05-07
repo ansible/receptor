@@ -7,7 +7,7 @@ import nox.command
 
 LATEST_PYTHON_VERSION = ["3.12"]
 
-python_versions = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+python_versions = ["3.10", "3.11", "3.12"]
 
 LINT_FILES: tuple[str, ...] = (*iglob("**/*.py"),)
 

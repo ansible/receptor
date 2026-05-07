@@ -365,7 +365,7 @@ def invoke(receptor_control_args):
             return arg_list
 
         # Since we may log errors/warnings on stderr we want to split stdout and stderr
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
 
         out = runner.invoke(
             receptorctl.cli.cli,

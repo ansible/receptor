@@ -58,7 +58,9 @@ class TestCLI:
     def test_cmd_traceroute_invalid_node(self, invoke):
         """Test traceroute command to a non-existent node"""
         result = invoke(commands.traceroute, ["nonexistent-node"])
-        lines = [line for line in result.stderr.strip().split("\n") if not line.startswith("Warning:")]
+        lines = [
+            line for line in result.stderr.strip().split("\n") if not line.startswith("Warning:")
+        ]
         assert len(lines) == 1, "Traceroute should produce a line for each node"
         assert result.exit_code == 0
         assert "ERROR: 1: Error no route to node from node1 in " in result.stderr

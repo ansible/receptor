@@ -137,7 +137,7 @@ jobs:
           python-version: ${{ env.DESIRED_PYTHON_VERSION }}
 
       - name: Install python dependencies
-        run: pip install build
+        run: pip install build==1.5.0 --only-binary :all:
 
       - name: Build container
         run: make container REPO=receptor LATEST=yes

@@ -3,9 +3,10 @@ FROM alpine
 WORKDIR /opt
 
 RUN set -x \
-    && apk add php py3-pip git bash \
+    && apk add php py3-pip py3-build git bash \
     && git clone --depth 1 https://github.com/ansible/receptor.git \
-    && pip3 install -e ./receptor/receptorctl
+    && python3 -m build --wheel ./receptor/receptorctl \
+    && pip3 install ./receptor/receptorctl/dist/*.whl --only-binary :all:
 
 WORKDIR /app
 

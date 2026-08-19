@@ -24,7 +24,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          pip install build
+          pip install build==1.5.0 --only-binary :all:
 
        # we will first build the image for x86 and load it on the host for testing
       - name: Build Image

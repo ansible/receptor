@@ -64,7 +64,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 -m pip install build
+          python3 -m pip install build==1.5.0 --only-binary :all:
 
       # setup qemu and buildx
       - name: Set up QEMU

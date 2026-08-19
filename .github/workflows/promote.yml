@@ -55,7 +55,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 -m pip install twine build
+          python3 -m pip install twine==7.0.0 build==1.5.0 --only-binary :all:
 
       - name: Set official pypi info
         run: echo pypi_repo=pypi >> $GITHUB_ENV

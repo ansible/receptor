@@ -17,7 +17,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          pip install build
+          pip install build==1.5.0 --only-binary :all:
 
       - name: Build wheel
         run: |
@@ -28,6 +28,6 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          pip install boto3
+          pip install boto3==1.43.74 --only-binary :all:
           ansible -i localhost, -c local all -m aws_s3 \
             -a "bucket=receptor-nightlies object=receptorctl/receptorctl-0.0.0-py3-none-any.whl src=$(ls receptorctl/dist/*.whl | head -n 1) mode=put"

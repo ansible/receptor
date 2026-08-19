@@ -219,10 +219,7 @@ func getSignWorkFromStatus(status *StatusFileData) bool {
 // Worker function called by the control service to process a "work" command.
 func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.NetceptorForControlCommand, cfo controlsvc.ControlFuncOperations) (map[string]interface{}, error) {
 	addr := cfo.RemoteAddr()
-	connIsUnix := false
-	if addr.Network() == "unix" {
-		connIsUnix = true
-	}
+	connIsUnix := addr.Network() == "unix"
 	switch c.subcommand {
 	case "submit":
 		workNode, err := strFromMap(c.params, "node")

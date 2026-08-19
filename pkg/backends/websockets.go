@@ -245,7 +245,8 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 		ws := newWebsocketSession(ctx, conn, nil)
 		sessChan <- ws
 	})
-	b.li, err = net.Listen("tcp", b.address)
+	lc := net.ListenConfig{}
+	b.li, err = lc.Listen(ctx, "tcp", b.address)
 	if err != nil {
 		return nil, err
 	}

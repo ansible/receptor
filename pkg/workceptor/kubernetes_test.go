@@ -2073,6 +2073,11 @@ func TestGetKubeRetryCount(t *testing.T) {
 			want:     100,
 		},
 		{
+			name:     "Value exceeding max",
+			envValue: "150",
+			want:     100, // Should be capped at MaxKubeRetryCount
+		},
+		{
 			name:     "Zero value",
 			envValue: "0",
 			want:     5, // Should default to 1
@@ -3170,7 +3175,7 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 		},
 		{
 			name: "Pod definition without permission",
-			params: map[string]string{
+			params: map[string]string{ //nolint:gosec // G101: test data, not credentials
 				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
 			},
 			allowRuntimeAuth:   false,
@@ -3198,7 +3203,7 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 		},
 		{
 			name: "Pod with conflicting image parameter",
-			params: map[string]string{
+			params: map[string]string{ //nolint:gosec // G101: test data, not credentials
 				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
 				"kube_image":      "busybox:latest",
 			},
@@ -3213,7 +3218,7 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 		},
 		{
 			name: "Pod with conflicting command parameter",
-			params: map[string]string{
+			params: map[string]string{ //nolint:gosec // G101: test data, not credentials
 				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
 				"kube_command":    "echo hello",
 			},
@@ -3637,6 +3642,58 @@ spec:
 			expectedErrorMsg: "cancelled",
 			description:      "Should return error when context is cancelled",
 		},
+		{
+			name: "Pod watch error with stdout writer failure",
+			extraData: &workceptor.KubeExtraData{
+				Image:         "busybox:latest",
+				Command:       "echo hello",
+				Params:        "",
+				KubeNamespace: "default",
+			},
+			env: nil,
+			setupMocks: func(mockBWU *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor) {
+				status := workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{
+					Image:         "busybox:latest",
+					Command:       "echo hello",
+					Params:        "",
+					KubeNamespace: "default",
+				}}
+				mockBWU.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
+				mockBWU.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{ExtraData: &workceptor.KubeExtraData{}})
+				mockBWU.EXPECT().GetStatusCopy().Return(status)
+				mockBWU.EXPECT().GetContext().Return(context.Background()).AnyTimes()
+				mockBWU.EXPECT().ID().Return("test-unit-id").AnyTimes()
+
+				createdPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-pod-watch-fail", Namespace: "default"},
+					Status:     corev1.PodStatus{Phase: corev1.PodPending},
+				}
+				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), "default", gomock.Any(), gomock.Any()).Return(createdPod, nil)
+				mockBWU.EXPECT().UpdateFullStatus(gomock.Any())
+
+				selector := &hasTerm{field: "metadata.name", value: "test-pod-watch-fail"}
+				mockAPI.EXPECT().OneTermEqualSelector("metadata.name", "test-pod-watch-fail").Return(selector)
+				mockAPI.EXPECT().List(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(&corev1.PodList{}, nil).AnyTimes()
+				mockAPI.EXPECT().Watch(gomock.Any(), gomock.Any(), "default", gomock.Any()).Return(nil, nil).AnyTimes()
+
+				// Make UntilWithSync return a non-ErrPodCompleted error
+				watchEvent := &watch.Event{
+					Type:   watch.Modified,
+					Object: createdPod,
+				}
+				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, fmt.Errorf("watch connection lost"))
+
+				// Make UnitDir return invalid path so NewStdoutWriter fails (covers line 766-769)
+				mockBWU.EXPECT().UnitDir().Return("/invalid/nonexistent/path")
+
+				// Expect error logging and status update (covers lines 769-770)
+				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			expectError:      true,
+			expectedErrorMsg: "Error opening stdout file:",
+			description:      "Should handle pod watch error and stdout writer failure",
+		},
 	}
 
 	for _, tt := range tests {
@@ -3649,6 +3706,7 @@ spec:
 			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
 			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
 
 			ctx := context.Background()
 			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")

@@ -31,7 +31,7 @@ func runCommand(qc net.Conn, command string, logger *logger.ReceptorLogger, util
 	if len(args) == 0 {
 		return errors.New("shell command is empty")
 	}
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...) //nolint:noctx // function does not receive a context
 	tty, err := pty.Start(cmd)
 	if err != nil {
 		return err

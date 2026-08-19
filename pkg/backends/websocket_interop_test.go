@@ -73,7 +73,8 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		}
 		b1.NewConnection(netceptor.MessageConnFromWebsocketConn(conn), true)
 	})
-	li, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := net.ListenConfig{}
+	li, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Error listening for TCP: %s", err)
 	}

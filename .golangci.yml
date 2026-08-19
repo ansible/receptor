@@ -1,26 +1,17 @@
----
-run:
-  timeout: 10m
-
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
     - asciicheck
     - bodyclose
     - depguard
     - dogsled
     - durationcheck
-    - exportloopref
-    - gci
     - gocritic
     - godot
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
-    - gomodguard
+    - gomodguard_v2
     - gosec
-    - gosimple
     - govet
     - importas
     - ineffassign
@@ -36,90 +27,115 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - stylecheck
     - tparallel
-    - typecheck
     - unconvert
     - unused
     - wastedassign
     - whitespace
-
-linters-settings:
-  depguard:
+  settings:
+    depguard:
+      rules:
+        main:
+          files:
+            - $all
+            - '!$test'
+            - '!**/functional/**/*.go'
+            - '!tests/goroutines/*.go'
+          allow:
+            - $gostd
+            - github.com/ansible/receptor/internal/version
+            - github.com/ansible/receptor/cmd
+            - github.com/ansible/receptor/pkg
+            - github.com/creack/pty
+            - github.com/fsnotify/fsnotify
+            - github.com/ghjm/cmdline
+            - github.com/golang-jwt/jwt/v4
+            - github.com/google/shlex
+            - github.com/gorilla/websocket
+            - github.com/jupp0r/go-priority-queue
+            - github.com/minio/highwayhash
+            - github.com/pbnjay/memory
+            - github.com/quic-go/quic-go
+            - github.com/rogpeppe/go-internal/lockedfile
+            - github.com/songgao/water
+            - github.com/vishvananda/netlink
+            - github.com/spf13/viper
+            - github.com/spf13/cobra
+            - gopkg.in/yaml.v2
+            - k8s.io/api/core
+            - k8s.io/apimachinery/pkg
+            - k8s.io/client-go
+            - github.com/grafana/pyroscope-go
+            - github.com/sirupsen/logrus
+            - golang.org/x/net/ipv4
+            - golang.org/x/net/ipv6
+            - go.uber.org/goleak
+        tests:
+          files:
+            - $test
+            - '**/functional/**/*.go'
+            - '**/goroutines/**/*.go'
+          allow:
+            - $gostd
+            - github.com/ansible/receptor/pkg
+            - github.com/ansible/receptor/tests/utils
+            - github.com/fortytw2/leaktest
+            - github.com/fsnotify/fsnotify
+            - github.com/gorilla/websocket
+            - github.com/prep/socketpair
+            - github.com/google/go-cmp/cmp
+            - github.com/ghjm/cmdline
+            - k8s.io/api/core/v1
+            - k8s.io/apimachinery/pkg/api/errors
+            - k8s.io/apimachinery/pkg/apis/meta/v1
+            - k8s.io/apimachinery/pkg/fields
+            - k8s.io/apimachinery/pkg/runtime/schema
+            - k8s.io/apimachinery/pkg/selection
+            - k8s.io/apimachinery/pkg/watch
+            - k8s.io/client-go/kubernetes
+            - k8s.io/client-go/rest
+            - k8s.io/client-go/tools/remotecommand
+            - k8s.io/client-go/tools/clientcmd
+            - k8s.io/client-go/tools/clientcmd/api
+            - github.com/quic-go/quic-go
+            - github.com/quic-go/quic-go/qlog
+            - github.com/AaronH88/quic-go
+            - github.com/stretchr/testify/assert
+            - go.uber.org/mock/gomock
+            - gopkg.in/yaml.v2
+            - golang.org/x/sys/unix
+            - go.uber.org/goleak
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      main:
-        files:
-          - "$all"
-          - "!$test"
-          - "!**/functional/**/*.go"
-        allow:
-          - "$gostd"
-          - "github.com/ansible/receptor/internal/version"
-          - "github.com/ansible/receptor/cmd"
-          - "github.com/ansible/receptor/pkg"
-          - "github.com/creack/pty"
-          - "github.com/fsnotify/fsnotify"
-          - "github.com/ghjm/cmdline"
-          - "github.com/golang-jwt/jwt/v4"
-          - "github.com/google/shlex"
-          - "github.com/gorilla/websocket"
-          - "github.com/jupp0r/go-priority-queue"
-          - "github.com/minio/highwayhash"
-          - "github.com/pbnjay/memory"
-          - "github.com/quic-go/quic-go"
-          - "github.com/rogpeppe/go-internal/lockedfile"
-          - "github.com/songgao/water"
-          - "github.com/vishvananda/netlink"
-          - "github.com/spf13/viper"
-          - "github.com/spf13/cobra"
-          - "gopkg.in/yaml.v2"
-          - "k8s.io/api/core"
-          - "k8s.io/apimachinery/pkg"
-          - "k8s.io/client-go"
-          - "github.com/grafana/pyroscope-go"
-          - "github.com/sirupsen/logrus"
-      tests:
-        files:
-          - "$test"
-          - "**/functional/**/*.go"
-        allow:
-          - "$gostd"
-          - "github.com/ansible/receptor/pkg"
-          - "github.com/ansible/receptor/tests/utils"
-          - "github.com/fortytw2/leaktest"
-          - "github.com/fsnotify/fsnotify"
-          - "github.com/gorilla/websocket"
-          - "github.com/prep/socketpair"
-          - "github.com/google/go-cmp/cmp"
-          - "github.com/ghjm/cmdline"
-          - "k8s.io/api/core/v1"
-          - "k8s.io/apimachinery/pkg/api/errors"
-          - "k8s.io/apimachinery/pkg/apis/meta/v1"
-          - "k8s.io/apimachinery/pkg/fields"
-          - "k8s.io/apimachinery/pkg/runtime/schema"
-          - "k8s.io/apimachinery/pkg/selection"
-          - "k8s.io/apimachinery/pkg/watch"
-          - "k8s.io/client-go/kubernetes"
-          - "k8s.io/client-go/rest"
-          - "k8s.io/client-go/tools/remotecommand"
-          - "k8s.io/client-go/tools/clientcmd"
-          - "k8s.io/client-go/tools/clientcmd/api"
-          - "github.com/quic-go/quic-go"
-          - "github.com/quic-go/quic-go/logging"
-          - "github.com/AaronH88/quic-go"
-          - "github.com/stretchr/testify/assert"
-          - "go.uber.org/mock/gomock"
-          - "gopkg.in/yaml.v2"
-          - "golang.org/x/sys/unix"
-
-issues:
-  # Dont commit the following line.
-  # It will make CI pass without telling you about errors.
-  # fix: true
-  exclude:
-    - "lostcancel"  # TODO: Context is not canceled on multiple occasions. Needs more detailed work to be fixed.
-    - "SA2002|thelper|testinggoroutine"  # TODO: Test interface used outside of its routine, tests need to be rewritten.
-    - "G306"  # TODO: Restrict perms of touched files.
-    - "G402|G404"  # TODO: Make TLS more secure.
-    - "G204"  # gosec is throwing a fit, ignore.
-...
+      - path: (.+)\.go$
+        text: lostcancel
+      - path: (.+)\.go$
+        text: SA2002|thelper|testinggoroutine
+      - path: (.+)\.go$
+        text: G306
+      - path: (.+)\.go$
+        text: G402|G404
+      - path: (.+)\.go$
+        text: G204
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -15,7 +15,7 @@ import (
 	"github.com/ansible/receptor/tests/utils"
 	"github.com/prep/socketpair"
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/logging"
+	"github.com/quic-go/quic-go/qlog"
 )
 
 type logWriter struct {
@@ -880,35 +880,26 @@ func TestTooShortSetMaxConnectionIdleTime(t *testing.T) {
 }
 
 func TestTracerReturnsNewConnectionTracer(t *testing.T) {
-	t.Parallel()
-	s := New(context.Background(), "node1")
-	p := logging.PerspectiveClient
-	os.Setenv("QLOGDIR", "/tmp/")
-	trace := s.tracer(s.context, p, quic.ConnectionID{})
+	t.Setenv("QLOGDIR", "/tmp/")
+	trace := qlog.DefaultConnectionTracer(context.Background(), true, quic.ConnectionID{})
 	if trace == nil {
 		t.Fatalf("tracer should return a newConnectionTracer when QLOGDIR environment variable is defined but got %v", trace)
 	}
-	os.Unsetenv("QLOGDIR")
 }
 
 func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
-	t.Parallel()
-	s := New(context.Background(), "node1")
-	p := logging.PerspectiveClient
-	os.Unsetenv("QLOGDIR")
-	trace := s.tracer(s.context, p, quic.ConnectionID{})
+	t.Setenv("QLOGDIR", "")
+	trace := qlog.DefaultConnectionTracer(context.Background(), true, quic.ConnectionID{})
 	if trace != nil {
 		t.Fatalf("tracer should return nil when QLOGDIR environment variable is not defined but got %v", trace)
 	}
 }
 
-// TestTracerCreatesCorrectFilePath tests the Netceptor.tracer() function that sets up
-// QUIC tracing does not depend on the QLOGDIR having a trailing slash character.
+// TestTracerCreatesCorrectFilePath tests that QUIC tracing does not depend on
+// the QLOGDIR having a trailing slash character.
 func TestTracerCreatesCorrectFilePath(t *testing.T) {
-	testNetcepter := New(context.Background(), "node1")
-	clientLoggingPerspective := logging.PerspectiveClient
-	connID := quic.ConnectionIDFromBytes([]byte{})
-	expectedFilename := "/tmp/log_28656d70747929_client.qlog"
+	connID := quic.ConnectionIDFromBytes([]byte{0x01, 0x02})
+	expectedFilename := "/tmp/0102_client.sqlog"
 
 	tests := []struct {
 		name          string
@@ -926,9 +917,11 @@ func TestTracerCreatesCorrectFilePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("QLOGDIR", tt.qlogDirectory)
-			tracer := testNetcepter.tracer(testNetcepter.context, clientLoggingPerspective, connID)
-			defer tracer.Close()
+			t.Setenv("QLOGDIR", tt.qlogDirectory)
+			trace := qlog.DefaultConnectionTracer(context.Background(), true, connID)
+			if trace == nil {
+				t.Fatal("tracer should not be nil when QLOGDIR is set")
+			}
 
 			_, err := os.Stat(expectedFilename)
 			if os.IsNotExist(err) {

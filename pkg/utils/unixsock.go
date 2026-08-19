@@ -20,7 +20,7 @@ func UnixSocketListen(filename string, permissions os.FileMode) (net.Listener, *
 
 		return nil, nil, MakeUnixSocketError(ErrSocketFileNotOverwritten, err)
 	}
-	uli, err := net.Listen("unix", filename)
+	uli, err := net.Listen("unix", filename) //nolint:noctx // function does not receive a context
 	if err != nil {
 		_ = lock.Unlock()
 

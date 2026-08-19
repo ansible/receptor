@@ -62,7 +62,7 @@ func UnixProxyServiceOutbound(s *netceptor.Netceptor, service string, tlscfg *tl
 
 				return
 			}
-			uc, err := net.Dial("unix", filename)
+			uc, err := net.Dial("unix", filename) //nolint:noctx // function does not receive a context
 			if err != nil {
 				s.Logger.Error("Error connecting via Unix socket: %s\n", err)
 

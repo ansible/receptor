@@ -798,7 +798,7 @@ func setupBadCertRequest() (certificates.CertOptions, *x509.CertificateRequest, 
 		NotBefore: badCaTimeBefore,
 	}
 
-	badSubjectAltNamesExtension, err := utils.MakeReceptorSAN(badCertOptions.CertNames.DNSNames,
+	badSubjectAltNamesExtension, err := utils.MakeReceptorSAN(badCertOptions.DNSNames,
 		badCertOptions.IPAddresses,
 		badCertOptions.NodeIDs)
 	if err != nil {
@@ -865,7 +865,7 @@ func setupGoodCertRequest() (certificates.CertOptions, *x509.CertificateRequest,
 		NotBefore: goodCaTimeBefore,
 	}
 
-	goodSubjectAltNamesExtension, err := utils.MakeReceptorSAN(goodCertOptions.CertNames.DNSNames, goodCertOptions.IPAddresses, goodCertOptions.NodeIDs)
+	goodSubjectAltNamesExtension, err := utils.MakeReceptorSAN(goodCertOptions.DNSNames, goodCertOptions.IPAddresses, goodCertOptions.NodeIDs)
 	if err != nil {
 		return goodCertOptions, &x509.CertificateRequest{}, err
 	}
@@ -1092,6 +1092,7 @@ func TestCreateCertReqWithKeyNegative(t *testing.T) {
 			wantErrs: []string{
 				"crypto/rsa: too few primes of given length to generate an RSA key",
 				"rsa: key too small",
+				"crypto/rsa: -1-bit keys are insecure (see https://go.dev/pkg/crypto/rsa#hdr-Minimum_key_size)",
 			},
 		},
 	}

@@ -188,7 +188,8 @@ func setupUDPServer(t *testing.T) *net.UDPConn {
 func setupUDPClient(t *testing.T, serverAddr net.Addr) *net.UDPConn {
 	t.Helper()
 
-	clientConn, err := net.Dial("udp", serverAddr.String())
+	d := net.Dialer{}
+	clientConn, err := d.DialContext(context.Background(), "udp", serverAddr.String())
 	if err != nil {
 		t.Fatalf("Failed to dial server: %v", err)
 	}

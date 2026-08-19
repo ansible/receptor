@@ -208,7 +208,7 @@ func (rl *ReceptorLogger) DebugPayload(payloadDebug int, payload string, workUni
 		}
 	default:
 	}
-	rl.Debug(fmt.Sprintf("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage)) //nolint:govet
+	rl.Debug("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage)
 }
 
 // SanitizedDebug contains extra information helpful to developers.
@@ -255,7 +255,7 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 	if logLevel >= level {
 		rl.Logger.SetPrefix(prefix)
 		format, v = rl.appendSuffix(format, v)
-		rl.Logger.Printf(format, v...)
+		rl.Printf(format, v...)
 	}
 }
 
@@ -314,7 +314,7 @@ func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{
 		message = fmt.Sprintf(message, v...)
 		sanMessage := strings.ReplaceAll(message, "\n", "")
 		rl.Logger.SetPrefix(prefix)
-		rl.Logger.Print(sanMessage)
+		rl.Print(sanMessage)
 	}
 }
 

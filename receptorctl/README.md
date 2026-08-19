@@ -64,26 +64,14 @@ Run the following `nox` sessions to test Receptorctl changes:
 
 ## Updating dependencies
 
-Update dependencies in the `requirements` directory as follows:
+Update dependencies using `uv` as follows:
 
-1. Add any packages or pins to the `*.in` file.
-2. Do one of the following from the `receptorctl` directory:
-
-* Update all dependencies.
+1. Add or modify packages in `pyproject.toml` under `dependencies` or `optional-dependencies`.
+2. Regenerate the lock file from the `receptorctl` directory:
 
     ```bash
-    nox -s pip-compile
+    uv lock
     ```
 
-* Generate the full dependency tree for a single set of dependencies, for example:
-
-    ```bash
-    nox -s "pip-compile-3.12(tests)"
-    ```
-
-> You can also pass the `--no-upgrade` flag when adding a new package.
-> This avoids bumping transitive dependencies for other packages in the `*.in` file.
-
-```bash
-nox -s pip-compile -- --no-upgrade
-```
+> The `uv.lock` file pins all dependencies with cryptographic hashes for reproducible installs.
+> Commit the updated `uv.lock` file along with your `pyproject.toml` changes.

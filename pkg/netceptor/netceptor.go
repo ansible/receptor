@@ -293,7 +293,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		seenUpdateExpireTime:     seenUpdateExpireTime,
 		maxForwardingHops:        maxForwardingHops,
 		maxConnectionIdleTime:    maxConnectionIdleTime,
-		epoch:                    uint64(time.Now().Unix()*(1<<24)) + uint64(rand.Intn(1<<24)),
+		epoch:                    uint64(time.Now().Unix())*(1<<24) + uint64(rand.Intn(1<<24)), //nolint:gosec
 		sequence:                 0,
 		sequenceLock:             &sync.RWMutex{},
 		connLock:                 &sync.RWMutex{},
@@ -508,7 +508,7 @@ func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*BackendInfo))
 	for _, mod := range modifiers {
 		mod(bi)
 	}
-	ctxBackend, cancel := context.WithCancel(s.context)
+	ctxBackend, cancel := context.WithCancel(s.context) //nolint:gosec // G118: cancel is stored in s.backendCancel
 	s.backendCancel = append(s.backendCancel, cancel)
 	// Start() runs a go routine that attempts establish a session over this
 	// backend. For listeners, each time a peer dials this backend, sessChan is
@@ -588,7 +588,7 @@ func (s *Netceptor) CancelBackends() {
 // Status returns the current state of the Netceptor object.
 func (s *Netceptor) Status() Status {
 	s.connLock.RLock()
-	conns := make([]*ConnStatus, 0)
+	conns := make([]*ConnStatus, 0, len(s.connections))
 	for conn := range s.connections {
 		conns = append(conns, &ConnStatus{
 			NodeID: conn,
@@ -969,7 +969,7 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 	}
 	tlscfg = tlscfg.Clone()
 	if !tlscfg.InsecureSkipVerify {
-		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer, s.Logger)
+		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer, s.Logger) //nolint:gosec // G123: custom peer verification is intentional
 		switch expectedHostNameType {
 		case ExpectedHostnameTypeDNS:
 			tlscfg.ServerName = expectedHostName
@@ -1192,7 +1192,7 @@ func (s *Netceptor) printRoutingTable() {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
 		_, _ = fmt.Fprintf(sb, "\n")
-		s.Logger.Log(logLevel, sb.String()) //nolint:govet
+		s.Logger.Log(logLevel, "%s", sb.String())
 	}
 	s.Logger.Log(logLevel, "Routing Table:\n")
 	for node := range s.routingTable {

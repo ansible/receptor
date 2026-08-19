@@ -365,7 +365,7 @@ func TestBrokerConcurrency(t *testing.T) {
 		go func(idx int) {
 			defer pubWg.Done()
 			for j := 0; j < messagesPerPublisher; j++ {
-				msg := "message from publisher " + string(rune('A'+idx)) + " #" + string(rune('0'+j))
+				msg := "message from publisher " + string(rune('A'+idx)) + " #" + string(rune('0'+j)) //nolint:gosec // G115: idx and j are small loop counters, no overflow risk
 				err := broker.Publish(msg)
 				if err != nil {
 					t.Errorf("Publish() error = %v", err)

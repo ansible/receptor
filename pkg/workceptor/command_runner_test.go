@@ -58,7 +58,7 @@ func setupCommandRunnerTest(t *testing.T) (context.Context, string, func()) {
 // timeout), the subprocess is killed automatically.
 func subprocessTestCmd(ctx context.Context, t *testing.T, testName string, unitdir string, command string, params string) *exec.Cmd {
 	t.Helper()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^"+testName+"$", "-test.v")
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^"+testName+"$", "-test.v") //nolint:gosec // G702: re-invoking test binary is intentional
 
 	// Filter out RECEPTOR_PAYLOAD_TRACE_LEVEL to ensure we always exercise
 	// the standard stdin code path rather than the payload-debug branch.

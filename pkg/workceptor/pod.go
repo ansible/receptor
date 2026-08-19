@@ -69,7 +69,7 @@ func (kw KubeUnit) PodHealthy(pod *corev1.Pod, containerName string) (bool, erro
 		return false, fmt.Errorf("pod is nil")
 	}
 
-	var containerDiag string = ""
+	var containerDiag string
 	containerOk, containerError := kw.PodContainerHealthy(pod, containerName)
 	if containerError != nil {
 		containerDiag = fmt.Sprintf(" %v", containerError)

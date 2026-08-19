@@ -262,7 +262,7 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 		return err
 	}
 	defer sfd.unlockStatusFile(filename, lockFile)
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // G703: filename is a controlled status file path
 	if err != nil {
 		return err
 	}
@@ -479,7 +479,7 @@ func (bwu *BaseWorkUnit) GetCancel() context.CancelFunc {
 
 func newUnknownWorker(w *Workceptor, unitID string, workType string) WorkUnit {
 	uu := &unknownUnit{}
-	uu.BaseWorkUnit.Init(w, unitID, workType, FileSystem{})
+	uu.Init(w, unitID, workType, FileSystem{})
 
 	return uu
 }

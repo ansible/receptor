@@ -120,7 +120,8 @@ func TestTCPDialerStart(t *testing.T) {
 			var listener net.Listener
 			if tt.setupListener {
 				var err error
-				listener, err = net.Listen("tcp", "127.0.0.1:0")
+				lc := net.ListenConfig{}
+				listener, err = lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 				if err != nil {
 					t.Fatalf("Failed to create test listener: %v", err)
 				}
@@ -359,7 +360,8 @@ func TestTCPListenerStart(t *testing.T) {
 
 			if tt.makeConnection {
 				// Make a connection to trigger accept path
-				conn, err := net.Dial("tcp", b.GetAddr())
+				d := net.Dialer{}
+				conn, err := d.DialContext(context.Background(), "tcp", b.GetAddr())
 				if err != nil {
 					t.Errorf("Failed to connect to listener: %v", err)
 				} else {

@@ -77,7 +77,7 @@ func New(ctx context.Context, nc NetceptorForWorkceptor, baseDir string) (*Workc
 		return nil, fmt.Errorf("baseDir must be provided")
 	}
 	nodeDataDir := path.Join(baseDir, nc.NodeID())
-	c, cancel := context.WithCancel(ctx)
+	c, cancel := context.WithCancel(ctx) //nolint:gosec // G118: cancel is stored in w.Cancel
 	w := &Workceptor{
 		ctx:               c,
 		Cancel:            cancel,
@@ -104,7 +104,7 @@ var MainInstance *Workceptor
 
 // stdoutSize returns size of stdout, if it exists, or 0 otherwise.
 func stdoutSize(unitdir string) int64 {
-	stat, err := os.Stat(path.Join(unitdir, "stdout"))
+	stat, err := os.Stat(path.Join(unitdir, "stdout")) //nolint:gosec // G703: unitdir is a controlled work directory
 	if err != nil {
 		return 0
 	}

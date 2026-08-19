@@ -69,7 +69,7 @@ type Neter interface {
 type Net struct{}
 
 func (n *Net) Listen(network string, address string) (net.Listener, error) {
-	return net.Listen(network, address)
+	return net.Listen(network, address) //nolint:noctx // interface method does not receive a context
 }
 
 type Tlser interface {
@@ -426,7 +426,7 @@ func (s *Server) ConnectionListener(ctx context.Context, listener net.Listener) 
 
 			continue
 		}
-		go s.SetupConnection(conn)
+		go s.SetupConnection(conn) //nolint:gosec // G118: goroutine intentionally outlives request scope
 	}
 }
 
@@ -441,7 +441,7 @@ func (s *Server) SetupConnection(conn net.Conn) {
 
 			return
 		}
-		err = tlsConn.Handshake()
+		err = tlsConn.HandshakeContext(context.Background())
 		if err != nil {
 			s.nc.GetLogger().Error("TLS handshake error: %s. Closing socket.\n", err)
 

@@ -55,8 +55,8 @@ func (b *TCPDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan netcept
 			if b.tls == nil {
 				conn, err = dialer.DialContext(ctx, "tcp", b.address)
 			} else {
-				dialer.Timeout = 15 * time.Second // tls library does not have a DialContext equivalent
-				conn, err = tls.DialWithDialer(dialer, "tcp", b.address, b.tls)
+				tlsDialer := &tls.Dialer{NetDialer: dialer, Config: b.tls}
+				conn, err = tlsDialer.DialContext(ctx, "tcp", b.address)
 			}
 			if err != nil {
 				return nil, err
@@ -196,10 +196,7 @@ func (ns *TCPSession) Send(data []byte) error {
 // Recv receives data via the session.
 func (ns *TCPSession) Recv(timeout time.Duration) ([]byte, error) {
 	buf := make([]byte, utils.NormalBufferSize)
-	for {
-		if ns.framer.MessageReady() {
-			break
-		}
+	for !ns.framer.MessageReady() {
 		err := ns.conn.SetReadDeadline(time.Now().Add(timeout))
 		if err != nil {
 			return nil, err

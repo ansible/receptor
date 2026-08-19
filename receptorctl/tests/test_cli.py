@@ -31,7 +31,7 @@ class TestCLI:
     def test_cmd_ping(self, invoke):
         result = invoke(commands.ping, ["node2"])
         assert result.exit_code == 0
-        assert "Reply from node2 in" in result.output
+        assert "Reply from node2 in" in result.stdout
 
     def test_cmd_traceroute(self, invoke):
         """Test traceroute command to a valid node"""
@@ -40,7 +40,7 @@ class TestCLI:
 
         # Verify output format: "hop_number: NodeName in TimeStr"
         # Example: "0: node1 in 200.323µs", "1: node2 in 490.723µs"
-        lines = result.output.strip().split("\n")
+        lines = result.stdout.strip().split("\n")
         assert len(lines) == 2, "Traceroute should produce a line for each node"
 
         # Regex pattern: hop_number: node_name in time_value(µs|ms|ns|s)
@@ -58,10 +58,12 @@ class TestCLI:
     def test_cmd_traceroute_invalid_node(self, invoke):
         """Test traceroute command to a non-existent node"""
         result = invoke(commands.traceroute, ["nonexistent-node"])
-        lines = result.output.strip().split("\n")
+        lines = [
+            line for line in result.stderr.strip().split("\n") if not line.startswith("Warning:")
+        ]
         assert len(lines) == 1, "Traceroute should produce a line for each node"
         assert result.exit_code == 0
-        assert "ERROR: 1: Error no route to node from node1 in " in str(result.stderr_bytes)
+        assert "ERROR: 1: Error no route to node from node1 in " in result.stderr
 
     @pytest.mark.skip(
         reason="skip code is 0 bug related here https://github.com/ansible/receptor/issues/431"
@@ -69,7 +71,7 @@ class TestCLI:
     def test_cmd_work_missing_subcommand(self, invoke):
         result = invoke(commands.work, [])
         assert result.exit_code != 0
-        assert "Usage: cli work [OPTIONS] COMMAND [ARGS]..." in result.output
+        assert "Usage: cli work [OPTIONS] COMMAND [ARGS]..." in result.stdout
 
     @pytest.mark.skip(
         reason="skip code is 0 bug related here https://github.com/ansible/receptor/issues/431"
@@ -95,7 +97,7 @@ class TestCLI:
     def test_cmd_work_list_empty_work_unit(self, invoke):
         result = invoke(commands.work, ["list"])
         assert result.exit_code == 0
-        assert json.loads(result.output) == {}
+        assert json.loads(result.stdout) == {}
 
     def test_cmd_work_list_successfully(self, invoke):
         # Require fixture with a node running work
@@ -131,7 +133,7 @@ class TestCLI:
         # Test the CLI results command
         result = invoke(commands.work, ["results", unit_id])
         assert result.exit_code == 0
-        assert payload.upper() in result.output
+        assert payload.upper() in result.stdout
 
         node1_controller.close()
 

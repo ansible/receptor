@@ -158,7 +158,7 @@ func (cfg TLSServerConfig) PrepareTLSServerConfig(n *Netceptor) (*tls.Config, er
 	}
 
 	if tlscfg.ClientAuth != tls.NoClientCert {
-		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints,
+		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, //nolint:gosec // G123: custom peer verification is intentional
 			"", ExpectedHostnameTypeDNS, VerifyClient, n.Logger)
 	}
 

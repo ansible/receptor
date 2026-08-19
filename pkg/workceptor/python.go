@@ -46,7 +46,7 @@ func (pw *pythonUnit) Start() error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("receptor-python-worker",
+	cmd := exec.Command("receptor-python-worker", //nolint:noctx // function does not receive a context
 		fmt.Sprintf("%s:%s", pw.plugin, pw.function), pw.UnitDir(), string(configJSON))
 
 	return pw.runCommand(cmd)
@@ -78,7 +78,7 @@ func (cfg WorkPythonCfg) NewWorker(_ BaseWorkUnitForWorkUnit, w *Workceptor, uni
 		function: cfg.Function,
 		config:   cfg.Config,
 	}
-	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
+	cw.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }

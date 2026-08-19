@@ -238,7 +238,7 @@ func TestCancel(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).Times(2)
 				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 
-				c := exec.Command("ls", "/tmp")
+				c := exec.CommandContext(context.Background(), "ls", "/tmp")
 				processPid := make(chan int)
 
 				go func(c *exec.Cmd, processPid chan int) {
@@ -268,7 +268,7 @@ func TestCancel(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{})
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
 
-				c := exec.Command("sleep", "30")
+				c := exec.CommandContext(context.Background(), "sleep", "30")
 				processPid := make(chan int)
 
 				go func(c *exec.Cmd, processPid chan int) {

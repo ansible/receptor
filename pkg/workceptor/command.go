@@ -109,17 +109,17 @@ func commandRunner(command string, params string, unitdir string) error {
 	}
 	var cmd *exec.Cmd
 	if params == "" {
-		cmd = exec.Command(command)
+		cmd = exec.Command(command) //nolint:gosec,noctx // G702: command execution is core functionality
 	} else {
 		paramList, err := shlex.Split(params)
 		if err != nil {
 			return err
 		}
-		cmd = exec.Command(command, paramList...)
+		cmd = exec.Command(command, paramList...) //nolint:gosec,noctx // G702: command execution is core functionality
 	}
 	termChan := make(chan os.Signal, 1)
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	stdin, err := os.Open(path.Join(unitdir, "stdin"))
+	stdin, err := os.Open(path.Join(unitdir, "stdin")) //nolint:gosec // G703: unitdir is a controlled work directory
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func commandRunner(command string, params string, unitdir string) error {
 	} else {
 		cmd.Stdin = stdin
 	}
-	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600)
+	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600) //nolint:gosec // G703: unitdir is a controlled work directory
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (cw *commandUnit) Start() error {
 		receptorBin = "receptor"
 	}
 
-	cmd := exec.Command(receptorBin, "--node", "id=worker",
+	cmd := exec.Command(receptorBin, "--node", "id=worker", //nolint:gosec,noctx // G702: launching receptor subprocess is intentional
 		"--log-level", levelName,
 		"--command-runner",
 		fmt.Sprintf("command=%s", cw.command),
@@ -415,7 +415,7 @@ func (cfg CommandWorkerCfg) NewWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor
 		baseParams:              cfg.Params,
 		allowRuntimeParams:      cfg.AllowRuntimeParams,
 	}
-	cw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
+	cw.Init(w, unitID, workType, FileSystem{})
 
 	return cw
 }
@@ -486,7 +486,7 @@ func filenameExists(filename string) error {
 func (cfg SigningKeyPrivateCfg) Prepare() error {
 	duration, err := cfg.PrepareSigningKeyPrivateCfg()
 	if err != nil {
-		return fmt.Errorf(err.Error()) //nolint:govet,staticcheck
+		return err
 	}
 
 	MainInstance.SigningExpiration = *duration

@@ -242,7 +242,7 @@ func TestMeshShutdown(t *testing.T) {
 			var out bytes.Buffer
 			for timeout := 10 * time.Second; timeout > 0 && !done; {
 				out = bytes.Buffer{}
-				cmd := exec.Command("lsof", "-tap", fmt.Sprint(pid), "-i", lsofProto)
+				cmd := exec.CommandContext(context.Background(), "lsof", "-tap", fmt.Sprint(pid), "-i", lsofProto)
 				cmd.Stdout = &out
 				cmd.Run()
 				if !strings.Contains(out.String(), fmt.Sprint(pid)) {

@@ -12,13 +12,11 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"path"
 	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/logging"
 	"github.com/quic-go/quic-go/qlog"
 )
 
@@ -136,7 +134,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
-		Tracer:                  s.tracer,
+		Tracer:                  qlog.DefaultConnectionTracer,
 		HandshakeIdleTimeout:    15 * time.Second,
 		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
 		Allow0RTT:               true,
@@ -186,32 +184,10 @@ func (s *Netceptor) GetConfigForClientOverride(tlscfg *tls.Config) func(*tls.Cli
 		if err != nil {
 			return nil, err
 		}
-		clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger)
+		clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger) //nolint:gosec // G123: custom peer verification is intentional
 
 		return clientTLSCfg, nil
 	}
-}
-
-func (s *Netceptor) tracer(ctx context.Context, p logging.Perspective, connID quic.ConnectionID) *logging.ConnectionTracer {
-	qlogPath := os.Getenv("QLOGDIR")
-	if qlogPath != "" {
-		role := "server"
-		if p == logging.PerspectiveClient {
-			role = "client"
-		}
-		filename := fmt.Sprintf("log_%x_%s.qlog", connID, role)
-		fullPath := path.Join(qlogPath, filename)
-		f, err := os.Create(fullPath)
-		if err != nil {
-			s.Logger.Debug("failed to create qlog file at path: %s", qlogPath)
-
-			return nil
-		}
-
-		return qlog.NewConnectionTracer(f, p, connID)
-	}
-
-	return nil
 }
 
 // Listen returns a stream listener compatible with Go's net.Listener.
@@ -409,7 +385,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 	}
 	rAddr := s.NewAddr(node, service)
 	cfg := &quic.Config{
-		Tracer:                  s.tracer,
+		Tracer:                  qlog.DefaultConnectionTracer,
 		HandshakeIdleTimeout:    15 * time.Second,
 		MaxIdleTimeout:          MaxIdleTimeoutForQuicConnections,
 		Allow0RTT:               true,
@@ -667,7 +643,7 @@ func generateClientTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		//nolint:gosec // G402: InsecureSkipVerify is intentional for non-TLS mode; see function comment above
 		InsecureSkipVerify:    true,
-		VerifyPeerCertificate: verifyServerCertificate,
+		VerifyPeerCertificate: verifyServerCertificate, //nolint:gosec // G123: custom peer verification is intentional
 		NextProtos:            []string{"netceptor"},
 		ServerName:            host,
 		MinVersion:            tls.VersionTLS12,

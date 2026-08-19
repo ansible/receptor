@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"context"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -17,7 +18,7 @@ func TestGetSysCPUCount(t *testing.T) {
 	}
 
 	if runtime.GOOS == "linux" {
-		commandOutput, err := exec.Command("nproc").CombinedOutput()
+		commandOutput, err := exec.CommandContext(context.Background(), "nproc").CombinedOutput()
 		if err != nil {
 			t.Fatalf("Failed to execute nproc command: %v", err)
 		}
@@ -41,7 +42,7 @@ func TestGetSysMemoryMiB(t *testing.T) {
 	}
 
 	if runtime.GOOS == "linux" {
-		commandOutput, err := exec.Command("sed", "-n", "s/^MemTotal:[[:space:]]*\\([[:digit:]]*\\).*/\\1/p", "/proc/meminfo").CombinedOutput()
+		commandOutput, err := exec.CommandContext(context.Background(), "sed", "-n", "s/^MemTotal:[[:space:]]*\\([[:digit:]]*\\).*/\\1/p", "/proc/meminfo").CombinedOutput()
 		if err != nil {
 			t.Fatalf("Failed to execute sed command: %v", err)
 		}

@@ -218,7 +218,7 @@ func TestQuicListenerAdapterAccept(t *testing.T) {
 		}
 
 		// Verify it's a QuicConnectionForConn interface
-		var _ netceptor.QuicConnectionForConn = acceptedConn
+		var _ netceptor.QuicConnectionForConn = acceptedConn //nolint:staticcheck // interface compliance check
 
 		// Verify LocalAddr and RemoteAddr work through the adapter
 		if acceptedConn.LocalAddr() == nil {
@@ -352,7 +352,7 @@ func TestQuicConnAdapterOpenStreamSync(t *testing.T) {
 		}
 
 		// Verify it implements QuicStreamForConn
-		var _ netceptor.QuicStreamForConn = stream
+		var _ netceptor.QuicStreamForConn = stream //nolint:staticcheck // interface compliance check
 
 		// Verify we can write to the stream
 		testData := []byte("hello")

@@ -10,7 +10,7 @@ updates:
       - "go"
     ignore:
       - dependency-name: "golang"
-        versions: ["1.23", "1.24"]
+        versions: ["1.24", "1.25"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

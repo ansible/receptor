@@ -131,7 +131,7 @@ func (ku KubeAPIWrapper) Delete(ctx context.Context, clientset kubernetes.Interf
 }
 
 func (ku KubeAPIWrapper) SubResource(clientset kubernetes.Interface, podName string, podNamespace string) *rest.Request {
-	return clientset.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(podNamespace).SubResource("attach")
+	return clientset.CoreV1().RESTClient().Post().Resource(kubeResourcePods).Name(podName).Namespace(podNamespace).SubResource(kubeSubResourceAttach)
 }
 
 func (ku KubeAPIWrapper) InClusterConfig() (*rest.Config, error) {
@@ -179,14 +179,35 @@ var ErrPodFailed = fmt.Errorf("pod failed to start")
 // ErrImagePullBackOff is returned when the image for the container in the Pod cannot be pulled.
 var ErrImagePullBackOff = fmt.Errorf("container failed to start")
 
-const WorkerContainerName = "worker"
+// Kubernetes constants and configuration values.
+const (
+	WorkerContainerName = "worker"
+
+	kubeResourcePods      = "pods"
+	kubeSubResourceAttach = "attach"
+
+	DefaultKubeTimeoutStart = 1 * time.Second
+	DefaultKubeRetryCount   = 5
+	MaxKubeTimeoutStart     = 1 * time.Minute
+	MaxKubeRetryCount       = 100
+)
+
+// formatPodCreationError creates a standardized error message for pod creation failures.
+func formatPodCreationError(err error) string {
+	return fmt.Sprintf("Error creating pod: %s", err)
+}
+
+// formatPodRetrievalError creates a standardized error message for pod retrieval failures.
+func formatPodRetrievalError(namespace, name string, err error) string {
+	return fmt.Sprintf("Error getting pod %s/%s. Error: %s", namespace, name, err)
+}
 
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
-			return false, kw.KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+			return false, kw.KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: kubeResourcePods}, "")
 		}
 		if t, ok := event.Object.(*corev1.Pod); ok {
 			switch t.Status.Phase {
@@ -230,21 +251,22 @@ func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 
 func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 	// RECEPTOR_KUBE_TIMEOUT_START
-	// default: 1 second
-	kubeTimeoutStart := 1 * time.Second
+	kubeTimeoutStart := DefaultKubeTimeoutStart
 	envTimeout := os.Getenv("RECEPTOR_KUBE_TIMEOUT_START")
 	if envTimeout != "" {
 		var err error
 		kubeTimeoutStart, err = time.ParseDuration(envTimeout)
 		if err != nil || kubeTimeoutStart <= 0 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Ignoring", envTimeout)
-			kubeTimeoutStart = 1 * time.Second
+			invalidTimeoutMsg := fmt.Sprintf("Invalid value for RECEPTOR_KUBE_TIMEOUT_START: %s. Default of %s will be used", envTimeout, DefaultKubeTimeoutStart)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", invalidTimeoutMsg)
+			kubeTimeoutStart = DefaultKubeTimeoutStart
 		}
 		// ignore if exceeds limit, use max
-		if kubeTimeoutStart > time.Minute*1 {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_TIMEOUT_START of: %d is larger than the max timeout of 1m. Max of 1m will be used", kubeTimeoutStart)
-			kubeTimeoutStart = time.Minute * 1
+		if kubeTimeoutStart > MaxKubeTimeoutStart {
+			maxTimeoutMsg := fmt.Sprintf("RECEPTOR_KUBE_TIMEOUT_START of: %s is larger than the max timeout of %s. Max of %s will be used", kubeTimeoutStart, MaxKubeTimeoutStart, MaxKubeTimeoutStart)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", maxTimeoutMsg)
+			kubeTimeoutStart = MaxKubeTimeoutStart
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_TIMEOUT_START: %s", kubeTimeoutStart)
@@ -254,21 +276,22 @@ func (kw *KubeUnit) GetKubeTimeoutStart() time.Duration {
 
 func (kw *KubeUnit) GetKubeRetryCount() int {
 	// RECEPTOR_KUBE_RETRY_COUNT
-	// default: 5
-	kubeRetryCount := 5
+	kubeRetryCount := DefaultKubeRetryCount
 	envRetryCount := os.Getenv("RECEPTOR_KUBE_RETRY_COUNT")
 	if envRetryCount != "" {
 		var err error
 		kubeRetryCount, err = strconv.Atoi(envRetryCount)
 		if err != nil || kubeRetryCount < 1 {
 			// ignore error, use default
-			kw.GetWorkceptor().nc.GetLogger().Warning("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of 5 will be used", envRetryCount)
-			kubeRetryCount = 5
+			defaultMsg := fmt.Sprintf("Invalid value for RECEPTOR_KUBE_RETRY_COUNT: %s. Default of %d will be used", envRetryCount, DefaultKubeRetryCount)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", defaultMsg)
+			kubeRetryCount = DefaultKubeRetryCount
 		}
 		// ignore if exceeds limit, use max retry
-		if kubeRetryCount > 100 {
-			kw.GetWorkceptor().nc.GetLogger().Warning("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of 100. Retry count of 100 will be used", kubeRetryCount)
-			kubeRetryCount = 100
+		if kubeRetryCount > MaxKubeRetryCount {
+			maxMsg := fmt.Sprintf("RECEPTOR_KUBE_RETRY_COUNT of: %d is larger than the max retry count of %d. Retry count of %d will be used", kubeRetryCount, MaxKubeRetryCount, MaxKubeRetryCount)
+			kw.GetWorkceptor().nc.GetLogger().Warning("%s", maxMsg)
+			kubeRetryCount = MaxKubeRetryCount
 		}
 	}
 	kw.GetWorkceptor().nc.GetLogger().Debug("RECEPTOR_KUBE_RETRY_COUNT: %d", kubeRetryCount)
@@ -324,7 +347,7 @@ func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Error: %s", podNamespace, podName, err)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 		return nil, err
@@ -397,9 +420,9 @@ mainLoop:
 			prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
 		}
 		if err != nil {
-			errMsg := fmt.Errorf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
-			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg.Error())
-			*stdoutErr = errMsg
+			errMsgStr := formatPodRetrievalError(podNamespace, podName, err)
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsgStr)
+			*stdoutErr = fmt.Errorf("%s", errMsgStr)
 
 			// fail to get pod, no need to continue
 			return
@@ -649,11 +672,11 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 			return fmt.Errorf("at least one container must be named worker")
 		}
 		spec.RestartPolicy = corev1.RestartPolicyNever
-		userNamespace := pod.ObjectMeta.Namespace
+		userNamespace := pod.Namespace
 		if userNamespace != "" {
 			ked.KubeNamespace = userNamespace
 		}
-		userPodName := pod.ObjectMeta.Name
+		userPodName := pod.Name
 		if userPodName != "" {
 			kw.namePrefix = userPodName + "-"
 		}
@@ -766,10 +789,10 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 		if err2 != nil {
 			errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
-			return fmt.Errorf(errMsg) //nolint:govet,staticcheck
+			return fmt.Errorf("%s", errMsg)
 		}
 		var stdoutErr error
 		var streamWait sync.WaitGroup
@@ -833,8 +856,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 		// TODO: add retry logic to make this more resilient to transient errors
 		if err := kw.CreatePod(nil); err != nil {
 			if err != ErrPodCompleted {
-				errMsg := fmt.Sprintf("Error creating pod: %s", err)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+				errMsg := formatPodCreationError(err)
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 				return
@@ -851,7 +874,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			errMsg := fmt.Sprintf("Error creating pod: pod namespace is empty for pod %s",
 				podName,
 			)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 			return
@@ -864,7 +887,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			select {
 			case <-kw.GetContext().Done():
 				errMsg := fmt.Sprintf("Context Done while getting pod %s/%s. Error: %s", podNamespace, podName, kw.GetContext().Err())
-				kw.GetWorkceptor().nc.GetLogger().Warning(errMsg) //nolint:govet
+				kw.GetWorkceptor().nc.GetLogger().Warning("%s", errMsg)
 
 				return
 			default:
@@ -884,8 +907,8 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 			time.Sleep(200 * time.Millisecond)
 		}
 		if err != nil {
-			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			errMsg := formatPodRetrievalError(podNamespace, podName, err)
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 			return
@@ -938,7 +961,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				skipStdin = true
 			} else {
 				errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 				return
@@ -963,7 +986,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 		return
@@ -1119,7 +1142,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 					podName,
 					err,
 				)
-				kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+				kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 				kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
 
 				close(stdinErrChan) // signal STDOUT goroutine to stop
@@ -1129,7 +1152,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				} else {
 					// this is probably not possible...
 					errMsg := fmt.Sprintf("Error reading stdin: %s", stdin.Error())
-					kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+					kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 					kw.GetWorkceptor().nc.GetLogger().Error("Pod status at time of error %s", kw.Pod.Status.String())
 					kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
 
@@ -1347,7 +1370,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error listening: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 
 		return
 	}
@@ -1360,7 +1383,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		if lcerr != nil {
 			errMsg := fmt.Sprintf("Error closing listener: %+v", lcerr)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			cancel()
 
 			return
@@ -1379,7 +1402,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		if err != nil {
 			errMsg := fmt.Sprintf("Error accepting: %s", err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			cancel()
 
 			return
@@ -1390,9 +1413,9 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	// Create the pod
 	err = kw.CreatePod(map[string]string{"RECEPTOR_HOST": listenHost, "RECEPTOR_PORT": listenPort})
 	if err != nil {
-		errMsg := fmt.Sprintf("Error creating pod: %s", err)
+		errMsg := formatPodCreationError(err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		cancel()
 
 		return
@@ -1411,7 +1434,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	stdin, err = NewStdinReader(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -1422,7 +1445,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	stdout, err := NewStdoutWriter(FileSystem{}, kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -1440,7 +1463,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		cwerr := conn.CloseWrite()
 		if cwerr != nil {
 			errMsg := fmt.Sprintf("Error closing writing side: %+v", cwerr)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			cancel()
 
@@ -1448,7 +1471,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Error sending stdin to pod: %s", err)
-			kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			cancel()
 
@@ -1480,7 +1503,7 @@ func (kw *KubeUnit) runWorkUsingTCP() {
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error reading stdout from pod: %s", err)
-		kw.GetWorkceptor().nc.GetLogger().Error(errMsg) //nolint:govet
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -1550,10 +1573,10 @@ func (kw *KubeUnit) connectUsingIncluster() error {
 
 func (kw *KubeUnit) connectToKube() error {
 	var err error
-	switch {
-	case kw.authMethod == "kubeconfig" || kw.authMethod == "runtime":
+	switch kw.authMethod {
+	case "kubeconfig", "runtime":
 		err = kw.connectUsingKubeconfig()
-	case kw.authMethod == "incluster":
+	case "incluster":
 		err = kw.connectUsingIncluster()
 	default:
 		return fmt.Errorf("unknown auth method %s", kw.authMethod)
@@ -1951,7 +1974,7 @@ func (cfg KubeWorkerCfg) NewkubeWorker(bwu BaseWorkUnitForWorkUnit, w *Workcepto
 		deletePodOnRestart:      cfg.DeletePodOnRestart,
 		namePrefix:              fmt.Sprintf("%s-", strings.ToLower(cfg.WorkType)),
 	}
-	ku.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
+	ku.Init(w, unitID, workType, FileSystem{})
 
 	return ku
 }
@@ -1962,7 +1985,7 @@ func (cfg KubeWorkerCfg) Prepare() error {
 	if lcAuth != "kubeconfig" && lcAuth != "incluster" && lcAuth != "runtime" {
 		return fmt.Errorf("invalid AuthMethod: %s", cfg.AuthMethod)
 	}
-	if cfg.Namespace == "" && !(lcAuth == "kubeconfig" || cfg.AllowRuntimeAuth) {
+	if cfg.Namespace == "" && lcAuth != "kubeconfig" && !cfg.AllowRuntimeAuth {
 		return fmt.Errorf("must provide namespace when AuthMethod is not kubeconfig")
 	}
 	if cfg.KubeConfig != "" {

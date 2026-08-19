@@ -170,7 +170,7 @@ func TestQuicConnectTimeout(t *testing.T) {
 	// Send some data, which should be processed through the echo server back to our
 	// receive function and printed to the screen.
 	_, err = c2.Write([]byte("Hello, world!"))
-	if !(err != nil && err != io.EOF) {
+	if err == nil || err == io.EOF {
 		t.Fatal("We should have gotten an error here")
 	}
 

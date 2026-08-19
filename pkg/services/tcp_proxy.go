@@ -29,11 +29,11 @@ type NetLib interface {
 type NetTCPWrapper struct{}
 
 func (n *NetTCPWrapper) Listen(network string, address string) (net.Listener, error) {
-	return net.Listen(network, address)
+	return net.Listen(network, address) //nolint:noctx // interface method does not receive a context
 }
 
 func (n *NetTCPWrapper) Dial(network string, address string) (net.Conn, error) {
-	return net.Dial(network, address)
+	return net.Dial(network, address) //nolint:noctx // interface method does not receive a context
 }
 
 // Interface for the tls library to generate stubs with mockgen.
@@ -49,7 +49,7 @@ func (n *TLSTCPWrapper) NewListener(inner net.Listener, config *tls.Config) net.
 }
 
 func (n *TLSTCPWrapper) Dial(network string, addr string, config *tls.Config) (*tls.Conn, error) {
-	return tls.Dial(network, addr, config)
+	return tls.Dial(network, addr, config) //nolint:noctx // interface method does not receive a context
 }
 
 // Interface for the Net Listener to generate stubs with mockgen.

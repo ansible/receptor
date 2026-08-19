@@ -63,14 +63,13 @@ func setupTLSCfg(t *testing.T) tls.Certificate {
 
 func TestNewWebsocketDialer(t *testing.T) {
 	NewWebsocketDialerTestCases := []struct {
-		name             string
-		address          string
-		redial           bool
-		tlscfg           *tls.Config
-		extraHeader      string
-		logger           *logger.ReceptorLogger
-		expectedErr      string
-		failedTestString string
+		name        string
+		address     string
+		redial      bool
+		tlscfg      *tls.Config
+		extraHeader string
+		logger      *logger.ReceptorLogger
+		expectedErr string
 	}{
 		{
 			name:    "NewWebsocketDialer wss Success ",
@@ -81,10 +80,9 @@ func TestNewWebsocketDialer(t *testing.T) {
 				MinVersion:               tls.VersionTLS12,
 				PreferServerCipherSuites: true,
 			},
-			extraHeader:      "",
-			logger:           logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
-			expectedErr:      "",
-			failedTestString: "Expected no error, but got: %v",
+			extraHeader: "",
+			logger:      logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
+			expectedErr: "",
 		},
 		{
 			name:    "NewWebsocketDialer non-wss Success ",
@@ -95,10 +93,9 @@ func TestNewWebsocketDialer(t *testing.T) {
 				MinVersion:               tls.VersionTLS12,
 				PreferServerCipherSuites: true,
 			},
-			extraHeader:      "",
-			logger:           logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
-			expectedErr:      "",
-			failedTestString: "Expected no error, but got: %v",
+			extraHeader: "",
+			logger:      logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
+			expectedErr: "",
 		},
 	}
 
@@ -106,13 +103,13 @@ func TestNewWebsocketDialer(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := backends.NewWebsocketDialer(testCase.address, testCase.tlscfg, testCase.extraHeader, testCase.redial, testCase.logger, nil)
 			if testCase.expectedErr == "" && err != nil {
-				t.Errorf(testCase.failedTestString, err)
+				t.Errorf("Expected no error, but got: %v", err)
 			}
 			if testCase.expectedErr != "" && err != nil && err.Error() != testCase.expectedErr {
-				t.Errorf(testCase.failedTestString, err)
+				t.Errorf("Expected error '%s', but got: %v", testCase.expectedErr, err)
 			}
 			if testCase.expectedErr != "" && err == nil {
-				t.Errorf(testCase.failedTestString, err)
+				t.Errorf("Expected error, but did not get one")
 			}
 		})
 	}
@@ -140,7 +137,7 @@ func TestWebsocketDialerStart(t *testing.T) {
 
 	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Errorf(newWebsocketDialerError, wdErr)
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	resp := &http.Response{
 		Body: io.NopCloser(bytes.NewBufferString("Hello World")),
@@ -166,7 +163,7 @@ func TestWebsocketDialerStart(t *testing.T) {
 			mockWebsocketConner.EXPECT().ReadMessage().Return(0, []byte{}, nil).AnyTimes()
 			sess, err := wd.Start(ctx, &sync.WaitGroup{})
 			if err != nil {
-				t.Errorf(err.Error()) //nolint:govet,staticcheck
+				t.Error(err)
 			}
 			s := <-sess
 
@@ -186,7 +183,7 @@ func TestWebsocketDialerGetAddr(t *testing.T) {
 	address := wssTestTesting
 	wd, wdErr := backends.NewWebsocketDialer(address, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Errorf(newWebsocketDialerError, wdErr)
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	add := wd.GetAddr()
 	if add != address {
@@ -200,7 +197,7 @@ func TestWebsocketDialerGetTLS(t *testing.T) {
 	blankTLS := &tls.Config{}
 	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, blankTLS, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
 	if wdErr != nil {
-		t.Errorf(newWebsocketDialerError, wdErr)
+		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
 	TLS := wd.GetTLS()
 	if TLS != blankTLS {
@@ -222,7 +219,7 @@ func TestNewWebsocketListener(t *testing.T) {
 
 	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 
 	if wi == nil {
@@ -235,7 +232,7 @@ func TestWebsocketListenerSetandGetPath(t *testing.T) {
 
 	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 
 	if wi == nil {
@@ -259,7 +256,7 @@ func TestWebsocketListenerStart(t *testing.T) {
 
 	wi, err := backends.NewWebsocketListener("localhost:21700", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if wi == nil {
 		t.Error(websocketListenerExpectedError)
@@ -272,7 +269,7 @@ func TestWebsocketListenerStart(t *testing.T) {
 
 	bs, err := wi.Start(ctx, &sync.WaitGroup{})
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if bs == nil {
 		t.Error(expectedWebsocketListenerError)
@@ -286,7 +283,7 @@ func TestWebsocketListenerStartUpgradeError(t *testing.T) {
 
 	wi, err := backends.NewWebsocketListener("localhost:21701", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if wi == nil {
 		t.Error(websocketListenerExpectedError)
@@ -317,7 +314,7 @@ func TestWebsocketListenerStartNetError(t *testing.T) {
 	badAddress := "127.0.0.1:80"
 	wi, err := backends.NewWebsocketListener(badAddress, &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if wi == nil {
 		t.Error(websocketListenerExpectedError)
@@ -327,7 +324,7 @@ func TestWebsocketListenerStartNetError(t *testing.T) {
 
 	bs, err := wi.Start(ctx, &sync.WaitGroup{})
 	if !strings.Contains(err.Error(), "listen tcp 127.0.0.1:80: bind: permission denied") {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if bs != nil {
 		t.Errorf("Expected Websocket Listener to be nil")
@@ -343,7 +340,7 @@ func TestWebsocketListenerStartTLSNil(t *testing.T) {
 
 	wi, err := backends.NewWebsocketListener("localhost:21702", nil, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if wi == nil {
 		t.Error(websocketListenerExpectedError)
@@ -355,7 +352,7 @@ func TestWebsocketListenerStartTLSNil(t *testing.T) {
 
 	bs, err := wi.Start(ctx, &sync.WaitGroup{})
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if bs == nil {
 		t.Errorf("Expected Websocket Listener not be nil")
@@ -372,7 +369,7 @@ func TestWebsocketListenerGetAddr(t *testing.T) {
 
 	wi, err := backends.NewWebsocketListener(address, &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if wi == nil {
 		t.Error(websocketListenerExpectedError)
@@ -385,7 +382,7 @@ func TestWebsocketListenerGetAddr(t *testing.T) {
 
 	bs, err := wi.Start(ctx, &sync.WaitGroup{})
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if bs == nil {
 		t.Error(expectedWebsocketListenerError)
@@ -403,7 +400,7 @@ func TestWebsocketListenerGetTLS(t *testing.T) {
 	blankTLS := &tls.Config{}
 	wi, err := backends.NewWebsocketListener("127.0.0.1:21704", blankTLS, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 	if wi == nil {
 		t.Error(websocketListenerExpectedError)
@@ -450,6 +447,6 @@ func TestWebsocketListenerCfg(t *testing.T) {
 
 	err := wlc.Prepare()
 	if err != nil {
-		t.Errorf(err.Error()) //nolint:govet,staticcheck
+		t.Error(err)
 	}
 }

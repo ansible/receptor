@@ -327,7 +327,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 				return
 			}
 		}
-		_, err := conn.Write([]byte(fmt.Sprintf("work status %s\n", remoteUnitID)))
+		_, err := fmt.Fprintf(conn, "work status %s\n", remoteUnitID)
 		if err != nil {
 			rw.GetWorkceptor().nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
 			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
@@ -735,7 +735,7 @@ func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workTyp
 		BaseWorkUnitForWorkUnit: bwu,
 		logger:                  w.nc.GetLogger(),
 	}
-	rw.BaseWorkUnitForWorkUnit.Init(w, unitID, workType, FileSystem{})
+	rw.Init(w, unitID, workType, FileSystem{})
 	red := &RemoteExtraData{}
 	red.RemoteParams = make(map[string]string)
 	rw.SetStatusExtraData(red)

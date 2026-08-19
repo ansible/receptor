@@ -4,9 +4,10 @@ authors = [{name = "Red Hat", email = "info@ansible.com"}]
 description = "Receptorctl is a front-end CLI and importable Python library that interacts with Receptor over its control socket interface."
 readme = "README.md"
 dynamic = ["version"]
+requires-python = ">=3.10"
 dependencies = [
   "python-dateutil>=2.8.1",
-  "click>=8.1.3, <8.2.0",
+  "click>=8.3.3, <8.4.0",
   "PyYAML>=5.4.1",
 ]
 
@@ -29,7 +30,6 @@ fallback_version = "0.0.0"
 [project.optional-dependencies]
 test = [
   "coverage",
-  "pip-tools>=7",
   "pytest",
   "pytest-cov",
   "ruff",
@@ -40,12 +40,6 @@ receptorctl = "receptorctl:run"
 
 [tool.ruff]
 line-length = 100
-
-[tool.pip-tools]
-resolver = "backtracking"
-allow-unsafe = true
-strip-extras = true
-quiet = true
 
 [tool.coverage.run]
 omit = ["tests/*"]

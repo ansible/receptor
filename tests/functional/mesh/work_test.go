@@ -585,7 +585,7 @@ func TestKubeRuntimeParams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kubeConfigBytes, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config"))
+	kubeConfigBytes, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".kube/config")) //nolint:gosec // G703: reading kubeconfig from well-known path
 	if err != nil {
 		t.Fatal(err)
 	}

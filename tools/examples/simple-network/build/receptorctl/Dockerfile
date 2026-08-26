@@ -5,6 +5,7 @@ WORKDIR /opt
 RUN set -x \
     && apk add --no-cache php py3-pip py3-build git bash \
     && git clone --depth 1 https://github.com/ansible/receptor.git \
+    && cd receptor && git checkout 4faa2fbd8e4a3c6b4aafd11bd281b9117224d359 && cd .. \
     && python3 -m build --wheel ./receptor/receptorctl \
     && pip3 install ./receptor/receptorctl/dist/*.whl --only-binary :all:
 

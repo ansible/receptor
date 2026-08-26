@@ -1,4 +1,3 @@
-import subprocess
 from glob import iglob
 
 import nox.command

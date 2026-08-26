@@ -32,7 +32,7 @@ test = [
   "coverage",
   "pytest",
   "pytest-cov",
-  "ruff",
+  "ruff==0.16.0",
 ]
 
 [project.scripts]
@@ -40,6 +40,11 @@ receptorctl = "receptorctl:run"
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+# Pin the enabled rule set explicitly so an upgraded ruff cannot silently
+# expand it and flag pre-existing code. Matches ruff's historical default.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.coverage.run]
 omit = ["tests/*"]

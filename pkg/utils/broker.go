@@ -12,7 +12,7 @@ import (
 
 // Broker implements a simple pub-sub broadcast system.
 type Broker struct {
-	ctx       context.Context
+	done      <-chan struct{}
 	msgType   reflect.Type
 	publishCh chan interface{}
 	subCh     chan chan interface{}
@@ -22,23 +22,23 @@ type Broker struct {
 // NewBroker allocates a new Broker object.
 func NewBroker(ctx context.Context, msgType reflect.Type) *Broker {
 	b := &Broker{
-		ctx:       ctx,
+		done:      ctx.Done(),
 		msgType:   msgType,
 		publishCh: make(chan interface{}),
 		subCh:     make(chan chan interface{}),
 		unsubCh:   make(chan chan interface{}),
 	}
-	go b.start()
+	go b.start(ctx)
 
 	return b
 }
 
 // start starts the broker goroutine.
-func (b *Broker) start() {
+func (b *Broker) start(ctx context.Context) {
 	subs := map[chan interface{}]struct{}{}
 	for {
 		select {
-		case <-b.ctx.Done():
+		case <-ctx.Done():
 			for ch := range subs {
 				close(ch)
 			}
@@ -57,7 +57,7 @@ func (b *Broker) start() {
 					defer wg.Done()
 					select {
 					case msgCh <- msg:
-					case <-b.ctx.Done():
+					case <-ctx.Done():
 					}
 				}(msgCh)
 			}
@@ -70,7 +70,7 @@ func (b *Broker) start() {
 func (b *Broker) Subscribe() chan interface{} {
 	msgCh := make(chan interface{})
 	select {
-	case <-b.ctx.Done():
+	case <-b.done:
 		return nil
 	case b.subCh <- msgCh:
 		return msgCh
@@ -80,7 +80,7 @@ func (b *Broker) Subscribe() chan interface{} {
 // Unsubscribe de-registers a message receiver.
 func (b *Broker) Unsubscribe(msgCh chan interface{}) {
 	select {
-	case <-b.ctx.Done():
+	case <-b.done:
 	case b.unsubCh <- msgCh:
 	}
 }
@@ -91,7 +91,7 @@ func (b *Broker) Publish(msg interface{}) error {
 		return fmt.Errorf("messages to broker must be of type %s", b.msgType.String())
 	}
 	select {
-	case <-b.ctx.Done():
+	case <-b.done:
 	case b.publishCh <- msg:
 	}
 

@@ -18,7 +18,7 @@ import (
 // A single JobContext can only run one job at a time.  If JobContext.NewJob() is called while a job
 // is already running, that job will be cancelled and waited on prior to starting the new job.
 type JobContext struct {
-	Ctx         context.Context
+	done        chan struct{}
 	JcCancel    context.CancelFunc
 	Wg          *sync.WaitGroup
 	JcRunning   bool
@@ -44,8 +44,24 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 		mw.RunningLock.Lock()
 	}
 
+	done := make(chan struct{})
+	mw.done = done
+	var closeOnce sync.Once
+	closeDone := func() {
+		closeOnce.Do(func() { close(done) })
+	}
+	mw.JcCancel = closeDone
+
+	// propagate parent cancellation to our done channel
+	go func() {
+		select {
+		case <-ctx.Done():
+			closeDone()
+		case <-done:
+		}
+	}()
+
 	mw.JcRunning = true
-	mw.Ctx, mw.JcCancel = context.WithCancel(ctx)
 	mw.Wg = &sync.WaitGroup{}
 	mw.Wg.Add(workers)
 	mw.RunningLock.Unlock()
@@ -53,7 +69,7 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 		mw.Wg.Wait()
 		mw.RunningLock.Lock()
 		mw.JcRunning = false
-		mw.JcCancel()
+		closeDone()
 		mw.RunningLock.Unlock()
 	}()
 
@@ -75,22 +91,27 @@ func (mw *JobContext) Wait() {
 
 // Done implements Context.Done().
 func (mw *JobContext) Done() <-chan struct{} {
-	return mw.Ctx.Done()
+	return mw.done
 }
 
 // Err implements Context.Err().
 func (mw *JobContext) Err() error {
-	return mw.Ctx.Err()
+	select {
+	case <-mw.done:
+		return context.Canceled
+	default:
+		return nil
+	}
 }
 
 // Deadline implements Context.Deadline().
-func (mw *JobContext) Deadline() (time time.Time, ok bool) {
-	return mw.Ctx.Deadline()
+func (mw *JobContext) Deadline() (deadline time.Time, ok bool) {
+	return time.Time{}, false
 }
 
 // Value implements Context.Value().
 func (mw *JobContext) Value(key interface{}) interface{} {
-	return mw.Ctx.Value(key)
+	return nil
 }
 
 // Cancel cancels the JobContext's context.  If no job has been started, this does nothing.

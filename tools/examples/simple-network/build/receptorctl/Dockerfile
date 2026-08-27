@@ -9,7 +9,7 @@ RUN set -x \
     && git fetch --depth 1 origin 4faa2fbd8e4a3c6b4aafd11bd281b9117224d359 \
     && git checkout 4faa2fbd8e4a3c6b4aafd11bd281b9117224d359 \
     && cd .. \
-    && python3 -m build --wheel ./receptor/receptorctl \
+    && python3 -m build --no-isolation --wheel ./receptor/receptorctl \
     && pip3 install ./receptor/receptorctl/dist/*.whl --only-binary :all:
 
 WORKDIR /app

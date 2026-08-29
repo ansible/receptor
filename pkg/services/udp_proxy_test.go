@@ -379,6 +379,63 @@ func TestRunUDPProxyServiceInbound(t *testing.T) {
 	}
 }
 
+func TestNetUDPWrapper(t *testing.T) {
+	wrapper := &NetUDPWrapper{}
+
+	t.Run("ResolveUDPAddr - valid address", func(t *testing.T) {
+		addr, err := wrapper.ResolveUDPAddr("udp", "127.0.0.1:8080")
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if addr == nil {
+			t.Error("Expected non-nil address")
+		}
+		if addr.Port != 8080 {
+			t.Errorf("Expected port 8080, got %d", addr.Port)
+		}
+	})
+
+	t.Run("ResolveUDPAddr - invalid address", func(t *testing.T) {
+		_, err := wrapper.ResolveUDPAddr("udp", "invalid:address:format")
+		if err == nil {
+			t.Error("Expected error for invalid address, got nil")
+		}
+	})
+
+	t.Run("ListenUDP - bind to localhost", func(t *testing.T) {
+		addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
+		conn, err := wrapper.ListenUDP("udp", addr)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if conn != nil {
+			defer conn.Close()
+		}
+	})
+
+	t.Run("DialUDP - dial localhost", func(t *testing.T) {
+		// First, create a listener to dial to
+		listenerAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
+		listener, err := wrapper.ListenUDP("udp", listenerAddr)
+		if err != nil {
+			t.Fatalf("Failed to create listener: %v", err)
+		}
+		defer listener.Close()
+
+		// Get the actual port the listener is using
+		localAddr := listener.LocalAddr().(*net.UDPAddr)
+
+		// Now dial to that address
+		conn, err := wrapper.DialUDP("udp", nil, localAddr)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if conn != nil {
+			defer conn.Close()
+		}
+	})
+}
+
 func TestRunUDPProxyServiceOutbound(t *testing.T) {
 	var mockNetceptor *mock_services.MockNetcForUDPProxy
 	var mockNetter *mock_net_interface.MockNetterUDP

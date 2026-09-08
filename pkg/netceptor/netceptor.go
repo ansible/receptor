@@ -563,6 +563,8 @@ func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*BackendInfo))
 	// written to, resulting in multiple ongoing sessions at once.
 	sessChan, err := backend.Start(ctxBackend, &s.backendWaitGroup)
 	if err != nil {
+		cancel()
+
 		return err
 	}
 	s.backendWaitGroup.Add(1)

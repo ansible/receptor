@@ -77,7 +77,7 @@ func New(ctx context.Context, nc NetceptorForWorkceptor, baseDir string) (*Workc
 		return nil, fmt.Errorf("baseDir must be provided")
 	}
 	nodeDataDir := path.Join(baseDir, nc.NodeID())
-	c, cancel := context.WithCancel(ctx) //nolint:gosec // G118: cancel is stored in w.Cancel
+	c, cancel := context.WithCancel(ctx)
 	w := &Workceptor{
 		wctx:              &workUnitContext{done: c.Done(), cancel: cancel},
 		Cancel:            cancel,

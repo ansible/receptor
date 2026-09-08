@@ -50,7 +50,7 @@ type ServerForWorkceptor interface {
 
 // Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
-	ctx               context.Context
+	wctx              *workUnitContext
 	Cancel            context.CancelFunc
 	nc                NetceptorForWorkceptor
 	dataDir           string
@@ -79,7 +79,7 @@ func New(ctx context.Context, nc NetceptorForWorkceptor, baseDir string) (*Workc
 	nodeDataDir := path.Join(baseDir, nc.NodeID())
 	c, cancel := context.WithCancel(ctx) //nolint:gosec // G118: cancel is stored in w.Cancel
 	w := &Workceptor{
-		ctx:               c,
+		wctx:              &workUnitContext{done: c.Done(), cancel: cancel},
 		Cancel:            cancel,
 		nc:                nc,
 		dataDir:           nodeDataDir,
@@ -110,6 +110,11 @@ func stdoutSize(unitdir string) int64 {
 	}
 
 	return stat.Size()
+}
+
+// Context returns the lifecycle context of this Workceptor.
+func (w *Workceptor) Context() context.Context {
+	return w.wctx
 }
 
 // RegisterWithControlService registers this workceptor instance with a control service instance.

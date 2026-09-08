@@ -635,7 +635,7 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
-	newJobStarted := rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, true)
+	newJobStarted := rw.topJC.NewJob(rw.GetWorkceptor().Context(), 1, true)
 	if !newJobStarted {
 		return fmt.Errorf("start or monitor process already running")
 	}
@@ -697,7 +697,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 		return nil
 	}
 	if release && force {
-		err := rw.connectAndRun(rw.GetWorkceptor().ctx, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+		err := rw.connectAndRun(rw.GetWorkceptor().Context(), func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true)
 		})
 		if err != nil {
@@ -706,7 +706,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 
 		return rw.BaseWorkUnitForWorkUnit.Release(true)
 	}
-	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
+	rw.topJC.NewJob(rw.GetWorkceptor().Context(), 1, false)
 
 	return rw.runAndMonitor(rw.topJC, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release)

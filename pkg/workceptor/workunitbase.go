@@ -69,9 +69,16 @@ type workUnitContext struct {
 	cancel context.CancelFunc
 }
 
-func (c *workUnitContext) Deadline() (time.Time, bool)  { return time.Time{}, false }
-func (c *workUnitContext) Done() <-chan struct{}          { return c.done }
-func (c *workUnitContext) Value(key any) any             { return nil }
+// Deadline implements context.Context.Deadline. Work unit contexts have no deadline.
+func (c *workUnitContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+
+// Done implements context.Context.Done.
+func (c *workUnitContext) Done() <-chan struct{} { return c.done }
+
+// Value implements context.Context.Value. Work unit contexts carry no values.
+func (c *workUnitContext) Value(key any) any { return nil }
+
+// Err implements context.Context.Err.
 func (c *workUnitContext) Err() error {
 	select {
 	case <-c.done:

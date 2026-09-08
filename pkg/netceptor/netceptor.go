@@ -53,9 +53,16 @@ type cancelCtx struct {
 	errFn  func() error // optional: forwards the source context's Err() for deadline vs cancel distinction
 }
 
+// Deadline implements context.Context.Deadline. cancelCtx contexts have no deadline.
 func (c *cancelCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
-func (c *cancelCtx) Done() <-chan struct{}        { return c.done }
-func (c *cancelCtx) Value(key any) any           { return nil }
+
+// Done implements context.Context.Done.
+func (c *cancelCtx) Done() <-chan struct{} { return c.done }
+
+// Value implements context.Context.Value. cancelCtx contexts carry no values.
+func (c *cancelCtx) Value(key any) any { return nil }
+
+// Err implements context.Context.Err.
 func (c *cancelCtx) Err() error {
 	select {
 	case <-c.done:

@@ -15,8 +15,11 @@ import (
 // ExternalBackend is a backend implementation for the situation when non-Receptor code
 // is initiating connections, outside the control of a Receptor-managed accept loop.
 type ExternalBackend struct {
-	done     <-chan struct{}
-	sessChan chan BackendSession
+	done       <-chan struct{}
+	sessChan   chan BackendSession
+	deadlineFn func() (time.Time, bool)
+	valueFn    func(key any) any
+	errFn      func() error
 }
 
 // netMessageConn implements MessageConn for Go net.Conn.
@@ -145,6 +148,9 @@ func NewExternalBackend() (*ExternalBackend, error) {
 // Start launches the backend from Receptor's point of view, and waits for connections to happen.
 func (b *ExternalBackend) Start(ctx context.Context, _ *sync.WaitGroup) (chan BackendSession, error) {
 	b.done = ctx.Done()
+	b.deadlineFn = ctx.Deadline
+	b.valueFn = ctx.Value
+	b.errFn = ctx.Err
 	b.sessChan = make(chan BackendSession)
 
 	return b.sessChan, nil
@@ -163,7 +169,7 @@ type ExternalSession struct {
 // connection will be closed when the session ends if closeConnWithSession is true. The
 // returned context will be cancelled after the connection closes.
 func (b *ExternalBackend) NewConnection(conn MessageConn, closeConnWithSession bool) context.Context {
-	parentCtx := &cancelCtx{done: b.done}
+	parentCtx := &cancelCtx{done: b.done, deadlineFn: b.deadlineFn, errFn: b.errFn, valueFn: b.valueFn}
 	childCtx, cancel := context.WithCancel(parentCtx)
 	ebs := &ExternalSession{
 		eb:          b,

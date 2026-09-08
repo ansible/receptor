@@ -23,6 +23,9 @@ type JobContext struct {
 	Wg          *sync.WaitGroup
 	JcRunning   bool
 	RunningLock *sync.Mutex
+	deadlineFn  func() (time.Time, bool)
+	valueFn     func(key interface{}) interface{}
+	errFn       func() error
 }
 
 // NewJob starts a new job with a defined number of workers.  If a prior job is running, it is cancelled.
@@ -38,9 +41,10 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 
 			return false
 		}
+		prevDone := mw.done
 		mw.JcCancel()
 		mw.RunningLock.Unlock()
-		mw.Wait()
+		<-prevDone // wait for cancellation to propagate; returns immediately after JcCancel
 		mw.RunningLock.Lock()
 	}
 
@@ -52,7 +56,12 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 	}
 	mw.JcCancel = closeDone
 
-	// propagate parent cancellation to our done channel
+	// Capture parent delegation functions so Deadline/Value/Err proxy the parent.
+	mw.deadlineFn = ctx.Deadline
+	mw.valueFn = ctx.Value
+	mw.errFn = ctx.Err
+
+	// Propagate parent cancellation to our done channel.
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -65,8 +74,16 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 	mw.Wg = &sync.WaitGroup{}
 	mw.Wg.Add(workers)
 	mw.RunningLock.Unlock()
+
+	// Background goroutine: mark job stopped when workers finish OR when cancelled.
+	wg := mw.Wg
 	go func() {
-		mw.Wg.Wait()
+		wgDone := make(chan struct{})
+		go func() { wg.Wait(); close(wgDone) }()
+		select {
+		case <-wgDone:
+		case <-done:
+		}
 		mw.RunningLock.Lock()
 		mw.JcRunning = false
 		closeDone()
@@ -94,23 +111,37 @@ func (mw *JobContext) Done() <-chan struct{} {
 	return mw.done
 }
 
-// Err implements Context.Err().
+// Err implements Context.Err(), delegating to the parent context's error when done.
 func (mw *JobContext) Err() error {
 	select {
 	case <-mw.done:
+		if mw.errFn != nil {
+			if err := mw.errFn(); err != nil {
+				return err
+			}
+		}
+
 		return context.Canceled
 	default:
 		return nil
 	}
 }
 
-// Deadline implements Context.Deadline().
+// Deadline implements Context.Deadline(), delegating to the parent context.
 func (mw *JobContext) Deadline() (deadline time.Time, ok bool) {
+	if mw.deadlineFn != nil {
+		return mw.deadlineFn()
+	}
+
 	return time.Time{}, false
 }
 
-// Value implements Context.Value().
+// Value implements Context.Value(), delegating to the parent context.
 func (mw *JobContext) Value(key interface{}) interface{} {
+	if mw.valueFn != nil {
+		return mw.valueFn(key)
+	}
+
 	return nil
 }
 

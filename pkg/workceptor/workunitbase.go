@@ -64,24 +64,44 @@ var ErrPending = fmt.Errorf("operation pending")
 
 // workUnitContext implements context.Context for a work unit's lifecycle without
 // storing context.Context as a struct field (which SonarCloud flags as a code smell).
+// Delegation functions capture the wrapped context's methods at construction time.
 type workUnitContext struct {
-	done   <-chan struct{}
-	cancel context.CancelFunc
+	done       <-chan struct{}
+	cancel     context.CancelFunc
+	deadlineFn func() (time.Time, bool)
+	errFn      func() error
+	valueFn    func(key any) any
 }
 
-// Deadline implements context.Context.Deadline. Work unit contexts have no deadline.
-func (c *workUnitContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+// Deadline implements context.Context.Deadline, delegating to the wrapped context.
+func (c *workUnitContext) Deadline() (time.Time, bool) {
+	if c.deadlineFn != nil {
+		return c.deadlineFn()
+	}
+
+	return time.Time{}, false
+}
 
 // Done implements context.Context.Done.
 func (c *workUnitContext) Done() <-chan struct{} { return c.done }
 
-// Value implements context.Context.Value. Work unit contexts carry no values.
-func (c *workUnitContext) Value(key any) any { return nil }
+// Value implements context.Context.Value, delegating to the wrapped context.
+func (c *workUnitContext) Value(key any) any {
+	if c.valueFn != nil {
+		return c.valueFn(key)
+	}
 
-// Err implements context.Context.Err.
+	return nil
+}
+
+// Err implements context.Context.Err, delegating to the wrapped context.
 func (c *workUnitContext) Err() error {
 	select {
 	case <-c.done:
+		if c.errFn != nil {
+			return c.errFn()
+		}
+
 		return context.Canceled
 	default:
 		return nil
@@ -122,7 +142,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs 
 	bwu.statusLock = &sync.RWMutex{}
 	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	ctx, cancel := context.WithCancel(w.wctx)
-	bwu.wctx = &workUnitContext{done: ctx.Done(), cancel: cancel}
+	bwu.wctx = &workUnitContext{done: ctx.Done(), cancel: cancel, deadlineFn: ctx.Deadline, errFn: ctx.Err, valueFn: ctx.Value}
 	bwu.fs = fs
 }
 

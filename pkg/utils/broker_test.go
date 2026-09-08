@@ -343,8 +343,7 @@ func TestBrokerJobContextReplacement(t *testing.T) {
 	}
 	<-done
 
-	// Replace the job — this cancels the old JobContext's done channel.
-	jc.WorkerDone()
+	// Replace the job — NewJob cancels the running job directly without WorkerDone.
 	jc.NewJob(context.Background(), 1, false)
 
 	// The subscription channel must be closed by the broker after replacement.

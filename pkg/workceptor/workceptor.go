@@ -79,7 +79,7 @@ func New(ctx context.Context, nc NetceptorForWorkceptor, baseDir string) (*Workc
 	nodeDataDir := path.Join(baseDir, nc.NodeID())
 	c, cancel := context.WithCancel(ctx)
 	w := &Workceptor{
-		wctx:              &workUnitContext{done: c.Done(), cancel: cancel},
+		wctx:              &workUnitContext{done: c.Done(), cancel: cancel, deadlineFn: c.Deadline, errFn: c.Err, valueFn: c.Value},
 		Cancel:            cancel,
 		nc:                nc,
 		dataDir:           nodeDataDir,

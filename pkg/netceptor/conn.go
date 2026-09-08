@@ -286,7 +286,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				qs:       qs,
 				doneChan: doneChan,
 				doneOnce: &sync.Once{},
-				wctx:     &cancelCtx{done: connCtxRaw.Done(), cancel: connCancel},
+				wctx:     &cancelCtx{done: connCtxRaw.Done(), cancel: connCancel, deadlineFn: connCtxRaw.Deadline, errFn: connCtxRaw.Err, valueFn: connCtxRaw.Value},
 			}
 			// Receptor Addr connections can be monitored for unreachable service; other types cannot
 			rAddr, ok := conn.RemoteAddr().(Addr)
@@ -364,7 +364,7 @@ func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStr
 		qs:       qs,
 		doneChan: doneChan,
 		doneOnce: doneOnce,
-		wctx:     &cancelCtx{done: ctx.Done(), cancel: func() {}},
+		wctx:     &cancelCtx{done: ctx.Done(), cancel: func() {}, deadlineFn: ctx.Deadline, errFn: ctx.Err, valueFn: ctx.Value},
 	}
 
 	return conn

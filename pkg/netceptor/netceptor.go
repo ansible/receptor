@@ -47,22 +47,37 @@ var MainInstance *Netceptor
 
 // cancelCtx wraps a done channel and cancel func to implement context.Context
 // without storing context.Context as a struct field (which SonarCloud flags).
+// Delegation functions capture the derived context's methods at construction time.
 type cancelCtx struct {
-	done   <-chan struct{}
-	cancel context.CancelFunc
-	errFn  func() error // optional: forwards the source context's Err() for deadline vs cancel distinction
+	done       <-chan struct{}
+	cancel     context.CancelFunc
+	deadlineFn func() (time.Time, bool) // delegates Deadline to the wrapped context
+	errFn      func() error             // delegates Err to the wrapped context
+	valueFn    func(key any) any        // delegates Value to the wrapped context
 }
 
-// Deadline implements context.Context.Deadline. cancelCtx contexts have no deadline.
-func (c *cancelCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
+// Deadline implements context.Context.Deadline, delegating to the wrapped context.
+func (c *cancelCtx) Deadline() (time.Time, bool) {
+	if c.deadlineFn != nil {
+		return c.deadlineFn()
+	}
+
+	return time.Time{}, false
+}
 
 // Done implements context.Context.Done.
 func (c *cancelCtx) Done() <-chan struct{} { return c.done }
 
-// Value implements context.Context.Value. cancelCtx contexts carry no values.
-func (c *cancelCtx) Value(key any) any { return nil }
+// Value implements context.Context.Value, delegating to the wrapped context.
+func (c *cancelCtx) Value(key any) any {
+	if c.valueFn != nil {
+		return c.valueFn(key)
+	}
 
-// Err implements context.Context.Err.
+	return nil
+}
+
+// Err implements context.Context.Err, delegating to the wrapped context.
 func (c *cancelCtx) Err() error {
 	select {
 	case <-c.done:
@@ -370,7 +385,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	s.AddNameHash(nodeID)
 	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	c, cancel := context.WithCancel(ctx)
-	s.wctx = &cancelCtx{done: c.Done(), cancel: cancel}
+	s.wctx = &cancelCtx{done: c.Done(), cancel: cancel, deadlineFn: c.Deadline, errFn: c.Err, valueFn: c.Value}
 	s.cancelFunc = cancel
 	s.unreachableBroker = utils.NewBroker(s.wctx, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.wctx, reflect.TypeOf(map[string]string{}))
@@ -1742,7 +1757,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 		logger:           s.Logger,
 	}
 	ciCtx, ciCancel := context.WithCancel(ctx)
-	ci.ctx = &cancelCtx{done: ciCtx.Done(), cancel: ciCancel}
+	ci.ctx = &cancelCtx{done: ciCtx.Done(), cancel: ciCancel, deadlineFn: ciCtx.Deadline, errFn: ciCtx.Err, valueFn: ciCtx.Value}
 	ci.CancelFunc = ciCancel
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)

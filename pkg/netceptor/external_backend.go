@@ -169,7 +169,7 @@ func (b *ExternalBackend) NewConnection(conn MessageConn, closeConnWithSession b
 		eb:          b,
 		conn:        conn,
 		shouldClose: closeConnWithSession,
-		sctx:        &cancelCtx{done: childCtx.Done(), cancel: cancel},
+		sctx:        &cancelCtx{done: childCtx.Done(), cancel: cancel, deadlineFn: childCtx.Deadline, errFn: childCtx.Err, valueFn: childCtx.Value},
 		cancel:      cancel,
 	}
 	b.sessChan <- ebs

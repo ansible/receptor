@@ -445,3 +445,69 @@ func TestListKnownUnitIDs(t *testing.T) {
 		})
 	}
 }
+
+// TestBaseWorkUnitContextMethods exercises GetContext, GetCancel, and the
+// workUnitContext.Err paths (both running and cancelled) on a real BaseWorkUnit.
+func TestBaseWorkUnitContextMethods(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockNetceptor.EXPECT().NodeID().Return("test").AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(nil).AnyTimes()
+	mockNetceptor.EXPECT().AddWorkCommand(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	w, err := workceptor.New(ctx, mockNetceptor, t.TempDir())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Capture the real BaseWorkUnitForWorkUnit handed to the factory.
+	var captured workceptor.BaseWorkUnitForWorkUnit
+	w.RegisterWorker("testctx", func(bwu workceptor.BaseWorkUnitForWorkUnit, ww *workceptor.Workceptor, unitID, workType string) workceptor.WorkUnit {
+		if bwu == nil {
+			bwu = &workceptor.BaseWorkUnit{}
+		}
+		bwu.Init(ww, unitID, workType, workceptor.FileSystem{})
+		captured = bwu
+		return &captureUnit{BaseWorkUnitForWorkUnit: bwu}
+	}, false)
+
+	if _, err := w.AllocateUnit("testctx", "", nil); err != nil {
+		t.Fatalf("AllocateUnit: %v", err)
+	}
+	if captured == nil {
+		t.Fatal("worker factory was not called")
+	}
+
+	// GetContext should return a live context.
+	wctx := captured.GetContext()
+	if wctx == nil {
+		t.Fatal("GetContext() returned nil")
+	}
+	if wctx.Err() != nil {
+		t.Errorf("Err() before cancel = %v, want nil", wctx.Err())
+	}
+
+	// GetCancel should return a callable cancel func that closes the context.
+	cancel := captured.GetCancel()
+	if cancel == nil {
+		t.Fatal("GetCancel() returned nil")
+	}
+	cancel()
+	if wctx.Err() == nil {
+		t.Error("Err() after cancel = nil, want non-nil")
+	}
+}
+
+// captureUnit is a minimal WorkUnit used by TestBaseWorkUnitContextMethods.
+type captureUnit struct {
+	workceptor.BaseWorkUnitForWorkUnit
+}
+
+func (cu *captureUnit) Start() error   { return nil }
+func (cu *captureUnit) Restart() error { return nil }
+func (cu *captureUnit) Cancel() error  { return nil }

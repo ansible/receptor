@@ -1526,3 +1526,24 @@ func (m *mockBackendSession) Close() error {
 
 	return nil
 }
+
+// TestCancelCtxDeadlineNilFn covers the fallback branch of cancelCtx.Deadline
+// when deadlineFn is nil (no deadline was set on the wrapped context).
+func TestCancelCtxDeadlineNilFn(t *testing.T) {
+	t.Parallel()
+	c := &cancelCtx{done: make(chan struct{})}
+	deadline, ok := c.Deadline()
+	if !deadline.IsZero() || ok {
+		t.Errorf("Deadline() with nil deadlineFn = (%v, %v), want (zero, false)", deadline, ok)
+	}
+}
+
+// TestCancelCtxValueNilFn covers the fallback branch of cancelCtx.Value
+// when valueFn is nil (the wrapped context carries no values).
+func TestCancelCtxValueNilFn(t *testing.T) {
+	t.Parallel()
+	c := &cancelCtx{done: make(chan struct{})}
+	if got := c.Value("key"); got != nil {
+		t.Errorf("Value() with nil valueFn = %v, want nil", got)
+	}
+}

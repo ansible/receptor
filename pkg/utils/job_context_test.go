@@ -97,23 +97,37 @@ func TestJobContextDeadline(t *testing.T) {
 func TestJobContextErr(t *testing.T) {
 	tests := []struct {
 		name    string
+		cancel  bool
 		wantErr bool
 	}{
 		{
-			name:    "Positive",
+			name:    "running returns nil",
+			cancel:  false,
 			wantErr: false,
+		},
+		{
+			name:    "canceled returns error",
+			cancel:  true,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			jc := &utils.JobContext{}
 			jc.NewJob(context.Background(), 1, false)
+			if tt.cancel {
+				jc.Cancel()
+				jc.WorkerDone()
+				jc.Wait()
+			}
 			if err := jc.Err(); (err != nil) != tt.wantErr {
 				t.Errorf("JobContext.Err() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			jc.Cancel()
-			jc.WorkerDone()
-			jc.Wait()
+			if !tt.cancel {
+				jc.Cancel()
+				jc.WorkerDone()
+				jc.Wait()
+			}
 		})
 	}
 }

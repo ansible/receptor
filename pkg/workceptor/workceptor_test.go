@@ -473,6 +473,7 @@ func TestBaseWorkUnitContextMethods(t *testing.T) {
 		}
 		bwu.Init(ww, unitID, workType, workceptor.FileSystem{})
 		captured = bwu
+
 		return &captureUnit{BaseWorkUnitForWorkUnit: bwu}
 	}, false)
 

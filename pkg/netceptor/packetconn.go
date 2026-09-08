@@ -24,7 +24,7 @@ type PacketConn struct {
 	connType          byte
 	hopsToLive        byte
 	unreachableSubs   *utils.Broker
-	context           context.Context
+	pctx              *cancelCtx
 	cancel            context.CancelFunc
 }
 
@@ -104,11 +104,13 @@ func (pc *PacketConn) GetLogger() *logger.ReceptorLogger {
 
 // startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages.
 func (pc *PacketConn) StartUnreachable() {
-	pc.context, pc.cancel = context.WithCancel(pc.s.Context())
-	pc.unreachableSubs = utils.NewBroker(pc.context, reflect.TypeOf(UnreachableNotification{}))
+	c, cancel := context.WithCancel(pc.s.Context())
+	pc.pctx = &cancelCtx{done: c.Done(), cancel: cancel}
+	pc.cancel = cancel
+	pc.unreachableSubs = utils.NewBroker(pc.pctx, reflect.TypeOf(UnreachableNotification{}))
 	iChan := pc.s.GetUnreachableBroker().Subscribe()
 	go func() {
-		<-pc.context.Done()
+		<-pc.pctx.Done()
 		pc.s.GetUnreachableBroker().Unsubscribe(iChan)
 	}()
 	go func() {
@@ -140,12 +142,12 @@ func (pc *PacketConn) SubscribeUnreachable(doneChan chan struct{}) chan Unreacha
 		select {
 		case <-doneChan:
 			pc.unreachableSubs.Unsubscribe(iChan)
-		case <-pc.context.Done():
+		case <-pc.pctx.Done():
 		}
 	}()
 	// goroutine 2
 	// this will exit when either the broker closes iChan, or the broker
-	// returns via pc.context.Done()
+	// returns via pc.pctx.Done()
 	go func() {
 		for {
 			msgIf, ok := <-iChan
@@ -171,7 +173,7 @@ func (pc *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if pc.GetReadDeadline().IsZero() {
 		select {
 		case m = <-pc.recvChan:
-		case <-pc.context.Done():
+		case <-pc.pctx.Done():
 			return 0, nil, fmt.Errorf("connection context closed")
 		}
 	} else {

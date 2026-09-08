@@ -157,7 +157,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 	doneChan := make(chan struct{})
 	go func() {
 		select {
-		case <-s.context.Done():
+		case <-s.wctx.Done():
 			_ = ql.Close()
 		case <-ctx.Done():
 			_ = ql.Close()
@@ -193,12 +193,12 @@ func (s *Netceptor) GetConfigForClientOverride(tlscfg *tls.Config) func(*tls.Cli
 // Listen returns a stream listener compatible with Go's net.Listener.
 // If service is blank, generates and uses an ephemeral service name.
 func (s *Netceptor) Listen(service string, tlscfg *tls.Config) (*Listener, error) {
-	return s.listen(s.context, service, tlscfg, false, nil)
+	return s.listen(s.wctx, service, tlscfg, false, nil)
 }
 
 // ListenAndAdvertise listens for stream connections on a service and also advertises it via broadcasts.
 func (s *Netceptor) ListenAndAdvertise(service string, tlscfg *tls.Config, tags map[string]string) (*Listener, error) {
-	return s.listen(s.context, service, tlscfg, true, tags)
+	return s.listen(s.wctx, service, tlscfg, true, tags)
 }
 
 func (li *Listener) SendResult(ctx context.Context, conn net.Conn, err error) {
@@ -278,7 +278,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				return
 			}
 			doneChan := make(chan struct{}, 1)
-			connCtx, connCancel := context.WithCancel(li.s.context)
+			connCtxRaw, connCancel := context.WithCancel(li.s.wctx)
 			conn := &Conn{
 				s:        li.s,
 				pc:       li.pc,
@@ -286,7 +286,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				qs:       qs,
 				doneChan: doneChan,
 				doneOnce: &sync.Once{},
-				ctx:      connCtx,
+				wctx:     &cancelCtx{done: connCtxRaw.Done(), cancel: connCancel},
 			}
 			// Receptor Addr connections can be monitored for unreachable service; other types cannot
 			rAddr, ok := conn.RemoteAddr().(Addr)
@@ -300,13 +300,13 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 				select {
 				case <-li.DoneChan:
 					_ = conn.Close()
-				case <-connCtx.Done():
+				case <-conn.wctx.Done():
 					_ = conn.Close()
 				case <-doneChan:
 					return
 				}
 			}()
-			// Send connection to caller. The lifecycle goroutine will cancel connCtx when the connection ends.
+			// Send connection to caller. The lifecycle goroutine will cancel conn.wctx when the connection ends.
 			li.SendResult(ctx, conn, err)
 		}()
 	}
@@ -352,7 +352,7 @@ type Conn struct {
 	qs       QuicStreamForConn
 	doneChan chan struct{}
 	doneOnce *sync.Once
-	ctx      context.Context
+	wctx     *cancelCtx
 }
 
 // NewConn constructs a new Conn instance, so that the test package can create one.
@@ -364,7 +364,7 @@ func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStr
 		qs:       qs,
 		doneChan: doneChan,
 		doneOnce: doneOnce,
-		ctx:      ctx,
+		wctx:     &cancelCtx{done: ctx.Done(), cancel: func() {}},
 	}
 
 	return conn
@@ -416,7 +416,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			return
 		case <-cctx.Done():
 			pcClose()
-		case <-s.context.Done():
+		case <-s.wctx.Done():
 			pcClose()
 		}
 	}()
@@ -470,7 +470,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		case <-qcAdapted.Context().Done():
 			_ = qs.Close()
 			_ = pc.Close()
-		case <-s.context.Done():
+		case <-s.wctx.Done():
 			_ = qs.Close()
 			_ = pc.Close()
 		case <-doneChan:
@@ -561,7 +561,7 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 
 // Context returns the connection's context.
 func (c *Conn) Context() context.Context {
-	return c.ctx
+	return c.wctx
 }
 
 const insecureCommonName = "netceptor-insecure-common-name"

@@ -422,7 +422,7 @@ func TestDuplicateNodeDetection(t *testing.T) {
 					knownRoutesLock.Lock()
 					knownRoutes[i] = routes
 					knownRoutesLock.Unlock()
-				case <-nodes[i].context.Done():
+				case <-nodes[i].wctx.Done():
 					return
 				}
 			}
@@ -1040,7 +1040,7 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 	if !exists {
 		t.Error("Expected new connection to be established after removing canceled connection")
 	}
-	if exists && newConn.Context.Err() != nil {
+	if exists && newConn.ctx.Err() != nil {
 		t.Error("Expected new connection to have valid context")
 	}
 
@@ -1118,7 +1118,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 			if !exists {
 				t.Error("Expected new connection to be established after removing connection with context error")
 			}
-			if exists && newConn.Context.Err() != nil {
+			if exists && newConn.ctx.Err() != nil {
 				t.Error("Expected new connection to have valid context")
 			}
 
@@ -1235,7 +1235,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 
 	// Create an existing connection with the canceled context.
 	existingConn := &connInfo{
-		Context:          canceledCtx,
+		ctx:              &cancelCtx{done: canceledCtx.Done(), cancel: cancel, errFn: canceledCtx.Err},
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte),
@@ -1261,7 +1261,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	if !exists {
 		t.Fatal("Existing connection should be in the connections map")
 	}
-	if storedConn.Context.Err() == nil {
+	if storedConn.ctx.Err() == nil {
 		t.Fatal("Existing connection context should be canceled")
 	}
 
@@ -1326,7 +1326,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	if finalConnectionCount != initialConnectionCount {
 		t.Errorf("Expected connection count to remain the same (%d), but got %d", initialConnectionCount, finalConnectionCount)
 	}
-	if stillExists && replacementConn.Context.Err() != nil {
+	if stillExists && replacementConn.ctx.Err() != nil {
 		t.Error("The replacement connection should have a valid (non-canceled) context")
 	}
 	if stillExists && replacementConn == existingConn {
@@ -1359,7 +1359,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	if finalFinalCount != 1 {
 		t.Errorf("Expected exactly 1 connection after cleanup, but got %d", finalFinalCount)
 	}
-	if finalExists && finalConn.Context.Err() != nil {
+	if finalExists && finalConn.ctx.Err() != nil {
 		t.Error("Final connection should have valid context")
 	}
 
@@ -1430,7 +1430,7 @@ func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID st
 // createExistingConnectionWithContext creates an existing connection with the given context.
 func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx context.Context, cancel context.CancelFunc) {
 	existingConn := &connInfo{
-		Context:          ctx,
+		ctx:              &cancelCtx{done: ctx.Done(), cancel: cancel, errFn: ctx.Err},
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte),

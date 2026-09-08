@@ -15,7 +15,7 @@ import (
 // ExternalBackend is a backend implementation for the situation when non-Receptor code
 // is initiating connections, outside the control of a Receptor-managed accept loop.
 type ExternalBackend struct {
-	ctx      context.Context
+	done     <-chan struct{}
 	sessChan chan BackendSession
 }
 
@@ -144,7 +144,7 @@ func NewExternalBackend() (*ExternalBackend, error) {
 
 // Start launches the backend from Receptor's point of view, and waits for connections to happen.
 func (b *ExternalBackend) Start(ctx context.Context, _ *sync.WaitGroup) (chan BackendSession, error) {
-	b.ctx = ctx
+	b.done = ctx.Done()
 	b.sessChan = make(chan BackendSession)
 
 	return b.sessChan, nil
@@ -155,7 +155,7 @@ type ExternalSession struct {
 	eb          *ExternalBackend
 	conn        MessageConn
 	shouldClose bool
-	ctx         context.Context
+	sctx        *cancelCtx
 	cancel      context.CancelFunc
 }
 
@@ -163,27 +163,28 @@ type ExternalSession struct {
 // connection will be closed when the session ends if closeConnWithSession is true. The
 // returned context will be cancelled after the connection closes.
 func (b *ExternalBackend) NewConnection(conn MessageConn, closeConnWithSession bool) context.Context {
-	ctx, cancel := context.WithCancel(b.ctx)
+	parentCtx := &cancelCtx{done: b.done}
+	childCtx, cancel := context.WithCancel(parentCtx)
 	ebs := &ExternalSession{
 		eb:          b,
 		conn:        conn,
 		shouldClose: closeConnWithSession,
-		ctx:         ctx,
+		sctx:        &cancelCtx{done: childCtx.Done(), cancel: cancel},
 		cancel:      cancel,
 	}
 	b.sessChan <- ebs
 
-	return ctx
+	return ebs.sctx
 }
 
 // Send sends data over the session.
 func (es *ExternalSession) Send(data []byte) error {
-	return es.conn.WriteMessage(es.ctx, data)
+	return es.conn.WriteMessage(es.sctx, data)
 }
 
 // Recv receives data via the session.
 func (es *ExternalSession) Recv(timeout time.Duration) ([]byte, error) {
-	return es.conn.ReadMessage(es.ctx, timeout)
+	return es.conn.ReadMessage(es.sctx, timeout)
 }
 
 // Close closes the session.

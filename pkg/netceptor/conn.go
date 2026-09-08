@@ -364,7 +364,15 @@ func NewConn(s *Netceptor, pc PacketConner, qc QuicConnectionForConn, qs QuicStr
 		qs:       qs,
 		doneChan: doneChan,
 		doneOnce: doneOnce,
-		wctx:     &cancelCtx{done: ctx.Done(), cancel: func() {}, deadlineFn: ctx.Deadline, errFn: ctx.Err, valueFn: ctx.Value},
+		wctx: &cancelCtx{
+			done: ctx.Done(),
+			cancel: func() {
+				// no-op: ctx lifetime is owned by the caller; NewConn does not cancel it.
+			},
+			deadlineFn: ctx.Deadline,
+			errFn:      ctx.Err,
+			valueFn:    ctx.Value,
+		},
 	}
 
 	return conn

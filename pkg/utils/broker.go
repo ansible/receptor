@@ -28,17 +28,17 @@ func NewBroker(ctx context.Context, msgType reflect.Type) *Broker {
 		subCh:     make(chan chan interface{}),
 		unsubCh:   make(chan chan interface{}),
 	}
-	go b.start(ctx)
+	go b.start()
 
 	return b
 }
 
 // start starts the broker goroutine.
-func (b *Broker) start(ctx context.Context) {
+func (b *Broker) start() {
 	subs := map[chan interface{}]struct{}{}
 	for {
 		select {
-		case <-ctx.Done():
+		case <-b.done:
 			for ch := range subs {
 				close(ch)
 			}
@@ -57,7 +57,7 @@ func (b *Broker) start(ctx context.Context) {
 					defer wg.Done()
 					select {
 					case msgCh <- msg:
-					case <-ctx.Done():
+					case <-b.done:
 					}
 				}(msgCh)
 			}

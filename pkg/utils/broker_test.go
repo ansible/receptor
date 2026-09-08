@@ -310,6 +310,68 @@ func TestBrokerContextCancellation(t *testing.T) {
 	}
 }
 
+// TestBrokerJobContextReplacement verifies that when a JobContext is replaced via
+// NewJob, the broker's done channel fires, all existing subscriptions are closed,
+// and no further publishes are delivered to those subscribers.
+func TestBrokerJobContextReplacement(t *testing.T) {
+	t.Parallel()
+
+	jc := &utils.JobContext{}
+	jc.NewJob(context.Background(), 1, false)
+
+	broker := utils.NewBroker(jc, reflect.TypeOf(""))
+	ch := broker.Subscribe()
+	if ch == nil {
+		t.Fatal("Subscribe() returned nil on active JobContext")
+	}
+
+	// Publish one message to confirm the broker is live.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		select {
+		case msg, ok := <-ch:
+			if !ok || msg != "hello" {
+				t.Errorf("expected 'hello', got %v (ok=%v)", msg, ok)
+			}
+		case <-time.After(time.Second):
+			t.Error("timed out waiting for first message")
+		}
+	}()
+	if err := broker.Publish("hello"); err != nil {
+		t.Fatalf("Publish error: %v", err)
+	}
+	<-done
+
+	// Replace the job — this cancels the old JobContext's done channel.
+	jc.WorkerDone()
+	jc.NewJob(context.Background(), 1, false)
+
+	// The subscription channel must be closed by the broker after replacement.
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("subscription channel should be closed after JobContext replacement")
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for subscription channel to close after replacement")
+	}
+
+	// Further publishes must not block or be delivered to the old channel.
+	publishErr := make(chan error, 1)
+	go func() { publishErr <- broker.Publish("after-replace") }()
+	select {
+	case err := <-publishErr:
+		if err != nil {
+			t.Errorf("unexpected Publish error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Error("Publish blocked after JobContext replacement")
+	}
+
+	jc.WorkerDone()
+}
+
 // TestBrokerConcurrency tests the broker under concurrent operations.
 func TestBrokerConcurrency(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

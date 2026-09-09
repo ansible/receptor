@@ -206,6 +206,75 @@ func TestJobContext_NewJob(t *testing.T) {
 	})
 }
 
+func TestJobContextClaimWorkerDone(t *testing.T) {
+	t.Run("ClaimWorkerDone captures WG at call time", func(t *testing.T) {
+		jc := &utils.JobContext{}
+		jc.NewJob(context.Background(), 2, false)
+
+		done1 := jc.ClaimWorkerDone()
+		done2 := jc.ClaimWorkerDone()
+
+		done1()
+		done2()
+		jc.Wait()
+		if err := WaitUntilFinished(jc, jobFinishTimeout); err != nil {
+			t.Fatalf("JobContext did not finish in time: %v", err)
+		}
+	})
+}
+
+func TestJobContextNilFnBranches(t *testing.T) {
+	t.Run("Deadline returns zero before NewJob", func(t *testing.T) {
+		jc := &utils.JobContext{}
+		dl, ok := jc.Deadline()
+		if !dl.IsZero() || ok {
+			t.Errorf("Deadline() before NewJob = %v, %v; want zero, false", dl, ok)
+		}
+	})
+
+	t.Run("Value returns nil before NewJob", func(t *testing.T) {
+		jc := &utils.JobContext{}
+		if got := jc.Value("key"); got != nil {
+			t.Errorf("Value() before NewJob = %v; want nil", got)
+		}
+	})
+}
+
+func TestJobContextErrDelegatesParentError(t *testing.T) {
+	t.Run("Err returns parent deadline error when parent deadline exceeded", func(t *testing.T) {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(20*time.Millisecond))
+		defer cancel()
+
+		jc := &utils.JobContext{}
+		jc.NewJob(ctx, 1, false)
+
+		<-ctx.Done()
+		<-jc.Done()
+
+		if err := jc.Err(); err != context.DeadlineExceeded {
+			t.Errorf("Err() = %v, want context.DeadlineExceeded", err)
+		}
+		jc.WorkerDone()
+	})
+}
+
+func TestJobContextParentCancelPropagates(t *testing.T) {
+	t.Run("Parent cancellation closes Done channel", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		jc := &utils.JobContext{}
+		jc.NewJob(ctx, 1, false)
+
+		cancel()
+
+		select {
+		case <-jc.Done():
+		case <-time.After(jobFinishTimeout):
+			t.Error("Done() did not close after parent cancel")
+		}
+		jc.WorkerDone()
+	})
+}
+
 func TestWaitUntilFinishedTimeout(t *testing.T) {
 	jc := &utils.JobContext{}
 

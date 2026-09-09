@@ -591,14 +591,28 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 	// spawned here call Done() on the right counter even if mw is later replaced.
 	workerDone := mw.ClaimWorkerDone()
 
-	return rw.getConnectionAndRun(mw, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	// Wrap mw in a stable derived context. mw.Done() is mutable (replaced on NewJob),
+	// so passing mw directly to context.WithTimeout/WithCancel would create propagateCancel
+	// goroutines that call mw.Err() after mw.done is replaced, violating the context contract.
+	runCtx, runCancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-mw.Done():
+			runCancel()
+		case <-runCtx.Done():
+		}
+	}()
+
+	return rw.getConnectionAndRun(runCtx, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		err := action(ctx, conn, reader)
 		if err != nil {
+			runCancel()
 			workerDone()
 
 			return err
 		}
 		go func() {
+			defer runCancel()
 			if forRelease {
 				err := rw.BaseWorkUnitForWorkUnit.Release(false)
 				if err != nil {
@@ -612,6 +626,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 
 		return nil
 	}, func() {
+		runCancel()
 		workerDone()
 	})
 }

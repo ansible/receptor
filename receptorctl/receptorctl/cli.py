@@ -566,7 +566,9 @@ def adopt(ctx, node, unit_id, tlsclient, signwork, follow, rm):
 @work.command(help="Get results for a previously or currently running unit of work.")
 @click.pass_context
 @click.argument("unit_id", type=str, required=True)
-@click.option("--startpos", type=int, default=0, help="Start position in the result stream (byte offset).")
+@click.option(
+    "--startpos", type=int, default=0, help="Start position in the result stream (byte offset)."
+)
 def results(ctx, unit_id, startpos):
     rc = get_rc(ctx)
     resultsfile = rc.get_work_results(unit_id, startpos=startpos)

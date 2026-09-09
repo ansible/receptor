@@ -99,10 +99,19 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 }
 
 // WorkerDone signals that a worker is finished, like sync.WaitGroup.Done().
-// Callers that may outlive a job replacement should capture mw.Wg at job start
-// and call Done() on it directly, to avoid decrementing the replacement job's counter.
 func (mw *JobContext) WorkerDone() {
 	mw.Wg.Done()
+}
+
+// ClaimWorkerDone captures the current job's WaitGroup and returns a function
+// that calls Done on it. Use this in goroutines that may outlive a job
+// replacement to avoid decrementing the replacement job's counter.
+func (mw *JobContext) ClaimWorkerDone() func() {
+	mw.RunningLock.Lock()
+	wg := mw.Wg
+	mw.RunningLock.Unlock()
+
+	return wg.Done
 }
 
 // Wait waits for the current job to complete, like sync.WaitGroup.Wait().

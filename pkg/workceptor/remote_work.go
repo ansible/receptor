@@ -587,10 +587,14 @@ func (rw *remoteUnit) UnredactedStatus() *StatusFileData {
 
 // runAndMonitor waits for a connection to be available, then starts the remote unit and monitors it.
 func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, action actionFunc) error {
+	// Capture the WG for this specific job at call time so that goroutines
+	// spawned here call Done() on the right counter even if mw is later replaced.
+	workerDone := mw.ClaimWorkerDone()
+
 	return rw.getConnectionAndRun(mw, true, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		err := action(ctx, conn, reader)
 		if err != nil {
-			mw.WorkerDone()
+			workerDone()
 
 			return err
 		}
@@ -603,12 +607,12 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 			} else {
 				rw.monitorRemoteUnit(ctx)
 			}
-			mw.WorkerDone()
+			workerDone()
 		}()
 
 		return nil
 	}, func() {
-		mw.WorkerDone()
+		workerDone()
 	})
 }
 
@@ -650,9 +654,10 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased)
 		})
 	}
+	workerDone := rw.topJC.ClaimWorkerDone()
 	go func() {
 		rw.monitorRemoteUnit(rw.topJC)
-		rw.topJC.WorkerDone()
+		workerDone()
 	}()
 
 	return nil

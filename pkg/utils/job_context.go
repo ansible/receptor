@@ -18,6 +18,7 @@ import (
 // A single JobContext can only run one job at a time.  If JobContext.NewJob() is called while a job
 // is already running, that job will be cancelled and waited on prior to starting the new job.
 type JobContext struct {
+	ctxMu       sync.RWMutex // protects done, deadlineFn, valueFn, errFn
 	done        chan struct{}
 	JcCancel    context.CancelFunc
 	Wg          *sync.WaitGroup
@@ -44,22 +45,24 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 		prevDone := mw.done
 		mw.JcCancel()
 		mw.RunningLock.Unlock()
-		<-prevDone // wait for cancellation to propagate; returns immediately after JcCancel
+		<-prevDone
 		mw.RunningLock.Lock()
 	}
 
 	done := make(chan struct{})
-	mw.done = done
 	var closeOnce sync.Once
 	closeDone := func() {
 		closeOnce.Do(func() { close(done) })
 	}
-	mw.JcCancel = closeDone
 
-	// Capture parent delegation functions so Deadline/Value/Err proxy the parent.
+	mw.ctxMu.Lock()
+	mw.done = done
 	mw.deadlineFn = ctx.Deadline
 	mw.valueFn = ctx.Value
 	mw.errFn = ctx.Err
+	mw.ctxMu.Unlock()
+
+	mw.JcCancel = closeDone
 
 	// Propagate parent cancellation to our done channel.
 	go func() {
@@ -76,6 +79,8 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 	mw.RunningLock.Unlock()
 
 	// Background goroutine: mark job stopped when workers finish OR when cancelled.
+	// Uses a captured wg so WorkerDone() calls on mw.Wg after job replacement
+	// do not affect this goroutine's tracking.
 	wg := mw.Wg
 	go func() {
 		wgDone := make(chan struct{})
@@ -94,6 +99,8 @@ func (mw *JobContext) NewJob(ctx context.Context, workers int, returnIfRunning b
 }
 
 // WorkerDone signals that a worker is finished, like sync.WaitGroup.Done().
+// Callers that may outlive a job replacement should capture mw.Wg at job start
+// and call Done() on it directly, to avoid decrementing the replacement job's counter.
 func (mw *JobContext) WorkerDone() {
 	mw.Wg.Done()
 }
@@ -108,15 +115,24 @@ func (mw *JobContext) Wait() {
 
 // Done implements Context.Done().
 func (mw *JobContext) Done() <-chan struct{} {
-	return mw.done
+	mw.ctxMu.RLock()
+	d := mw.done
+	mw.ctxMu.RUnlock()
+
+	return d
 }
 
 // Err implements Context.Err(), delegating to the parent context's error when done.
 func (mw *JobContext) Err() error {
+	mw.ctxMu.RLock()
+	d := mw.done
+	fn := mw.errFn
+	mw.ctxMu.RUnlock()
+
 	select {
-	case <-mw.done:
-		if mw.errFn != nil {
-			if err := mw.errFn(); err != nil {
+	case <-d:
+		if fn != nil {
+			if err := fn(); err != nil {
 				return err
 			}
 		}
@@ -129,8 +145,12 @@ func (mw *JobContext) Err() error {
 
 // Deadline implements Context.Deadline(), delegating to the parent context.
 func (mw *JobContext) Deadline() (deadline time.Time, ok bool) {
-	if mw.deadlineFn != nil {
-		return mw.deadlineFn()
+	mw.ctxMu.RLock()
+	fn := mw.deadlineFn
+	mw.ctxMu.RUnlock()
+
+	if fn != nil {
+		return fn()
 	}
 
 	return time.Time{}, false
@@ -138,8 +158,12 @@ func (mw *JobContext) Deadline() (deadline time.Time, ok bool) {
 
 // Value implements Context.Value(), delegating to the parent context.
 func (mw *JobContext) Value(key interface{}) interface{} {
-	if mw.valueFn != nil {
-		return mw.valueFn(key)
+	mw.ctxMu.RLock()
+	fn := mw.valueFn
+	mw.ctxMu.RUnlock()
+
+	if fn != nil {
+		return fn(key)
 	}
 
 	return nil

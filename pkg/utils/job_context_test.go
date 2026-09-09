@@ -260,4 +260,3 @@ func WaitUntilFinished(mw *utils.JobContext, timeout time.Duration) error {
 		return fmt.Errorf("timeout")
 	}
 }
-

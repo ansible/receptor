@@ -336,7 +336,6 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, workUnitID s
 	return rw, nil
 }
 
-
 func (w *Workceptor) scanForUnit(unitID string) {
 	unitdir := path.Join(w.dataDir, unitID)
 	fi, _ := os.Stat(unitdir)

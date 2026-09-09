@@ -477,6 +477,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			// Unit already exists - idempotent success, don't change anything
 			cfr["unitid"] = worker.ID()
 			cfr["result"] = "Already Adopted"
+
 			return cfr, nil
 		}
 

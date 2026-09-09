@@ -595,6 +595,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 	// so passing mw directly to context.WithTimeout/WithCancel would create propagateCancel
 	// goroutines that call mw.Err() after mw.done is replaced, violating the context contract.
 	runCtx, runCancel := context.WithCancel(context.Background())
+	defer runCancel()
 	go func() {
 		select {
 		case <-mw.Done():

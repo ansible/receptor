@@ -816,3 +816,85 @@ func TestSignedWorkVerification(t *testing.T) {
 		t.Fatalf("Did not see the expected error. Wanted %s, got: %s", expected, actual)
 	}
 }
+
+func TestWorkAdopt(t *testing.T) {
+	t.Parallel()
+
+	for _, plugin := range workPlugins {
+		plugin := plugin
+
+		t.Run(string(plugin), func(t *testing.T) {
+			t.Parallel()
+			controllers, m, expectedResults := workSetup(plugin, t)
+
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+
+			// Submit work from node1 to node3
+			unitID, err := controllers["node1"].WorkSubmit("node3", "echosleeplong")
+			if err != nil {
+				t.Fatal(err, m.DataDir)
+			}
+
+			ctx1, cancel1 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel1()
+
+			err = controllers["node1"].AssertWorkRunning(ctx1, unitID)
+			if err != nil {
+				t.Fatal(err, m.DataDir)
+			}
+
+			// Get remote unit ID from node1's local work
+			workStatus, err := controllers["node1"].GetWorkStatus(unitID)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
+			remoteUnitID := workStatus.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+			if remoteUnitID == "" {
+				t.Errorf("remoteUnitID should not be empty")
+			}
+
+			// Now node2 adopts the remote work from node3
+			response, err := controllers["node2"].WorkAdopt("node3", remoteUnitID)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
+
+			result := response["result"].(string)
+			if result != "Adopted" && result != "Adopt Pending" {
+				t.Fatalf("unexpected adopt result: %s", result)
+			}
+
+			localUnitID := response["unitid"].(string)
+			if localUnitID != remoteUnitID {
+				t.Errorf("local unitID (%s) should match remote unitID (%s)", localUnitID, remoteUnitID)
+			}
+
+			// Second adopt - should be idempotent
+			response2, err := controllers["node2"].WorkAdopt("node3", remoteUnitID)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
+
+			result2 := response2["result"].(string)
+			if result2 != "Already Adopted" {
+				t.Fatalf("expected 'Already Adopted' on second call, got: %s", result2)
+			}
+
+			// Wait for work to complete
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel2()
+
+			err = controllers["node2"].AssertWorkSucceeded(ctx2, localUnitID)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
+
+			// Verify results on node2 (the adopting node)
+			err = controllers["node2"].AssertWorkResults(localUnitID, expectedResults)
+			if err != nil {
+				t.Fatal(err, m.GetDataDir())
+			}
+		})
+	}
+}

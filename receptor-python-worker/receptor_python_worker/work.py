@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import threading
 import signal
 import queue
@@ -11,6 +12,58 @@ from .plugin_utils import BUFFER_PAYLOAD, BYTES_PAYLOAD, FILE_PAYLOAD
 # Allow existing worker plugins to "import receptor" and get our version of plugin_utils
 sys.modules['receptor'] = sys.modules[__package__+'.plugin_utils']
 
+# Allowlist pattern for plugin directives: "namespace:function" where both parts are
+# restricted to alphanumerics and underscores. This blocks shell metacharacters,
+# path separators, and other injection vectors before the string reaches pkg_resources.
+_PLUGIN_DIRECTIVE_RE = re.compile(r'^[A-Za-z0-9_]+:[A-Za-z0-9_]+$')
+
+
+def validate_plugin_directive(directive):
+    """Validate that a plugin directive matches 'namespace:function' allowlist pattern.
+
+    Raises ValueError if the directive contains any character outside [A-Za-z0-9_:]
+    or does not follow the expected two-part colon-delimited format.
+    """
+    if not _PLUGIN_DIRECTIVE_RE.match(directive):
+        raise ValueError(
+            "Plugin directive must be 'namespace:function' using only alphanumerics and underscores"
+        )
+
+
+def validate_unitdir(unitdir):
+    """Resolve and validate a unit directory path against path-traversal attacks.
+
+    Strategy:
+      1. Require an absolute path so relative paths are rejected immediately.
+      2. Reject any '..' components in the path parts before touching the filesystem.
+      3. Call Path.resolve() (follows symlinks) and compare to the lexically-normalised
+         form.  A mismatch means a symlink redirects the path to a different location —
+         reject it so callers cannot use a planted symlink to escape the intended tree.
+      4. Require the resolved path to be an existing directory.
+
+    Returns the resolved Path on success; raises ValueError on any violation.
+    """
+    p = Path(unitdir)
+    if not p.is_absolute():
+        raise ValueError(f"unitdir must be an absolute path, got: {unitdir!r}")
+
+    # Catch '..' traversal in the path string itself before any I/O.
+    if ".." in p.parts:
+        raise ValueError(f"unitdir must not contain '..' components: {unitdir!r}")
+
+    resolved = p.resolve()
+    normalised = Path(os.path.normpath(str(p)))
+    # If resolve() changed the path, a symlink redirects to a different location.
+    if resolved != normalised:
+        raise ValueError(
+            f"unitdir resolves outside its stated location (symlink or traversal): {unitdir!r}"
+        )
+
+    if not resolved.is_dir():
+        raise ValueError(f"unitdir does not exist or is not a directory: {unitdir!r}")
+
+    return resolved
+
 # WorkState constants
 WorkStatePending = 0
 WorkStateRunning = 1
@@ -20,19 +73,20 @@ WorkStateFailed = 3
 
 class WorkPluginRunner:
     def __init__(self, plugin_directive, unitdir, config):
-        try:
-            self.plugin_namespace, self.plugin_action = plugin_directive.split(":", 1)
-        except ValueError as e:
-            raise ValueError("Plugin directive must be of the form namespace:function")
+        # Validate both CLI arguments before touching the filesystem.
+        validate_plugin_directive(plugin_directive)
+        self.plugin_namespace, self.plugin_action = plugin_directive.split(":", 1)
+
+        safe_unitdir = validate_unitdir(unitdir)
         self.config = config
-        self.unitdir = unitdir
-        self.status_filename = os.path.join(unitdir, "status")
+        self.unitdir = str(safe_unitdir)
+        self.status_filename = os.path.join(self.unitdir, "status")
         if not os.path.exists(self.status_filename):
             raise ValueError("Status file does not exist in unitdir")
-        self.stdin_filename = os.path.join(unitdir, "stdin")
+        self.stdin_filename = os.path.join(self.unitdir, "stdin")
         if not os.path.exists(self.stdin_filename):
             raise ValueError("Stdin file does not exist in unitdir")
-        self.stdout_filename = os.path.join(unitdir, "stdout")
+        self.stdout_filename = os.path.join(self.unitdir, "stdout")
         Path(self.stdout_filename).touch(mode=0o0600, exist_ok=True)
         with open(self.status_filename) as file:
             self.status = json.load(file)

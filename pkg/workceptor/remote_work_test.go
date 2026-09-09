@@ -31,9 +31,14 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 	mockQuicConnection := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
 	mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 
-	messageIndex := 0
+	var (
+		messageIndex int
+		messagesMu   sync.Mutex
+	)
 	// Set up reads to return different messages based on the provided list
 	readExpectation := mockQuicStream.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		messagesMu.Lock()
+		defer messagesMu.Unlock()
 		if messageIndex < len(messages) {
 			msg := messages[messageIndex]
 			messageIndex++

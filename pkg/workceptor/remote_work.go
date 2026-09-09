@@ -594,7 +594,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 	// Wrap mw in a stable derived context. mw.Done() is mutable (replaced on NewJob),
 	// so passing mw directly to context.WithTimeout/WithCancel would create propagateCancel
 	// goroutines that call mw.Err() after mw.done is replaced, violating the context contract.
-	runCtx, runCancel := context.WithCancel(context.Background()) //NOSONAR go:S1034: runCancel is called by goroutines when work completes; defer would cancel runCtx before the work goroutine finishes
+	runCtx, runCancel := context.WithCancel(context.Background()) // NOSONAR go:S1034: runCancel is called by goroutines when work completes; defer would cancel runCtx before the work goroutine finishes
 	go func() {
 		select {
 		case <-mw.Done():

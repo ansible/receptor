@@ -514,22 +514,67 @@ def submit(
             op_on_unit_ids(ctx, "release", [unitid])
 
 
+@work.command(help="Adopt and attach to an already-running unit of work on a remote node.")
+@click.pass_context
+@click.option(
+    "--node",
+    type=str,
+    required=True,
+    help="Receptor node where the work is running.",
+)
+@click.argument("unit_id", type=str, required=True)
+@click.option(
+    "--tls-client",
+    "tlsclient",
+    type=str,
+    default="",
+    help="TLS client used when connecting to the remote node",
+)
+@click.option("--signwork", help="Digitally sign remote work submissions", is_flag=True)
+@click.option(
+    "--follow",
+    "-f",
+    help="Remain attached to the job and print its results to stdout",
+    is_flag=True,
+)
+@click.option("--rm", help="Release unit after completion", is_flag=True)
+def adopt(ctx, node, unit_id, tlsclient, signwork, follow, rm):
+    unitid = None
+    try:
+        rc = get_rc(ctx)
+        work = rc.adopt_work(
+            node,
+            unit_id,
+            tlsclient=tlsclient,
+            signwork=signwork,
+        )
+        result = work.pop("result")
+        unitid = work.pop("unitid")
+        if follow:
+            ctx.invoke(results, unit_id=unitid)
+        else:
+            print_message(f"Result: {result}")
+            print_message(f"Unit ID: {unitid}")
+    except Exception as e:
+        print_error(e)
+        sys.exit(101)
+    finally:
+        if rm and unitid:
+            op_on_unit_ids(ctx, "release", [unitid])
+
+
 @work.command(help="Get results for a previously or currently running unit of work.")
 @click.pass_context
 @click.argument("unit_id", type=str, required=True)
-def results(ctx, unit_id):
+@click.option(
+    "--startpos", type=int, default=0, help="Start position in the result stream (byte offset)."
+)
+def results(ctx, unit_id, startpos):
     rc = get_rc(ctx)
-    resultsfile = rc.get_work_results(unit_id)
+    resultsfile = rc.get_work_results(unit_id, startpos=startpos)
     for text in iter(partial(resultsfile.readline, 256), b""):
         sys.stdout.buffer.write(text)
         sys.stdout.buffer.flush()
-    rc = get_rc(ctx)
-    status = rc.simple_command(f"work status {unit_id}")
-    state = status.pop("State", 0)
-    if state == 3:  # Failed
-        detail = status.pop("Detail", "Unknown")
-        print_error(f"Remote unit failed: {detail}\n")
-        sys.exit(1)
 
 
 def op_on_unit_ids(ctx, op, unit_ids):

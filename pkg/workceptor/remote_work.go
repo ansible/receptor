@@ -310,6 +310,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	}
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
+	remoteWorkType := red.RemoteWorkType
 	conn, reader := rw.GetConnection(mw)
 	defer func() {
 		if conn != nil {
@@ -371,6 +372,16 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 			return
 		}
 		rw.UpdateBasicStatus(si.State, si.Detail, si.StdoutSize)
+		if remoteWorkType == "" {
+			// work adopt starts this with "", so do a full update if empty
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				ed := status.ExtraData.(*RemoteExtraData)
+				if ed.RemoteWorkType == "" && si.WorkType != "" {
+					ed.RemoteWorkType = si.WorkType
+				}
+			})
+			remoteWorkType = si.WorkType
+		}
 		if rw.LastUpdateError() != nil {
 			writeStatusFailures++
 			if writeStatusFailures > 3 {

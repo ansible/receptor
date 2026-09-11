@@ -208,7 +208,11 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		}
 		signWork, err := boolFromMap(config, "signwork")
 		if err == nil {
-			c.params["signwork"] = signWork
+			c.params["signwork"] = strconv.FormatBool(signWork)
+		}
+		signature, err := strFromMap(config, "signature")
+		if err == nil {
+			c.params["signature"] = signature
 		}
 	}
 
@@ -467,7 +471,19 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if err != nil {
 			tlsClient = ""
 		}
-		signWork, _ := boolFromMap(c.params, "signwork")
+		signWork, err := boolFromMap(c.params, "signwork")
+		if err != nil {
+			signWork = false
+		}
+		signature, err := strFromMap(c.params, "signature")
+		if err != nil {
+			signature = ""
+		}
+
+		err = c.processSignature("remote", signature, connIsUnix, signWork)
+		if err != nil {
+			return nil, err
+		}
 
 		cfr := make(map[string]interface{})
 
@@ -492,6 +508,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			ed := status.ExtraData.(*RemoteExtraData)
 			ed.RemoteUnitID = unitid
 			ed.RemoteStarted = true
+			ed.SignWork = signWork
 		})
 
 		cfr["unitid"] = worker.ID()

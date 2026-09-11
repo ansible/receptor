@@ -380,6 +380,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 					ed.RemoteWorkType = si.WorkType
 				}
 			})
+			remoteWorkType = si.WorkType
 		}
 		if rw.LastUpdateError() != nil {
 			writeStatusFailures++

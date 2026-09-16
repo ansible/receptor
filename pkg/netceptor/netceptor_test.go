@@ -1078,7 +1078,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 
 				return ctx, cancel
 			},
-			expectedMsg: "context deadline exceeded",
+			expectedMsg: "context canceled",
 		},
 	}
 
@@ -1229,13 +1229,13 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 
 	remoteNodeID := "leak-test-node"
 
-	// Create a canceled context for the existing connection.
-	canceledCtx, cancel := context.WithCancel(context.Background())
+	// Create a canceled connContext for the existing connection.
+	connCtx, cancel := newConnContext(nil)
 	cancel() // Cancel it immediately
 
-	// Create an existing connection with the canceled context.
+	// Create an existing connection with the canceled connContext.
 	existingConn := &connInfo{
-		Context:          canceledCtx,
+		Context:          connCtx,
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte),
@@ -1427,10 +1427,12 @@ func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID st
 	return mockSession, bi
 }
 
-// createExistingConnectionWithContext creates an existing connection with the given context.
-func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx context.Context, cancel context.CancelFunc) {
+// createExistingConnectionWithContext creates an existing connection with a pre-cancelled connContext.
+func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, _ context.Context, _ context.CancelFunc) {
+	connCtx, cancel := newConnContext(nil)
+	cancel()
 	existingConn := &connInfo{
-		Context:          ctx,
+		Context:          connCtx,
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte),

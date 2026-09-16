@@ -464,7 +464,8 @@ def submit(
         )
         sys.exit(1)
     if rm and not follow:
-        print_warning("using --rm without --follow. Unit results will never be seen.")
+        print_error("Must use --rm with --follow.")
+        sys.exit(1)
     if payload_literal:
         payload_data = f"{payload_literal}\n".encode()
     elif no_payload:
@@ -510,7 +511,7 @@ def submit(
         print_error(e)
         sys.exit(101)
     finally:
-        if rm and unitid:
+        if follow and rm and unitid:
             op_on_unit_ids(ctx, "release", [unitid])
 
 
@@ -539,6 +540,9 @@ def submit(
 )
 @click.option("--rm", help="Release unit after completion", is_flag=True)
 def adopt(ctx, node, unit_id, tlsclient, signwork, follow, rm):
+    if rm and not follow:
+        print_error("Must use --rm with --follow.")
+        sys.exit(1)
     unitid = None
     try:
         rc = get_rc(ctx)
@@ -559,7 +563,7 @@ def adopt(ctx, node, unit_id, tlsclient, signwork, follow, rm):
         print_error(e)
         sys.exit(101)
     finally:
-        if rm and unitid:
+        if follow and rm and unitid:
             op_on_unit_ids(ctx, "release", [unitid])
 
 
@@ -575,6 +579,13 @@ def results(ctx, unit_id, startpos):
     for text in iter(partial(resultsfile.readline, 256), b""):
         sys.stdout.buffer.write(text)
         sys.stdout.buffer.flush()
+    rc = get_rc(ctx)
+    status = rc.simple_command(f"work status {unit_id}")
+    state = status.pop("State", 0)
+    if state == 3:  # Failed
+        detail = status.pop("Detail", "Unknown")
+        print_error(f"Remote unit failed: {detail}\n")
+        sys.exit(1)
 
 
 def op_on_unit_ids(ctx, op, unit_ids):

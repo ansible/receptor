@@ -310,16 +310,6 @@ func (r *ReceptorControl) WorkAdopt(node, unitID string) (map[string]interface{}
 	return r.ReadAndParseJSON()
 }
 
-// WorkAdoptJSON adopts a remote work unit via JSON command.
-func (r *ReceptorControl) WorkAdoptJSON(command string) (map[string]interface{}, error) {
-	_, err := r.WriteStr(fmt.Sprintf("%s\n", command))
-	if err != nil {
-		return nil, err
-	}
-
-	return r.ReadAndParseJSON()
-}
-
 // GetWorkStatus returns JSON of status file for a given unitID.
 func (r *ReceptorControl) GetWorkStatus(unitID string) (*workceptor.StatusFileData, error) {
 	status := &workceptor.StatusFileData{}

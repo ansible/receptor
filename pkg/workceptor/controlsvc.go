@@ -490,17 +490,9 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 
 		cfr := make(map[string]interface{})
 
-		// Try to find existing unit first - if it exists, we've already adopted it
-		worker, err := c.w.findUnit(unitid)
-		if err == nil {
-			// Unit already exists - idempotent success, don't change anything
-			cfr["unitid"] = worker.ID()
-			cfr["result"] = "Already Adopted"
+		var worker WorkUnit
 
-			return cfr, nil
-		}
-
-		// Create new remote unit (remoteWorkType will be updated when we monitor)
+		// Create new local unit to track the remote work
 		worker, err = c.w.AllocateRemoteUnit(remoteNode, "", unitid, tlsClient, "", signWork, map[string]string{})
 		if err != nil {
 			return nil, err

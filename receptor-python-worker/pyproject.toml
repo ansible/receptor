@@ -13,5 +13,11 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
 
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-cov",
+]
+
 [project.scripts]
 receptor-python-worker = "receptor_python_worker:run"

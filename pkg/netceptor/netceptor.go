@@ -339,8 +339,8 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	s.AddNameHash(nodeID)
 	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
-	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
-	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
+	s.unreachableBroker = utils.NewBroker(s.context.Done(), reflect.TypeOf(UnreachableNotification{}))
+	s.routingUpdateBroker = utils.NewBroker(s.context.Done(), reflect.TypeOf(map[string]string{}))
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
 	s.sendRouteFloodChan = tickrunner.Run(s.context, func() { s.sendRoutingUpdate(0) }, s.routeUpdateTime, time.Millisecond*100)
 	if s.serviceAdTime > 0 {

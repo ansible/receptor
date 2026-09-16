@@ -105,7 +105,7 @@ func (pc *PacketConn) GetLogger() *logger.ReceptorLogger {
 // startUnreachable starts monitoring the netceptor unreachable channel and forwarding relevant messages.
 func (pc *PacketConn) StartUnreachable() {
 	pc.context, pc.cancel = context.WithCancel(pc.s.Context())
-	pc.unreachableSubs = utils.NewBroker(pc.context, reflect.TypeOf(UnreachableNotification{}))
+	pc.unreachableSubs = utils.NewBroker(pc.context.Done(), reflect.TypeOf(UnreachableNotification{}))
 	iChan := pc.s.GetUnreachableBroker().Subscribe()
 	go func() {
 		<-pc.context.Done()

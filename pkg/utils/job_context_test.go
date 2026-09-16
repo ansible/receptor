@@ -244,10 +244,9 @@ func TestJobContext_NewJob(t *testing.T) {
 		initialWg := jc.Wg
 
 		jc.WorkerDone()
-		jc.Wait() // but not for finished job
-		if !jc.Running() {
-			t.Errorf("Expected job context to be running after initial job done")
-		}
+		// No Wait() or Running() check here: with a single worker, WorkerDone() drops
+		// the WaitGroup counter to 0 and races the background goroutine that sets
+		// JcRunning=false. Asserting Running()==true here is non-deterministic.
 
 		replaced := jc.NewJob(ctx, 2, false) // Start a new job with 2 workers, specifying that you want them replaced.
 		if !replaced {

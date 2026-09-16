@@ -1748,6 +1748,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 		logger:           s.Logger,
 	}
 	ci.Context, ci.CancelFunc = newConnContext(ctx.Done())
+	defer ci.CancelFunc()
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
 	initDoneChan := make(chan bool)

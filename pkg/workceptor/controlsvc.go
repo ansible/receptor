@@ -79,6 +79,9 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 		}
 		c.params["node"] = tokens[1]
 		c.params["unitid"] = tokens[2]
+		if len(tokens) > 3 {
+			c.params["params"] = strings.Join(tokens[3:], " ")
+		}
 	}
 
 	return c, nil

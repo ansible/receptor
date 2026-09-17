@@ -462,53 +462,54 @@ func (s *Server) SetupConnection(conn net.Conn) {
 }
 
 // RunControlSvc runs the main accept loop of the control service.
-func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
-	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
-) error {
-	var uli net.Listener
-	var lock *utils.FLock
-	var err error
-	if unixSocket != "" {
-		uli, lock, err = s.serverUtils.UnixSocketListen(unixSocket, unixSocketPermissions)
-		if err != nil {
-			return fmt.Errorf("error opening Unix socket: %s", err)
-		}
-	} else {
-		uli = nil
+// openUnixListener opens a Unix socket listener, or returns nil when unixSocket is empty.
+func (s *Server) openUnixListener(unixSocket string, perms os.FileMode) (net.Listener, *utils.FLock, error) {
+	if unixSocket == "" {
+		return nil, nil, nil
 	}
-	var tli net.Listener
-	if tcpListen != "" {
-		var listenAddr string
-		if strings.Contains(tcpListen, ":") {
-			listenAddr = tcpListen
-		} else {
-			listenAddr = fmt.Sprintf("0.0.0.0:%s", tcpListen)
-		}
-		tli, err = s.serverNet.Listen("tcp", listenAddr)
-		if err != nil {
-			return fmt.Errorf("error listening on TCP socket: %s", err)
-		}
-		if tcptls != nil {
-			tli = s.serverTLS.NewListener(tli, tcptls)
-		}
-	} else {
-		tli = nil
+	uli, lock, err := s.serverUtils.UnixSocketListen(unixSocket, perms)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error opening Unix socket: %s", err)
 	}
-	var li *netceptor.Listener
-	if service != "" {
-		li, err = s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{
-			"type": "Control Service",
-		})
-		if err != nil {
-			return fmt.Errorf("error opening Unix socket: %s", err)
-		}
-	} else {
-		li = nil
+
+	return uli, lock, nil
+}
+
+// openTCPListener opens a TCP listener (optionally wrapped in TLS), or returns nil when tcpListen is empty.
+func (s *Server) openTCPListener(tcpListen string, tcptls *tls.Config) (net.Listener, error) {
+	if tcpListen == "" {
+		return nil, nil
 	}
-	if uli == nil && tli == nil && li == nil {
-		return fmt.Errorf("no listeners specified")
+	listenAddr := tcpListen
+	if !strings.Contains(tcpListen, ":") {
+		listenAddr = fmt.Sprintf("0.0.0.0:%s", tcpListen)
 	}
-	s.nc.GetLogger().Info("Running control service %s\n", service)
+	tli, err := s.serverNet.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, fmt.Errorf("error listening on TCP socket: %s", err)
+	}
+	if tcptls != nil {
+		tli = s.serverTLS.NewListener(tli, tcptls)
+	}
+
+	return tli, nil
+}
+
+// openServiceListener opens a Receptor service listener, or returns nil when service is empty.
+func (s *Server) openServiceListener(service string, tlscfg *tls.Config) (*netceptor.Listener, error) {
+	if service == "" {
+		return nil, nil
+	}
+	li, err := s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{"type": "Control Service"})
+	if err != nil {
+		return nil, fmt.Errorf("error opening Unix socket: %s", err)
+	}
+
+	return li, nil
+}
+
+// startListeners launches a cleanup goroutine and per-listener accept loops.
+func (s *Server) startListeners(ctx context.Context, uli net.Listener, lock *utils.FLock, tli net.Listener, li *netceptor.Listener) {
 	go func() {
 		<-ctx.Done()
 		if uli != nil {
@@ -528,6 +529,29 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		}
 		go s.ConnectionListener(ctx, listener)
 	}
+}
+
+// RunControlSvc runs the main accept loop of the control service.
+func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
+	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
+) error {
+	uli, lock, err := s.openUnixListener(unixSocket, unixSocketPermissions)
+	if err != nil {
+		return err
+	}
+	tli, err := s.openTCPListener(tcpListen, tcptls)
+	if err != nil {
+		return err
+	}
+	li, err := s.openServiceListener(service, tlscfg)
+	if err != nil {
+		return err
+	}
+	if uli == nil && tli == nil && li == nil {
+		return fmt.Errorf("no listeners specified")
+	}
+	s.nc.GetLogger().Info("Running control service %s\n", service)
+	s.startListeners(ctx, uli, lock, tli, li)
 
 	return nil
 }

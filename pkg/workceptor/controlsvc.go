@@ -70,6 +70,9 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 			if err != nil {
 				return nil, fmt.Errorf("error converting start position to integer: %s", err)
 			}
+			if c.params["startpos"].(int64) < 0 {
+				c.params["startpos"] = int64(0)
+			}
 		} else {
 			c.params["startpos"] = int64(0)
 		}
@@ -190,6 +193,9 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		}
 		c.params["startpos"], err = intFromMap(config, "startpos")
 		if err != nil {
+			c.params["startpos"] = int64(0)
+		}
+		if c.params["startpos"].(int64) < 0 {
 			c.params["startpos"] = int64(0)
 		}
 		signature, err := strFromMap(config, "signature")
@@ -434,6 +440,9 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 		startPos, err := intFromMap(c.params, "startpos")
 		if err != nil {
+			startPos = 0
+		}
+		if startPos < 0 {
 			startPos = 0
 		}
 		signature, err := strFromMap(c.params, "signature")

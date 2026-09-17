@@ -1526,3 +1526,216 @@ func (m *mockBackendSession) Close() error {
 
 	return nil
 }
+
+// slowBackendSession is a BackendSession whose Send blocks for a fixed delay,
+// simulating a slow or congested mesh link.
+type slowBackendSession struct {
+	delay  time.Duration
+	closed chan struct{}
+}
+
+func (s *slowBackendSession) Send(_ []byte) error {
+	select {
+	case <-time.After(s.delay):
+		return nil
+	case <-s.closed:
+		return fmt.Errorf("session closed")
+	}
+}
+
+func (s *slowBackendSession) Recv(timeout time.Duration) ([]byte, error) {
+	select {
+	case <-time.After(timeout):
+		return nil, ErrTimeout
+	case <-s.closed:
+		return nil, fmt.Errorf("session closed")
+	}
+}
+
+func (s *slowBackendSession) Close() error {
+	close(s.closed)
+
+	return nil
+}
+
+// blockableBackendSession is a BackendSession whose first Send blocks until the
+// test signals unblockFirst; subsequent Sends return immediately.
+type blockableBackendSession struct {
+	firstSendStarted chan struct{}
+	unblockFirst     chan struct{}
+	once             sync.Once
+}
+
+func (s *blockableBackendSession) Send(_ []byte) error {
+	s.once.Do(func() {
+		close(s.firstSendStarted)
+		<-s.unblockFirst
+	})
+
+	return nil
+}
+
+func (s *blockableBackendSession) Recv(timeout time.Duration) ([]byte, error) {
+	time.Sleep(timeout)
+
+	return nil, ErrTimeout
+}
+
+func (s *blockableBackendSession) Close() error { return nil }
+
+// TestProtoWriterDoesNotDropBufferedMessagesOnContextCancel verifies that when
+// the context is cancelled while protoWriter is blocked in sess.Send, messages
+// already enqueued in the buffered WriteChan are not silently dropped. Senders
+// received nil from their channel send and believe delivery succeeded; losing
+// those messages is a correctness bug.
+func TestProtoWriterDoesNotDropBufferedMessagesOnContextCancel(t *testing.T) {
+	const bufSize = writeChanBufferSize
+
+	firstSendStarted := make(chan struct{})
+	unblockFirst := make(chan struct{})
+
+	sess := &blockableBackendSession{
+		firstSendStarted: firstSendStarted,
+		unblockFirst:     unblockFirst,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := New(ctx, "test-node")
+	ci := &connInfo{
+		Context:          ctx,
+		CancelFunc:       cancel,
+		ReadChan:         make(chan []byte),
+		WriteChan:        make(chan []byte, bufSize),
+		lastReceivedLock: &sync.RWMutex{},
+		logger:           s.Logger,
+	}
+
+	protoWriterDone := make(chan struct{})
+	go func() {
+		defer close(protoWriterDone)
+		ci.protoWriter(sess)
+	}()
+
+	// Enqueue bufSize+1 messages: protoWriter consumes the first into the blocking
+	// Send; the remaining bufSize sit in the channel. The loop blocks on the last
+	// send until protoWriter drains a slot, so all messages are enqueued by the
+	// time <-firstSendStarted fires.
+	for i := range bufSize + 1 {
+		ci.WriteChan <- fmt.Appendf(nil, "msg-%d", i)
+	}
+
+	// Wait until protoWriter is confirmed inside Send before cancelling, so the
+	// buffer is full and the race window is deterministic.
+	<-firstSendStarted
+	cancel()
+	close(unblockFirst) // Send(msg-0) returns; protoWriter re-enters the select
+
+	select {
+	case <-protoWriterDone:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("protoWriter did not exit after context cancellation")
+	}
+
+	if remaining := len(ci.WriteChan); remaining > 0 {
+		t.Errorf("protoWriter silently dropped %d buffered message(s) on context cancellation", remaining)
+	}
+}
+
+// TestProtoWriterLogsDroppedMessagesOnContextCancel verifies that when protoWriter
+// drains buffered messages on context cancellation it emits a warning with the
+// drop count rather than discarding them silently.
+func TestProtoWriterLogsDroppedMessagesOnContextCancel(t *testing.T) {
+	const bufSize = writeChanBufferSize
+
+	firstSendStarted := make(chan struct{})
+	unblockFirst := make(chan struct{})
+
+	sess := &blockableBackendSession{
+		firstSendStarted: firstSendStarted,
+		unblockFirst:     unblockFirst,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := New(ctx, "test-node")
+
+	var logBuf bytes.Buffer
+	s.Logger.SetOutput(&logBuf)
+
+	ci := &connInfo{
+		Context:          ctx,
+		CancelFunc:       cancel,
+		ReadChan:         make(chan []byte),
+		WriteChan:        make(chan []byte, bufSize),
+		lastReceivedLock: &sync.RWMutex{},
+		logger:           s.Logger,
+	}
+
+	protoWriterDone := make(chan struct{})
+	go func() {
+		defer close(protoWriterDone)
+		ci.protoWriter(sess)
+	}()
+
+	for i := range bufSize + 1 {
+		ci.WriteChan <- fmt.Appendf(nil, "msg-%d", i)
+	}
+
+	<-firstSendStarted
+	cancel()
+	close(unblockFirst)
+
+	select {
+	case <-protoWriterDone:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("protoWriter did not exit after context cancellation")
+	}
+
+	// protoWriter has exited; no further writes to logBuf can occur.
+	logged := logBuf.String()
+	if !strings.Contains(logged, "queued message(s): connection closed before delivery") {
+		t.Errorf("expected a drop warning in the log, got: %q", logged)
+	}
+}
+
+// TestWriteChanBufferDecouplesSendersFromProtoWriter verifies that the buffered
+// WriteChan allows senders to enqueue without blocking on a slow protoWriter.
+// It uses non-blocking sends: if the buffer is too small (or absent), sends
+// fall through to the default arm and are counted as blocked.
+func TestWriteChanBufferDecouplesSendersFromProtoWriter(t *testing.T) {
+	const bufferSize = writeChanBufferSize
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := New(ctx, "test-node")
+
+	sess := &slowBackendSession{delay: time.Hour, closed: make(chan struct{})}
+	defer sess.Close()
+
+	ci := &connInfo{
+		Context:          ctx,
+		CancelFunc:       cancel,
+		ReadChan:         make(chan []byte),
+		WriteChan:        make(chan []byte, bufferSize),
+		lastReceivedLock: &sync.RWMutex{},
+		logger:           s.Logger,
+	}
+	go ci.protoWriter(sess)
+
+	blocked := 0
+	for range bufferSize {
+		select {
+		case ci.WriteChan <- []byte("payload"):
+		default:
+			blocked++
+		}
+	}
+
+	if blocked > 0 {
+		t.Errorf("%d/%d sends blocked: buffer did not decouple senders from the slow writer", blocked, bufferSize)
+	}
+}

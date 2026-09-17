@@ -42,6 +42,11 @@ const defaultMaxForwardingHops = 30
 // defaultMaxConnectionIdleTime is the maximum time a connection can go without data before we consider it failed.
 const defaultMaxConnectionIdleTime = 2*defaultRouteUpdateTime + 1*time.Second
 
+// writeChanBufferSize is the number of outbound messages that can queue per connection before senders block.
+// Raise this if the "dropping queued message(s)" warning fires frequently under normal load;
+// lower it if per-connection memory pressure is a concern (worst case: writeChanBufferSize × defaultMTU bytes).
+const writeChanBufferSize = 128
+
 // MainInstance is the global instance of Netceptor instantiated by the command-line main() function.
 var MainInstance *Netceptor
 
@@ -1587,6 +1592,15 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
 		select {
 		case <-ci.Context.Done():
+			dropped := 0
+			for len(ci.WriteChan) > 0 {
+				<-ci.WriteChan
+				dropped++
+			}
+			if dropped > 0 {
+				ci.logger.Warning("dropping %d queued message(s): connection closed before delivery\n", dropped)
+			}
+
 			return
 		case message, more := <-ci.WriteChan:
 			if !more {
@@ -1703,7 +1717,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 	}()
 	ci := &connInfo{
 		ReadChan:         make(chan []byte),
-		WriteChan:        make(chan []byte),
+		WriteChan:        make(chan []byte, writeChanBufferSize),
 		Cost:             connectionCost,
 		lastReceivedLock: &sync.RWMutex{},
 		logger:           s.Logger,

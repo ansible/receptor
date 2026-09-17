@@ -399,8 +399,8 @@ type streamAction int
 
 const (
 	streamContinueInner streamAction = iota // continue the inner line-reader loop
-	streamContinueMain                       // break out to the outer reconnect loop
-	streamReturn                             // return from the goroutine entirely
+	streamContinueMain                      // break out to the outer reconnect loop
+	streamReturn                            // return from the goroutine entirely
 )
 
 // retryGetPod fetches the pod with exponential back-off, updating kw.Pod on success.
@@ -707,9 +707,9 @@ func (kw *KubeUnit) buildPodSpec(ked *KubeExtraData, command, params []string) (
 	if pod.Name != "" {
 		kw.namePrefix = pod.Name + "-"
 	}
-	pod.ObjectMeta.Name = ""
-	pod.ObjectMeta.GenerateName = kw.namePrefix
-	pod.ObjectMeta.Namespace = ked.KubeNamespace
+	pod.Name = ""
+	pod.GenerateName = kw.namePrefix
+	pod.Namespace = ked.KubeNamespace
 
 	return pod, nil
 }

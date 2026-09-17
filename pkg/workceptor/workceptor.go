@@ -591,18 +591,19 @@ func (w *Workceptor) streamStdoutToChannel(ctx context.Context, stdout *os.File,
 			}
 		}
 	afterInner:
-		if err == io.EOF {
+		switch {
+		case err == io.EOF:
 			unitStatus := unit.Status()
 			if IsComplete(unitStatus.State) && filePos >= unitStatus.StdoutSize {
 				w.nc.GetLogger().Debug("Stdout complete - closing channel for: %s \n", unitID)
 
 				return
 			}
-		} else if err != nil && err != ctx.Err() && err != io.ErrUnexpectedEOF {
+		case err != nil && err != ctx.Err() && err != io.ErrUnexpectedEOF:
 			w.nc.GetLogger().Error("Error reading stdout: %s\n", err)
 
 			return
-		} else if err != nil {
+		case err != nil:
 			return
 		}
 	}

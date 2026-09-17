@@ -322,6 +322,7 @@ func parseCommand(cmdBytes []byte) (cmd string, params string, jsonData map[stri
 func (s *Server) lookupControlType(cmd string) ControlCommandType {
 	s.controlFuncLock.RLock()
 	defer s.controlFuncLock.RUnlock()
+
 	return s.controlTypes[cmd]
 }
 

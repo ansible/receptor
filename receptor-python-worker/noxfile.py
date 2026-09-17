@@ -8,7 +8,7 @@ def coverage(session: nox.Session):
     """
     Run receptor-python-worker tests with code coverage
     """
-    session.install("-e", ".[test]")
+    session.install("setuptools", "-e", ".[test]")
     session.run(
         "pytest",
         "--cov=receptor_python_worker",
@@ -27,5 +27,5 @@ def tests(session: nox.Session):
     """
     Run receptor-python-worker tests
     """
-    session.install("-e", ".[test]")
+    session.install("setuptools", "-e", ".[test]")
     session.run("pytest", "-v", "tests", *session.posargs)

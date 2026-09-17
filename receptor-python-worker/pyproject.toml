@@ -17,6 +17,7 @@ fallback_version = "0.0.0"
 test = [
   "pytest",
   "pytest-cov",
+  "setuptools",
 ]
 
 [project.scripts]

@@ -20,5 +20,11 @@ test = [
   "setuptools",
 ]
 
+[tool.coverage.run]
+relative_files = true
+
+[tool.coverage.report]
+skip_empty = true
+
 [project.scripts]
 receptor-python-worker = "receptor_python_worker:run"

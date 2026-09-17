@@ -1,20 +1,30 @@
 import nox
+import os
 
 LATEST_PYTHON_VERSION = ["3.12"]
+
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 @nox.session(python=False)
 def coverage(session: nox.Session):
     """
-    Run receptor-python-worker tests with code coverage
+    Run receptor-python-worker tests with code coverage.
+
+    Must be invoked from the repo root so that coverage filenames are
+    workspace-root-relative, which is what SonarCloud's sonar.sources=. expects:
+
+        nox -f receptor-python-worker/noxfile.py --session coverage
     """
-    session.run("python", "-m", "pip", "install", "-e", ".[test]", "setuptools", external=True)
+    session.run("python", "-m", "pip", "install", "setuptools",
+                f"{_PACKAGE_DIR}[test]", external=True)
     session.run(
         "python", "-m", "pytest",
         "--cov=receptor_python_worker",
+        f"--cov-config={_PACKAGE_DIR}/pyproject.toml",
         "--cov-report", "term-missing:skip-covered",
-        "--cov-report", "xml:python_worker_coverage.xml",
-        "tests",
+        "--cov-report", "xml:receptor-python-worker/python_worker_coverage.xml",
+        f"{_PACKAGE_DIR}/tests",
         *session.posargs,
         external=True,
     )
@@ -25,5 +35,5 @@ def tests(session: nox.Session):
     """
     Run receptor-python-worker tests
     """
-    session.install("setuptools", "-e", ".[test]")
-    session.run("pytest", "-v", "tests", *session.posargs)
+    session.install("setuptools", f"{_PACKAGE_DIR}[test]")
+    session.run("pytest", "-v", f"{_PACKAGE_DIR}/tests", *session.posargs)

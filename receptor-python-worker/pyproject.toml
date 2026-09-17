@@ -21,9 +21,6 @@ test = [
   "setuptools>=69.0.0",
 ]
 
-[tool.coverage.run]
-relative_files = true
-
 [tool.coverage.report]
 skip_empty = true
 

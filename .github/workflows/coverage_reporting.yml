@@ -71,6 +71,13 @@ jobs:
           r = ET.parse('receptorctl/receptorctl_coverage.xml').getroot()
           w = ET.parse('receptor-python-worker/python_worker_coverage.xml').getroot()
 
+          # Append python-worker <source> entries so SonarCloud can resolve
+          # the short filenames (e.g. "work.py") against the correct base dir,
+          # exactly like it does for the receptorctl entries.
+          r_sources = r.find('sources')
+          for src in w.find('sources'):
+              r_sources.append(src)
+
           r_pkgs = r.find('packages')
           for pkg in w.find('packages'):
               r_pkgs.append(pkg)
@@ -83,9 +90,8 @@ jobs:
           r.set('line-rate', f'{covered/total:.4f}' if total else '0')
 
           ET.indent(r)
-          tree = ET.ElementTree(r)
-          tree.write('receptorctl/receptorctl_coverage.xml',
-                     xml_declaration=True, encoding='unicode')
+          ET.ElementTree(r).write('receptorctl/receptorctl_coverage.xml',
+                                  xml_declaration=True, encoding='unicode')
           print('Merged receptor-python-worker coverage into receptorctl_coverage.xml')
           EOF
 

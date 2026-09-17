@@ -318,22 +318,78 @@ func parseCommand(cmdBytes []byte) (cmd string, params string, jsonData map[stri
 	return cmd, params, jsonData, err
 }
 
+// lookupControlType returns the ControlCommandType registered for cmd, or nil.
+func (s *Server) lookupControlType(cmd string) ControlCommandType {
+	s.controlFuncLock.RLock()
+	defer s.controlFuncLock.RUnlock()
+	return s.controlTypes[cmd]
+}
+
+// initControlCommand initialises a ControlCommand from either a plain string or
+// a JSON object, depending on which was supplied.
+func initControlCommand(ct ControlCommandType, params string, jsonData map[string]interface{}) (ControlCommand, error) {
+	if jsonData == nil {
+		return ct.InitFromString(params)
+	}
+
+	return ct.InitFromJSON(jsonData)
+}
+
+// sendJSONResponse marshals cfr and writes it to conn. Returns true when the
+// caller should close the session.
+func (s *Server) sendJSONResponse(conn net.Conn, cfr map[string]interface{}) bool {
+	rbytes, err := json.Marshal(cfr)
+	if err != nil {
+		writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
+
+		return writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError)
+	}
+	rbytes = append(rbytes, '\n')
+
+	return writeToConnWithLog(conn, s.nc, string(rbytes), writeControlServiceError)
+}
+
+// dispatchControlCommand looks up cmd, initialises it, executes it, and writes
+// the response. Returns true when the caller should close the session.
+func (s *Server) dispatchControlCommand(conn net.Conn, cmd, params string, jsonData map[string]interface{}) bool {
+	ct := s.lookupControlType(cmd)
+	if ct == nil {
+		writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
+
+		return writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError)
+	}
+	cc, err := initControlCommand(ct, params, jsonData)
+	if err == nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		var cfr map[string]interface{}
+		cfr, err = cc.ControlFunc(ctx, s.nc, NewSockControl(conn))
+		if err == nil && cfr != nil {
+			return s.sendJSONResponse(conn, cfr)
+		}
+	}
+	if err != nil {
+		errorNormal(s.nc, "", err)
+
+		return writeToConnWithLog(conn, s.nc, fmt.Sprintf("ERROR: %s\n", err), writeControlServiceError)
+	}
+
+	return false
+}
+
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
 	s.nc.GetLogger().Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
 	defer func() {
 		s.nc.GetLogger().Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
 		if conn != nil {
-			err := conn.Close()
-			if err != nil {
+			if err := conn.Close(); err != nil {
 				s.nc.GetLogger().Warning("Could not close connection: %s\n", err)
 			}
 		}
 	}()
 
-	writeMsg := fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())
-	logMsg := "Could not write in control service"
-	if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+	if writeToConnWithLog(conn, s.nc, fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID()), "Could not write in control service") {
 		return
 	}
 
@@ -349,66 +405,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		if len(cmdBytes) == 0 {
 			continue
 		}
-
 		cmd, params, jsonData, err := parseCommand(cmdBytes)
 		if err != nil {
-			writeMsg := fmt.Sprintf("ERROR: %s\n", err)
-			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
+			if writeToConnWithLog(conn, s.nc, fmt.Sprintf("ERROR: %s\n", err), writeControlServiceError) {
 				return
 			}
 		}
-		s.controlFuncLock.RLock()
-		var ct ControlCommandType
-		for f := range s.controlTypes {
-			if f == cmd {
-				ct = s.controlTypes[f]
-
-				break
-			}
-		}
-		s.controlFuncLock.RUnlock()
-		if ct != nil {
-			cfo := NewSockControl(conn)
-
-			var cfr map[string]interface{}
-			var cc ControlCommand
-			var err error
-			if jsonData == nil {
-				cc, err = ct.InitFromString(params)
-			} else {
-				cc, err = ct.InitFromJSON(jsonData)
-			}
-			if err == nil {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
-			}
-			if err != nil {
-				errorNormal(s.nc, "", err)
-
-				writeMsg := fmt.Sprintf("ERROR: %s\n", err)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			} else if cfr != nil {
-				rbytes, err := json.Marshal(cfr)
-				if err != nil {
-					writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
-					if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-						return
-					}
-				}
-				rbytes = append(rbytes, '\n')
-				writeMsg := string(rbytes)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			}
-		} else {
-			writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
-			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-				return
-			}
+		if s.dispatchControlCommand(conn, cmd, params, jsonData) {
+			return
 		}
 	}
 }

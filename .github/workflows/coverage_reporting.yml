@@ -60,8 +60,8 @@ jobs:
         run: nox --no-install --session coverage
         working-directory: ./receptorctl
 
-      - name: Run `receptor-python-worker` nox coverage session
-        run: nox -f receptor-python-worker/noxfile.py --session coverage
+      - name: Run receptor-python-worker coverage
+        run: bash receptor-python-worker/run_coverage.sh
 
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v7

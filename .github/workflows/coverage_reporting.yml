@@ -61,7 +61,7 @@ jobs:
         working-directory: ./receptorctl
 
       - name: Run receptor-python-worker coverage
-        run: bash receptor-python-worker/run_coverage.sh
+        run: bash receptor-python-worker/run_coverage.sh # NOSONAR
 
       - name: Merge python-worker coverage into receptorctl coverage XML
         run: |

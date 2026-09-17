@@ -1260,105 +1260,120 @@ func (s *Netceptor) sendRoutingUpdate(suspectedDuplicate uint64) {
 }
 
 // Processes a routing update received from a connection.
+// handleSelfOriginatedUpdate processes a routing update whose NodeID matches
+// our own. Returns true when the caller should stop processing the update.
+func (s *Netceptor) handleSelfOriginatedUpdate(ri *routingUpdate, recvConn string) bool {
+	if ri.UpdateEpoch == s.epoch {
+		return true
+	}
+	if ri.SuspectedDuplicate == s.epoch {
+		s.Logger.Error("We are a duplicate node with ID %s and epoch %d.  Shutting down.\n", s.nodeID, s.epoch)
+		s.Shutdown()
+
+		return true
+	}
+	if ri.UpdateEpoch > s.epoch {
+		s.Logger.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
+		s.sendRoutingUpdate(ri.UpdateEpoch)
+	}
+
+	return true
+}
+
+// recordSeenUpdate records the update ID in the seen-updates map.
+// Returns true if the update was already seen (caller should skip it).
+func (s *Netceptor) recordSeenUpdate(updateID string) bool {
+	s.seenUpdatesLock.Lock()
+	defer s.seenUpdatesLock.Unlock()
+	if _, seen := s.seenUpdates[updateID]; seen {
+		return true
+	}
+	s.seenUpdates[updateID] = time.Now()
+
+	return false
+}
+
+// handleSuspectedDuplicateUpdate processes a routing update where the sender
+// suspects a duplicate node, updating our nodeInfo if the epoch matches.
+func (s *Netceptor) handleSuspectedDuplicateUpdate(ri *routingUpdate) {
+	s.Logger.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n",
+		ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
+	s.knownNodeLock.Lock()
+	defer s.knownNodeLock.Unlock()
+	ni, ok := s.knownNodeInfo[ri.NodeID]
+	if ok && ni.Epoch == ri.SuspectedDuplicate {
+		s.knownNodeInfo[ri.NodeID].Epoch = ri.UpdateEpoch
+		s.knownNodeInfo[ri.NodeID].Sequence = ri.UpdateSequence
+	}
+}
+
+// applyNormalRoutingUpdate validates epoch/sequence, updates nodeInfo and
+// connection costs. Returns (changed, shouldReturn).
+func (s *Netceptor) applyNormalRoutingUpdate(ri *routingUpdate, recvConn string) (bool, bool) {
+	s.Logger.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
+	s.knownNodeLock.Lock()
+	ni, known := s.knownNodeInfo[ri.NodeID]
+	if known {
+		if ri.UpdateEpoch < ni.Epoch || (ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence) {
+			s.knownNodeLock.Unlock()
+
+			return false, true
+		}
+	} else {
+		select {
+		case <-s.context.Done():
+			s.knownNodeLock.Unlock()
+
+			return false, true
+		case s.sendRouteFloodChan <- 0:
+		}
+		ni = &nodeInfo{}
+	}
+	ni.Epoch = ri.UpdateEpoch
+	ni.Sequence = ri.UpdateSequence
+	changed := !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID])
+	if !known {
+		_ = s.AddNameHash(ri.NodeID)
+	}
+	s.knownNodeInfo[ri.NodeID] = ni
+	if changed {
+		s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
+		for k, v := range ri.Connections {
+			s.knownConnectionCosts[ri.NodeID][k] = v
+		}
+		for conn := range s.knownConnectionCosts {
+			if conn == s.nodeID {
+				continue
+			}
+			if _, inRI := ri.Connections[conn]; !inRI {
+				delete(s.knownConnectionCosts[conn], ri.NodeID)
+			}
+		}
+	}
+	s.knownNodeLock.Unlock()
+
+	return changed, false
+}
+
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	if ri.NodeID == "" {
-		// Our peer is still trying to initialize
-		return
+		return // peer still initializing
 	}
 	if ri.NodeID == s.nodeID {
-		if ri.UpdateEpoch == s.epoch {
-			return
-		}
-		if ri.SuspectedDuplicate == s.epoch {
-			// We are the duplicate!
-			s.Logger.Error("We are a duplicate node with ID %s and epoch %d.  Shutting down.\n", s.nodeID, s.epoch)
-			s.Shutdown()
-
-			return
-		}
-		if ri.UpdateEpoch > s.epoch {
-			// Update has our node ID but a newer epoch - so if clocks are in sync they are a duplicate
-			s.Logger.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
-			// Send routing update noting our suspicion
-			s.sendRoutingUpdate(ri.UpdateEpoch)
-
-			return
-		}
+		s.handleSelfOriginatedUpdate(ri, recvConn)
 
 		return
 	}
-	s.seenUpdatesLock.Lock()
-	_, ok := s.seenUpdates[ri.UpdateID]
-	if ok {
-		s.seenUpdatesLock.Unlock()
-
+	if s.recordSeenUpdate(ri.UpdateID) {
 		return
 	}
-	s.seenUpdates[ri.UpdateID] = time.Now()
-	s.seenUpdatesLock.Unlock()
 	if ri.SuspectedDuplicate != 0 {
-		s.Logger.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
-		s.knownNodeLock.Lock()
-		ni, ok := s.knownNodeInfo[ri.NodeID]
-		if ok {
-			if ni.Epoch == ri.SuspectedDuplicate {
-				s.knownNodeInfo[ri.NodeID].Epoch = ri.UpdateEpoch
-				s.knownNodeInfo[ri.NodeID].Sequence = ri.UpdateSequence
-			}
-		}
-		s.knownNodeLock.Unlock()
+		s.handleSuspectedDuplicateUpdate(ri)
 	} else {
-		s.Logger.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
-		s.knownNodeLock.Lock()
-		ni, ok := s.knownNodeInfo[ri.NodeID]
-		if ok {
-			if ri.UpdateEpoch < ni.Epoch {
-				s.knownNodeLock.Unlock()
-
-				return
-			}
-			if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence {
-				s.knownNodeLock.Unlock()
-
-				return
-			}
-		} else {
-			select {
-			case <-s.context.Done():
-				s.knownNodeLock.Unlock()
-
-				return
-			case s.sendRouteFloodChan <- 0:
-			}
-			ni = &nodeInfo{}
+		changed, shouldReturn := s.applyNormalRoutingUpdate(ri, recvConn)
+		if shouldReturn {
+			return
 		}
-		ni.Epoch = ri.UpdateEpoch
-		ni.Sequence = ri.UpdateSequence
-		changed := false
-		if !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID]) {
-			changed = true
-		}
-		_, ok = s.knownNodeInfo[ri.NodeID]
-		if !ok {
-			_ = s.AddNameHash(ri.NodeID)
-		}
-		s.knownNodeInfo[ri.NodeID] = ni
-		if changed {
-			s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
-			for k, v := range ri.Connections {
-				s.knownConnectionCosts[ri.NodeID][k] = v
-			}
-			for conn := range s.knownConnectionCosts {
-				if conn == s.nodeID {
-					continue
-				}
-				_, ok = ri.Connections[conn]
-				if !ok {
-					delete(s.knownConnectionCosts[conn], ri.NodeID)
-				}
-			}
-		}
-		s.knownNodeLock.Unlock()
 		if changed {
 			select {
 			case <-s.context.Done():

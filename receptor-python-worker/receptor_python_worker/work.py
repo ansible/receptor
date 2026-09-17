@@ -15,7 +15,7 @@ sys.modules['receptor'] = sys.modules[__package__+'.plugin_utils']
 # Allowlist pattern for plugin directives: "namespace:function" where both parts are
 # restricted to alphanumerics and underscores. This blocks shell metacharacters,
 # path separators, and other injection vectors before the string reaches entry_points().
-_PLUGIN_DIRECTIVE_RE = re.compile(r'^[A-Za-z0-9_]+:[A-Za-z0-9_]+$')
+_PLUGIN_DIRECTIVE_RE = re.compile(r'^\w+:\w+$', re.ASCII)
 
 
 def validate_plugin_directive(directive):

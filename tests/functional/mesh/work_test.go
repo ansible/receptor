@@ -870,15 +870,10 @@ func TestWorkAdopt(t *testing.T) {
 				t.Errorf("local unitID (%s) should match remote unitID (%s)", localUnitID, remoteUnitID)
 			}
 
-			// Second adopt - should be idempotent
-			response2, err := controllers["node2"].WorkAdopt("node3", remoteUnitID)
-			if err != nil {
-				t.Fatal(err, m.GetDataDir())
-			}
-
-			result2 := response2["result"].(string)
-			if result2 != "Already Adopted" {
-				t.Fatalf("expected 'Already Adopted' on second call, got: %s", result2)
+			// Second adopt should fail
+			_, err = controllers["node2"].WorkAdopt("node3", remoteUnitID)
+			if !strings.Contains(err.Error(), "already in use") {
+				t.Fatal("Expected second adopt command to fail", m.GetDataDir())
 			}
 
 			// Wait for work to complete

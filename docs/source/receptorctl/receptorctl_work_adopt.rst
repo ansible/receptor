@@ -65,7 +65,7 @@ The ``work adopt`` command is useful when multiple nodes need to monitor the sam
    # Node B can adopt the same work unit to monitor it
    receptorctl --socket /tmp/nodeB.sock work adopt --node nodeC --follow abc-123
 
-The ``work adopt`` command is idempotent. Running it multiple times with the same unit ID will not create duplicate monitoring sessions.
+The ``work adopt`` command is *not* idempotent. Running a second adopt command targeting the same unit ID will fail.
 
 .. note::
    The work unit must already exist and be running on the remote node. The ``work adopt`` command does not submit new work; it only attaches to existing work units.

@@ -16,12 +16,11 @@ def coverage(session: nox.Session):
 
         nox -f receptor-python-worker/noxfile.py --session coverage
     """
-    session.run("python", "-m", "pip", "install", "setuptools",
-                f"{_PACKAGE_DIR}[test]", external=True)
+    session.run("pip", "install", "setuptools", "-e", f"{_PACKAGE_DIR}[test]", external=True)
     session.run(
         "python", "-m", "pytest",
         "--cov=receptor_python_worker",
-        f"--cov-config={_PACKAGE_DIR}/pyproject.toml",
+        f"--cov-config={os.path.relpath(os.path.join(_PACKAGE_DIR, 'pyproject.toml'))}",
         "--cov-report", "term-missing:skip-covered",
         "--cov-report", "xml:receptor-python-worker/python_worker_coverage.xml",
         f"{_PACKAGE_DIR}/tests",
@@ -35,5 +34,5 @@ def tests(session: nox.Session):
     """
     Run receptor-python-worker tests
     """
-    session.install("setuptools", f"{_PACKAGE_DIR}[test]")
+    session.run("pip", "install", "setuptools", "-e", f"{_PACKAGE_DIR}[test]", external=True)
     session.run("pytest", "-v", f"{_PACKAGE_DIR}/tests", *session.posargs)

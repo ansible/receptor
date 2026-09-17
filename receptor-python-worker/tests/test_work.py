@@ -344,3 +344,46 @@ class TestModuleRun:
         assert exc.value.code == 0
         data = json.loads((tmp_path / "status").read_text())
         assert data["State"] == WorkStateFailed
+
+    def test_signal_handler_save_status_raises_exits_1(self, tmp_path):
+        """Lines 171-173: save_status raises inside signal_handler → exit(1)."""
+        _make_unitdir(tmp_path)
+        action = MagicMock()
+        action.receptor_export = True
+        action.payload_type = BYTES_PAYLOAD
+
+        def slow_action(payload, config, q):
+            import os
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        action.side_effect = slow_action
+        worker = MagicMock()
+        worker.fn = action
+        ep = MagicMock()
+        ep.name = "ns"
+        ep.load.return_value = worker
+        with patch.object(sys, "argv", ["prog", "ns:fn", str(tmp_path), "{}"]):
+            with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
+                with patch.object(WorkPluginRunner, "save_status", side_effect=OSError("disk full")):
+                    with pytest.raises(SystemExit) as exc:
+                        work.run()
+        assert exc.value.code == 1
+
+    def test_run_save_status_raises_on_worker_exception_exits_1(self, tmp_path):
+        """Lines 188-190: save_status raises when handling a worker exception → exit(1)."""
+        _make_unitdir(tmp_path)
+        action = MagicMock()
+        action.receptor_export = True
+        action.payload_type = BYTES_PAYLOAD
+        action.side_effect = RuntimeError("worker blew up")
+        worker = MagicMock()
+        worker.fn = action
+        ep = MagicMock()
+        ep.name = "ns"
+        ep.load.return_value = worker
+        with patch.object(sys, "argv", ["prog", "ns:fn", str(tmp_path), "{}"]):
+            with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
+                with patch.object(WorkPluginRunner, "save_status", side_effect=OSError("disk full")):
+                    with pytest.raises(SystemExit) as exc:
+                        work.run()
+        assert exc.value.code == 1

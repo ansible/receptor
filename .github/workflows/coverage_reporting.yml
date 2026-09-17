@@ -63,6 +63,32 @@ jobs:
       - name: Run receptor-python-worker coverage
         run: bash receptor-python-worker/run_coverage.sh
 
+      - name: Merge python-worker coverage into receptorctl coverage XML
+        run: |
+          python3 - <<'EOF'
+          import xml.etree.ElementTree as ET
+
+          r = ET.parse('receptorctl/receptorctl_coverage.xml').getroot()
+          w = ET.parse('receptor-python-worker/python_worker_coverage.xml').getroot()
+
+          r_pkgs = r.find('packages')
+          for pkg in w.find('packages'):
+              r_pkgs.append(pkg)
+
+          for attr in ('lines-valid', 'lines-covered', 'branches-valid', 'branches-covered'):
+              r.set(attr, str(int(r.get(attr, 0)) + int(w.get(attr, 0))))
+
+          total = int(r.get('lines-valid', 0))
+          covered = int(r.get('lines-covered', 0))
+          r.set('line-rate', f'{covered/total:.4f}' if total else '0')
+
+          ET.indent(r)
+          tree = ET.ElementTree(r)
+          tree.write('receptorctl/receptorctl_coverage.xml',
+                     xml_declaration=True, encoding='unicode')
+          print('Merged receptor-python-worker coverage into receptorctl_coverage.xml')
+          EOF
+
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v7
         if: github.event_name == 'push' && github.repository == 'ansible/receptor'

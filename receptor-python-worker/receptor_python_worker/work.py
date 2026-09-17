@@ -6,7 +6,7 @@ import signal
 import queue
 from pathlib import Path
 import json
-import pkg_resources
+from importlib.metadata import entry_points
 from .plugin_utils import BUFFER_PAYLOAD, BYTES_PAYLOAD, FILE_PAYLOAD
 
 # Allow existing worker plugins to "import receptor" and get our version of plugin_utils
@@ -14,7 +14,7 @@ sys.modules['receptor'] = sys.modules[__package__+'.plugin_utils']
 
 # Allowlist pattern for plugin directives: "namespace:function" where both parts are
 # restricted to alphanumerics and underscores. This blocks shell metacharacters,
-# path separators, and other injection vectors before the string reaches pkg_resources.
+# path separators, and other injection vectors before the string reaches entry_points().
 _PLUGIN_DIRECTIVE_RE = re.compile(r'^[A-Za-z0-9_]+:[A-Za-z0-9_]+$')
 
 
@@ -99,15 +99,14 @@ class WorkPluginRunner:
         self.shutting_down = False
 
     def load_plugin(self):
-        entry_points = [
+        eps = [
             x
-            for x in filter(
-                lambda x: x.name == self.plugin_namespace, pkg_resources.iter_entry_points("receptor.worker")
-            )
+            for x in entry_points(group="receptor.worker")
+            if x.name == self.plugin_namespace
         ]
-        if not entry_points:
+        if not eps:
             raise ValueError(f"Plugin {self.plugin_namespace} not found")
-        self.plugin_worker = entry_points[0].load()
+        self.plugin_worker = eps[0].load()
         self.plugin_action_method = getattr(self.plugin_worker, self.plugin_action, False)
         if not self.plugin_action_method:
             raise ValueError(f"Function {self.plugin_action} does not exist in {self.plugin_namespace}")

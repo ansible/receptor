@@ -102,7 +102,7 @@ class TestLoadPlugin:
 
     def test_plugin_not_found(self, tmp_path):
         wpr = _make_wpr(tmp_path)
-        with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[]):
+        with patch("receptor_python_worker.work.entry_points", return_value=[]):
             with pytest.raises(ValueError, match="not found"):
                 wpr.load_plugin()
 
@@ -112,7 +112,7 @@ class TestLoadPlugin:
         ep = MagicMock()
         ep.name = "myplugin"
         ep.load.return_value = worker
-        with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[ep]):
+        with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
             with pytest.raises(ValueError, match="does not exist"):
                 wpr.load_plugin()
 
@@ -125,7 +125,7 @@ class TestLoadPlugin:
         ep = MagicMock()
         ep.name = "myplugin"
         ep.load.return_value = worker
-        with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[ep]):
+        with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
             with pytest.raises(ValueError, match="Not allowed"):
                 wpr.load_plugin()
 
@@ -139,7 +139,7 @@ class TestLoadPlugin:
         ep = MagicMock()
         ep.name = "myplugin"
         ep.load.return_value = worker
-        with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[ep]):
+        with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
             wpr.load_plugin()
         assert wpr.plugin_action_method is action
         assert wpr.payload_input_type == BYTES_PAYLOAD
@@ -153,7 +153,7 @@ class TestLoadPlugin:
         ep = MagicMock()
         ep.name = "myplugin"
         ep.load.return_value = worker
-        with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[ep]):
+        with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
             wpr.load_plugin()
         assert wpr.payload_input_type == BYTES_PAYLOAD
 
@@ -299,7 +299,7 @@ class TestModuleRun:
     def test_load_plugin_failure_exits(self, tmp_path):
         _make_unitdir(tmp_path)
         with patch.object(sys, "argv", ["prog", "ns:fn", str(tmp_path), "{}"]):
-            with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[]):
+            with patch("receptor_python_worker.work.entry_points", return_value=[]):
                 with pytest.raises(SystemExit) as exc:
                     work.run()
                 assert exc.value.code == 0  # saves status and exits 0
@@ -315,7 +315,7 @@ class TestModuleRun:
         ep.name = "ns"
         ep.load.return_value = worker
         with patch.object(sys, "argv", ["prog", "ns:fn", str(tmp_path), "{}"]):
-            with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[ep]):
+            with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
                 work.run()
         data = json.loads((tmp_path / "status").read_text())
         assert data["State"] == WorkStateSucceeded
@@ -338,7 +338,7 @@ class TestModuleRun:
         ep.name = "ns"
         ep.load.return_value = worker
         with patch.object(sys, "argv", ["prog", "ns:fn", str(tmp_path), "{}"]):
-            with patch("receptor_python_worker.work.pkg_resources.iter_entry_points", return_value=[ep]):
+            with patch("receptor_python_worker.work.entry_points", return_value=[ep]):
                 with pytest.raises(SystemExit) as exc:
                     work.run()
         assert exc.value.code == 0

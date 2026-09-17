@@ -60,11 +60,17 @@ jobs:
         run: nox --no-install --session coverage
         working-directory: ./receptorctl
 
-      - name: Provision nox environment for receptor-python-worker coverage
-        run: nox -f receptor-python-worker/noxfile.py --install-only --session coverage
+      - name: Install receptor-python-worker test dependencies
+        run: pip install setuptools -e "receptor-python-worker/[test]"
 
-      - name: Run `receptor-python-worker` nox coverage session
-        run: nox -f receptor-python-worker/noxfile.py --no-install --session coverage
+      - name: Run receptor-python-worker pytest with coverage
+        run: |
+          python -m pytest \
+            --cov=receptor_python_worker \
+            --cov-config=receptor-python-worker/pyproject.toml \
+            --cov-report term-missing:skip-covered \
+            --cov-report xml:receptor-python-worker/python_worker_coverage.xml \
+            receptor-python-worker/tests/
 
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v7

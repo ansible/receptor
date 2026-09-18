@@ -5,7 +5,7 @@ work adopt
 .. contents::
    :local:
 
-``receptorctl work adopt`` attaches to an already-running unit of work on a remote Receptor node, allowing a node to monitor and retrieve results from work that was submitted by another node.
+``receptorctl work adopt`` attaches to an already-running unit of work on a remote Receptor node, allowing a node to co-own that unit of work. It can monitor and retrieve results from work that was submitted to another node.
 
 Command syntax: ``receptorctl --socket=<socket_path> work adopt [<<Options>>] --node <<Node ID>> <<Unit ID>>``
 

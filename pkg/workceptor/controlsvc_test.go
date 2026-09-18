@@ -400,36 +400,36 @@ func Test_boolFromMap(t *testing.T) {
 
 func Test_workceptorCommandTypeInitFromString_AdoptParams(t *testing.T) {
 	tests := []struct {
-		name           string
-		params         string
-		wantNode       string
-		wantUnitID     string
+		name            string
+		params          string
+		wantNode        string
+		wantUnitID      string
 		wantExtraParams string
-		wantErr        bool
+		wantErr         bool
 	}{
 		{
-			name:           "Adopt without extra params",
-			params:         "adopt node1 unit123",
-			wantNode:       "node1",
-			wantUnitID:     "unit123",
+			name:            "Adopt without extra params",
+			params:          "adopt node1 unit123",
+			wantNode:        "node1",
+			wantUnitID:      "unit123",
 			wantExtraParams: "",
-			wantErr:        false,
+			wantErr:         false,
 		},
 		{
-			name:           "Adopt with single extra param",
-			params:         "adopt node1 unit123 signature=abc123",
-			wantNode:       "node1",
-			wantUnitID:     "unit123",
+			name:            "Adopt with single extra param",
+			params:          "adopt node1 unit123 signature=abc123",
+			wantNode:        "node1",
+			wantUnitID:      "unit123",
 			wantExtraParams: "signature=abc123",
-			wantErr:        false,
+			wantErr:         false,
 		},
 		{
-			name:           "Adopt with multiple extra params",
-			params:         "adopt node1 unit123 param1 param2 param3",
-			wantNode:       "node1",
-			wantUnitID:     "unit123",
+			name:            "Adopt with multiple extra params",
+			params:          "adopt node1 unit123 param1 param2 param3",
+			wantNode:        "node1",
+			wantUnitID:      "unit123",
 			wantExtraParams: "param1 param2 param3",
-			wantErr:        false,
+			wantErr:         false,
 		},
 	}
 
@@ -439,6 +439,7 @@ func Test_workceptorCommandTypeInitFromString_AdoptParams(t *testing.T) {
 			got, err := tr.InitFromString(tt.params)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("InitFromString() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if got == nil {
@@ -525,6 +526,7 @@ func Test_workceptorCommandTypeInitFromString_ResultsStartpos(t *testing.T) {
 			got, err := tr.InitFromString(tt.params)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("InitFromString() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if got == nil {
@@ -604,6 +606,7 @@ func Test_workceptorCommandTypeInitFromJSON_AdoptParams(t *testing.T) {
 			got, err := tr.InitFromJSON(tt.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("InitFromJSON() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if got == nil {
@@ -725,6 +728,7 @@ func Test_workceptorCommandTypeInitFromJSON_ResultsStartpos(t *testing.T) {
 			got, err := tr.InitFromJSON(tt.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("InitFromJSON() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
 			if got == nil {

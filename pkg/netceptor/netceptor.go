@@ -508,7 +508,7 @@ func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*BackendInfo))
 	for _, mod := range modifiers {
 		mod(bi)
 	}
-	ctxBackend, cancel := context.WithCancel(s.context) //nolint:gosec // G118: cancel is stored in s.backendCancel
+	ctxBackend, cancel := context.WithCancel(s.context)
 	s.backendCancel = append(s.backendCancel, cancel)
 	// Start() runs a go routine that attempts establish a session over this
 	// backend. For listeners, each time a peer dials this backend, sessChan is

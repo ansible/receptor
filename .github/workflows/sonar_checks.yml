@@ -41,6 +41,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
+      - name: Fetch python-worker coverage report
+        uses: actions/download-artifact@v8
+        with:
+          name: python-worker-coverage-report
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
       - name: Fetch PR Number
         uses: actions/download-artifact@v8
         with:
@@ -87,4 +95,4 @@ jobs:
             -Dsonar.pullrequest.branch=${{ env.PR_HEAD }}
             -Dsonar.pullrequest.base=${{ env.PR_BASE }}
             -Dsonar.go.coverage.reportPaths=coverage.txt
-            -Dsonar.python.coverage.reportPaths=receptorctl_coverage.xml
+            -Dsonar.python.coverage.reportPaths=receptorctl_coverage.xml,python_worker_coverage.xml

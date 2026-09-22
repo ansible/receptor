@@ -98,74 +98,60 @@ func cmdWaiter(cmd *exec.Cmd, doneChan chan bool) {
 	doneChan <- true
 }
 
-// commandRunner is run in a separate process, to monitor the subprocess and report back metadata.
-func commandRunner(command string, params string, unitdir string) error {
-	status := StatusFileData{}
-	status.ExtraData = &CommandExtraData{}
-	statusFilename := path.Join(unitdir, "status")
-	err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0)
-	if err != nil {
-		MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
-	}
-	var cmd *exec.Cmd
+// buildCmd constructs an exec.Cmd from the command string and optional params.
+func buildCmd(command, params string) (*exec.Cmd, error) {
 	if params == "" {
-		cmd = exec.Command(command) //nolint:gosec,noctx // G702: command execution is core functionality
-	} else {
-		paramList, err := shlex.Split(params)
-		if err != nil {
-			return err
-		}
-		cmd = exec.Command(command, paramList...) //nolint:gosec,noctx // G702: command execution is core functionality
+		return exec.Command(command), nil //nolint:gosec,noctx // G702: command execution is core functionality
 	}
-	termChan := make(chan os.Signal, 1)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	paramList, err := shlex.Split(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return exec.Command(command, paramList...), nil //nolint:gosec,noctx // G702: command execution is core functionality
+}
+
+// wireStdin attaches the stdin file to cmd, logging the payload when debug tracing is enabled.
+// Returns the opened stdin file so the caller can close it later.
+func wireStdin(cmd *exec.Cmd, unitdir string, payloadDebug int) (*os.File, error) {
 	stdin, err := os.Open(path.Join(unitdir, "stdin")) //nolint:gosec // G703: unitdir is a controlled work directory
 	if err != nil {
-		return err
+		return nil, err
 	}
-	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
-
-	if payloadDebug != 0 {
-		splitUnitDir := strings.Split(unitdir, "/")
-		workUnitID := splitUnitDir[len(splitUnitDir)-1]
-		stdinStream, err := cmd.StdinPipe()
-		if err != nil {
-			return err
-		}
-		var payload string
-		reader := bufio.NewReader(stdin)
-
-		for {
-			response, err := reader.ReadString('\n')
-			if err != nil {
-				if err.Error() != "EOF" {
-					MainInstance.nc.GetLogger().Error("Error reading work unit %v stdin: %v\n", workUnitID, err)
-				}
-
-				break
-			}
-			payload += response
-		}
-
-		MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "stdin")
-		io.WriteString(stdinStream, payload)
-		stdinStream.Close()
-	} else {
+	if payloadDebug == 0 {
 		cmd.Stdin = stdin
-	}
-	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600) //nolint:gosec // G703: unitdir is a controlled work directory
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = stdout
-	cmd.Stderr = stdout
 
-	err = cmd.Start()
-	if err != nil {
-		return err
+		return stdin, nil
 	}
-	doneChan := make(chan bool, 1)
-	go cmdWaiter(cmd, doneChan)
+	workUnitID := path.Base(unitdir)
+	stdinStream, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	var payload string
+	reader := bufio.NewReader(stdin)
+	for {
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if err.Error() != "EOF" {
+				MainInstance.nc.GetLogger().Error("Error reading work unit %v stdin: %v\n", workUnitID, err)
+			}
+
+			break
+		}
+		payload += response
+	}
+	MainInstance.nc.GetLogger().DebugPayload(payloadDebug, payload, workUnitID, "stdin")
+	io.WriteString(stdinStream, payload)
+	stdinStream.Close()
+
+	return stdin, nil
+}
+
+// monitorProcess runs the select loop that watches doneChan, termChan, and the
+// 250 ms ticker while the subprocess is running. It returns the last error seen
+// on the ticker path (nil if the process exited cleanly).
+func monitorProcess(cmd *exec.Cmd, status *StatusFileData, statusFilename string, termChan <-chan os.Signal, doneChan chan bool, unitdir string) {
 	writeStatusFailures := 0
 loop:
 	for {
@@ -174,13 +160,12 @@ loop:
 			break loop
 		case <-termChan:
 			termThenKill(cmd, doneChan)
-			err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir))
-			if err != nil {
+			if err := status.UpdateBasicStatus(statusFilename, WorkStateFailed, "Killed", stdoutSize(unitdir)); err != nil {
 				MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 			}
 			os.Exit(-1)
 		case <-time.After(250 * time.Millisecond):
-			err = status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
+			err := status.UpdateBasicStatus(statusFilename, WorkStateRunning, fmt.Sprintf("Running: PID %d", cmd.Process.Pid), stdoutSize(unitdir))
 			if err != nil {
 				MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 				writeStatusFailures++
@@ -193,34 +178,61 @@ loop:
 			}
 		}
 	}
-	if err != nil {
-		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, fmt.Sprintf("Error: %s", err), stdoutSize(unitdir))
-		if err != nil {
-			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
-		}
+}
 
-		return err
+// reportFinalStatus writes the succeeded/failed status and closes stdio files,
+// then calls os.Exit with the subprocess exit code.
+func reportFinalStatus(cmd *exec.Cmd, status *StatusFileData, statusFilename, unitdir string, stdin, stdout *os.File) {
+	state := WorkStateSucceeded
+	if !cmd.ProcessState.Success() {
+		state = WorkStateFailed
 	}
-	if cmd.ProcessState.Success() {
-		err = status.UpdateBasicStatus(statusFilename, WorkStateSucceeded, cmd.ProcessState.String(), stdoutSize(unitdir))
-		if err != nil {
-			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
-		}
-	} else {
-		err = status.UpdateBasicStatus(statusFilename, WorkStateFailed, cmd.ProcessState.String(), stdoutSize(unitdir))
-		if err != nil {
-			MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
-		}
+	if err := status.UpdateBasicStatus(statusFilename, state, cmd.ProcessState.String(), stdoutSize(unitdir)); err != nil {
+		MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
 	}
-	err = stdin.Close()
-	if err != nil {
+	if err := stdin.Close(); err != nil {
 		MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(unitdir, "stdin"), err)
 	}
-	err = stdout.Close()
-	if err != nil {
+	if err := stdout.Close(); err != nil {
 		MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(unitdir, "stdout"), err)
 	}
 	os.Exit(cmd.ProcessState.ExitCode())
+}
+
+// commandRunner is run in a separate process, to monitor the subprocess and report back metadata.
+func commandRunner(command string, params string, unitdir string) error {
+	status := StatusFileData{}
+	status.ExtraData = &CommandExtraData{}
+	statusFilename := path.Join(unitdir, "status")
+	if err := status.UpdateBasicStatus(statusFilename, WorkStatePending, "Not started yet", 0); err != nil {
+		MainInstance.nc.GetLogger().Error(errMsgStatusFileUpdate, statusFilename, err)
+	}
+	cmd, err := buildCmd(command, params)
+	if err != nil {
+		return err
+	}
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+
+	payloadDebug, _ := strconv.Atoi(os.Getenv("RECEPTOR_PAYLOAD_TRACE_LEVEL"))
+	stdin, err := wireStdin(cmd, unitdir, payloadDebug)
+	if err != nil {
+		return err
+	}
+	stdout, err := os.OpenFile(path.Join(unitdir, "stdout"), os.O_CREATE+os.O_WRONLY+os.O_SYNC, 0o600) //nolint:gosec // G703: unitdir is a controlled work directory
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = stdout
+	cmd.Stderr = stdout
+
+	if err = cmd.Start(); err != nil {
+		return err
+	}
+	doneChan := make(chan bool, 1)
+	go cmdWaiter(cmd, doneChan)
+	monitorProcess(cmd, &status, statusFilename, termChan, doneChan, unitdir)
+	reportFinalStatus(cmd, &status, statusFilename, unitdir, stdin, stdout)
 
 	return nil
 }

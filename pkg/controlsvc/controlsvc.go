@@ -318,22 +318,79 @@ func parseCommand(cmdBytes []byte) (cmd string, params string, jsonData map[stri
 	return cmd, params, jsonData, err
 }
 
+// lookupControlType returns the ControlCommandType registered for cmd, or nil.
+func (s *Server) lookupControlType(cmd string) ControlCommandType {
+	s.controlFuncLock.RLock()
+	defer s.controlFuncLock.RUnlock()
+
+	return s.controlTypes[cmd]
+}
+
+// initControlCommand initialises a ControlCommand from either a plain string or
+// a JSON object, depending on which was supplied.
+func initControlCommand(ct ControlCommandType, params string, jsonData map[string]interface{}) (ControlCommand, error) {
+	if jsonData == nil {
+		return ct.InitFromString(params)
+	}
+
+	return ct.InitFromJSON(jsonData)
+}
+
+// sendJSONResponse marshals cfr and writes it to conn. Returns true when the
+// caller should close the session.
+func (s *Server) sendJSONResponse(conn net.Conn, cfr map[string]interface{}) bool {
+	rbytes, err := json.Marshal(cfr)
+	if err != nil {
+		writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
+
+		return writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError)
+	}
+	rbytes = append(rbytes, '\n')
+
+	return writeToConnWithLog(conn, s.nc, string(rbytes), writeControlServiceError)
+}
+
+// dispatchControlCommand looks up cmd, initialises it, executes it, and writes
+// the response. Returns true when the caller should close the session.
+func (s *Server) dispatchControlCommand(conn net.Conn, cmd, params string, jsonData map[string]interface{}) bool {
+	ct := s.lookupControlType(cmd)
+	if ct == nil {
+		writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
+
+		return writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError)
+	}
+	cc, err := initControlCommand(ct, params, jsonData)
+	if err == nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		var cfr map[string]interface{}
+		cfr, err = cc.ControlFunc(ctx, s.nc, NewSockControl(conn))
+		if err == nil && cfr != nil {
+			return s.sendJSONResponse(conn, cfr)
+		}
+	}
+	if err != nil {
+		errorNormal(s.nc, "", err)
+
+		return writeToConnWithLog(conn, s.nc, fmt.Sprintf("ERROR: %s\n", err), writeControlServiceError)
+	}
+
+	return false
+}
+
 // RunControlSession runs the server protocol on the given connection.
 func (s *Server) RunControlSession(conn net.Conn) {
 	s.nc.GetLogger().Debug("Client connected to control service %s\n", conn.RemoteAddr().String())
 	defer func() {
 		s.nc.GetLogger().Debug("Client disconnected from control service %s\n", conn.RemoteAddr().String())
 		if conn != nil {
-			err := conn.Close()
-			if err != nil {
+			if err := conn.Close(); err != nil {
 				s.nc.GetLogger().Warning("Could not close connection: %s\n", err)
 			}
 		}
 	}()
 
-	writeMsg := fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID())
-	logMsg := "Could not write in control service"
-	if writeToConnWithLog(conn, s.nc, writeMsg, logMsg) {
+	if writeToConnWithLog(conn, s.nc, fmt.Sprintf("Receptor Control, node %s\n", s.nc.NodeID()), "Could not write in control service") {
 		return
 	}
 
@@ -349,66 +406,14 @@ func (s *Server) RunControlSession(conn net.Conn) {
 		if len(cmdBytes) == 0 {
 			continue
 		}
-
 		cmd, params, jsonData, err := parseCommand(cmdBytes)
 		if err != nil {
-			writeMsg := fmt.Sprintf("ERROR: %s\n", err)
-			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
+			if writeToConnWithLog(conn, s.nc, fmt.Sprintf("ERROR: %s\n", err), writeControlServiceError) {
 				return
 			}
 		}
-		s.controlFuncLock.RLock()
-		var ct ControlCommandType
-		for f := range s.controlTypes {
-			if f == cmd {
-				ct = s.controlTypes[f]
-
-				break
-			}
-		}
-		s.controlFuncLock.RUnlock()
-		if ct != nil {
-			cfo := NewSockControl(conn)
-
-			var cfr map[string]interface{}
-			var cc ControlCommand
-			var err error
-			if jsonData == nil {
-				cc, err = ct.InitFromString(params)
-			} else {
-				cc, err = ct.InitFromJSON(jsonData)
-			}
-			if err == nil {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				cfr, err = cc.ControlFunc(ctx, s.nc, cfo)
-			}
-			if err != nil {
-				errorNormal(s.nc, "", err)
-
-				writeMsg := fmt.Sprintf("ERROR: %s\n", err)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			} else if cfr != nil {
-				rbytes, err := json.Marshal(cfr)
-				if err != nil {
-					writeMsg := fmt.Sprintf("ERROR: could not convert response to JSON: %s\n", err)
-					if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-						return
-					}
-				}
-				rbytes = append(rbytes, '\n')
-				writeMsg := string(rbytes)
-				if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-					return
-				}
-			}
-		} else {
-			writeMsg := fmt.Sprintf("ERROR: Unknown command, %v\n", cmd)
-			if writeToConnWithLog(conn, s.nc, writeMsg, writeControlServiceError) {
-				return
-			}
+		if s.dispatchControlCommand(conn, cmd, params, jsonData) {
+			return
 		}
 	}
 }
@@ -458,53 +463,54 @@ func (s *Server) SetupConnection(conn net.Conn) {
 }
 
 // RunControlSvc runs the main accept loop of the control service.
-func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
-	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
-) error {
-	var uli net.Listener
-	var lock *utils.FLock
-	var err error
-	if unixSocket != "" {
-		uli, lock, err = s.serverUtils.UnixSocketListen(unixSocket, unixSocketPermissions)
-		if err != nil {
-			return fmt.Errorf("error opening Unix socket: %s", err)
-		}
-	} else {
-		uli = nil
+// openUnixListener opens a Unix socket listener, or returns nil when unixSocket is empty.
+func (s *Server) openUnixListener(unixSocket string, perms os.FileMode) (net.Listener, *utils.FLock, error) {
+	if unixSocket == "" {
+		return nil, nil, nil
 	}
-	var tli net.Listener
-	if tcpListen != "" {
-		var listenAddr string
-		if strings.Contains(tcpListen, ":") {
-			listenAddr = tcpListen
-		} else {
-			listenAddr = fmt.Sprintf("0.0.0.0:%s", tcpListen)
-		}
-		tli, err = s.serverNet.Listen("tcp", listenAddr)
-		if err != nil {
-			return fmt.Errorf("error listening on TCP socket: %s", err)
-		}
-		if tcptls != nil {
-			tli = s.serverTLS.NewListener(tli, tcptls)
-		}
-	} else {
-		tli = nil
+	uli, lock, err := s.serverUtils.UnixSocketListen(unixSocket, perms)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error opening Unix socket: %s", err)
 	}
-	var li *netceptor.Listener
-	if service != "" {
-		li, err = s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{
-			"type": "Control Service",
-		})
-		if err != nil {
-			return fmt.Errorf("error opening Unix socket: %s", err)
-		}
-	} else {
-		li = nil
+
+	return uli, lock, nil
+}
+
+// openTCPListener opens a TCP listener (optionally wrapped in TLS), or returns nil when tcpListen is empty.
+func (s *Server) openTCPListener(tcpListen string, tcptls *tls.Config) (net.Listener, error) {
+	if tcpListen == "" {
+		return nil, nil
 	}
-	if uli == nil && tli == nil && li == nil {
-		return fmt.Errorf("no listeners specified")
+	listenAddr := tcpListen
+	if !strings.Contains(tcpListen, ":") {
+		listenAddr = fmt.Sprintf("0.0.0.0:%s", tcpListen)
 	}
-	s.nc.GetLogger().Info("Running control service %s\n", service)
+	tli, err := s.serverNet.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, fmt.Errorf("error listening on TCP socket: %s", err)
+	}
+	if tcptls != nil {
+		tli = s.serverTLS.NewListener(tli, tcptls)
+	}
+
+	return tli, nil
+}
+
+// openServiceListener opens a Receptor service listener, or returns nil when service is empty.
+func (s *Server) openServiceListener(service string, tlscfg *tls.Config) (*netceptor.Listener, error) {
+	if service == "" {
+		return nil, nil
+	}
+	li, err := s.nc.ListenAndAdvertise(service, tlscfg, map[string]string{"type": "Control Service"})
+	if err != nil {
+		return nil, fmt.Errorf("error opening Unix socket: %s", err)
+	}
+
+	return li, nil
+}
+
+// startListeners launches a cleanup goroutine and per-listener accept loops.
+func (s *Server) startListeners(ctx context.Context, uli net.Listener, lock *utils.FLock, tli net.Listener, li *netceptor.Listener) {
 	go func() {
 		<-ctx.Done()
 		if uli != nil {
@@ -524,6 +530,29 @@ func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.
 		}
 		go s.ConnectionListener(ctx, listener)
 	}
+}
+
+// RunControlSvc runs the main accept loop of the control service.
+func (s *Server) RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config,
+	unixSocket string, unixSocketPermissions os.FileMode, tcpListen string, tcptls *tls.Config,
+) error {
+	uli, lock, err := s.openUnixListener(unixSocket, unixSocketPermissions)
+	if err != nil {
+		return err
+	}
+	tli, err := s.openTCPListener(tcpListen, tcptls)
+	if err != nil {
+		return err
+	}
+	li, err := s.openServiceListener(service, tlscfg)
+	if err != nil {
+		return err
+	}
+	if uli == nil && tli == nil && li == nil {
+		return fmt.Errorf("no listeners specified")
+	}
+	s.nc.GetLogger().Info("Running control service %s\n", service)
+	s.startListeners(ctx, uli, lock, tli, li)
 
 	return nil
 }

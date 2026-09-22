@@ -1265,105 +1265,120 @@ func (s *Netceptor) sendRoutingUpdate(suspectedDuplicate uint64) {
 }
 
 // Processes a routing update received from a connection.
+// handleSelfOriginatedUpdate processes a routing update whose NodeID matches
+// our own. Returns true when the caller should stop processing the update.
+func (s *Netceptor) handleSelfOriginatedUpdate(ri *routingUpdate, recvConn string) bool {
+	if ri.UpdateEpoch == s.epoch {
+		return true
+	}
+	if ri.SuspectedDuplicate == s.epoch {
+		s.Logger.Error("We are a duplicate node with ID %s and epoch %d.  Shutting down.\n", s.nodeID, s.epoch)
+		s.Shutdown()
+
+		return true
+	}
+	if ri.UpdateEpoch > s.epoch {
+		s.Logger.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
+		s.sendRoutingUpdate(ri.UpdateEpoch)
+	}
+
+	return true
+}
+
+// recordSeenUpdate records the update ID in the seen-updates map.
+// Returns true if the update was already seen (caller should skip it).
+func (s *Netceptor) recordSeenUpdate(updateID string) bool {
+	s.seenUpdatesLock.Lock()
+	defer s.seenUpdatesLock.Unlock()
+	if _, seen := s.seenUpdates[updateID]; seen {
+		return true
+	}
+	s.seenUpdates[updateID] = time.Now()
+
+	return false
+}
+
+// handleSuspectedDuplicateUpdate processes a routing update where the sender
+// suspects a duplicate node, updating our nodeInfo if the epoch matches.
+func (s *Netceptor) handleSuspectedDuplicateUpdate(ri *routingUpdate) {
+	s.Logger.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n",
+		ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
+	s.knownNodeLock.Lock()
+	defer s.knownNodeLock.Unlock()
+	ni, ok := s.knownNodeInfo[ri.NodeID]
+	if ok && ni.Epoch == ri.SuspectedDuplicate {
+		s.knownNodeInfo[ri.NodeID].Epoch = ri.UpdateEpoch
+		s.knownNodeInfo[ri.NodeID].Sequence = ri.UpdateSequence
+	}
+}
+
+// applyNormalRoutingUpdate validates epoch/sequence, updates nodeInfo and
+// connection costs. Returns (changed, shouldReturn).
+func (s *Netceptor) applyNormalRoutingUpdate(ri *routingUpdate, recvConn string) (bool, bool) {
+	s.Logger.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
+	s.knownNodeLock.Lock()
+	ni, known := s.knownNodeInfo[ri.NodeID]
+	if known {
+		if ri.UpdateEpoch < ni.Epoch || (ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence) {
+			s.knownNodeLock.Unlock()
+
+			return false, true
+		}
+	} else {
+		select {
+		case <-s.context.Done():
+			s.knownNodeLock.Unlock()
+
+			return false, true
+		case s.sendRouteFloodChan <- 0:
+		}
+		ni = &nodeInfo{}
+	}
+	ni.Epoch = ri.UpdateEpoch
+	ni.Sequence = ri.UpdateSequence
+	changed := !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID])
+	if !known {
+		_ = s.AddNameHash(ri.NodeID)
+	}
+	s.knownNodeInfo[ri.NodeID] = ni
+	if changed {
+		s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
+		for k, v := range ri.Connections {
+			s.knownConnectionCosts[ri.NodeID][k] = v
+		}
+		for conn := range s.knownConnectionCosts {
+			if conn == s.nodeID {
+				continue
+			}
+			if _, inRI := ri.Connections[conn]; !inRI {
+				delete(s.knownConnectionCosts[conn], ri.NodeID)
+			}
+		}
+	}
+	s.knownNodeLock.Unlock()
+
+	return changed, false
+}
+
 func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	if ri.NodeID == "" {
-		// Our peer is still trying to initialize
-		return
+		return // peer still initializing
 	}
 	if ri.NodeID == s.nodeID {
-		if ri.UpdateEpoch == s.epoch {
-			return
-		}
-		if ri.SuspectedDuplicate == s.epoch {
-			// We are the duplicate!
-			s.Logger.Error("We are a duplicate node with ID %s and epoch %d.  Shutting down.\n", s.nodeID, s.epoch)
-			s.Shutdown()
-
-			return
-		}
-		if ri.UpdateEpoch > s.epoch {
-			// Update has our node ID but a newer epoch - so if clocks are in sync they are a duplicate
-			s.Logger.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
-			// Send routing update noting our suspicion
-			s.sendRoutingUpdate(ri.UpdateEpoch)
-
-			return
-		}
+		s.handleSelfOriginatedUpdate(ri, recvConn)
 
 		return
 	}
-	s.seenUpdatesLock.Lock()
-	_, ok := s.seenUpdates[ri.UpdateID]
-	if ok {
-		s.seenUpdatesLock.Unlock()
-
+	if s.recordSeenUpdate(ri.UpdateID) {
 		return
 	}
-	s.seenUpdates[ri.UpdateID] = time.Now()
-	s.seenUpdatesLock.Unlock()
 	if ri.SuspectedDuplicate != 0 {
-		s.Logger.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
-		s.knownNodeLock.Lock()
-		ni, ok := s.knownNodeInfo[ri.NodeID]
-		if ok {
-			if ni.Epoch == ri.SuspectedDuplicate {
-				s.knownNodeInfo[ri.NodeID].Epoch = ri.UpdateEpoch
-				s.knownNodeInfo[ri.NodeID].Sequence = ri.UpdateSequence
-			}
-		}
-		s.knownNodeLock.Unlock()
+		s.handleSuspectedDuplicateUpdate(ri)
 	} else {
-		s.Logger.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
-		s.knownNodeLock.Lock()
-		ni, ok := s.knownNodeInfo[ri.NodeID]
-		if ok {
-			if ri.UpdateEpoch < ni.Epoch {
-				s.knownNodeLock.Unlock()
-
-				return
-			}
-			if ri.UpdateEpoch == ni.Epoch && ri.UpdateSequence <= ni.Sequence {
-				s.knownNodeLock.Unlock()
-
-				return
-			}
-		} else {
-			select {
-			case <-s.context.Done():
-				s.knownNodeLock.Unlock()
-
-				return
-			case s.sendRouteFloodChan <- 0:
-			}
-			ni = &nodeInfo{}
+		changed, shouldReturn := s.applyNormalRoutingUpdate(ri, recvConn)
+		if shouldReturn {
+			return
 		}
-		ni.Epoch = ri.UpdateEpoch
-		ni.Sequence = ri.UpdateSequence
-		changed := false
-		if !reflect.DeepEqual(ri.Connections, s.knownConnectionCosts[ri.NodeID]) {
-			changed = true
-		}
-		_, ok = s.knownNodeInfo[ri.NodeID]
-		if !ok {
-			_ = s.AddNameHash(ri.NodeID)
-		}
-		s.knownNodeInfo[ri.NodeID] = ni
-		if changed {
-			s.knownConnectionCosts[ri.NodeID] = make(map[string]float64)
-			for k, v := range ri.Connections {
-				s.knownConnectionCosts[ri.NodeID][k] = v
-			}
-			for conn := range s.knownConnectionCosts {
-				if conn == s.nodeID {
-					continue
-				}
-				_, ok = ri.Connections[conn]
-				if !ok {
-					delete(s.knownConnectionCosts[conn], ri.NodeID)
-				}
-			}
-		}
-		s.knownNodeLock.Unlock()
 		if changed {
 			select {
 			case <-s.context.Done():
@@ -1692,17 +1707,23 @@ func (s *Netceptor) removeConnection(remoteNodeID string) {
 }
 
 // Main Netceptor protocol loop.
+// protocolState holds the mutable per-connection state threaded through the
+// runProtocol loop and its helper methods.
+type protocolState struct {
+	established       bool
+	remoteEstablished bool
+	remoteNodeID      string
+	connectionCost    float64
+}
+
 func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *BackendInfo) error {
 	if bi.connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
-	established := false
-	remoteEstablished := false
-	remoteNodeID := ""
-	connectionCost := bi.connectionCost
+	ps := &protocolState{connectionCost: bi.connectionCost}
 	defer func() {
 		_ = sess.Close()
-		if established {
+		if ps.established {
 			select {
 			case s.sendRouteFloodChan <- 0:
 			case <-ctx.Done(): // ctx is a child of s.context
@@ -1718,7 +1739,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 	ci := &connInfo{
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, writeChanBufferSize),
-		Cost:             connectionCost,
+		Cost:             ps.connectionCost,
 		lastReceivedLock: &sync.RWMutex{},
 		logger:           s.Logger,
 	}
@@ -1730,198 +1751,221 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 	for {
 		select {
 		case data := <-ci.ReadChan:
-			msgType := data[0]
-			if established {
-				switch msgType {
-				case MsgTypeData:
-					message, err := s.translateDataToMessage(data)
-					if err != nil {
-						s.Logger.Error("Error translating data to message struct: %s\n", err)
-
-						continue
-					}
-					s.Logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
-						message.FromNode, message.FromService, message.ToNode, message.ToService, remoteNodeID)
-					err = s.handleMessageData(message)
-					if err != nil {
-						s.Logger.Error("Error handling message data: %s\n", err)
-					}
-				case MsgTypeRoute:
-					ri := &routingUpdate{}
-					err := json.Unmarshal(data[1:], ri)
-					if err != nil {
-						s.Logger.Error("Error unpacking routing update: %s\n", err)
-
-						continue
-					}
-					if ri.ForwardingNode != remoteNodeID {
-						s.removeConnection(remoteNodeID)
-
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci,
-							fmt.Sprintf("remote node ID changed unexpectedly from %s to %s",
-								remoteNodeID, ri.NodeID))
-					}
-					if ri.NodeID == remoteNodeID {
-						// This is an update from our direct connection, so do some extra verification
-						remoteCost, ok := ri.Connections[s.nodeID]
-						if !ok {
-							if remoteEstablished {
-								s.removeConnection(remoteNodeID)
-
-								return s.sendAndLogConnectionRejection(remoteNodeID, ci, "remote node no longer lists us as a connection")
-							}
-							// This is a late initialization request from the remote node, so don't process it as a routing update.
-							continue
-						}
-						remoteEstablished = true
-						if ok && remoteCost != connectionCost {
-							s.removeConnection(remoteNodeID)
-
-							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
-						}
-					}
-					s.handleRoutingUpdate(ri, remoteNodeID)
-				case MsgTypeServiceAdvertisement:
-					err := s.handleServiceAdvertisement(data, remoteNodeID)
-					if err != nil {
-						s.Logger.Error("Error handling service advertisement: %s\n", err)
-
-						continue
-					}
-				case MsgTypeReject:
-					s.Logger.Warning("Received a rejection message from peer.")
-					s.removeConnection(remoteNodeID)
-
-					return fmt.Errorf("remote node rejected the connection")
-				default:
-					s.Logger.Warning("Unknown message type\n")
-				}
-			} else {
-				// Connection not established
-				if msgType == MsgTypeRoute {
-					ri := &routingUpdate{}
-					err := json.Unmarshal(data[1:], ri)
-					if err != nil {
-						s.Logger.Error("Error unpacking routing update: %s\n", err)
-
-						continue
-					}
-					remoteNodeID = ri.ForwardingNode
-					// Decide whether the remote node is acceptable
-					if remoteNodeID == s.nodeID {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
-					}
-					suffix := map[string]string{"remote_id": remoteNodeID}
-					s.GetLogger().UpdateSuffix(suffix)
-					remoteNodeAccepted := true
-					if bi.allowedPeers != nil {
-						remoteNodeAccepted = false
-						for i := range bi.allowedPeers {
-							if bi.allowedPeers[i] == remoteNodeID {
-								remoteNodeAccepted = true
-
-								break
-							}
-						}
-					}
-					if !remoteNodeAccepted {
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it is not in the allowed peers list")
-					}
-
-					// Check if there is connection cost for this remoteNodeID
-					// Check if there is connection cost for this remoteNodeID
-					remoteNodeCost, ok := bi.nodeCost[remoteNodeID]
-					if ok {
-						ci.Cost = remoteNodeCost
-						connectionCost = remoteNodeCost
-					}
-					s.connLock.Lock()
-
-					// Check if there is already connInfo for this remoteNodeID
-					existingConn, ok := s.connections[remoteNodeID]
-					if ok {
-						remoteNodeAccepted = false
-					}
-					var connError error
-					connError = nil
-
-					// Verify that the existing connection is valid
-					if ok && existingConn != nil {
-						connError = existingConn.Context.Err()
-					}
-					if ok && connError != nil {
-						s.Logger.Error("Context for existing connection error: %s", connError)
-						s.connLock.Unlock()
-						// Remove the canceled connection to prevent resource leak
-						s.removeConnection(remoteNodeID)
-						s.connLock.Lock()
-						remoteNodeAccepted = true // Allow the new connection to proceed
-					}
-
-					if !remoteNodeAccepted {
-						s.connLock.Unlock()
-
-						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it connected using a node ID we are already connected to")
-					}
-					s.connections[remoteNodeID] = ci
-					s.connLock.Unlock()
-
-					// Establish the connection
-					select {
-					case initDoneChan <- true:
-					case <-ctx.Done():
-						s.removeConnection(remoteNodeID)
-
-						return nil
-					case <-ci.Context.Done():
-						s.removeConnection(remoteNodeID)
-
-						return nil
-					}
-					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
-					s.AddNameHash(remoteNodeID)
-					s.knownNodeLock.Lock()
-					_, ok = s.knownConnectionCosts[s.nodeID]
-					if !ok {
-						s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
-					}
-					s.knownConnectionCosts[s.nodeID][remoteNodeID] = connectionCost
-					_, ok = s.knownConnectionCosts[remoteNodeID]
-					if !ok {
-						s.knownConnectionCosts[remoteNodeID] = make(map[string]float64)
-					}
-					s.knownConnectionCosts[remoteNodeID][s.nodeID] = connectionCost
-					s.knownNodeLock.Unlock()
-					select {
-					case s.sendRouteFloodChan <- 0:
-					case <-ctx.Done():
-						s.removeConnection(remoteNodeID)
-
-						return nil
-					case <-ci.Context.Done():
-						s.removeConnection(remoteNodeID)
-
-						return nil
-					}
-					select {
-					case s.updateRoutingTableChan <- 0:
-					case <-ctx.Done():
-						return nil
-					case <-ci.Context.Done():
-						return nil
-					}
-					established = true
-				} else if msgType == MsgTypeReject {
-					s.Logger.Warning("Received a rejection message from peer.")
-					s.removeConnection(remoteNodeID)
-
-					return fmt.Errorf("remote node rejected the connection")
-				}
+			if err := s.handleProtocolData(ctx, data, ci, bi, ps, initDoneChan); err != nil {
+				return err
 			}
 		case <-ci.Context.Done():
-			s.removeConnection(remoteNodeID)
+			s.removeConnection(ps.remoteNodeID)
 
 			return nil
 		}
 	}
+}
+
+// handleProtocolData dispatches an incoming frame to the appropriate handler
+// based on whether the connection has been established yet.
+func (s *Netceptor) handleProtocolData(ctx context.Context, data []byte, ci *connInfo, bi *BackendInfo, ps *protocolState, initDoneChan chan bool) error {
+	if ps.established {
+		return s.handleEstablishedData(data, ci, ps)
+	}
+
+	return s.handlePreEstablishData(ctx, data, ci, bi, ps, initDoneChan)
+}
+
+// handleEstablishedData processes a frame received on an already-established connection.
+func (s *Netceptor) handleEstablishedData(data []byte, ci *connInfo, ps *protocolState) error {
+	msgType := data[0]
+	switch msgType {
+	case MsgTypeData:
+		message, err := s.translateDataToMessage(data)
+		if err != nil {
+			s.Logger.Error("Error translating data to message struct: %s\n", err)
+
+			return nil // non-fatal: continue the loop
+		}
+		s.Logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
+			message.FromNode, message.FromService, message.ToNode, message.ToService, ps.remoteNodeID)
+		if err = s.handleMessageData(message); err != nil {
+			s.Logger.Error("Error handling message data: %s\n", err)
+		}
+	case MsgTypeRoute:
+		return s.handleEstablishedRoute(data, ci, ps)
+	case MsgTypeServiceAdvertisement:
+		if err := s.handleServiceAdvertisement(data, ps.remoteNodeID); err != nil {
+			s.Logger.Error("Error handling service advertisement: %s\n", err)
+		}
+	case MsgTypeReject:
+		s.Logger.Warning("Received a rejection message from peer.")
+		s.removeConnection(ps.remoteNodeID)
+
+		return fmt.Errorf("remote node rejected the connection")
+	default:
+		s.Logger.Warning("Unknown message type\n")
+	}
+
+	return nil
+}
+
+// handleEstablishedRoute processes a routing update received on an established connection.
+func (s *Netceptor) handleEstablishedRoute(data []byte, ci *connInfo, ps *protocolState) error {
+	ri := &routingUpdate{}
+	if err := json.Unmarshal(data[1:], ri); err != nil {
+		s.Logger.Error("Error unpacking routing update: %s\n", err)
+
+		return nil // non-fatal: continue the loop
+	}
+	if ri.ForwardingNode != ps.remoteNodeID {
+		s.removeConnection(ps.remoteNodeID)
+
+		return s.sendAndLogConnectionRejection(ps.remoteNodeID, ci,
+			fmt.Sprintf("remote node ID changed unexpectedly from %s to %s", ps.remoteNodeID, ri.NodeID))
+	}
+	if ri.NodeID == ps.remoteNodeID {
+		// Extra verification for updates from our direct connection.
+		remoteCost, ok := ri.Connections[s.nodeID]
+		if !ok {
+			if ps.remoteEstablished {
+				s.removeConnection(ps.remoteNodeID)
+
+				return s.sendAndLogConnectionRejection(ps.remoteNodeID, ci, "remote node no longer lists us as a connection")
+			}
+			// Late initialization request — skip routing update processing.
+			return nil
+		}
+		ps.remoteEstablished = true
+		if remoteCost != ps.connectionCost {
+			s.removeConnection(ps.remoteNodeID)
+
+			return s.sendAndLogConnectionRejection(ps.remoteNodeID, ci, "we disagree about the connection cost")
+		}
+	}
+	s.handleRoutingUpdate(ri, ps.remoteNodeID)
+
+	return nil
+}
+
+// handlePreEstablishData processes a frame received before the connection is established.
+func (s *Netceptor) handlePreEstablishData(ctx context.Context, data []byte, ci *connInfo, bi *BackendInfo, ps *protocolState, initDoneChan chan bool) error {
+	msgType := data[0]
+	if msgType == MsgTypeReject {
+		s.Logger.Warning("Received a rejection message from peer.")
+		s.removeConnection(ps.remoteNodeID)
+
+		return fmt.Errorf("remote node rejected the connection")
+	}
+	if msgType != MsgTypeRoute {
+		return nil
+	}
+	ri := &routingUpdate{}
+	if err := json.Unmarshal(data[1:], ri); err != nil {
+		s.Logger.Error("Error unpacking routing update: %s\n", err)
+
+		return nil // non-fatal: continue the loop
+	}
+	ps.remoteNodeID = ri.ForwardingNode
+	if err := s.checkRemoteNodeAccepted(ri, ci, bi, ps); err != nil {
+		return err
+	}
+
+	return s.finalizeConnection(ctx, ci, bi, ps, initDoneChan)
+}
+
+// checkRemoteNodeAccepted verifies that the remote peer is permitted to connect
+// and registers it in s.connections. Returns an error if the peer is rejected.
+func (s *Netceptor) checkRemoteNodeAccepted(ri *routingUpdate, ci *connInfo, bi *BackendInfo, ps *protocolState) error {
+	if ps.remoteNodeID == s.nodeID {
+		return s.sendAndLogConnectionRejection(ps.remoteNodeID, ci, "it tried to connect using our own node ID")
+	}
+	s.GetLogger().UpdateSuffix(map[string]string{"remote_id": ps.remoteNodeID})
+
+	if bi.allowedPeers != nil {
+		allowed := false
+		for _, peer := range bi.allowedPeers {
+			if peer == ps.remoteNodeID {
+				allowed = true
+
+				break
+			}
+		}
+		if !allowed {
+			return s.sendAndLogConnectionRejection(ps.remoteNodeID, ci, "it is not in the allowed peers list")
+		}
+	}
+
+	// Apply per-node cost override if configured.
+	if remoteNodeCost, ok := bi.nodeCost[ps.remoteNodeID]; ok {
+		ci.Cost = remoteNodeCost
+		ps.connectionCost = remoteNodeCost
+	}
+
+	s.connLock.Lock()
+	existingConn, exists := s.connections[ps.remoteNodeID]
+	remoteNodeAccepted := !exists
+	if exists && existingConn != nil {
+		if connErr := existingConn.Context.Err(); connErr != nil {
+			s.Logger.Error("Context for existing connection error: %s", connErr)
+			s.connLock.Unlock()
+			s.removeConnection(ps.remoteNodeID)
+			s.connLock.Lock()
+			remoteNodeAccepted = true // stale connection replaced
+		}
+	}
+	if !remoteNodeAccepted {
+		s.connLock.Unlock()
+
+		return s.sendAndLogConnectionRejection(ps.remoteNodeID, ci, "it connected using a node ID we are already connected to")
+	}
+	s.connections[ps.remoteNodeID] = ci
+	s.connLock.Unlock()
+
+	return nil
+}
+
+// finalizeConnection completes the handshake: signals the init goroutine, records
+// connection costs, and floods routing updates.
+func (s *Netceptor) finalizeConnection(ctx context.Context, ci *connInfo, _ *BackendInfo, ps *protocolState, initDoneChan chan bool) error {
+	select {
+	case initDoneChan <- true:
+	case <-ctx.Done():
+		s.removeConnection(ps.remoteNodeID)
+
+		return nil
+	case <-ci.Context.Done():
+		s.removeConnection(ps.remoteNodeID)
+
+		return nil
+	}
+	s.Logger.SanitizedInfo("Connection established with %s\n", ps.remoteNodeID)
+	s.AddNameHash(ps.remoteNodeID)
+	s.knownNodeLock.Lock()
+	if _, ok := s.knownConnectionCosts[s.nodeID]; !ok {
+		s.knownConnectionCosts[s.nodeID] = make(map[string]float64)
+	}
+	s.knownConnectionCosts[s.nodeID][ps.remoteNodeID] = ps.connectionCost
+	if _, ok := s.knownConnectionCosts[ps.remoteNodeID]; !ok {
+		s.knownConnectionCosts[ps.remoteNodeID] = make(map[string]float64)
+	}
+	s.knownConnectionCosts[ps.remoteNodeID][s.nodeID] = ps.connectionCost
+	s.knownNodeLock.Unlock()
+	select {
+	case s.sendRouteFloodChan <- 0:
+	case <-ctx.Done():
+		s.removeConnection(ps.remoteNodeID)
+
+		return nil
+	case <-ci.Context.Done():
+		s.removeConnection(ps.remoteNodeID)
+
+		return nil
+	}
+	select {
+	case s.updateRoutingTableChan <- 0:
+	case <-ctx.Done():
+		return nil
+	case <-ci.Context.Done():
+		return nil
+	}
+	ps.established = true
+
+	return nil
 }

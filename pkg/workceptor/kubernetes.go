@@ -203,44 +203,58 @@ func formatPodRetrievalError(namespace, name string, err error) string {
 }
 
 // podRunningAndReady is a completion criterion for pod ready to be attached to.
+// checkImagePullBackOff inspects container statuses for an ImagePullBackOff
+// condition and decrements the retry counter when found.
+func checkImagePullBackOff(statuses []corev1.ContainerStatus, imagePullBackOffRetries *int) error {
+	for j := range statuses {
+		if statuses[j].State.Waiting == nil || statuses[j].State.Waiting.Reason != "ImagePullBackOff" {
+			continue
+		}
+		if *imagePullBackOffRetries == 0 {
+			return ErrImagePullBackOff
+		}
+		*imagePullBackOffRetries--
+	}
+
+	return nil
+}
+
+// podConditionReady evaluates pod conditions to determine readiness.
+func podConditionReady(conditions []corev1.PodCondition, statuses []corev1.ContainerStatus, imagePullBackOffRetries *int) (bool, error) {
+	if conditions == nil {
+		return false, nil
+	}
+	for i := range conditions {
+		if conditions[i].Type == corev1.PodReady && conditions[i].Status == corev1.ConditionTrue {
+			return true, nil
+		}
+		if conditions[i].Type == corev1.ContainersReady && conditions[i].Status == corev1.ConditionFalse {
+			if err := checkImagePullBackOff(statuses, imagePullBackOffRetries); err != nil {
+				return false, err
+			}
+		}
+	}
+
+	return false, nil
+}
+
 func podRunningAndReady(kw KubeUnit) func(event watch.Event) (bool, error) {
 	imagePullBackOffRetries := 3
 	inner := func(event watch.Event) (bool, error) {
 		if event.Type == watch.Deleted {
 			return false, kw.KubeAPIWrapperInstance.NewNotFound(schema.GroupResource{Resource: kubeResourcePods}, "")
 		}
-		if t, ok := event.Object.(*corev1.Pod); ok {
-			switch t.Status.Phase {
-			case corev1.PodFailed:
-				return false, ErrPodFailed
-			case corev1.PodSucceeded:
-				return false, ErrPodCompleted
-			case corev1.PodRunning, corev1.PodPending:
-				conditions := t.Status.Conditions
-				if conditions == nil {
-					return false, nil
-				}
-				for i := range conditions {
-					if conditions[i].Type == corev1.PodReady &&
-						conditions[i].Status == corev1.ConditionTrue {
-						return true, nil
-					}
-					if conditions[i].Type == corev1.ContainersReady &&
-						conditions[i].Status == corev1.ConditionFalse {
-						statuses := t.Status.ContainerStatuses
-						for j := range statuses {
-							if statuses[j].State.Waiting != nil {
-								if statuses[j].State.Waiting.Reason == "ImagePullBackOff" {
-									if imagePullBackOffRetries == 0 {
-										return false, ErrImagePullBackOff
-									}
-									imagePullBackOffRetries--
-								}
-							}
-						}
-					}
-				}
-			}
+		t, ok := event.Object.(*corev1.Pod)
+		if !ok {
+			return false, nil
+		}
+		switch t.Status.Phase {
+		case corev1.PodFailed:
+			return false, ErrPodFailed
+		case corev1.PodSucceeded:
+			return false, ErrPodCompleted
+		case corev1.PodRunning, corev1.PodPending:
+			return podConditionReady(t.Status.Conditions, t.Status.ContainerStatuses, &imagePullBackOffRetries)
 		}
 
 		return false, nil
@@ -380,12 +394,200 @@ func (kw *KubeUnit) kubeLoggingNoReconnect(streamWait *sync.WaitGroup, stdout *S
 	}
 }
 
+// streamAction signals what the stream reader should do after a helper returns.
+type streamAction int
+
+const (
+	streamContinueInner streamAction = iota // continue the inner line-reader loop
+	streamContinueMain                      // break out to the outer reconnect loop
+	streamReturn                            // return from the goroutine entirely
+)
+
+// retryGetPod fetches the pod with exponential back-off, updating kw.Pod on success.
+func (kw *KubeUnit) retryGetPod(retries int, podNamespace, podName string, prevDelay, curDelay *int) error {
+	var err error
+	for retryGetPod := retries; retryGetPod > 0; retryGetPod-- {
+		kw.Pod, err = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+		if err == nil {
+			return nil
+		}
+		kw.GetWorkceptor().nc.GetLogger().Warning(
+			"Error getting pod %s/%s. Will retry %d more times. Error: %s",
+			podNamespace, podName, retryGetPod, err,
+		)
+		time.Sleep(kw.GetSleepDuration(*curDelay))
+		*prevDelay, *curDelay = GetNextFibonacciValues(*prevDelay, *curDelay)
+	}
+
+	return err
+}
+
+// handleTerminatedContainer logs and optionally sets an error for a terminated container,
+// then flushes any trailing partial line to stdout.
+func (kw *KubeUnit) handleTerminatedContainer(
+	containerState corev1.ContainerState,
+	line string, sinceTime time.Time, successfulWrite bool,
+	podNamespace, podName string,
+	stdoutErr *error, stdout *STDoutWriter,
+) {
+	if containerState.Terminated.ExitCode == 0 {
+		kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed successfully",
+			podNamespace, podName, WorkerContainerName)
+	} else {
+		reason := containerState.Terminated.Reason
+		// Whitelist: "Completed" and "Error" mean the program ran to completion.
+		// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted.
+		// Note: Reason field is not strictly defined in K8s API, these are observed conventions.
+		allowedReasons := []string{"Completed", "Error"}
+		if !slices.Contains(allowedReasons, reason) {
+			kw.GetWorkceptor().nc.GetLogger().Warning(
+				"%s/%s: %s execution was interrupted, exit code: %d, terminated reason: %s and terminated message: %s",
+				podNamespace, podName, WorkerContainerName,
+				containerState.Terminated.ExitCode, reason, containerState.Terminated.Message)
+			*stdoutErr = fmt.Errorf("pod %s/%s execution interrupted: exit code: %d, terminated reason: %s, terminated message: %s",
+				podNamespace, podName,
+				containerState.Terminated.ExitCode, reason, containerState.Terminated.Message)
+		} else {
+			kw.GetWorkceptor().nc.GetLogger().Info(
+				"%s/%s: %s completed with error, exit code: %d, terminated reason: %s, terminated message: %s",
+				podNamespace, podName, WorkerContainerName,
+				containerState.Terminated.ExitCode, reason, containerState.Terminated.Message)
+		}
+	}
+	// Flush any trailing partial line.
+	if line != "" {
+		msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
+		if msg != "" {
+			if _, err := stdout.Write([]byte(msg + "\n")); err != nil {
+				*stdoutErr = fmt.Errorf("error writing last line to stdout: %s", err)
+				kw.GetWorkceptor().nc.GetLogger().Error("Error writing last line to stdout: %s", err)
+			}
+		}
+	}
+}
+
+// handleEOFError handles the io.EOF case after a log-stream read: it looks up
+// the container state and decides whether to reconnect or return.
+func (kw *KubeUnit) handleEOFError(
+	eofErr error, line string,
+	podNamespace, podName string,
+	sinceTime time.Time, successfulWrite bool,
+	stdout *STDoutWriter, stdoutErr *error,
+	curContainerDelay, prevContainerDelay *int,
+) streamAction {
+	podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
+	if kubeErr != nil {
+		// There are many reasons why the kube api might not be able to get the pod,
+		// This does not mean there is a problem just yet.
+		// Let's try to get the pod again, max 5 times, and decide.
+		kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod after reading stream: '%s' , continuing try to get pod up to 5 more times.", kubeErr)
+
+		return streamContinueMain
+	}
+
+	var containerState corev1.ContainerState
+	foundContainer := false
+	for _, cs := range podDetails.Status.ContainerStatuses {
+		if cs.Name == WorkerContainerName {
+			containerState = cs.State
+			foundContainer = true
+		}
+	}
+	if !foundContainer {
+		kw.GetWorkceptor().nc.GetLogger().Error(
+			"Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting",
+			WorkerContainerName, podName)
+		*stdoutErr = fmt.Errorf("unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting",
+			WorkerContainerName, podName)
+
+		return streamReturn
+	}
+
+	switch {
+	case containerState.Running != nil:
+		// EOF seen but pod still running — may be the 4-hour kube log-stream timeout.
+		kw.GetWorkceptor().nc.GetLogger().Info(
+			"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will continue attempting to run job.",
+			eofErr, podNamespace, podName)
+		time.Sleep(kw.GetSleepDuration(*curContainerDelay))
+		*prevContainerDelay, *curContainerDelay = GetNextFibonacciValues(*prevContainerDelay, *curContainerDelay)
+
+		return streamContinueMain
+	case containerState.Terminated != nil:
+		kw.handleTerminatedContainer(containerState, line, sinceTime, successfulWrite, podNamespace, podName, stdoutErr, stdout)
+
+		return streamReturn
+	default:
+		// We dont expect to ever get here, However, beinging in an unknown state will not have a negative effect so we will log and ignore.
+		kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. We will continue.", podName, containerState)
+	}
+
+	// Something has gone very wrong: EOF received, container state is neither Running nor Terminated.
+	kw.GetWorkceptor().nc.GetLogger().Error(
+		"%s/%s: %s sent EOF on log stream and container state is not valid %s, failing and marking the job as failed",
+		podNamespace, podName, WorkerContainerName, containerState)
+	*stdoutErr = fmt.Errorf("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed",
+		podName, containerState)
+
+	return streamReturn
+}
+
+// handleStreamLineError processes a read error from the log-stream line reader.
+func (kw *KubeUnit) handleStreamLineError(
+	err error, line string,
+	podNamespace, podName string,
+	sinceTime time.Time, successfulWrite bool,
+	stdout *STDoutWriter, stdoutErr *error,
+	retryGetLogStream *int, retries int,
+	curDelay, prevDelay *int,
+	curContainerDelay, prevContainerDelay *int,
+) streamAction {
+	// Context canceled — mark failed unless the job already has a terminal state.
+	if kw.GetContext().Err() == context.Canceled {
+		if kw.Status().State != WorkStateSucceeded &&
+			kw.Status().State != WorkStateFailed &&
+			kw.Status().State != WorkStateCanceled {
+			errMsg := fmt.Sprintf(
+				"Context was canceled while reading logs for pod %s/%s. This is unrecoverable. Marking the job as failed and exiting. Error: %s",
+				podNamespace, podName, err.Error())
+			*stdoutErr = fmt.Errorf("%s", errMsg)
+			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
+		}
+
+		return streamReturn
+	}
+
+	// Non-EOF error: retry with back-off.
+	if err != io.EOF {
+		*retryGetLogStream--
+		if *retryGetLogStream > 0 {
+			kw.GetWorkceptor().nc.GetLogger().Info(
+				"Detected non-EOF Error: %s for pod %s/%s. Will retry %d more times.",
+				err, podNamespace, podName, *retryGetLogStream)
+			time.Sleep(kw.GetSleepDuration(*curDelay))
+			*prevDelay, *curDelay = GetNextFibonacciValues(*prevDelay, *curDelay)
+
+			return streamContinueMain
+		}
+		*stdoutErr = err
+		kw.GetWorkceptor().nc.GetLogger().Error(
+			"Unexpected non-EOF error while reading logs for pod %s/%s, retries exhausted. Error: %s",
+			podNamespace, podName, err.Error())
+
+		return streamReturn
+	}
+
+	// EOF: inspect container state to decide whether to reconnect or finish.
+	// EOF errors are expected in two cases:
+	// 1. The job finished and the last line was sent.
+	// 2. The job lasted > 4 hours and the kube API closed the log stream (recoverable).
+	return kw.handleEOFError(err, line, podNamespace, podName, sinceTime, successfulWrite, stdout, stdoutErr, curContainerDelay, prevContainerDelay)
+}
+
 func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout *STDoutWriter, stdinErr *error, stdoutErr *error) {
 	// preferred method for k8s >= 1.23.14
 	defer streamWait.Done()
 	var sinceTime time.Time
-	var err error
-	var retryGetLogStream int
 	var successfulWrite bool
 	podNamespace := kw.Pod.Namespace
 	podName := kw.Pod.Name
@@ -394,37 +596,19 @@ func (kw *KubeUnit) KubeLoggingWithReconnect(streamWait *sync.WaitGroup, stdout 
 	prevDelay, curDelay := 0, 1
 	prevPodDelay, curPodDelay := 0, 1
 	prevContainerDelay, curContainerDelay := 0, 1
-	retryGetLogStream = retries
+	retryGetLogStream := retries
 
 mainLoop:
 	for {
 		if *stdinErr != nil {
-			// fail to send stdin to pod, no need to continue
 			return
 		}
 
-		// get pod, with retry
-		for retryGetPod := retries; retryGetPod > 0; retryGetPod-- {
-			kw.Pod, err = kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
-			if err == nil {
-				break
-			}
-			kw.GetWorkceptor().nc.GetLogger().Warning(
-				"Error getting pod %s/%s. Will retry %d more times. Error: %s",
-				podNamespace,
-				podName,
-				retryGetPod,
-				err,
-			)
-			time.Sleep(kw.GetSleepDuration(curPodDelay))
-			prevPodDelay, curPodDelay = GetNextFibonacciValues(prevPodDelay, curPodDelay)
-		}
-		if err != nil {
+		if err := kw.retryGetPod(retries, podNamespace, podName, &prevPodDelay, &curPodDelay); err != nil {
 			errMsgStr := formatPodRetrievalError(podNamespace, podName, err)
 			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsgStr)
 			*stdoutErr = fmt.Errorf("%s", errMsgStr)
 
-			// fail to get pod, no need to continue
 			return
 		}
 		prevPodDelay, curPodDelay = 1, 1
@@ -434,184 +618,29 @@ mainLoop:
 
 		logStream, err := kw.kubeLoggingConnectionHandler(true, sinceTime)
 		if err != nil {
-			// fail to get log stream, no need to continue
 			return
 		}
 		defer logStream.Close()
 
-		// read from logstream
 		streamReader := bufio.NewReader(logStream)
-		for { // check between every line read to see if we need to stop reading
+		for {
 			line, err := streamReader.ReadString('\n')
 			if err != nil {
-				// Check if the context was canceled and the work state isn't "Succeeded".
-				// If so, set the error and mark the job as failed.
-				if kw.GetContext().Err() == context.Canceled {
-					if kw.Status().State != WorkStateSucceeded &&
-						kw.Status().State != WorkStateFailed &&
-						kw.Status().State != WorkStateCanceled {
-						errMsg := fmt.Sprintf("Context was canceled while reading logs for pod %s/%s. This is unrecoverable. Marking the job as failed and exiting. Error: %s",
-							podNamespace,
-							podName,
-							err.Error(),
-						)
-						*stdoutErr = fmt.Errorf("%s", errMsg)
-						kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
-					}
-
-					return
-				}
-
-				// Check if the error is not EOF, if error is not EOF retry 5 times if error persists set error and mark the job as failed.
-				if err != io.EOF {
-					retryGetLogStream--
-					if retryGetLogStream > 0 {
-						kw.GetWorkceptor().nc.GetLogger().Info(
-							"Detected non-EOF Error: %s for pod %s/%s. Will retry %d more times.",
-							err,
-							podNamespace,
-							podName,
-							retryGetLogStream,
-						)
-
-						time.Sleep(kw.GetSleepDuration(curDelay))
-						prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
-
-						continue mainLoop
-					}
-
-					*stdoutErr = err
-					kw.GetWorkceptor().nc.GetLogger().Error(
-						"Unexpected non-EOF error while reading logs for pod %s/%s, retries exhausted. Error: %s",
-						podNamespace,
-						podName,
-						err.Error(),
-					)
-
-					return
-				}
-
-				// EOF errors are expected in two cases.
-				// 1. When the job is finished and the last line is sent.
-				// In this case we monitor the container status to ensure we move out of Running,
-				// and we make sure we get the last line of output.
-				// 2. When the job lasts longer than 4 hours and kube api closes the log stream.
-				// This is a recoverable EOF, so we attempt to reconnect with a back-off.
-				// In BOTH cases, we have a simular approach, wait 1-2 seconds and check if the container status has changed.
-
-				podDetails, kubeErr := kw.KubeAPIWrapperInstance.Get(kw.GetContext(), kw.clientset, podNamespace, podName, metav1.GetOptions{})
-				if kubeErr != nil {
-					// There are many reasons why the kube api might not be able to get the pod,
-					// This does not mean there is a problem just yet.
-					// Let's try to get the pod again, max 5 times, and decide.
-					kw.GetWorkceptor().nc.GetLogger().Info("Error getting pod after reading stream: '%s' , continuing try to get pod up to 5 more times.", kubeErr)
-
+				switch kw.handleStreamLineError(
+					err, line, podNamespace, podName,
+					sinceTime, successfulWrite,
+					stdout, stdoutErr,
+					&retryGetLogStream, retries,
+					&curDelay, &prevDelay,
+					&curContainerDelay, &prevContainerDelay,
+				) {
+				case streamContinueMain:
 					continue mainLoop
-				}
-
-				var containerState corev1.ContainerState
-				foundContainer := false
-				for _, containerStatus := range podDetails.Status.ContainerStatuses {
-					if containerStatus.Name == WorkerContainerName {
-						containerState = containerStatus.State
-						foundContainer = true
-					}
-				}
-
-				if !foundContainer {
-					kw.GetWorkceptor().nc.GetLogger().Error("Unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
-					*stdoutErr = fmt.Errorf("unable to find the container %s for pod %s. This is unrecoverable. Marking the job as failed and exiting", WorkerContainerName, podName)
-
+				case streamReturn:
 					return
 				}
 
-				switch {
-				case containerState.Running != nil:
-					// EOF was seen but the pod is still running. Is this because we checked too fast and it will switch to a terminated state soon, or are we hitting the 4-hour log stream kube error?
-					// There is no way to tell so continue checking without failing the job.
-					kw.GetWorkceptor().nc.GetLogger().Info(
-						"Detected EOF Error: %s for pod %s/%s in with container state: Running. Job may not be complete. Will continue attempting to run job.",
-						err,
-						podNamespace,
-						podName,
-					)
-
-					time.Sleep(kw.GetSleepDuration(curContainerDelay))
-					prevContainerDelay, curContainerDelay = GetNextFibonacciValues(prevContainerDelay, curContainerDelay)
-
-					continue mainLoop
-				case containerState.Terminated != nil:
-
-					if containerState.Terminated.ExitCode == 0 {
-						// Log successful completion
-						kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed successfully",
-							podNamespace,
-							podName,
-							WorkerContainerName)
-					} else {
-						reason := containerState.Terminated.Reason
-						// Whitelist: "Completed" and "Error" mean the program ran to completion
-						// Everything else (OOMKilled, Evicted, etc.) means execution was interrupted
-						// Note: Reason field is not strictly defined in K8s API, these are observed conventions
-						allowedReasons := []string{"Completed", "Error"}
-						if !slices.Contains(allowedReasons, reason) {
-							kw.GetWorkceptor().nc.GetLogger().Warning("%s/%s: %s execution was interrupted, exit code: %d, terminated reason: %s and terminated message: %s",
-								podNamespace,
-								podName,
-								WorkerContainerName,
-								containerState.Terminated.ExitCode,
-								reason,
-								containerState.Terminated.Message)
-							*stdoutErr = fmt.Errorf("pod %s/%s execution interrupted: exit code: %d, terminated reason: %s, terminated message: %s",
-								podNamespace,
-								podName,
-								containerState.Terminated.ExitCode,
-								reason,
-								containerState.Terminated.Message)
-						} else {
-							// Log error completion
-							kw.GetWorkceptor().nc.GetLogger().Info("%s/%s: %s completed with error, exit code: %d, terminated reason: %s, terminated message: %s",
-								podNamespace,
-								podName,
-								WorkerContainerName,
-								containerState.Terminated.ExitCode,
-								reason,
-								containerState.Terminated.Message)
-						}
-					}
-
-					// We need to check if last line has data
-					if line != "" {
-						msg, _, _ := kw.ProcessLogLine(line, sinceTime, successfulWrite)
-						if msg != "" {
-							_, err = stdout.Write([]byte(msg + "\n"))
-							if err != nil {
-								*stdoutErr = fmt.Errorf("error writing last line to stdout: %s", err)
-								kw.GetWorkceptor().nc.GetLogger().Error("Error writing last line to stdout: %s", err)
-
-								return
-							}
-						}
-					}
-					// Got EOF, terminated and ensured we captured last line then return
-					return
-				default:
-					// We dont expect to ever get here, However, beinging in an unknown state will not have a negative effect so we will log and ignore.
-					kw.GetWorkceptor().nc.GetLogger().Debug("%s is in an unexpected container state %s. This is unexpected. We will continue.", podName, containerState)
-				}
-
-				// Something has gone very wrong if we are here. EOF is true and we can get the container state, but it is not running or terminated.
-				// At this stage something has gone very wrong with our interactions with the container.
-				// We will fail, and mark the job as failed due to an unknown kube container state.
-				kw.GetWorkceptor().nc.GetLogger().Error("%s/%s: %s sent EOF on log stream and container state is not valid %s, failing and marking the job as failed",
-					podNamespace,
-					podName,
-					WorkerContainerName,
-					containerState,
-				)
-				*stdoutErr = fmt.Errorf("received EOF on log stream for pod %s and container state is not valid %s, failing and marking the job as failed", podName, containerState)
-
-				return
+				continue
 			}
 
 			msg, newSinceTime, shouldSkip := kw.ProcessLogLine(line, sinceTime, successfulWrite)
@@ -622,8 +651,7 @@ mainLoop:
 				continue
 			}
 
-			_, err = stdout.Write([]byte(msg))
-			if err != nil {
+			if _, err = stdout.Write([]byte(msg)); err != nil {
 				*stdoutErr = fmt.Errorf("writing to stdout: %s", err)
 				kw.GetWorkceptor().nc.GetLogger().Error("Error writing to stdout: %s", err)
 
@@ -637,6 +665,121 @@ mainLoop:
 	}
 }
 
+// buildPodSpec constructs the Pod object from a KubePod template or from scratch.
+// Side effects: may update ked.KubeNamespace and kw.namePrefix.
+func (kw *KubeUnit) buildPodSpec(ked *KubeExtraData, command, params []string) (*corev1.Pod, error) {
+	pod := &corev1.Pod{}
+	if ked.KubePod == "" {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: kw.namePrefix, Namespace: ked.KubeNamespace},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name: WorkerContainerName, Image: ked.Image,
+					Command: command, Args: params,
+					Stdin: true, StdinOnce: true, TTY: false,
+				}},
+				RestartPolicy: corev1.RestartPolicyNever,
+			},
+		}, nil
+	}
+
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	if _, _, err := decode([]byte(ked.KubePod), nil, pod); err != nil {
+		return nil, err
+	}
+	foundWorker := false
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name == WorkerContainerName {
+			pod.Spec.Containers[i].Stdin = true
+			pod.Spec.Containers[i].StdinOnce = true
+			foundWorker = true
+
+			break
+		}
+	}
+	if !foundWorker {
+		return nil, fmt.Errorf("at least one container must be named worker")
+	}
+	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
+	if pod.Namespace != "" {
+		ked.KubeNamespace = pod.Namespace
+	}
+	if pod.Name != "" {
+		kw.namePrefix = pod.Name + "-"
+	}
+	pod.Name = ""
+	pod.GenerateName = kw.namePrefix
+	pod.Namespace = ked.KubeNamespace
+
+	return pod, nil
+}
+
+// waitForPodRunning blocks until the pod reaches a running or terminal state,
+// updating kw.Pod with the observed pod object.
+func (kw *KubeUnit) waitForPodRunning(ked *KubeExtraData) (*watch.Event, error) {
+	fieldSelector := kw.KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.Pod.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+
+			return kw.KubeAPIWrapperInstance.List(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+
+			return kw.KubeAPIWrapperInstance.Watch(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
+		},
+	}
+	ctxPodReady := kw.GetContext()
+	if kw.podPendingTimeout != time.Duration(0) {
+		var ctxPodCancel context.CancelFunc
+		ctxPodReady, ctxPodCancel = context.WithTimeout(kw.GetContext(), kw.podPendingTimeout)
+		defer ctxPodCancel()
+	}
+	time.Sleep(2 * time.Second)
+
+	return kw.KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady(*kw))
+}
+
+// handlePodStartError streams logs and inspects container status when pod startup fails.
+func (kw *KubeUnit) handlePodStartError(watchErr error) error {
+	stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
+	if err2 != nil {
+		errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
+		kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
+		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+		return fmt.Errorf("%s", errMsg)
+	}
+	var stdoutErr error
+	var streamWait sync.WaitGroup
+	streamWait.Add(1)
+	go kw.kubeLoggingNoReconnect(&streamWait, stdout, &stdoutErr)
+	streamWait.Wait()
+	kw.Cancel()
+	if len(kw.Pod.Status.ContainerStatuses) != 1 {
+		return watchErr
+	}
+	if kw.Pod.Status.ContainerStatuses[0].State.Waiting != nil {
+		return fmt.Errorf("%s, %s", watchErr.Error(), kw.Pod.Status.ContainerStatuses[0].State.Waiting.Reason)
+	}
+	for _, cstat := range kw.Pod.Status.ContainerStatuses {
+		if cstat.Name != WorkerContainerName {
+			continue
+		}
+		if cstat.State.Waiting != nil {
+			return fmt.Errorf("%s, %s", watchErr.Error(), cstat.State.Waiting.Reason)
+		}
+		if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
+			return fmt.Errorf("%s, exit code %d: %s", watchErr.Error(), cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
+		}
+
+		break
+	}
+
+	return watchErr
+}
+
 func (kw *KubeUnit) CreatePod(env map[string]string) error {
 	ked := kw.UnredactedStatus().ExtraData.(*KubeExtraData)
 	command, err := shlex.Split(ked.Command)
@@ -648,78 +791,19 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		return err
 	}
 
-	pod := &corev1.Pod{}
-	var spec *corev1.PodSpec
-	var objectMeta *metav1.ObjectMeta
-	if ked.KubePod != "" {
-		decode := scheme.Codecs.UniversalDeserializer().Decode
-		_, _, err := decode([]byte(ked.KubePod), nil, pod)
-		if err != nil {
-			return err
-		}
-		foundWorker := false
-		spec = &pod.Spec
-		for i := range spec.Containers {
-			if spec.Containers[i].Name == WorkerContainerName {
-				spec.Containers[i].Stdin = true
-				spec.Containers[i].StdinOnce = true
-				foundWorker = true
-
-				break
-			}
-		}
-		if !foundWorker {
-			return fmt.Errorf("at least one container must be named worker")
-		}
-		spec.RestartPolicy = corev1.RestartPolicyNever
-		userNamespace := pod.Namespace
-		if userNamespace != "" {
-			ked.KubeNamespace = userNamespace
-		}
-		userPodName := pod.Name
-		if userPodName != "" {
-			kw.namePrefix = userPodName + "-"
-		}
-		objectMeta = &pod.ObjectMeta
-		objectMeta.Name = ""
-		objectMeta.GenerateName = kw.namePrefix
-		objectMeta.Namespace = ked.KubeNamespace
-	} else {
-		objectMeta = &metav1.ObjectMeta{
-			GenerateName: kw.namePrefix,
-			Namespace:    ked.KubeNamespace,
-		}
-		spec = &corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Name:      WorkerContainerName,
-				Image:     ked.Image,
-				Command:   command,
-				Args:      params,
-				Stdin:     true,
-				StdinOnce: true,
-				TTY:       false,
-			}},
-			RestartPolicy: corev1.RestartPolicyNever,
-		}
-	}
-
-	pod = &corev1.Pod{
-		ObjectMeta: *objectMeta,
-		Spec:       *spec,
+	pod, err := kw.buildPodSpec(ked, command, params)
+	if err != nil {
+		return err
 	}
 
 	if env != nil {
-		evs := make([]corev1.EnvVar, 0)
+		evs := make([]corev1.EnvVar, 0, len(env))
 		for k, v := range env {
-			evs = append(evs, corev1.EnvVar{
-				Name:  k,
-				Value: v,
-			})
+			evs = append(evs, corev1.EnvVar{Name: k, Value: v})
 		}
 		pod.Spec.Containers[0].Env = evs
 	}
 
-	// get pod and store to kw.Pod
 	kw.Pod, err = kw.KubeAPIWrapperInstance.Create(kw.GetContext(), kw.clientset, ked.KubeNamespace, pod, metav1.CreateOptions{})
 	if err != nil {
 		return err
@@ -738,30 +822,7 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		status.ExtraData.(*KubeExtraData).PodName = kw.Pod.Name
 	})
 
-	// Wait for the pod to be running
-	fieldSelector := kw.KubeAPIWrapperInstance.OneTermEqualSelector("metadata.name", kw.Pod.Name).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fieldSelector
-
-			return kw.KubeAPIWrapperInstance.List(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fieldSelector
-
-			return kw.KubeAPIWrapperInstance.Watch(kw.GetContext(), kw.clientset, ked.KubeNamespace, options)
-		},
-	}
-
-	ctxPodReady := kw.GetContext()
-	if kw.podPendingTimeout != time.Duration(0) {
-		var ctxPodCancel context.CancelFunc
-		ctxPodReady, ctxPodCancel = context.WithTimeout(kw.GetContext(), kw.podPendingTimeout)
-		defer ctxPodCancel()
-	}
-
-	time.Sleep(2 * time.Second)
-	ev, err := kw.KubeAPIWrapperInstance.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady(*kw))
+	ev, err := kw.waitForPodRunning(ked)
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}
@@ -785,42 +846,8 @@ func (kw *KubeUnit) CreatePod(env map[string]string) error {
 		}
 
 		return err
-	} else if err != nil { // any other error besides ErrPodCompleted
-		stdout, err2 := NewStdoutWriter(FileSystem{}, kw.UnitDir())
-		if err2 != nil {
-			errMsg := fmt.Sprintf("Error opening stdout file: %s", err2)
-			kw.GetWorkceptor().nc.GetLogger().Error("%s", errMsg)
-			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-
-			return fmt.Errorf("%s", errMsg)
-		}
-		var stdoutErr error
-		var streamWait sync.WaitGroup
-		streamWait.Add(1)
-		go kw.kubeLoggingNoReconnect(&streamWait, stdout, &stdoutErr)
-		streamWait.Wait()
-		kw.Cancel()
-		if len(kw.Pod.Status.ContainerStatuses) == 1 {
-			if kw.Pod.Status.ContainerStatuses[0].State.Waiting != nil {
-				return fmt.Errorf("%s, %s", err.Error(), kw.Pod.Status.ContainerStatuses[0].State.Waiting.Reason)
-			}
-
-			for _, cstat := range kw.Pod.Status.ContainerStatuses {
-				if cstat.Name == WorkerContainerName {
-					if cstat.State.Waiting != nil {
-						return fmt.Errorf("%s, %s", err.Error(), cstat.State.Waiting.Reason)
-					}
-
-					if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
-						return fmt.Errorf("%s, exit code %d: %s", err.Error(), cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
-					}
-
-					break
-				}
-			}
-		}
-
-		return err
+	} else if err != nil {
+		return kw.handlePodStartError(err)
 	}
 
 	return nil

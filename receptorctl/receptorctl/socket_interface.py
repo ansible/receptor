@@ -243,6 +243,31 @@ class ReceptorControl:
         result = json.loads(text)
         return result
 
+    def adopt_work(
+        self,
+        node,
+        unit_id,
+        tlsclient=None,
+        signwork=False,
+    ):
+        self.connect()
+        commandMap = {
+            "command": "work",
+            "subcommand": "adopt",
+            "node": node,
+            "unitid": unit_id,
+        }
+
+        if tlsclient:
+            commandMap["tlsclient"] = tlsclient
+
+        if signwork:
+            commandMap["signwork"] = "true"
+
+        commandJson = json.dumps(commandMap)
+        self.writestr(f"{commandJson}\n")
+        return self.read_and_parse_json()
+
     def get_work_results(self, unit_id, startpos=0, return_socket=False, return_sockfile=True):
         self.connect()
         self.writestr(f"work results {unit_id} {startpos}\n")

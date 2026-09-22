@@ -723,3 +723,131 @@ func TestRemoteWorkGetConnectionCryptoErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestRemoteWorkAdoptedUnitNotStarted verifies that an adopted work unit whose remote
+// reports a pending state is failed locally, since adoption never submits the work and
+// nothing will ever start it. Non-adopted units must keep tracking pending normally.
+func TestRemoteWorkAdoptedUnitNotStarted(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		adopted     bool
+		remoteState int
+		expectFail  bool
+	}{
+		{
+			name:        "adopted_remote_pending_fails_locally",
+			adopted:     true,
+			remoteState: workceptor.WorkStatePending,
+			expectFail:  true,
+		},
+		{
+			name:        "adopted_remote_running_keeps_monitoring",
+			adopted:     true,
+			remoteState: workceptor.WorkStateRunning,
+		},
+		{
+			name:        "submitted_remote_pending_keeps_monitoring",
+			remoteState: workceptor.WorkStatePending,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			contextWithCancel, cancel := context.WithCancel(context.Background())
+			wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, contextWithCancel)
+
+			t.Cleanup(func() {
+				cancel()
+				time.Sleep(200 * time.Millisecond)
+			})
+
+			remoteExtraData := &workceptor.RemoteExtraData{
+				RemoteStarted:  true,
+				Adopted:        tt.adopted,
+				RemoteNode:     "execution",
+				RemoteUnitID:   "remoteunit",
+				RemoteWorkType: "echoint",
+				RemoteParams:   make(map[string]string),
+			}
+
+			statusLock := &sync.RWMutex{}
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+				ExtraData: remoteExtraData,
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBaseWorkUnit.EXPECT().ID().Return("test-id").AnyTimes()
+
+			// Declared before createRemoteWorkNetworkSetup so these absorb the calls
+			// ahead of the permissive expectations the helper registers.
+			failed := make(chan workceptor.StatusFileData, 1)
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+				status := workceptor.StatusFileData{ExtraData: remoteExtraData}
+				updateFunc.(func(*workceptor.StatusFileData))(&status)
+				if status.State == workceptor.WorkStateFailed {
+					select {
+					case failed <- status:
+					default:
+					}
+				}
+			}).AnyTimes()
+
+			copied := make(chan int, 1)
+			mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(state int, _ string, _ int64) {
+				select {
+				case copied <- state:
+				default:
+				}
+			}).AnyTimes()
+
+			messages := []string{
+				"execution\n", // Hello message with remote node ID
+				fmt.Sprintf("{\"State\": %d, \"Detail\": \"status detail\", \"StdoutSize\": 0}\n", tt.remoteState),
+			}
+			createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, filepath.Join("/tmp", tt.name), remoteExtraData, true)
+
+			if err := wu.Restart(); err != nil {
+				t.Fatalf("Unexpected error restarting work unit: %v", err)
+			}
+
+			if tt.expectFail {
+				select {
+				case status := <-failed:
+					if status.Detail != "Adopted remote work unit was never started" {
+						t.Errorf("Expected detail 'Adopted remote work unit was never started', got: %s", status.Detail)
+					}
+				case <-time.After(10 * time.Second):
+					t.Fatal("Expected adopted work unit reporting pending to be failed locally")
+				}
+				// The pending remote state must not be copied onto the local unit.
+				select {
+				case state := <-copied:
+					t.Errorf("Expected no status copy from a never-started adopted unit, got state %d", state)
+				default:
+				}
+
+				return
+			}
+
+			select {
+			case state := <-copied:
+				if state != tt.remoteState {
+					t.Errorf("Expected remote state %d to be copied locally, got %d", tt.remoteState, state)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("Expected remote status to be copied to the local work unit")
+			}
+			select {
+			case status := <-failed:
+				t.Errorf("Unexpected local failure: %s", status.Detail)
+			default:
+			}
+		})
+	}
+}

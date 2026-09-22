@@ -12,7 +12,9 @@ import (
 )
 
 func workSetup(workPluginName workPlugin, t *testing.T) (map[string]*ReceptorControl, *LibMesh, []byte) {
-	checkSkipKube(t)
+	if workPluginName == "kube" {
+		checkSkipKube(t)
+	}
 
 	m := workTestMesh(workPluginName)
 

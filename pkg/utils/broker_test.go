@@ -39,7 +39,7 @@ func TestBrokerSubscribe(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tt.contextTimeout)
 			defer cancel()
 
-			broker := utils.NewBroker(ctx, reflect.TypeOf(""))
+			broker := utils.NewBroker(ctx.Done(), reflect.TypeOf(""))
 
 			if tt.cancelContext {
 				cancel()
@@ -81,7 +81,7 @@ func TestBrokerUnsubscribe(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tt.contextTimeout)
 			defer cancel()
 
-			broker := utils.NewBroker(ctx, reflect.TypeOf(""))
+			broker := utils.NewBroker(ctx.Done(), reflect.TypeOf(""))
 			ch := broker.Subscribe()
 
 			if tt.cancelContext {
@@ -139,7 +139,7 @@ func TestBrokerPublish(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tt.contextTimeout)
 			defer cancel()
 
-			broker := utils.NewBroker(ctx, tt.msgType)
+			broker := utils.NewBroker(ctx.Done(), tt.msgType)
 
 			if tt.cancelContext {
 				cancel()
@@ -196,7 +196,7 @@ func TestBrokerEndToEnd(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tt.contextTimeout)
 			defer cancel()
 
-			broker := utils.NewBroker(ctx, reflect.TypeOf(""))
+			broker := utils.NewBroker(ctx.Done(), reflect.TypeOf(""))
 
 			// Create subscribers
 			var subscribers []chan interface{}
@@ -281,7 +281,7 @@ func TestBrokerEndToEnd(t *testing.T) {
 // TestBrokerContextCancellation tests that the broker properly handles context cancellation.
 func TestBrokerContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	broker := utils.NewBroker(ctx, reflect.TypeOf(""))
+	broker := utils.NewBroker(ctx.Done(), reflect.TypeOf(""))
 
 	// Subscribe before cancellation
 	ch := broker.Subscribe()
@@ -315,7 +315,7 @@ func TestBrokerConcurrency(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	broker := utils.NewBroker(ctx, reflect.TypeOf(""))
+	broker := utils.NewBroker(ctx.Done(), reflect.TypeOf(""))
 
 	const numSubscribers = 10
 	const numPublishers = 5

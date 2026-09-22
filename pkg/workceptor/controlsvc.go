@@ -512,6 +512,7 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			ed := status.ExtraData.(*RemoteExtraData)
 			ed.RemoteUnitID = unitid
 			ed.RemoteStarted = true
+			ed.Adopted = true
 			ed.SignWork = signWork
 		})
 

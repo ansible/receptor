@@ -38,6 +38,7 @@ type RemoteExtraData struct {
 	RemoteParams   map[string]string
 	RemoteUnitID   string
 	RemoteStarted  bool
+	Adopted        bool
 	LocalCancelled bool
 	LocalReleased  bool
 	SignWork       bool
@@ -311,6 +312,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
 	remoteWorkType := red.RemoteWorkType
+	adopted := red.Adopted
 	conn, reader := rw.GetConnection(mw)
 	defer func() {
 		if conn != nil {
@@ -368,6 +370,17 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		err = json.Unmarshal([]byte(status), &si)
 		if err != nil {
 			rw.GetWorkceptor().nc.GetLogger().Error("Error unmarshalling JSON: %s\n", status)
+
+			return
+		}
+		// Adoption assumes the remote unit is already underway; we never submitted it, so a
+		// pending remote will never be started by anyone and the adoption cannot succeed.
+		if adopted && si.State == WorkStatePending {
+			rw.GetWorkceptor().nc.GetLogger().Error("Adopted work unit %s on node %s has not started.\n", remoteUnitID, remoteNode)
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.State = WorkStateFailed
+				status.Detail = "Adopted remote work unit was never started"
+			})
 
 			return
 		}

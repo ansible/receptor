@@ -1605,9 +1605,11 @@ func TestProtoWriterDoesNotDropBufferedMessagesOnContextCancel(t *testing.T) {
 	defer cancel()
 
 	s := New(ctx, "test-node")
+	connCtx, connCancel := newConnContext(ctx.Done())
+	defer connCancel()
 	ci := &connInfo{
-		Context:          ctx,
-		CancelFunc:       cancel,
+		Context:          connCtx,
+		CancelFunc:       connCancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufSize),
 		lastReceivedLock: &sync.RWMutex{},
@@ -1667,9 +1669,11 @@ func TestProtoWriterLogsDroppedMessagesOnContextCancel(t *testing.T) {
 	var logBuf bytes.Buffer
 	s.Logger.SetOutput(&logBuf)
 
+	connCtx, connCancel := newConnContext(ctx.Done())
+	defer connCancel()
 	ci := &connInfo{
-		Context:          ctx,
-		CancelFunc:       cancel,
+		Context:          connCtx,
+		CancelFunc:       connCancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufSize),
 		lastReceivedLock: &sync.RWMutex{},
@@ -1718,9 +1722,11 @@ func TestWriteChanBufferDecouplesSendersFromProtoWriter(t *testing.T) {
 	sess := &slowBackendSession{delay: time.Hour, closed: make(chan struct{})}
 	defer sess.Close()
 
+	connCtx, connCancel := newConnContext(ctx.Done())
+	defer connCancel()
 	ci := &connInfo{
-		Context:          ctx,
-		CancelFunc:       cancel,
+		Context:          connCtx,
+		CancelFunc:       connCancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufferSize),
 		lastReceivedLock: &sync.RWMutex{},

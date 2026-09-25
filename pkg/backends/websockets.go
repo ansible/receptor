@@ -278,7 +278,6 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener.
 type WebsocketSession struct {
 	conn            Conner
-	done            <-chan struct{}
 	recvChan        chan *recvResult
 	closeChan       chan struct{}
 	closeChanCloser sync.Once
@@ -298,22 +297,21 @@ type Conner interface {
 func newWebsocketSession(done <-chan struct{}, conn Conner, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
-		done:            done,
 		recvChan:        make(chan *recvResult),
 		closeChan:       closeChan,
 		closeChanCloser: sync.Once{},
 	}
-	go ws.recvChannelizer()
+	go ws.recvChannelizer(done)
 
 	return ws
 }
 
 // recvChannelizer receives messages and pushes them to a channel.
-func (ns *WebsocketSession) recvChannelizer() {
+func (ns *WebsocketSession) recvChannelizer(done <-chan struct{}) {
 	for {
 		_, data, err := ns.conn.ReadMessage()
 		select {
-		case <-ns.done:
+		case <-done:
 			return
 		case ns.recvChan <- &recvResult{
 			data: data,

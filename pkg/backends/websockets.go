@@ -102,7 +102,7 @@ func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan n
 			if resp.Body.Close(); err != nil {
 				return nil, err
 			}
-			ns := newWebsocketSession(ctx, conn, closeChan)
+			ns := newWebsocketSession(ctx.Done(), conn, closeChan)
 
 			return ns, nil
 		})
@@ -242,7 +242,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 
 			return
 		}
-		ws := newWebsocketSession(ctx, conn, nil)
+		ws := newWebsocketSession(ctx.Done(), conn, nil)
 		sessChan <- ws
 	})
 	lc := net.ListenConfig{}
@@ -278,7 +278,6 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 // WebsocketSession implements BackendSession for WebsocketDialer and WebsocketListener.
 type WebsocketSession struct {
 	conn            Conner
-	context         context.Context
 	recvChan        chan *recvResult
 	closeChan       chan struct{}
 	closeChanCloser sync.Once
@@ -295,25 +294,24 @@ type Conner interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
-func newWebsocketSession(ctx context.Context, conn Conner, closeChan chan struct{}) *WebsocketSession {
+func newWebsocketSession(done <-chan struct{}, conn Conner, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
-		context:         ctx,
 		recvChan:        make(chan *recvResult),
 		closeChan:       closeChan,
 		closeChanCloser: sync.Once{},
 	}
-	go ws.recvChannelizer()
+	go ws.recvChannelizer(done)
 
 	return ws
 }
 
 // recvChannelizer receives messages and pushes them to a channel.
-func (ns *WebsocketSession) recvChannelizer() {
+func (ns *WebsocketSession) recvChannelizer(done <-chan struct{}) {
 	for {
 		_, data, err := ns.conn.ReadMessage()
 		select {
-		case <-ns.context.Done():
+		case <-done:
 			return
 		case ns.recvChan <- &recvResult{
 			data: data,

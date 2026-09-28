@@ -102,7 +102,7 @@ func (b *WebsocketDialer) Start(ctx context.Context, wg *sync.WaitGroup) (chan n
 			if resp.Body.Close(); err != nil {
 				return nil, err
 			}
-			ns := newWebsocketSession(ctx.Done(), conn, closeChan)
+			ns := newWebsocketSession(ctx, conn, closeChan)
 
 			return ns, nil
 		})
@@ -242,7 +242,7 @@ func (b *WebsocketListener) Start(ctx context.Context, wg *sync.WaitGroup) (chan
 
 			return
 		}
-		ws := newWebsocketSession(ctx.Done(), conn, nil)
+		ws := newWebsocketSession(ctx, conn, nil)
 		sessChan <- ws
 	})
 	lc := net.ListenConfig{}
@@ -294,14 +294,14 @@ type Conner interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
-func newWebsocketSession(done <-chan struct{}, conn Conner, closeChan chan struct{}) *WebsocketSession {
+func newWebsocketSession(ctx context.Context, conn Conner, closeChan chan struct{}) *WebsocketSession {
 	ws := &WebsocketSession{
 		conn:            conn,
 		recvChan:        make(chan *recvResult),
 		closeChan:       closeChan,
 		closeChanCloser: sync.Once{},
 	}
-	go ws.recvChannelizer(done)
+	go ws.recvChannelizer(ctx.Done())
 
 	return ws
 }

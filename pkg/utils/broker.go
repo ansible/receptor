@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -19,9 +20,9 @@ type Broker struct {
 }
 
 // NewBroker allocates a new Broker object.
-func NewBroker(done <-chan struct{}, msgType reflect.Type) *Broker {
+func NewBroker(ctx context.Context, msgType reflect.Type) *Broker {
 	b := &Broker{
-		done:      done,
+		done:      ctx.Done(),
 		msgType:   msgType,
 		publishCh: make(chan interface{}),
 		subCh:     make(chan chan interface{}),

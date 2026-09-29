@@ -30,6 +30,7 @@ author = AUTHOR_NAME
 # ones.
 extensions = [
     "sphinx.ext.autosectionlabel",
+    "sphinx_design",
 ]
 
 autosectionlabel_prefix_document = True

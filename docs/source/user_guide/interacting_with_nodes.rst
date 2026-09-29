@@ -11,44 +11,196 @@ Interacting with nodes
 
 The ``control-service`` allows the user to issue commands like "status" or "work submit" to a receptor node.
 
+There are three ways to reach a control service, and they are independent of the mesh backend transport:
+
+* **Unix domain socket** — set ``filename`` to create a filesystem socket. This is the most common case and what ``receptorctl --socket`` uses.
+* **TCP socket** — set ``tcplisten`` to accept connections on a network port, optionally secured with TLS. Useful for remote management when a local socket is not accessible.
+* **Mesh service** — set ``service`` to expose the control service as a named service on the Receptor overlay network. Any node on the mesh can then reach it via the ``connect`` command without a direct socket. This path is fully encrypted by the mesh's QUIC layer.
+
+Unix domain socket example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 foo.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: foo
+   .. tab-item:: Version 2
 
-    log-level:
-      level: debug
+      .. code-block:: yaml
 
-    tcp-listeners:
-      - port: 2222
+         ---
+         version: 2
+         node:
+           id: foo
 
-    control-services:
-      - service: control
-        filename: /tmp/foo.sock
+         log-level:
+           level: debug
+
+         tcp-listeners:
+           - port: 2222
+
+         control-services:
+           - service: control
+             filename: /tmp/foo.sock
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: foo
+
+         - log-level: debug
+
+         - tcp-listener:
+            port: 2222
+
+         - control-service:
+            service: control
+            filename: /tmp/foo.sock
 
 bar.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: bar
+   .. tab-item:: Version 2
 
-    log-level:
-      level: debug
+      .. code-block:: yaml
 
-    tcp-peers:
-      - address: localhost:2222
+         ---
+         version: 2
+         node:
+           id: bar
 
-    control-services:
-      - service: control
+         log-level:
+           level: debug
 
-If ``filename`` is set, receptor will create a unix domain socket. Use receptorctl to interact with the running receptor node via this domain socket (using "--socket"). The control service on `bar` does not have a ``filename`` set, but can be connected to using the "connect" command, as shown in the :ref:`connect_to_csv` section.
+         tcp-peers:
+           - address: localhost:2222
+
+         control-services:
+           - service: control
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: bar
+
+         - log-level: debug
+
+         - tcp-peer:
+            address: localhost:2222
+
+         - control-service:
+            service: control
+
+If ``filename`` is set, receptor will create a unix domain socket. Use receptorctl to interact with the running receptor node via this domain socket (using ``--socket``):
+
+.. code-block:: bash
+
+    receptorctl --socket /tmp/foo.sock status
+
+TCP socket example
+~~~~~~~~~~~~~~~~~~~
+
+Use ``tcplisten`` to expose the control service on a TCP port instead of a filesystem socket. This is useful for remote management when the node is not on the same host.
+
+.. tab-set::
+
+   .. tab-item:: Version 2
+
+      .. code-block:: yaml
+
+         ---
+         version: 2
+         node:
+           id: foo
+
+         log-level:
+           level: info
+
+         udp-listeners:
+           - port: 2223
+
+         control-services:
+           - service: control
+             tcplisten: "127.0.0.1:7323"
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: foo
+
+         - log-level: info
+
+         - udp-listener:
+            port: 2223
+
+         - control-service:
+            service: control
+            tcplisten: "127.0.0.1:7323"
+
+Connect using the ``tcp://`` scheme:
+
+.. code-block:: bash
+
+    receptorctl --socket tcp://127.0.0.1:7323 status
+
+Mesh service example
+~~~~~~~~~~~~~~~~~~~~~
+
+Setting only ``service`` (without ``filename`` or ``tcplisten``) exposes the control service on the Receptor overlay network. Any other node on the mesh can reach it using the ``connect`` command — no direct socket needed. The connection is encrypted by the mesh's QUIC layer.
+
+.. tab-set::
+
+   .. tab-item:: Version 2
+
+      .. code-block:: yaml
+
+         ---
+         version: 2
+         node:
+           id: bar
+
+         log-level:
+           level: info
+
+         udp-peers:
+           - address: localhost:2223
+
+         control-services:
+           - service: control
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: bar
+
+         - log-level: info
+
+         - udp-peer:
+            address: localhost:2223
+
+         - control-service:
+            service: control
+
+From ``foo`` (which has a local socket or TCP listener), connect to ``bar``'s control service through the mesh:
+
+.. code-block:: bash
+
+    receptorctl --socket /tmp/foo.sock connect bar control
+
+The control service on `bar` can also be connected to using the "connect" command, as shown in the :ref:`connect_to_csv` section.
 
 The "status" command will display helpful information about mesh, including known connections, routing tables, control services, and work types.
 
@@ -75,7 +227,7 @@ The "status" command will display helpful information about mesh, including know
     bar          control   Stream     2021-07-22 23:32:35 -               -
 
 ReceptorControl
-----------------
+~~~~~~~~~~~~~~~~
 
 For a more programmatic way to interact with receptor nodes, use the ReceptorControl python class.
 
@@ -89,7 +241,7 @@ For a more programmatic way to interact with receptor nodes, use the ReceptorCon
 .. _connect_to_csv:
 
 Connect to control service
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use the "connect" command to connect to any receptor control service running on the mesh. From here, issue a series of commands and examine the output, without disconnecting.
 
@@ -116,7 +268,7 @@ Keep in mind that a "work submit" command will require a payload. Type out the p
 .. _control_service_commands:
 
 Control service commands
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A ``control-service`` can accept commands in two formats; a space-delimited string or JSON. In some cases, JSON accepts arguments that are not supported in the string format and are marked with `json-only` in the table below.
 
@@ -182,7 +334,7 @@ The order of the parameters (from left to right) in the following table matter, 
 The above table does not apply the receptorctl command-line tool. For the exact usage of the various receptorctl commands, type ``receptorctl --help``, or to see the help for a specific command, ``receptorctl work submit --help``.
 
 Reload
--------
+~~~~~~~~
 
 In general, changes to a receptor configuration file do not take effect until the receptor process is restarted.
 

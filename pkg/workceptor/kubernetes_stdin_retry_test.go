@@ -105,8 +105,47 @@ func TestStreamStdinWithRetryBacksOff(t *testing.T) {
 	_ = kw.streamStdinWithRetry(nil, nil, "ns", "pod")
 	elapsed := time.Since(start)
 
-	// Fibonacci multipliers 1,1,2,3,5 against a 10ms base is 120ms; a fixed 10ms delay would be 50ms.
+	// Five attempts wait four times, multipliers 1,2,3,5 against a 10ms base: 110ms. A fixed 10ms delay would be 40ms.
 	if elapsed < 100*time.Millisecond {
 		t.Errorf("expected the delays to grow across attempts, total wait was only %s", elapsed)
+	}
+}
+
+// Nothing follows the last attempt, so there is no wait after it, and cancelling the work unit ends a wait
+// in progress rather than leaving the goroutine asleep.
+func TestStreamStdinWithRetryStopsWaitingWhenCancelled(t *testing.T) {
+	t.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10s")
+	t.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "5")
+
+	api := &stubKubeAPIForStdinRetry{failures: 99, err: errDialingBackend}
+	kw := newKubeUnitForStdinRetry(api)
+	time.AfterFunc(20*time.Millisecond, kw.GetCancel())
+
+	start := time.Now()
+	err := kw.streamStdinWithRetry(nil, nil, "ns", "pod")
+	elapsed := time.Since(start)
+
+	if !errors.Is(err, errDialingBackend) {
+		t.Errorf("expected the last stream error, got: %v", err)
+	}
+	if api.calls != 1 {
+		t.Errorf("expected cancellation to end the first wait, got %d attempts", api.calls)
+	}
+	if elapsed > time.Second {
+		t.Errorf("expected cancellation to end the wait promptly, took %s", elapsed)
+	}
+}
+
+func TestStreamStdinWithRetryDoesNotWaitAfterTheLastAttempt(t *testing.T) {
+	t.Setenv("RECEPTOR_KUBE_TIMEOUT_START", "10s")
+	t.Setenv("RECEPTOR_KUBE_RETRY_COUNT", "1")
+
+	api := &stubKubeAPIForStdinRetry{failures: 99, err: errDialingBackend}
+	kw := newKubeUnitForStdinRetry(api)
+
+	start := time.Now()
+	_ = kw.streamStdinWithRetry(nil, nil, "ns", "pod")
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("expected no wait after the only attempt, took %s", elapsed)
 	}
 }

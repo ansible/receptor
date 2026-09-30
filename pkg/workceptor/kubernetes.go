@@ -335,17 +335,24 @@ func (kw *KubeUnit) streamStdinWithRetry(exec remotecommand.Executor, stdin *STD
 		if err == nil {
 			return nil
 		}
+		if retries == 1 {
+			break
+		}
 
 		// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
 		kw.GetWorkceptor().nc.GetLogger().Warning(
 			"Error streaming stdin to pod %s/%s. Will retry %d more times. Error: %s",
 			podNamespace,
 			podName,
-			retries,
+			retries-1,
 			err,
 		)
 
-		time.Sleep(kw.GetSleepDuration(curDelay))
+		select {
+		case <-kw.GetContext().Done():
+			return err
+		case <-time.After(kw.GetSleepDuration(curDelay)):
+		}
 		prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
 	}
 

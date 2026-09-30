@@ -128,7 +128,6 @@ func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.Wo
 }
 
 func TestRemoteWorkUnredactedStatus(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	wu, mockBaseWorkUnit, _, _, _ := createRemoteWorkTestSetup(t, ctx) //nolint:dogsled
 	restartTestCases := []struct {
@@ -141,7 +140,6 @@ func TestRemoteWorkUnredactedStatus(t *testing.T) {
 	statusLock := &sync.RWMutex{}
 	for _, testCase := range restartTestCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
 			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
 			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
 				return &workceptor.StatusFileData{}
@@ -721,5 +719,244 @@ func TestRemoteWorkGetConnectionCryptoErrors(t *testing.T) {
 				t.Errorf("Expected State=0, got: %d", capturedState)
 			}
 		})
+	}
+}
+
+type remoteWorkAdoptedUnitTestCase struct {
+	name                        string
+	adopted                     bool
+	remoteState                 int
+	remoteWorkType              string
+	remoteStatusWorkType        string
+	lastUpdateError             error
+	expectRemoteWorkTypePersist bool
+	expectFail                  bool
+}
+
+type remoteWorkAdoptedUnitObservations struct {
+	failed                   chan workceptor.StatusFileData
+	remoteWorkTypePersisted  chan string
+	statusWriteErrorObserved chan struct{}
+	copied                   chan int
+}
+
+// TestRemoteWorkAdoptedUnitNotStarted verifies that an adopted work unit whose remote
+// reports a pending state is failed locally, since adoption never submits the work and
+// nothing will ever start it. Non-adopted units must keep tracking pending normally.
+func TestRemoteWorkAdoptedUnitNotStarted(t *testing.T) {
+	t.Parallel()
+	tests := []remoteWorkAdoptedUnitTestCase{
+		{
+			name:                 "adopted_remote_pending_fails_locally",
+			adopted:              true,
+			remoteState:          workceptor.WorkStatePending,
+			remoteStatusWorkType: "echoint",
+			expectFail:           true,
+		},
+		{
+			name:                 "adopted_remote_running_keeps_monitoring",
+			adopted:              true,
+			remoteState:          workceptor.WorkStateRunning,
+			remoteWorkType:       "echoint",
+			remoteStatusWorkType: "echoint",
+		},
+		{
+			name:                        "adopted_remote_running_persists_missing_work_type",
+			adopted:                     true,
+			remoteState:                 workceptor.WorkStateRunning,
+			remoteStatusWorkType:        "echoint",
+			expectRemoteWorkTypePersist: true,
+		},
+		{
+			name:                 "adopted_remote_running_without_reported_work_type",
+			adopted:              true,
+			remoteState:          workceptor.WorkStateRunning,
+			remoteStatusWorkType: "",
+		},
+		{
+			name:                 "submitted_remote_pending_keeps_monitoring",
+			remoteState:          workceptor.WorkStatePending,
+			remoteWorkType:       "echoint",
+			remoteStatusWorkType: "echoint",
+		},
+		{
+			name:                 "submitted_remote_running_retries_status_write",
+			remoteState:          workceptor.WorkStateRunning,
+			remoteWorkType:       "echoint",
+			remoteStatusWorkType: "echoint",
+			lastUpdateError:      fmt.Errorf("temporary status write failure"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { runRemoteWorkAdoptedUnitTest(t, tt) })
+	}
+}
+
+func runRemoteWorkAdoptedUnitTest(t *testing.T, tt remoteWorkAdoptedUnitTestCase) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+	t.Cleanup(func() {
+		cancel()
+		time.Sleep(200 * time.Millisecond)
+	})
+
+	remoteExtraData := &workceptor.RemoteExtraData{
+		RemoteStarted:  true,
+		Adopted:        tt.adopted,
+		RemoteNode:     "execution",
+		RemoteUnitID:   "remoteunit",
+		RemoteWorkType: tt.remoteWorkType,
+		RemoteParams:   make(map[string]string),
+	}
+	observations := setupRemoteWorkAdoptedObservations(t, tt, mockBaseWorkUnit, w, remoteExtraData)
+	messages := []string{
+		"execution\n",
+		fmt.Sprintf("{\"State\": %d, \"Detail\": \"status detail\", \"StdoutSize\": 0, \"WorkType\": %q}\n", tt.remoteState, tt.remoteStatusWorkType),
+	}
+	createRemoteWorkNetworkSetup(t, ctrl, ctx, messages, mockNetceptor, mockBaseWorkUnit, filepath.Join("/tmp", tt.name), remoteExtraData, true)
+	if err := wu.Restart(); err != nil {
+		t.Fatalf("Unexpected error restarting work unit: %v", err)
+	}
+	assertRemoteWorkAdoptedObservations(t, tt, observations)
+}
+
+func setupRemoteWorkAdoptedObservations(t *testing.T, tt remoteWorkAdoptedUnitTestCase, mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, w *workceptor.Workceptor, remoteExtraData *workceptor.RemoteExtraData) *remoteWorkAdoptedUnitObservations {
+	t.Helper()
+	statusLock := &sync.RWMutex{}
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+		return &workceptor.StatusFileData{}
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: remoteExtraData}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().ID().Return("test-id").AnyTimes()
+
+	observations := &remoteWorkAdoptedUnitObservations{
+		failed:                   make(chan workceptor.StatusFileData, 1),
+		remoteWorkTypePersisted:  make(chan string, 1),
+		statusWriteErrorObserved: make(chan struct{}, 1),
+		copied:                   make(chan int, 1),
+	}
+	if tt.lastUpdateError != nil {
+		expectRemoteStatusWriteError(mockBaseWorkUnit, tt.lastUpdateError, observations.statusWriteErrorObserved)
+	}
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+		status := workceptor.StatusFileData{ExtraData: remoteExtraData}
+		updateFunc.(func(*workceptor.StatusFileData))(&status)
+		observeRemoteAdoptedStatus(observations, status)
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(state int, _ string, _ int64) {
+		observeRemoteAdoptedState(observations, state)
+	}).AnyTimes()
+
+	return observations
+}
+
+func expectRemoteStatusWriteError(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, writeErr error, observed chan struct{}) {
+	mockBaseWorkUnit.EXPECT().LastUpdateError().DoAndReturn(func() error {
+		observed <- struct{}{}
+
+		return writeErr
+	}).Times(1)
+}
+
+func observeRemoteAdoptedStatus(observations *remoteWorkAdoptedUnitObservations, status workceptor.StatusFileData) {
+	if status.State == workceptor.WorkStateFailed {
+		select {
+		case observations.failed <- status:
+		default:
+		}
+	}
+	extra, ok := status.ExtraData.(*workceptor.RemoteExtraData)
+	if ok && extra.RemoteWorkType != "" {
+		select {
+		case observations.remoteWorkTypePersisted <- extra.RemoteWorkType:
+		default:
+		}
+	}
+}
+
+func observeRemoteAdoptedState(observations *remoteWorkAdoptedUnitObservations, state int) {
+	select {
+	case observations.copied <- state:
+	default:
+	}
+}
+
+func assertRemoteWorkAdoptedObservations(t *testing.T, tt remoteWorkAdoptedUnitTestCase, observations *remoteWorkAdoptedUnitObservations) {
+	if tt.expectFail {
+		assertRemoteWorkAdoptionFailure(t, observations)
+
+		return
+	}
+	assertRemoteWorkStatusCopied(t, tt.remoteState, observations.copied)
+	assertRemoteWorkStatusWriteErrorObserved(t, tt.lastUpdateError, observations.statusWriteErrorObserved)
+	assertRemoteWorkWasNotFailed(t, observations.failed)
+	assertRemoteWorkTypePersisted(t, tt.expectRemoteWorkTypePersist, observations.remoteWorkTypePersisted)
+}
+
+func assertRemoteWorkAdoptionFailure(t *testing.T, observations *remoteWorkAdoptedUnitObservations) {
+	select {
+	case status := <-observations.failed:
+		if status.Detail != "Adopted remote work unit was never started" {
+			t.Errorf("Expected detail 'Adopted remote work unit was never started', got: %s", status.Detail)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Expected adopted work unit reporting pending to be failed locally")
+	}
+	assertRemoteAdoptedPendingWasNotCopied(t, observations.copied)
+}
+
+func assertRemoteAdoptedPendingWasNotCopied(t *testing.T, copied <-chan int) {
+	select {
+	case state := <-copied:
+		t.Errorf("Expected no status copy from a never-started adopted unit, got state %d", state)
+	default:
+	}
+}
+
+func assertRemoteWorkStatusCopied(t *testing.T, wantState int, copied <-chan int) {
+	select {
+	case state := <-copied:
+		if state != wantState {
+			t.Errorf("Expected remote state %d to be copied locally, got %d", wantState, state)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Expected remote status to be copied to the local work unit")
+	}
+}
+
+func assertRemoteWorkStatusWriteErrorObserved(t *testing.T, expected error, observed <-chan struct{}) {
+	if expected == nil {
+		return
+	}
+	select {
+	case <-observed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("status write error was not observed")
+	}
+}
+
+func assertRemoteWorkWasNotFailed(t *testing.T, failed <-chan workceptor.StatusFileData) {
+	select {
+	case status := <-failed:
+		t.Errorf("Unexpected local failure: %s", status.Detail)
+	default:
+	}
+}
+
+func assertRemoteWorkTypePersisted(t *testing.T, expected bool, persisted <-chan string) {
+	if !expected {
+		return
+	}
+	select {
+	case persistedType := <-persisted:
+		if persistedType != "echoint" {
+			t.Errorf("RemoteWorkType = %q, want echoint", persistedType)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("remote work type was not persisted")
 	}
 }

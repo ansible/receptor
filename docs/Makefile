@@ -15,7 +15,10 @@ help:
 	@echo -e "  lint        All documentation linters (including linkcheck)"
 	@echo -e "  rstcheck    rstcheck linter"
 
-.PHONY: doc8 help lint Makefile rstcheck server
+.PHONY: doc8 help install lint Makefile rstcheck server
+
+install:
+	pip install -r requirements.txt -r source/requirements.txt
 
 doc8:
 	doc8 --ignore D001 .
@@ -33,5 +36,5 @@ rstcheck:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 
-server:
-	python3 -m http.server
+server: html
+	python3 -m http.server --directory build/html

@@ -16,6 +16,8 @@ Using the Receptor CLI
       - Description
     * - ``--config <filename>``
       - Loads configuration options from a YAML file.
+    * - ``--config-v2``
+      - Use the version 2 config format (flat YAML map). Must be combined with ``--config``. Without this flag, receptor expects the legacy list-of-maps format.
     * - ``--version``
       - Display the Receptor version.
     * - ``--help``
@@ -28,24 +30,50 @@ Configuring Receptor with a config file
 
 Receptor can be configured on the command-line, exemplified above, or via a yaml config file. All actions and parameters shown in ``receptor --help`` can be written to a config file.
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: foo
+   .. tab-item:: Version 2
 
-    local-only:
-      local: true
+      .. code-block:: yaml
 
-    log-level:
-      level: Debug
+         ---
+         version: 2
+         node:
+           id: foo
+
+         local-only:
+           local: true
+
+         log-level:
+           level: Debug
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: foo
+
+         - local-only:
+
+         - log-level: Debug
 
 Start receptor using the config file
 
-.. code-block:: bash
+.. tab-set::
 
-    receptor --config foo.yml
+   .. tab-item:: Version 2
+
+      .. code-block:: bash
+
+         receptor --config-v2 --config foo.yml
+
+   .. tab-item:: Version 1
+
+      .. code-block:: bash
+
+         receptor --config foo.yml
 
 Changing the configuration file does take effect until the receptor process is restarted.
 

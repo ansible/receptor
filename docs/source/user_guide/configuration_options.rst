@@ -111,7 +111,7 @@ Run qvis locally:
 -----------------
 
 - Git clone qvis repo
-- ``cd visualizations`` 
+- ``cd visualizations``
 - ``run npm install``
 - ``npm run serve``
 - Qvis is now served on port 8080
@@ -178,7 +178,7 @@ Use pyroscope-client to implement pyroscope push-mode to profile receptor and pu
     pyroscope-client:
       - applicationName: "receptor"
         serverAddress: "http://localhost:4040"
-        profileTypes: 
+        profileTypes:
           - ProfileGoroutines
           - ProfileMutexCount
           - ProfileMutexDuration

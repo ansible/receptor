@@ -1,8 +1,10 @@
 import json
 import re
 import time
+from io import BytesIO
 
 import pytest
+from click.testing import CliRunner
 
 from receptorctl import cli as commands
 
@@ -110,6 +112,23 @@ class TestCLI:
         assert result.exception is not None
         assert "invalid-unit-id" in str(result.exception)
 
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["submit", "sleep", "--no-payload", "--rm"],
+            ["adopt", "--node", "node3", "unit123", "--rm"],
+        ],
+    )
+    def test_cmd_work_rm_requires_follow_before_control_request(self, invoke, monkeypatch, args):
+        get_rc_calls = []
+        monkeypatch.setattr(commands, "get_rc", lambda ctx: get_rc_calls.append(ctx))
+
+        result = invoke(commands.work, args)
+
+        assert result.exit_code == 1
+        assert "Must use --rm with --follow." in result.stderr
+        assert get_rc_calls == []
+
     def test_cmd_work_results_successful(self, invoke, default_receptor_controller_socket_file):
         node1_controller = default_receptor_controller_socket_file
 
@@ -142,3 +161,65 @@ class TestCLI:
         assert result.exit_code != 0, (
             "The 'work cancel' command should fail, but did not return non-zero exit code"
         )
+
+
+class AdoptController:
+    def __init__(self, error=None):
+        self.error = error
+        self.adopt_calls = []
+        self.simple_commands = []
+
+    def adopt_work(self, node, unit_id, tlsclient="", signwork=False):
+        self.adopt_calls.append((node, unit_id, tlsclient, signwork))
+        if self.error:
+            raise self.error
+        return {"result": "Adopted", "unitid": "local-unit"}
+
+    def get_work_results(self, unit_id, startpos=0):
+        return BytesIO(b"adopted output\n")
+
+    def simple_command(self, command):
+        self.simple_commands.append(command)
+        if command.startswith("work status"):
+            return {"State": 2}
+        return {"result": "Released"}
+
+
+def test_adopt_cli_success_prints_result_and_passes_options():
+    controller = AdoptController()
+    result = CliRunner().invoke(
+        commands.adopt,
+        ["--node", "node3", "remote-unit", "--tls-client", "client1", "--signwork"],
+        obj={"rc": controller},
+    )
+
+    assert result.exit_code == 0
+    assert "Result: Adopted" in result.stdout
+    assert "Unit ID: local-unit" in result.stdout
+    assert controller.adopt_calls == [("node3", "remote-unit", "client1", True)]
+
+
+def test_adopt_cli_follow_and_remove_releases_completed_work():
+    controller = AdoptController()
+    result = CliRunner().invoke(
+        commands.adopt,
+        ["--node", "node3", "remote-unit", "--follow", "--rm"],
+        obj={"rc": controller},
+    )
+
+    assert result.exit_code == 0
+    assert "adopted output" in result.stdout
+    assert controller.adopt_calls == [("node3", "remote-unit", "", False)]
+    assert controller.simple_commands == ["work status local-unit", "work release local-unit"]
+
+
+def test_adopt_cli_reports_control_request_error():
+    controller = AdoptController(error=RuntimeError("controller unavailable"))
+    result = CliRunner().invoke(
+        commands.adopt,
+        ["--node", "node3", "remote-unit"],
+        obj={"rc": controller},
+    )
+
+    assert result.exit_code == 101
+    assert "controller unavailable" in result.stderr

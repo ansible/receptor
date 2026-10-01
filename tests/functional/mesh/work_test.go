@@ -816,3 +816,189 @@ func TestSignedWorkVerification(t *testing.T) {
 		t.Fatalf("Did not see the expected error. Wanted %s, got: %s", expected, actual)
 	}
 }
+
+func submitRunningWorkForAdoption(t *testing.T, controller *ReceptorControl) string {
+	t.Helper()
+	unitID, err := controller.WorkSubmit("node3", "echosleeplong")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	if err := controller.AssertWorkRunning(ctx, unitID); err != nil {
+		t.Fatal(err)
+	}
+	status, err := controller.GetWorkStatus(unitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remoteUnitID, ok := status.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+	if !ok || remoteUnitID == "" {
+		t.Fatal("remote work unit ID is missing")
+	}
+
+	return remoteUnitID
+}
+
+func adoptAndCheckResults(t *testing.T, controller *ReceptorControl, remoteNode, remoteUnitID string, expectedResults []byte) string {
+	t.Helper()
+	response, err := controller.WorkAdopt(remoteNode, remoteUnitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, ok := response["result"].(string)
+	if !ok || (result != "Adopted" && result != "Adopt Pending") {
+		t.Fatalf("unexpected adopt response: %#v", response)
+	}
+	localUnitID, ok := response["unitid"].(string)
+	if !ok || localUnitID == "" {
+		t.Fatalf("adopt response has no local unit ID: %#v", response)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	if err := controller.AssertWorkSucceeded(ctx, localUnitID); err != nil {
+		t.Fatal(err)
+	}
+	if err := controller.AssertWorkResults(localUnitID, expectedResults); err != nil {
+		t.Fatal(err)
+	}
+
+	return localUnitID
+}
+
+func TestWorkAdopt(t *testing.T) {
+	t.Parallel()
+	for _, plugin := range workPlugins {
+		plugin := plugin
+		t.Run(string(plugin), func(t *testing.T) {
+			t.Parallel()
+			controllers, m, expectedResults := workSetup(plugin, t)
+			defer m.WaitForShutdown()
+			defer m.Destroy()
+
+			remoteUnitID := submitRunningWorkForAdoption(t, controllers["node1"])
+			adoptAndCheckResults(t, controllers["node2"], "node3", remoteUnitID, expectedResults)
+			if _, err := controllers["node2"].WorkAdopt("node3", remoteUnitID); err == nil || !strings.Contains(err.Error(), "already in use") {
+				t.Fatalf("second adoption error = %v, want already-in-use error", err)
+			}
+		})
+	}
+}
+
+func TestWorkAdoptCompletedWork(t *testing.T) {
+	t.Parallel()
+	controllers, m, expectedResults := workSetup("command", t)
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	unitID, err := controllers["node1"].WorkSubmit("node3", "echosleepshort")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	if err := controllers["node1"].AssertWorkSucceeded(ctx, unitID); err != nil {
+		t.Fatal(err)
+	}
+	status, err := controllers["node1"].GetWorkStatus(unitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remoteUnitID := status.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+	if remoteUnitID == "" {
+		t.Fatal("remote work unit ID is missing")
+	}
+	adoptAndCheckResults(t, controllers["node2"], "node3", remoteUnitID, expectedResults)
+}
+
+func TestWorkAdoptNonexistentRemoteUnit(t *testing.T) {
+	t.Parallel()
+	controllers, m, _ := workSetup("command", t)
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	response, err := controllers["node2"].WorkAdopt("node3", "does-not-exist")
+	if err != nil {
+		t.Fatal(err)
+	}
+	localUnitID, ok := response["unitid"].(string)
+	if !ok || localUnitID == "" {
+		t.Fatalf("adopt response has no local unit ID: %#v", response)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := controllers["node2"].AssertWorkFailed(ctx, localUnitID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWorkAdoptSignedVerification(t *testing.T) {
+	t.Parallel()
+	privateKey, publicKey, err := utils.GenerateRSAPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.WorkSigningKey = &workceptor.SigningKeyPrivateCfg{PrivateKey: privateKey}
+	node1.ListenerCfgs = map[listenerName]ListenerCfg{listenerName("tcp"): newListenerCfg("tcp", "", 1, nil)}
+	node2 := m.NewLibNode("node2")
+	node2.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.CommandWorkerCfg{WorkType: "echo", Command: "bash", Params: "-c 'echo signed-output'", VerifySignature: true},
+	}
+	node2.WorkVerificationKey = &workceptor.VerifyingKeyPublicCfg{PublicKey: publicKey}
+	node2.ListenerCfgs = map[listenerName]ListenerCfg{listenerName("tcp"): newListenerCfg("tcp", "", 1, nil)}
+	node2.Connections = []Connection{{RemoteNode: node1, Protocol: "tcp"}}
+	node3 := m.NewLibNode("node3")
+	node3.WorkSigningKey = &workceptor.SigningKeyPrivateCfg{PrivateKey: privateKey}
+	node3.Connections = []Connection{{RemoteNode: node2, Protocol: "tcp"}}
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	nodes := m.GetNodes()
+	node1Controller := NewReceptorControl()
+	if err := node1Controller.Connect(nodes["node1"].GetControlSocket()); err != nil {
+		t.Fatal(err)
+	}
+	node2Controller := NewReceptorControl()
+	if err := node2Controller.Connect(nodes["node2"].GetControlSocket()); err != nil {
+		t.Fatal(err)
+	}
+	node3Controller := NewReceptorControl()
+	if err := node3Controller.Connect(nodes["node3"].GetControlSocket()); err != nil {
+		t.Fatal(err)
+	}
+	unitID, err := node1Controller.WorkSubmitJSON(`{"command":"work","subcommand":"submit","worktype":"echo","node":"node2","signwork":"true"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := node1Controller.AssertWorkSucceeded(ctx, unitID); err != nil {
+		t.Fatal(err)
+	}
+	status, err := node1Controller.GetWorkStatus(unitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remoteUnitID := status.ExtraData.(map[string]interface{})["RemoteUnitID"].(string)
+	response, err := node3Controller.WorkAdoptJSON(fmt.Sprintf(`{"command":"work","subcommand":"adopt","node":"node2","unitid":%q,"signwork":"true"}`, remoteUnitID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	localUnitID, ok := response["unitid"].(string)
+	if !ok || localUnitID == "" {
+		t.Fatalf("adopt response has no local unit ID: %#v", response)
+	}
+	if err := node3Controller.AssertWorkSucceeded(ctx, localUnitID); err != nil {
+		t.Fatal(err)
+	}
+	if err := node3Controller.AssertWorkResults(localUnitID, []byte("signed-output\n")); err != nil {
+		t.Fatal(err)
+	}
+}

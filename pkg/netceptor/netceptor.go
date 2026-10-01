@@ -182,11 +182,50 @@ type MessageData struct {
 	Data        []byte
 }
 
+// connContext is a minimal cancellable signalling type for connInfo.
+// Only Done and Err are exposed; Deadline and Value are intentionally absent.
+type connContext struct {
+	done chan struct{}
+	once sync.Once
+	mu   sync.Mutex
+	err  error
+}
+
+func newConnContext(parentDone <-chan struct{}) (*connContext, func()) {
+	cc := &connContext{done: make(chan struct{})}
+	cancel := func() {
+		cc.once.Do(func() {
+			cc.mu.Lock()
+			cc.err = context.Canceled
+			cc.mu.Unlock()
+			close(cc.done)
+		})
+	}
+	go func() {
+		select {
+		case <-parentDone:
+			cancel()
+		case <-cc.done:
+		}
+	}()
+
+	return cc, cancel
+}
+
+func (cc *connContext) Done() <-chan struct{} { return cc.done }
+
+func (cc *connContext) Err() error {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	return cc.err
+}
+
 type connInfo struct {
 	ReadChan         chan []byte
 	WriteChan        chan []byte
-	Context          context.Context
-	CancelFunc       context.CancelFunc
+	Context          *connContext
+	CancelFunc       func()
 	Cost             float64
 	lastReceivedData time.Time
 	lastReceivedLock *sync.RWMutex
@@ -772,7 +811,7 @@ func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			timedOut := make(map[string]context.CancelFunc, 0)
+			timedOut := make(map[string]func(), 0)
 			s.connLock.RLock()
 			for conn := range s.connections {
 				connInfo := s.connections[conn]
@@ -1722,7 +1761,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 		lastReceivedLock: &sync.RWMutex{},
 		logger:           s.Logger,
 	}
-	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
+	ci.Context, ci.CancelFunc = newConnContext(ctx.Done())
+	defer ci.CancelFunc()
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
 	initDoneChan := make(chan bool)

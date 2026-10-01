@@ -9,7 +9,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/controlsvc/mock_controlsvc"
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/utils/mock_utils"
@@ -74,20 +73,7 @@ func TestControlFuncResultsDoesNotCloseConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Capture the ControlCommandType via RegisterWithControlService.
-	var cmdType controlsvc.ControlCommandType
-	mockServer := mock_workceptor.NewMockServerForWorkceptor(ctrl)
-	mockServer.EXPECT().AddControlFunc("work", gomock.Any()).DoAndReturn(
-		func(_ string, ct controlsvc.ControlCommandType) error {
-			cmdType = ct
-
-			return nil
-		},
-	)
-	err = w.RegisterWithControlService(mockServer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cmdType := workceptor.NewWorkceptorCommandTypeForTest(w)
 
 	// Create a "results" command to simulate getting work results
 	// using receptorctl.

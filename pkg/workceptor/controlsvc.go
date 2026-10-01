@@ -70,8 +70,20 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 			if err != nil {
 				return nil, fmt.Errorf("error converting start position to integer: %s", err)
 			}
+			if c.params["startpos"].(int64) < 0 {
+				c.params["startpos"] = int64(0)
+			}
 		} else {
 			c.params["startpos"] = int64(0)
+		}
+	case "adopt":
+		if len(tokens) < 3 {
+			return nil, fmt.Errorf("work adopt requires a remote node and unit ID")
+		}
+		c.params["node"] = tokens[1]
+		c.params["unitid"] = tokens[2]
+		if len(tokens) > 3 {
+			c.params["params"] = strings.Join(tokens[3:], " ")
 		}
 	}
 
@@ -181,7 +193,31 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 		}
 		c.params["startpos"], err = intFromMap(config, "startpos")
 		if err != nil {
+			c.params["startpos"] = int64(0)
+		}
+		if c.params["startpos"].(int64) < 0 {
+			c.params["startpos"] = int64(0)
+		}
+		signature, err := strFromMap(config, "signature")
+		if err == nil {
+			c.params["signature"] = signature
+		}
+	case "adopt":
+		c.params["node"], err = strFromMap(config, "node")
+		if err != nil {
 			return nil, err
+		}
+		c.params["unitid"], err = strFromMap(config, "unitid")
+		if err != nil {
+			return nil, err
+		}
+		tlsClient, err := strFromMap(config, "tlsclient")
+		if err == nil {
+			c.params["tlsclient"] = tlsClient
+		}
+		signWork, err := boolFromMap(config, "signwork")
+		if err == nil {
+			c.params["signwork"] = strconv.FormatBool(signWork)
 		}
 		signature, err := strFromMap(config, "signature")
 		if err == nil {
@@ -214,6 +250,21 @@ func getSignWorkFromStatus(status *StatusFileData) bool {
 	}
 
 	return false
+}
+
+func finalizeAdoptRestart(worker WorkUnit, response map[string]interface{}, err error) (map[string]interface{}, error) {
+	if err != nil && !IsPending(err) {
+		worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error adopting remote work: %s", err), 0)
+
+		return response, err
+	}
+	if IsPending(err) {
+		response["result"] = "Adopt Pending"
+	} else {
+		response["result"] = "Adopted"
+	}
+
+	return response, nil
 }
 
 // Worker function called by the control service to process a "work" command.
@@ -404,7 +455,10 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 		startPos, err := intFromMap(c.params, "startpos")
 		if err != nil {
-			return nil, err
+			startPos = 0
+		}
+		if startPos < 0 {
+			startPos = 0
 		}
 		signature, err := strFromMap(c.params, "signature")
 		if err != nil {
@@ -431,6 +485,57 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		}
 
 		return nil, nil
+	case "adopt":
+		remoteNode, err := strFromMap(c.params, "node")
+		if err != nil {
+			return nil, err
+		}
+		unitid, err := strFromMap(c.params, "unitid")
+		if err != nil {
+			return nil, err
+		}
+		tlsClient, err := strFromMap(c.params, "tlsclient")
+		if err != nil {
+			tlsClient = ""
+		}
+		signWork, err := boolFromMap(c.params, "signwork")
+		if err != nil {
+			signWork = false
+		}
+		signature, err := strFromMap(c.params, "signature")
+		if err != nil {
+			signature = ""
+		}
+
+		err = c.processSignature("remote", signature, connIsUnix, signWork)
+		if err != nil {
+			return nil, err
+		}
+
+		cfr := make(map[string]interface{})
+
+		var worker WorkUnit
+
+		// Create new local unit to track the remote work
+		worker, err = c.w.AllocateRemoteUnit(remoteNode, "", unitid, tlsClient, "", signWork, map[string]string{})
+		if err != nil {
+			return nil, err
+		}
+
+		// Set RemoteUnitID and RemoteStarted for adoption
+		worker.UpdateFullStatus(func(status *StatusFileData) {
+			ed := status.ExtraData.(*RemoteExtraData)
+			ed.RemoteUnitID = unitid
+			ed.RemoteStarted = true
+			ed.Adopted = true
+			ed.SignWork = signWork
+		})
+
+		cfr["unitid"] = worker.ID()
+		worker.UpdateBasicStatus(WorkStatePending, "Adopting Remote Work", 0)
+		err = worker.Restart()
+
+		return finalizeAdoptRestart(worker, cfr, err)
 	}
 
 	return nil, fmt.Errorf("bad command")

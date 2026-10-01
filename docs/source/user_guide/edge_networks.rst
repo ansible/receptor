@@ -33,48 +33,104 @@ The configuration files for the diagram above are listed below.
 
 foo.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: foo
-      maxidleconnectiontimeout: 60s
+   .. tab-item:: Version 2
 
-    log-level:
-      level: Debug
+      .. code-block:: yaml
 
-    tcp-listeners:
-      - port: 2222
+         ---
+         version: 2
+         node:
+           id: foo
+           maxidleconnectiontimeout: 60s
+
+         log-level:
+           level: Debug
+
+         tcp-listeners:
+           - port: 2222
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: foo
+            maxidleconnectiontimeout: 60s
+
+         - log-level: Debug
+
+         - tcp-listener:
+            port: 2222
 
 bar.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    node:
-      id: bar
-      maxidleconnectiontimeout: 60s
+   .. tab-item:: Version 2
 
-    log-level:
-      level: Debug
+      .. code-block:: yaml
 
-    tcp-peers:
-      - address: localhost:2222
+         ---
+         version: 2
+         node:
+           id: bar
+           maxidleconnectiontimeout: 60s
+
+         log-level:
+           level: Debug
+
+         tcp-peers:
+           - address: localhost:2222
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: bar
+            maxidleconnectiontimeout: 60s
+
+         - log-level: Debug
+
+         - tcp-peer:
+            address: localhost:2222
 
 fish.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    node:
-      id: fish
-      maxidleconnectiontimeout: 60s
+   .. tab-item:: Version 2
 
-    log-level:
-      level: Debug
+      .. code-block:: yaml
 
-    tcp-peers:
-      - address: localhost:2222
+         ---
+         version: 2
+         node:
+           id: fish
+           maxidleconnectiontimeout: 60s
+
+         log-level:
+           level: Debug
+
+         tcp-peers:
+           - address: localhost:2222
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: fish
+            maxidleconnectiontimeout: 60s
+
+         - log-level: Debug
+
+         - tcp-peer:
+            address: localhost:2222
 
 *Note* - All Receptor nodes in the mesh must define a `maxidleconnectiontimeout` value, if this value is consumed on ANY node. The effective `maxidleconnectiontimeout` value is the minumum value between all the nodes in the mesh.

@@ -8,57 +8,302 @@ Connecting nodes
 
 
 Connect nodes through Receptor backends.
-TCP, UDP, and websockets are currently supported.
+TCP, UDP, and WebSockets are the supported backend transports.
+These backends are not the mesh protocol itself — they are the underlying carrier over which Receptor runs QUIC.
+QUIC provides the encrypted, multiplexed streams that the mesh protocol uses to route traffic between nodes.
+
+.. list-table:: Backend transports
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Backend
+     - When to use
+   * - UDP
+     - Default choice. QUIC was designed for UDP, so this is the most direct path.
+   * - TCP
+     - Use when firewalls or network policy block UDP. QUIC frames are carried inside the TCP stream.
+   * - WebSocket
+     - Use when only HTTP/HTTPS traffic is allowed out (e.g. corporate proxies). QUIC frames are tunneled over a WebSocket connection.
+
 For example, you can connect one Receptor node to another using the ``tcp-peers`` and ``tcp-listeners`` configuration options.
 Similarly you can connect Receptor nodes using the ``ws-peers`` and ``ws-listeners`` configuration options.
 
 .. image:: mesh.png
    :alt: Connected nodes as netceptor peers
 
+UDP example (control → hop → execution)
+-----------------------------------------
+
+The following three-node example uses UDP as the backend transport.
+``control`` is the root listener; ``hop`` connects to ``control`` and also listens for additional peers;
+``execution`` connects only to ``hop`` and reaches ``control`` through it.
+
+udp-control.yml
+
+.. tab-set::
+
+   .. tab-item:: Version 2
+
+      .. code-block:: yaml
+
+         ---
+         version: 2
+
+         node:
+           id: control
+
+         log-level:
+           level: info
+
+         control-services:
+           - service: control
+             tcplisten: "127.0.0.1:7323"
+
+         udp-listeners:
+           - port: 2223
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: control
+
+         - log-level: info
+
+         - control-service:
+            service: control
+            tcplisten: "127.0.0.1:7323"
+
+         - udp-listener:
+            port: 2223
+
+udp-hop.yml
+
+.. tab-set::
+
+   .. tab-item:: Version 2
+
+      .. code-block:: yaml
+
+         ---
+         version: 2
+
+         node:
+           id: hop
+
+         log-level:
+           level: info
+
+         control-services:
+           - service: control
+             tcplisten: "127.0.0.1:7324"
+
+         udp-listeners:
+           - port: 2224
+
+         udp-peers:
+           - address: localhost:2223
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: hop
+
+         - log-level: info
+
+         - control-service:
+            service: control
+            tcplisten: "127.0.0.1:7324"
+
+         - udp-listener:
+            port: 2224
+
+         - udp-peer:
+            address: localhost:2223
+
+udp-execution.yml
+
+.. tab-set::
+
+   .. tab-item:: Version 2
+
+      .. code-block:: yaml
+
+         ---
+         version: 2
+
+         node:
+           id: execution
+
+         log-level:
+           level: info
+
+         control-services:
+           - service: control
+             tcplisten: "127.0.0.1:7325"
+
+         udp-peers:
+           - address: localhost:2224
+
+         work-commands:
+           - worktype: bash
+             command: bash
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: execution
+
+         - log-level: info
+
+         - control-service:
+            service: control
+            tcplisten: "127.0.0.1:7325"
+
+         - udp-peer:
+            address: localhost:2224
+
+         - work-command:
+            worktype: bash
+            command: bash
+
+Start each node in a separate terminal:
+
+.. tab-set::
+
+   .. tab-item:: Version 2
+
+      .. code-block:: bash
+
+         receptor --config-v2 --config udp-control.yml
+         receptor --config-v2 --config udp-hop.yml
+         receptor --config-v2 --config udp-execution.yml
+
+   .. tab-item:: Version 1
+
+      .. code-block:: bash
+
+         receptor --config udp-control.yml
+         receptor --config udp-hop.yml
+         receptor --config udp-execution.yml
+
+Verify the mesh from any node using ``receptorctl`` over its TCP control socket:
+
+.. code-block:: bash
+
+    receptorctl --socket tcp://127.0.0.1:7323 status
+
+The routing table should show all three nodes. ``execution`` reaches ``control`` via ``hop``.
+
+TCP example (foo → bar, foo → fish)
+--------------------------------------
+
+The following example uses TCP as the backend transport instead.
+This is useful when UDP is blocked by a firewall.
+
 foo.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: foo
+   .. tab-item:: Version 2
 
-    log-level:
-      level: Debug
+      .. code-block:: yaml
 
-    tcp-listeners:
-      - port: 2222
+         ---
+         version: 2
+         node:
+           id: foo
+
+         log-level:
+           level: Debug
+
+         tcp-listeners:
+           - port: 2222
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: foo
+
+         - log-level: Debug
+
+         - tcp-listener:
+            port: 2222
 
 bar.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: bar
+   .. tab-item:: Version 2
 
-    log-level:
-      level: Debug
+      .. code-block:: yaml
 
-    tcp-peers:
-      - address: localhost:2222
+         ---
+         version: 2
+         node:
+           id: bar
+
+         log-level:
+           level: Debug
+
+         tcp-peers:
+           - address: localhost:2222
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: bar
+
+         - log-level: Debug
+
+         - tcp-peer:
+            address: localhost:2222
 
 fish.yml
 
-.. code-block:: yaml
+.. tab-set::
 
-    ---
-    version: 2
-    node:
-      id: fish
+   .. tab-item:: Version 2
 
-    log-level:
-      level: Debug
+      .. code-block:: yaml
 
-    tcp-peers:
-      - address: localhost:2222
+         ---
+         version: 2
+         node:
+           id: fish
+
+         log-level:
+           level: Debug
+
+         tcp-peers:
+           - address: localhost:2222
+
+   .. tab-item:: Version 1
+
+      .. code-block:: yaml
+
+         ---
+         - node:
+            id: fish
+
+         - log-level: Debug
+
+         - tcp-peer:
+            address: localhost:2222
 
 If we start the backends for each of these configurations, this will form a three-node mesh. Notice `bar` and `fish` are not directly connected to each other. However, the mesh allows traffic from `bar` to pass through `foo` to reach `fish`, as if `bar` and `fish` were directly connected.
 

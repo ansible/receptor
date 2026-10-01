@@ -38,6 +38,7 @@ type RemoteExtraData struct {
 	RemoteParams   map[string]string
 	RemoteUnitID   string
 	RemoteStarted  bool
+	Adopted        bool
 	LocalCancelled bool
 	LocalReleased  bool
 	SignWork       bool
@@ -295,6 +296,25 @@ func (rw *remoteUnit) cancelOrReleaseRemoteUnit(ctx context.Context, conn net.Co
 	return nil
 }
 
+func (rw *remoteUnit) updateRemoteWorkType(currentType, remoteType string) (string, error) {
+	if currentType != "" || remoteType == "" {
+		return currentType, nil
+	}
+	persistedType := ""
+	rw.UpdateFullStatus(func(status *StatusFileData) {
+		ed := status.ExtraData.(*RemoteExtraData)
+		if ed.RemoteWorkType == "" {
+			ed.RemoteWorkType = remoteType
+		}
+		persistedType = ed.RemoteWorkType
+	})
+	if err := rw.LastUpdateError(); err != nil {
+		return currentType, err
+	}
+
+	return persistedType, nil
+}
+
 // monitorRemoteStatus monitors the remote status file and copies results to the local one.
 func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool) {
 	defer func() {
@@ -310,6 +330,8 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 	}
 	remoteNode := red.RemoteNode
 	remoteUnitID := red.RemoteUnitID
+	remoteWorkType := red.RemoteWorkType
+	adopted := red.Adopted
 	conn, reader := rw.GetConnection(mw)
 	defer func() {
 		if conn != nil {
@@ -370,8 +392,23 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 
 			return
 		}
+		// Adoption assumes the remote unit is already underway; we never submitted it, so a
+		// pending remote will never be started by anyone and the adoption cannot succeed.
+		if adopted && si.State == WorkStatePending {
+			rw.GetWorkceptor().nc.GetLogger().Error("Adopted work unit %s on node %s has not started.\n", remoteUnitID, remoteNode)
+			rw.UpdateFullStatus(func(status *StatusFileData) {
+				status.State = WorkStateFailed
+				status.Detail = "Adopted remote work unit was never started"
+			})
+
+			return
+		}
 		rw.UpdateBasicStatus(si.State, si.Detail, si.StdoutSize)
-		if rw.LastUpdateError() != nil {
+		updateErr := rw.LastUpdateError()
+		if remoteWorkType == "" && si.WorkType != "" {
+			remoteWorkType, updateErr = rw.updateRemoteWorkType(remoteWorkType, si.WorkType)
+		}
+		if updateErr != nil {
 			writeStatusFailures++
 			if writeStatusFailures > 3 {
 				rw.GetWorkceptor().nc.GetLogger().Error("Exceeded retries for updating status file for work unit %s", rw.ID())

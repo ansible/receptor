@@ -3328,6 +3328,177 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 	}
 }
 
+// TestKubeUnit_SetFromParams_PodName covers the pod_name runtime parameter, which lets a
+// submitter attach a new work unit to a pod that already exists instead of creating one.
+// RunWorkUsingLogger has always had that branch — it keys on ExtraData.PodName and skips
+// stdin, because the pod already received its private data dir — but until now the only way
+// to reach it was Restart() on the same node that created the pod. A controller that takes
+// over another controller's orphaned container-group job needs the same branch from a plain
+// `work submit`, and gets `work cancel` for free because Cancel() deletes kw.Pod.
+func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
+	tests := []struct {
+		name             string
+		params           map[string]string
+		configNamespace  string
+		allowRuntimeAuth bool
+		allowRuntimeCmd  bool
+		allowRuntimePod  bool
+		expectError      bool
+		expectedErrorMsg string
+		expectedPodName  string
+		description      string
+	}{
+		{
+			name:            "Attaches to an existing pod",
+			params:          map[string]string{"pod_name": "automation-job-2198375-fkvmx"},
+			configNamespace: "aap",
+			allowRuntimePod: true,
+			expectedPodName: "automation-job-2198375-fkvmx",
+			description:     "pod_name should land in ExtraData so RunWorkUsingLogger takes the attach branch",
+		},
+		{
+			name:             "Namespace may come from the same submission",
+			params:           map[string]string{"pod_name": "automation-job-7-abcde", "kube_namespace": "other-ns"},
+			allowRuntimeAuth: true,
+			allowRuntimePod:  true,
+			expectedPodName:  "automation-job-7-abcde",
+			description:      "A runtime namespace should satisfy the namespace requirement",
+		},
+		{
+			name:             "Rejected without pod permission",
+			params:           map[string]string{"pod_name": "automation-job-7-abcde"},
+			configNamespace:  "aap",
+			allowRuntimePod:  false,
+			expectError:      true,
+			expectedErrorMsg: "pod_name provided but not allowed",
+			description:      "pod_name hands the submitter an arbitrary pod, so it needs the same gate as secret_kube_pod",
+		},
+		{
+			name:             "Rejected without a namespace",
+			params:           map[string]string{"pod_name": "automation-job-7-abcde"},
+			configNamespace:  "",
+			allowRuntimePod:  true,
+			expectError:      true,
+			expectedErrorMsg: "param kube_namespace must be provided with pod_name",
+			description:      "Fail at submit time rather than after the work unit is already running",
+		},
+		{
+			name: "Rejected alongside a pod definition",
+			params: map[string]string{ //nolint:gosec // G101: test data, not credentials
+				"pod_name":        "automation-job-7-abcde",
+				"secret_kube_pod": "apiVersion: v1\nkind: Pod",
+			},
+			configNamespace:  "aap",
+			allowRuntimePod:  true,
+			expectError:      true,
+			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with pod_name",
+			description:      "secret_kube_pod describes a pod to create; pod_name names one that already exists",
+		},
+		{
+			name: "Rejected alongside a command",
+			params: map[string]string{
+				"pod_name":     "automation-job-7-abcde",
+				"kube_command": "echo hello",
+			},
+			configNamespace:  "aap",
+			allowRuntimeCmd:  true,
+			allowRuntimePod:  true,
+			expectError:      true,
+			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with pod_name",
+			description:      "An existing pod is already running its command",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+			w, err := workceptor.New(context.Background(), mockNetceptor, "/tmp")
+			if err != nil {
+				t.Fatalf("Error creating Workceptor: %v", err)
+			}
+
+			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+
+			kubeConfig := workceptor.KubeWorkerCfg{
+				AuthMethod:          "incluster",
+				StreamMethod:        "logger",
+				Namespace:           tt.configNamespace,
+				AllowRuntimeAuth:    tt.allowRuntimeAuth,
+				AllowRuntimeCommand: tt.allowRuntimeCmd,
+				AllowRuntimePod:     tt.allowRuntimePod,
+			}
+			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+			extraData := &workceptor.KubeExtraData{KubeNamespace: tt.configNamespace}
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: extraData}).AnyTimes()
+
+			err = kubeUnit.SetFromParams(tt.params)
+
+			if tt.expectError {
+				if assert.Error(t, err, tt.description) {
+					assert.Contains(t, err.Error(), tt.expectedErrorMsg, tt.description)
+				}
+				assert.Empty(t, extraData.PodName, "a rejected submission must not leave a pod name behind")
+
+				return
+			}
+			assert.NoError(t, err, tt.description)
+			assert.Equal(t, tt.expectedPodName, extraData.PodName, tt.description)
+		})
+	}
+}
+
+func TestKubeUnit_SetFromParams_PodName_ClearsStalePodCreationFields(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
+
+	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
+
+	w, err := workceptor.New(context.Background(), mockNetceptor, "/tmp")
+	if err != nil {
+		t.Fatalf("Error creating Workceptor: %v", err)
+	}
+	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
+
+	kubeConfig := workceptor.KubeWorkerCfg{
+		AuthMethod:      "incluster",
+		StreamMethod:    "logger",
+		Namespace:       "aap",
+		AllowRuntimePod: true,
+	}
+	kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)
+
+	// Pre-populate stale pod-creation fields so the test is non-trivial.
+	extraData := &workceptor.KubeExtraData{
+		KubeNamespace: "aap",
+		Image:         "old-image:latest",
+		Command:       "old-command",
+		Params:        "old-params",
+	}
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: extraData}).AnyTimes()
+
+	err = kubeUnit.SetFromParams(map[string]string{"pod_name": "automation-job-123-xyz"})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "automation-job-123-xyz", extraData.PodName)
+	assert.Empty(t, extraData.KubePod, "pod_name must clear KubePod so the attach path is taken")
+	assert.Empty(t, extraData.Image, "pod_name must clear Image so no pod-creation override is applied")
+	assert.Empty(t, extraData.Command, "pod_name must clear Command so the existing pod's command is used")
+	assert.Empty(t, extraData.Params, "pod_name must clear Params so stale params are not forwarded")
+}
+
 func TestKubeUnit_CreatePod(t *testing.T) {
 	tests := []struct {
 		name             string

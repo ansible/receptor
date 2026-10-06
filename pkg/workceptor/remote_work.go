@@ -15,6 +15,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -27,8 +28,11 @@ const errMsgRemoteExtraDataMissing = "remote ExtraData missing"
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnitForWorkUnit
-	topJC  *utils.JobContext
-	logger *logger.ReceptorLogger
+	// jobMutex protects access to topJC, which manages the lifecycle of monitor goroutines.
+	// This lock is separate from the status lock because lifecycle management is orthogonal to status updates.
+	jobMutex *sync.RWMutex
+	topJC    *utils.JobContext
+	logger   *logger.ReceptorLogger
 }
 
 // RemoteExtraData is the content of the ExtraData JSON field for a remote work unit.
@@ -96,36 +100,75 @@ func getCryptoErrorDetail(errStr string) string {
 	return ""
 }
 
+// clearStaleConnectionDetail removes a transient "Connection to ..." message left by a
+// previous retry so it does not persist on a unit that ends up completing successfully.
+func (rw *remoteUnit) clearStaleConnectionDetail() {
+	rw.UpdateFullStatus(func(status *StatusFileData) {
+		if strings.HasPrefix(status.Detail, "Connection to ") {
+			status.Detail = ""
+		}
+	})
+}
+
+// handleConnectionError logs the error and updates unit status. Returns true when the
+// error is fatal (crypto) and the caller should stop retrying.
+func (rw *remoteUnit) handleConnectionError(err error) bool {
+	rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
+		rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
+	errStr := err.Error()
+
+	detail := getCryptoErrorDetail(errStr)
+	if detail != "" {
+		shouldExit := false
+		rw.UpdateFullStatus(func(status *StatusFileData) {
+			status.Detail = detail
+			if red, ok := status.ExtraData.(*RemoteExtraData); ok && !red.RemoteStarted {
+				shouldExit = true
+				status.State = WorkStateFailed
+			}
+		})
+		if shouldExit {
+			rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
+		}
+
+		return shouldExit
+	}
+
+	rw.surfaceRetryableError(errStr)
+
+	return false
+}
+
+// surfaceRetryableError writes a connection-failure message into the unit's Detail so
+// that a client polling the status can distinguish a stalled transfer from a slow one.
+// The message clears itself: monitorRemoteStatus overwrites Detail on the next
+// successful poll, and clearStaleConnectionDetail clears it on reconnect.
+func (rw *remoteUnit) surfaceRetryableError(errStr string) {
+	rw.UpdateFullStatus(func(status *StatusFileData) {
+		remoteNode := "remote node"
+		if red, ok := status.ExtraData.(*RemoteExtraData); ok {
+			remoteNode = red.RemoteNode
+		}
+		newDetail := fmt.Sprintf("Connection to %s failed: %s", remoteNode, errStr)
+		if status.Detail == newDetail {
+			return
+		}
+		status.Detail = newDetail
+	})
+}
+
 // GetConnection retries connectToRemote until connected or the context expires.
 func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
 	for {
 		conn, reader, err := rw.ConnectToRemote(ctx)
 		if err == nil {
+			rw.clearStaleConnectionDetail()
+
 			return conn, reader
 		}
-		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
-			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
-		errStr := err.Error()
-
-		// Only return on CRYPTO errors, others are retryable.
-		detail := getCryptoErrorDetail(errStr)
-		if detail != "" {
-			shouldExit := false
-			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = detail
-				if red, ok := status.ExtraData.(*RemoteExtraData); ok && !red.RemoteStarted {
-					shouldExit = true
-					status.State = WorkStateFailed
-				}
-			})
-
-			if shouldExit {
-				// Log the helpful error message so it appears in logs, not just status file
-				rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
-
-				return nil, nil
-			}
+		if rw.handleConnectionError(err) {
+			return nil, nil
 		}
 		select {
 		case <-ctx.Done():
@@ -516,7 +559,8 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
-				rw.GetWorkceptor().nc.GetLogger().Warning("Remote node %s did not stream results\n", remoteNode)
+				rw.GetWorkceptor().nc.GetLogger().Warning("Remote node %s did not stream results for unit %s (signwork=%v): %s\n",
+					remoteNode, red.RemoteUnitID, red.SignWork, strings.TrimSpace(status))
 
 				continue
 			}
@@ -672,24 +716,40 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
+	rw.jobMutex.Lock()
 	newJobStarted := rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, true)
+	rw.jobMutex.Unlock()
 	if !newJobStarted {
 		return fmt.Errorf("start or monitor process already running")
 	}
 	if start || !red.RemoteStarted {
 		if !red.Expiration.IsZero() {
-			go rw.setExpiration(rw.topJC)
+			rw.jobMutex.RLock()
+			jc := rw.topJC
+			rw.jobMutex.RUnlock()
+			go rw.setExpiration(jc)
 		}
 
-		return rw.runAndMonitor(rw.topJC, false, rw.StartRemoteUnit)
+		rw.jobMutex.RLock()
+		jc := rw.topJC
+		rw.jobMutex.RUnlock()
+
+		return rw.runAndMonitor(jc, false, rw.StartRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
-		return rw.runAndMonitor(rw.topJC, red.LocalReleased, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+		rw.jobMutex.RLock()
+		jc := rw.topJC
+		rw.jobMutex.RUnlock()
+
+		return rw.runAndMonitor(jc, red.LocalReleased, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased)
 		})
 	}
 	go func() {
-		rw.monitorRemoteUnit(rw.topJC)
-		rw.topJC.WorkerDone()
+		rw.jobMutex.RLock()
+		jc := rw.topJC
+		rw.jobMutex.RUnlock()
+		rw.monitorRemoteUnit(jc)
+		jc.WorkerDone()
 	}()
 
 	return nil
@@ -724,8 +784,11 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	})
 	// if remote work has not started, don't attempt to connect to remote
 	if !remoteStarted {
-		rw.topJC.Cancel()
-		rw.topJC.Wait()
+		rw.jobMutex.Lock()
+		jc := rw.topJC
+		rw.jobMutex.Unlock()
+		jc.Cancel()
+		jc.Wait()
 		if release {
 			return rw.BaseWorkUnitForWorkUnit.Release(true)
 		}
@@ -743,9 +806,17 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 
 		return rw.BaseWorkUnitForWorkUnit.Release(true)
 	}
-	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
+	rw.jobMutex.Lock()
+	newJobStarted := rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
+	rw.jobMutex.Unlock()
+	if !newJobStarted {
+		return fmt.Errorf("cancel/release process already running")
+	}
+	rw.jobMutex.RLock()
+	jc := rw.topJC
+	rw.jobMutex.RUnlock()
 
-	return rw.runAndMonitor(rw.topJC, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	return rw.runAndMonitor(jc, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release)
 	})
 }
@@ -776,6 +847,7 @@ func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workTyp
 	red := &RemoteExtraData{}
 	red.RemoteParams = make(map[string]string)
 	rw.SetStatusExtraData(red)
+	rw.jobMutex = &sync.RWMutex{}
 	rw.topJC = &utils.JobContext{}
 
 	return rw

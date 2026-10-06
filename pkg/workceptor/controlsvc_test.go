@@ -5,6 +5,7 @@ package workceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -353,9 +354,30 @@ func Test_boolFromMap(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Field is not a string",
+			// The control socket speaks JSON, which has a native bool type, so a
+			// client that sends `"signwork": true` must be understood rather than
+			// rejected. Rejecting it silently disabled work signing on adopted units.
+			name: "Valid native JSON bool - true",
 			config: map[string]interface{}{
 				"enabled": true,
+			},
+			field:   "enabled",
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Valid native JSON bool - false",
+			config: map[string]interface{}{
+				"enabled": false,
+			},
+			field:   "enabled",
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "Field is neither string nor bool",
+			config: map[string]interface{}{
+				"enabled": 1,
 			},
 			field:   "enabled",
 			want:    false,
@@ -401,6 +423,25 @@ func Test_boolFromMap(t *testing.T) {
 				t.Errorf("boolFromMap() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Callers default an optional flag to false when it is absent. They must NOT do so
+// when it is present but malformed: silently downgrading a security-relevant flag
+// like signwork from "unparseable" to "off" is how adopted work units ended up
+// requesting results unsigned.
+func Test_boolFromMapDistinguishesMissingFromMalformed(t *testing.T) {
+	_, err := boolFromMap(map[string]interface{}{}, "signwork")
+	if !errors.Is(err, ErrFieldMissing) {
+		t.Errorf("absent field: got %v, want ErrFieldMissing", err)
+	}
+
+	_, err = boolFromMap(map[string]interface{}{"signwork": "yes"}, "signwork")
+	if err == nil {
+		t.Error("malformed field: got nil error, want an error")
+	}
+	if errors.Is(err, ErrFieldMissing) {
+		t.Errorf("malformed field: got ErrFieldMissing, want a distinct error: %v", err)
 	}
 }
 
@@ -503,6 +544,11 @@ func TestWorkceptorControlFuncAdoptRequiresNodeAndUnitID(t *testing.T) {
 	}{
 		{name: "missing node", params: map[string]interface{}{"unitid": "unit"}, wantErrMsg: "field node missing"},
 		{name: "missing unit ID", params: map[string]interface{}{"node": "node"}, wantErrMsg: "field unitid missing"},
+		{
+			name:       "malformed signwork is an error",
+			params:     map[string]interface{}{"node": "node1", "unitid": "unit123", "signwork": "yes"},
+			wantErrMsg: "field signwork value yes is not convertible to a bool",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -515,6 +561,25 @@ func TestWorkceptorControlFuncAdoptRequiresNodeAndUnitID(t *testing.T) {
 				t.Fatalf("ControlFunc error = %v, want %q", err, tt.wantErrMsg)
 			}
 		})
+	}
+}
+
+func TestWorkceptorControlFuncSubmitRejectsMalformedSignwork(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	cfo := mock_controlsvc.NewMockControlFuncOperations(ctrl)
+	cfo.EXPECT().RemoteAddr().Return(&net.UnixAddr{Net: "unix"})
+	cmd := &workceptorCommand{
+		subcommand: "submit",
+		params: map[string]interface{}{
+			"node": "node1", "worktype": "work-type-1", "signwork": "yes",
+		},
+	}
+	_, err := cmd.ControlFunc(context.Background(), nil, cfo)
+	if err == nil {
+		t.Fatal("expected error for malformed signwork, got nil")
+	}
+	if !strings.Contains(err.Error(), "not convertible to a bool") {
+		t.Fatalf("expected bool conversion error, got: %v", err)
 	}
 }
 
@@ -662,9 +727,29 @@ func Test_workceptorCommandTypeInitFromJSON_AdoptParams(t *testing.T) {
 			name: "wrong optional field types are ignored",
 			config: map[string]interface{}{
 				"subcommand": "adopt", "node": "node1", "unitid": "unit123",
-				"tlsclient": 1, "signwork": true, "signature": 123,
+				"tlsclient": 1, "signature": 123,
 			},
 			want: map[string]interface{}{"node": "node1", "unitid": "unit123"},
+		},
+		{
+			// signwork is NOT in the "ignored" group above: dropping an unparseable
+			// signing flag silently downgrades the adopted unit to unsigned work
+			// results, which the remote then rejects forever. A JSON bool is valid
+			// and must be normalized, not discarded.
+			name: "native JSON bool signwork is honored",
+			config: map[string]interface{}{
+				"subcommand": "adopt", "node": "node1", "unitid": "unit123",
+				"signwork": true,
+			},
+			want: map[string]interface{}{"node": "node1", "unitid": "unit123", "signwork": "true"},
+		},
+		{
+			name: "malformed signwork is an error, not a silent downgrade",
+			config: map[string]interface{}{
+				"subcommand": "adopt", "node": "node1", "unitid": "unit123",
+				"signwork": "yes",
+			},
+			wantErr: true,
 		},
 	}
 

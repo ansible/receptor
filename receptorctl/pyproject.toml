@@ -32,7 +32,7 @@ test = [
   "coverage",
   "pytest",
   "pytest-cov",
-  "ruff==0.16.0",
+  "ruff==0.16.10",
 ]
 
 [project.scripts]

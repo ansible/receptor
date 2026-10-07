@@ -182,6 +182,45 @@ type MessageData struct {
 	Data        []byte
 }
 
+// connContext is a minimal cancellable signalling type.
+// Only Done and Err are exposed; Deadline and Value are intentionally absent.
+type connContext struct {
+	done chan struct{}
+	once sync.Once
+	mu   sync.Mutex
+	err  error
+}
+
+func newConnContext(parentDone <-chan struct{}) (*connContext, func()) {
+	cc := &connContext{done: make(chan struct{})}
+	cancel := func() {
+		cc.once.Do(func() {
+			cc.mu.Lock()
+			cc.err = context.Canceled
+			cc.mu.Unlock()
+			close(cc.done)
+		})
+	}
+	go func() {
+		select {
+		case <-parentDone:
+			cancel()
+		case <-cc.done:
+		}
+	}()
+
+	return cc, cancel
+}
+
+func (cc *connContext) Done() <-chan struct{} { return cc.done }
+
+func (cc *connContext) Err() error {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	return cc.err
+}
+
 type connInfo struct {
 	ReadChan         chan []byte
 	WriteChan        chan []byte
@@ -344,8 +383,8 @@ func NewWithConsts(ctx context.Context, nodeID string,
 	s.AddNameHash(nodeID)
 	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
-	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
-	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
+	s.unreachableBroker = utils.NewBroker(s.context.Done(), reflect.TypeOf(UnreachableNotification{}))
+	s.routingUpdateBroker = utils.NewBroker(s.context.Done(), reflect.TypeOf(map[string]string{}))
 	s.updateRoutingTableChan = tickrunner.Run(s.context, s.updateRoutingTable, time.Hour*24, time.Millisecond*100)
 	s.sendRouteFloodChan = tickrunner.Run(s.context, func() { s.sendRoutingUpdate(0) }, s.routeUpdateTime, time.Millisecond*100)
 	if s.serviceAdTime > 0 {

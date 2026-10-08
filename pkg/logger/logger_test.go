@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -308,4 +309,43 @@ func TestGetLoggerWithSuffix(t *testing.T) {
 		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
 		assertSuffixFieldsPresent(t, logBuffer.String(), updated)
 	})
+}
+
+// TestUpdateSuffixDoesNotLeakAcrossGoroutines confirms that UpdateSuffix on a shared logger
+// does not bleed connection-scoped fields (e.g. remote_id set by execution-a's handler) into
+// unrelated goroutines (e.g. the workceptor retry loop targeting the stale node "execution").
+func TestUpdateSuffixDoesNotLeakAcrossGoroutines(t *testing.T) {
+	origLevel := logger.GetLogLevel()
+	defer logger.SetGlobalLogLevel(origLevel)
+	logger.SetGlobalLogLevel(logger.InfoLevel)
+
+	origLogger := logger.GetRegisteredLogger()
+	defer logger.RegisterLogger(origLogger)
+	logger.RegisterLogger(nil)
+
+	var buf bytes.Buffer
+	rl := logger.NewReceptorLogger("")
+	rl.SetOutput(&buf)
+
+	// Goroutine A: connection handler for execution-a sets remote_id on the shared logger
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rl.UpdateSuffix(map[string]string{"remote_id": "execution-a"})
+	}()
+	wg.Wait()
+
+	// Goroutine B: workceptor retry loop for the non existent node "execution-b" — must not inherit execution-a's remote_id
+	buf.Reset()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rl.Info("Connection to %s failed with error: no route to node", "execution-b")
+	}()
+	wg.Wait()
+
+	if strings.Contains(buf.String(), "execution-a") {
+		t.Errorf("unrelated goroutine log must not carry execution-a's remote_id, got: %q", buf.String())
+	}
 }

@@ -315,6 +315,53 @@ func (kw *KubeUnit) GetSleepDuration(multipler int) time.Duration {
 	return sleepDuration
 }
 
+// streamStdinWithRetry sends the work unit's payload to the pod, retrying a failed stream.
+//
+// The API server dials the kubelet to open this stream, so it fails while the kubelet on the node has
+// no serving certificate yet -- with "error dialing backend: remote error: tls: internal error". On a
+// node that has just joined the cluster that is a wait rather than a fault: the kubelet-serving CSR is
+// approved shortly after the node registers, and the stream succeeds once it is. Backing off the same
+// way the caller does while waiting for the container to start lets RECEPTOR_KUBE_RETRY_COUNT span that
+// window; a fixed short delay cannot, whatever it is set to.
+func (kw *KubeUnit) streamStdinWithRetry(exec remotecommand.Executor, stdin *STDinReader, podNamespace, podName string) error {
+	var err error
+	prevDelay, curDelay := 1, 1
+
+	for retries := kw.GetKubeRetryCount(); retries > 0; retries-- {
+		err = kw.KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
+			Stdin: stdin,
+			Tty:   false,
+		})
+		if err == nil {
+			return nil
+		}
+		if retries == 1 {
+			break
+		}
+
+		delay := kw.GetSleepDuration(curDelay)
+
+		// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
+		kw.GetWorkceptor().nc.GetLogger().Warning(
+			"Error streaming stdin to pod %s/%s. Will retry %d more times. Next retry in %d seconds. Error: %s",
+			podNamespace,
+			podName,
+			retries-1,
+			int(math.Ceil(delay.Seconds())),
+			err,
+		)
+
+		select {
+		case <-kw.GetContext().Done():
+			return err
+		case <-time.After(delay):
+		}
+		prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
+	}
+
+	return err
+}
+
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
 	var logStream io.ReadCloser
 	var err error
@@ -1113,26 +1160,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				status.Detail = "Sending stdin to pod"
 			})
 
-			var err error
-			for retries := kw.GetKubeRetryCount(); retries > 0; retries-- {
-				err = kw.KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
-					Stdin: stdin,
-					Tty:   false,
-				})
-				if err != nil {
-					// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
-					kw.GetWorkceptor().nc.GetLogger().Warning(
-						"Error streaming stdin to pod %s/%s. Will retry %d more times. Error: %s",
-						podNamespace,
-						podName,
-						retries,
-						err,
-					)
-					time.Sleep(200 * time.Millisecond)
-				} else {
-					break
-				}
-			}
+			err := kw.streamStdinWithRetry(exec, stdin, podNamespace, podName)
 
 			if err != nil {
 				stdinErr = err

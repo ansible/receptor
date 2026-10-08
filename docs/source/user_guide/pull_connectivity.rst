@@ -34,7 +34,7 @@ or when you cannot open inbound ports on execution nodes.
 mTLS requirement
 ----------------
 
-Pull mode requires mutual TLS (mTLS).
+Production pull deployments require mutual TLS (mTLS). Basic pull connections can run without mTLS, but they do not meet this production security requirement.
 Because the control plane never initiates a connection to the execution node, it cannot rely on connecting
 to a known address to verify identity.
 Instead, both sides present certificates signed by a shared CA, so each node can verify the other's identity
@@ -279,15 +279,15 @@ Key configuration options
 --------------------------
 
 ``redial``
-  Set to ``true`` on execution node ``*-peer`` entries.
+  TCP and WebSocket ``*-peer`` entries enable ``redial`` by default.
+  You can set it explicitly to ``true`` for clarity.
   If the connection is lost, the execution node will automatically reconnect to the control node.
-  This is critical in pull mode — without it, a dropped connection requires manual intervention
-  because the control plane cannot re-initiate.
+  This is critical in pull mode because the control plane cannot re-initiate the connection.
 
 ``requireclientcert``
   Set to ``true`` on the control node's ``tls-server`` definition.
   Forces the execution node to present a valid certificate during the TLS handshake,
   preventing unauthorized nodes from joining the mesh.
 
-``redial`` and ``requireclientcert`` together are the two settings that distinguish a production
-pull configuration from a basic ``tcp-peer`` connection.
+``requireclientcert`` and the TLS configuration provide the mTLS protection required for a
+production pull configuration. ``redial`` is already enabled by default.

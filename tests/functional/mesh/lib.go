@@ -305,6 +305,16 @@ func (n *LibNode) GetID() string {
 	return n.Config.ID
 }
 
+// GetNetceptor returns the running netceptor instance for this node.
+//
+// Exposed so a test can reconfigure a mesh that is already up. Adding firewall rules
+// at runtime is the only way to sever one node from another while leaving both
+// processes alive and still holding their work units, which is what distinguishes a
+// network partition from a node that has simply gone away.
+func (n *LibNode) GetNetceptor() *netceptor.Netceptor {
+	return n.netceptorInstance
+}
+
 // Start will start local services (netceptor, workceptor, controlsvc),
 // then start any listeners, finally establishing any remote connections.
 // Note that this requires remote nodes to be running since we need to detect which

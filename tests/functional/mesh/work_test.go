@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/tests/utils"
 )
@@ -929,6 +930,155 @@ func TestWorkAdoptNonexistentRemoteUnit(t *testing.T) {
 	defer cancel()
 	if err := controllers["node2"].AssertWorkFailed(ctx, localUnitID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// partitionControlService stops node from reaching remoteNode's control service while
+// leaving routing, pings, and both receptor processes untouched.
+//
+// Deliberately narrower than cutting the two nodes apart. In the outage this was written
+// from, the routing tables on both sides stayed correct and the nodes still answered
+// pings; only the control connections timed out. Dropping every packet instead would
+// evict remoteNode from the routing table, and "no route to node" is a different and far
+// more detectable error than the silence being reproduced here.
+func partitionControlService(t *testing.T, node *LibNode, remoteNode string) {
+	t.Helper()
+	rules, err := netceptor.ParseFirewallRules([]netceptor.FirewallRuleData{
+		{"Action": "drop", "ToNode": remoteNode, "ToService": "control"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := node.GetNetceptor().AddFirewallRules(rules, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// localStdoutSize reports how many bytes of a unit's stdout have actually landed on this
+// node. That is not the StdoutSize the unit status advertises: for a remote unit, the
+// status figure is copied from the remote node and says nothing about what arrived here.
+func localStdoutSize(t *testing.T, node *LibNode, unitID string) int64 {
+	t.Helper()
+	info, err := os.Stat(filepath.Join(node.GetDataDir(), "datadir", node.GetID(), unitID, "stdout"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0
+		}
+		t.Fatal(err)
+	}
+
+	return info.Size()
+}
+
+// awaitRemoteFailureSurfaced polls a unit's status until receptor admits it cannot reach
+// the node holding the work, or ctx expires.
+//
+// "Admits" is read generously on purpose. Either failing the unit or writing something
+// about the connection into Detail would be enough for a client to tell a stalled
+// transfer from a slow one, so the test only fails when neither ever happens.
+func awaitRemoteFailureSurfaced(ctx context.Context, controller *ReceptorControl, unitID string) (*workceptor.StatusFileData, bool) {
+	last := &workceptor.StatusFileData{}
+	for {
+		if status, err := controller.GetWorkStatus(unitID); err == nil {
+			last = status
+			if status.State == workceptor.WorkStateFailed {
+				return status, true
+			}
+			detail := strings.ToLower(status.Detail)
+			for _, phrase := range []string{"unreachable", "no route", "connection", "timeout", "timed out"} {
+				if strings.Contains(detail, phrase) {
+					return status, true
+				}
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return last, false
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+// TestWorkAdoptRemoteUnreachableIsSurfaced checks that losing contact with the node
+// holding an adopted unit's output becomes visible to a control-service client.
+//
+// Compare TestWorkAdoptNonexistentRemoteUnit above, which asserts the unit fails when the
+// remote unit does not exist. A remote unit that does exist, on a node that can no longer
+// be reached, is the same situation from the client's side -- the output is not coming --
+// but it is reported completely differently.
+//
+// Reproduces a production incident: a controller adopted ~20 units whose execution node
+// became unreachable. Every unit went on reporting its last-synced state, with a
+// StdoutSize copied from the remote and an empty local stdout, so the client could not
+// tell "output still arriving" from "output will never arrive" and blocked on the results
+// stream indefinitely.
+func TestWorkAdoptRemoteUnreachableIsSurfaced(t *testing.T) {
+	t.Parallel()
+	controllers, m, _ := workSetup("command", t)
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	nodes := m.GetNodes()
+	remoteUnitID := submitRunningWorkForAdoption(t, controllers["node1"])
+
+	response, err := controllers["node2"].WorkAdopt("node3", remoteUnitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localUnitID, ok := response["unitid"].(string)
+	if !ok || localUnitID == "" {
+		t.Fatalf("adopt response has no local unit ID: %#v", response)
+	}
+
+	// Let the adoption settle first, so what follows is a connection that was lost rather
+	// than one that was never established -- those take different paths through the monitor.
+	runningCtx, cancelRunning := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelRunning()
+	if err := controllers["node2"].AssertWorkRunning(runningCtx, localUnitID); err != nil {
+		t.Fatal(err)
+	}
+
+	// node2 is the hub of this mesh, so this severs node1 from node3 as well. Irrelevant
+	// here: every assertion below is made against node2.
+	partitionControlService(t, nodes["node2"], "node3")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	status, surfaced := awaitRemoteFailureSurfaced(ctx, controllers["node2"], localUnitID)
+	if !surfaced {
+		t.Fatalf("node3's control service is unreachable, but unit %s never reported it: "+
+			"State=%d Detail=%q StdoutSize=%d, local stdout bytes=%d.\n"+
+			"A client polling this unit cannot tell a stalled transfer from a slow one.",
+			localUnitID, status.State, status.Detail, status.StdoutSize,
+			localStdoutSize(t, nodes["node2"], localUnitID))
+	}
+}
+
+// TestWorkAdoptRemoteFailureDetectionControl is the positive control for the test above.
+//
+// Adopting a unit that does not exist on node3 is a failure receptor does report, so
+// awaitRemoteFailureSurfaced has to return true here. Without this, a bug in the poller
+// would make TestWorkAdoptRemoteUnreachableIsSurfaced fail for the wrong reason and be
+// mistaken for a receptor defect.
+func TestWorkAdoptRemoteFailureDetectionControl(t *testing.T) {
+	t.Parallel()
+	controllers, m, _ := workSetup("command", t)
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	response, err := controllers["node2"].WorkAdopt("node3", "does-not-exist")
+	if err != nil {
+		t.Fatal(err)
+	}
+	localUnitID, ok := response["unitid"].(string)
+	if !ok || localUnitID == "" {
+		t.Fatalf("adopt response has no local unit ID: %#v", response)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if status, surfaced := awaitRemoteFailureSurfaced(ctx, controllers["node2"], localUnitID); !surfaced {
+		t.Fatalf("poller missed a failure receptor did report: State=%d Detail=%q", status.State, status.Detail)
 	}
 }
 

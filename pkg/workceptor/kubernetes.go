@@ -1717,6 +1717,7 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	userCommand := ""
 	userImage := ""
 	userPod := ""
+	userPodName := ""
 	podPendingTimeoutString := ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
@@ -1725,6 +1726,7 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
 		{name: "secret_kube_pod", permission: kw.allowRuntimePod, setter: setString(&userPod)},
+		{name: "pod_name", permission: kw.allowRuntimePod, setter: setString(&userPodName)},
 		{name: "pod_pending_timeout", permission: kw.allowRuntimeParams, setter: setString(&podPendingTimeoutString)},
 	}
 	for i := range values {
@@ -1742,6 +1744,19 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	}
 	if kw.authMethod == "runtime" && ked.KubeConfig == "" {
 		return fmt.Errorf("param secret_kube_config must be provided if AuthMethod=runtime")
+	}
+	// pod_name check first: it is the most specific constraint and its message names all
+	// conflicting params. The secret_kube_pod check below would fire first on a 3-way
+	// conflict and produce an incomplete error that omits pod_name.
+	if userPodName != "" {
+		if userPod != "" || userParams != "" || userCommand != "" || userImage != "" {
+			return fmt.Errorf("params kube_command, kube_image, kube_params, secret_kube_pod not compatible with pod_name")
+		}
+		// RunWorkUsingLogger fails the unit on an empty namespace. Catching it here means the
+		// submitter is told at submit time instead of discovering it from a failed work unit.
+		if ked.KubeNamespace == "" {
+			return fmt.Errorf("param kube_namespace must be provided with pod_name")
+		}
 	}
 	if userPod != "" && (userParams != "" || userCommand != "" || userImage != "") {
 		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_pod")
@@ -1768,8 +1783,16 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 		ked.Image = ""
 		ked.Command = ""
 		kw.baseParams = ""
-	} else {
+	} else if userPodName == "" {
 		ked.Params = combineParams(kw.baseParams, userParams)
+	}
+	if userPodName != "" {
+		ked.PodName = userPodName
+		ked.KubePod = ""
+		ked.Image = ""
+		ked.Command = ""
+		ked.Params = ""
+		kw.baseParams = ""
 	}
 
 	return nil

@@ -5,6 +5,7 @@ package workceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -126,23 +127,34 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	return 0, fmt.Errorf("field %s value %s is not convertible to an int", name, value)
 }
 
+// ErrFieldMissing reports that an optional field was absent from the command.
+// Callers may default such a field, but must not default one that is present
+// and malformed — see Test_boolFromMapDistinguishesMissingFromMalformed.
+var ErrFieldMissing = errors.New("field missing")
+
 func boolFromMap(config map[string]interface{}, name string) (bool, error) {
 	value, ok := config[name]
 	if !ok {
-		return false, fmt.Errorf("field %s missing", name)
+		return false, fmt.Errorf("field %s: %w", name, ErrFieldMissing)
 	}
-	valueBoolStr, ok := value.(string)
-	if !ok {
-		return false, fmt.Errorf("field %s must be a string", name)
-	}
-	if valueBoolStr == "true" {
-		return true, nil
-	}
-	if valueBoolStr == "false" {
-		return false, nil
+	switch typedValue := value.(type) {
+	case bool:
+		// The control socket also speaks JSON, whose booleans unmarshal into
+		// interface{} as a Go bool. receptorctl sends the strings "true"/"false",
+		// but a JSON client sending a real bool is equally valid.
+		return typedValue, nil
+	case string:
+		if typedValue == "true" {
+			return true, nil
+		}
+		if typedValue == "false" {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("field %s value %s is not convertible to a bool", name, typedValue)
 	}
 
-	return false, fmt.Errorf("field %s value %s is not convertible to a bool", name, value)
+	return false, fmt.Errorf("field %s must be a string or a bool", name)
 }
 
 func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (controlsvc.ControlCommand, error) {
@@ -216,6 +228,9 @@ func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (con
 			c.params["tlsclient"] = tlsClient
 		}
 		signWork, err := boolFromMap(config, "signwork")
+		if err != nil && !errors.Is(err, ErrFieldMissing) {
+			return nil, err
+		}
 		if err == nil {
 			c.params["signwork"] = strconv.FormatBool(signWork)
 		}
@@ -290,8 +305,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			ttl = ""
 		}
 		signWork, err := boolFromMap(c.params, "signwork")
-		if err != nil {
-			signWork = false
+		if err != nil && !errors.Is(err, ErrFieldMissing) {
+			return nil, err
 		}
 		signature, err := strFromMap(c.params, "signature")
 		if err != nil {
@@ -499,8 +514,8 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 			tlsClient = ""
 		}
 		signWork, err := boolFromMap(c.params, "signwork")
-		if err != nil {
-			signWork = false
+		if err != nil && !errors.Is(err, ErrFieldMissing) {
+			return nil, err
 		}
 		signature, err := strFromMap(c.params, "signature")
 		if err != nil {

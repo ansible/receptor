@@ -12,10 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	logLevel  int
-	showTrace bool
-)
+var logLevel int
 
 // Log level constants.
 const (
@@ -23,6 +20,7 @@ const (
 	WarningLevel
 	InfoLevel
 	DebugLevel
+	TraceLevel
 )
 
 // QuietMode turns off all log output.
@@ -73,6 +71,7 @@ var logLevelMap = map[string]int{
 	"warning": WarningLevel,
 	"info":    InfoLevel,
 	"debug":   DebugLevel,
+	"trace":   TraceLevel,
 }
 
 type MessageFunc func(level int, format string, v ...interface{})
@@ -139,9 +138,9 @@ func (rl *ReceptorLogger) SetOutput(w io.Writer) {
 	rl.Logger.SetOutput(w)
 }
 
-// SetShowTrace is a helper function for setting showTrace bool.
+// SetShowTrace enables trace-level logging.
 func (rl *ReceptorLogger) SetShowTrace(trace bool) {
-	showTrace = trace
+	SetGlobalLogLevel(TraceLevel)
 }
 
 // GetLogLevel returns the log level.
@@ -218,18 +217,12 @@ func (rl *ReceptorLogger) SanitizedDebug(format string, v ...interface{}) {
 
 // Trace outputs detailed packet traversal.
 func (rl *ReceptorLogger) Trace(format string, v ...interface{}) {
-	if showTrace {
-		rl.SetPrefix("TRACE")
-		rl.Log(logLevel, format, v...)
-	}
+	rl.Log(TraceLevel, format, v...)
 }
 
 // SanitizedTrace outputs detailed packet traversal.
 func (rl *ReceptorLogger) SanitizedTrace(format string, v ...interface{}) {
-	if showTrace {
-		rl.SetPrefix("TRACE")
-		rl.SanitizedLog(logLevel, format, v...)
-	}
+	rl.SanitizedLog(TraceLevel, format, v...)
 }
 
 // Log adds a prefix and prints a given log message.
@@ -357,7 +350,7 @@ func (rl *ReceptorLogger) LogLevelToName(logLevel int) (string, error) {
 }
 
 type LoglevelCfg struct {
-	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
+	Level string `description:"Log level: Error, Warning, Info, Debug or Trace" barevalue:"yes" default:"error"`
 }
 
 func (cfg LoglevelCfg) Init() error {
@@ -374,6 +367,8 @@ func (cfg LoglevelCfg) Init() error {
 type TraceCfg struct{}
 
 func (cfg TraceCfg) Prepare() error {
+	SetGlobalLogLevel(TraceLevel)
+
 	return nil
 }
 
@@ -383,7 +378,6 @@ func init() {
 		return
 	}
 	logLevel = InfoLevel
-	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 

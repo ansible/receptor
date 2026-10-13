@@ -329,7 +329,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		serverTLSConfigs:         make(map[string]*tls.Config),
 		firewallLock:             &sync.RWMutex{},
 		workCommandsLock:         &sync.RWMutex{},
-		Logger:                   logger.NewReceptorLogger(""),
+		Logger:                   logger.NewReceptorLogger(),
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
@@ -342,7 +342,6 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		MinVersion: tls.VersionTLS12,
 	}
 	s.AddNameHash(nodeID)
-	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -1185,11 +1184,7 @@ func (s *Netceptor) GetEphemeralService() string {
 // Prints the routing table.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	logLevel, _ := s.Logger.GetLogLevelByName("Info")
-	if s.Logger.GetLogLevel() < logLevel {
-		return
-	}
-	s.Logger.Log(logLevel, "Known Connections:\n")
+	s.Logger.Info("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
 		sb := &strings.Builder{}
 		_, _ = fmt.Fprintf(sb, "   %s: ", conn)
@@ -1197,11 +1192,11 @@ func (s *Netceptor) printRoutingTable() {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
 		_, _ = fmt.Fprintf(sb, "\n")
-		s.Logger.Log(logLevel, "%s", sb.String())
+		s.Logger.Info("%s", sb.String())
 	}
-	s.Logger.Log(logLevel, "Routing Table:\n")
+	s.Logger.Info("Routing Table:\n")
 	for node := range s.routingTable {
-		s.Logger.Log(logLevel, "   %s via %s\n", node, s.routingTable[node])
+		s.Logger.Info("   %s via %s\n", node, s.routingTable[node])
 	}
 }
 
@@ -1811,8 +1806,6 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					if remoteNodeID == s.nodeID {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
-					suffix := map[string]string{"remote_id": remoteNodeID}
-					s.GetLogger().UpdateSuffix(suffix)
 					remoteNodeAccepted := true
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
@@ -1878,7 +1871,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 
 						return nil
 					}
-					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
+					s.Logger.SanitizedInfo("Connection established with %s {\"node_id\":\"%s\",\"remote_id\":\"%s\"}\n",
+						remoteNodeID, s.nodeID, remoteNodeID)
 					s.AddNameHash(remoteNodeID)
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]

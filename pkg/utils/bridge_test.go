@@ -57,7 +57,7 @@ func TestBridgeConnsSuccessfulBridge(t *testing.T) {
 	}).Times(1) // Small data fits in one write
 	connection2.EXPECT().Close().Return(nil).Times(1) // Closed by goroutine 1
 
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 
 	// Run BridgeConns in a goroutine with timeout
 	done := make(chan bool)
@@ -101,7 +101,7 @@ func TestBridgeConnsEmptyData(t *testing.T) {
 	connection1.EXPECT().Close().Return(nil).Times(1) // Closed by goroutine 2
 	connection2.EXPECT().Close().Return(nil).Times(1) // Closed by goroutine 1
 
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 
 	done := make(chan bool)
 	go func() {
@@ -141,7 +141,7 @@ func TestBridgeConnsReadError(t *testing.T) {
 
 	// Capture log output
 	var logBuf bytes.Buffer
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 	log.SetOutput(&logBuf)
 
 	done := make(chan bool)
@@ -186,7 +186,7 @@ func TestBridgeConnsWriteError(t *testing.T) {
 
 	// Capture log output
 	var logBuf bytes.Buffer
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 	log.SetOutput(&logBuf)
 
 	done := make(chan bool)
@@ -233,7 +233,7 @@ func TestBridgeConnsCloseError(t *testing.T) {
 
 	// Capture log output
 	var logBuf bytes.Buffer
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 	log.SetOutput(&logBuf)
 
 	done := make(chan bool)
@@ -287,7 +287,7 @@ func TestBridgeConnsPartialWrite(t *testing.T) {
 
 	// Capture log output
 	var logBuf bytes.Buffer
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 	log.SetOutput(&logBuf)
 
 	done := make(chan bool)
@@ -344,7 +344,7 @@ func TestBridgeConnsLargeData(t *testing.T) {
 	}).Times(3) // 3 writes for the 3 data chunks (65536 + 65536 + 1000 bytes)
 	connection2.EXPECT().Close().Return(nil).Times(1) // Closed by goroutine 1
 
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 
 	done := make(chan bool)
 	go func() {
@@ -402,7 +402,7 @@ func TestBridgeConnsUnidirectionalData(t *testing.T) {
 	}).Times(1) // Small data fits in one write
 	connection2.EXPECT().Close().Return(nil).Times(1) // Closed by goroutine 1
 
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 
 	done := make(chan bool)
 	go func() {
@@ -467,7 +467,7 @@ func TestBridgeConnsConcurrentData(t *testing.T) {
 	}).Times(1) // Small data fits in one write
 	connection2.EXPECT().Close().Return(nil).Times(1) // Closed by goroutine 1
 
-	log := logger.NewReceptorLogger("")
+	log := logger.NewReceptorLogger()
 
 	done := make(chan bool)
 	go func() {

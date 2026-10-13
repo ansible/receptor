@@ -23,7 +23,7 @@ func testSetup(t *testing.T) (*gomock.Controller, *mock_workceptor.MockNetceptor
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNetceptor.EXPECT().NodeID().Return("test").AnyTimes()
 
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
@@ -42,7 +42,7 @@ func TestAllocateUnit(t *testing.T) {
 	ctx := context.Background()
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
 	workFunc := func(bwu workceptor.BaseWorkUnitForWorkUnit, w *workceptor.Workceptor, unitID string, workType string) workceptor.WorkUnit {

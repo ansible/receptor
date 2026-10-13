@@ -28,7 +28,7 @@ func TestNewUDPListener(t *testing.T) {
 			name: "Positive",
 			args: args{
 				address: "127.0.0.1:0",
-				logger:  logger.NewReceptorLogger("UDPtest"),
+				logger:  logger.NewReceptorLogger(),
 			},
 			wantErr: false,
 		},
@@ -79,7 +79,7 @@ func TestUDPListenerStart(t *testing.T) {
 				conn:            &net.UDPConn{},
 				sessChan:        make(chan *UDPListenerSession),
 				sessionRegistry: make(map[string]*UDPListenerSession),
-				logger:          logger.NewReceptorLogger("UDPtest"),
+				logger:          logger.NewReceptorLogger(),
 			},
 			args: args{
 				ctx: context.Background(),
@@ -139,7 +139,7 @@ func TestUDPDialerStart(t *testing.T) {
 			fields: fields{
 				address: "127.0.0.1:0",
 				redial:  true,
-				logger:  logger.NewReceptorLogger("UDPtest"),
+				logger:  logger.NewReceptorLogger(),
 			},
 			args: args{
 				ctx: context.Background(),

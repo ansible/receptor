@@ -300,7 +300,7 @@ func TestKubeStart(t *testing.T) {
 				config := rest.Config{}
 				mockKubeAPI.EXPECT().InClusterConfig().Return(&config, nil)
 				mockbwu.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNet.EXPECT().GetLogger().Return(logger).AnyTimes()
 				clientset := kubernetes.Clientset{}
 				mockKubeAPI.EXPECT().NewForConfig(gomock.Any()).Return(&clientset, nil)
@@ -603,7 +603,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 			name: "stdin_error_causes_immediate_return",
 			setupMocks: func(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, mockNetceptor *mock_workceptor.MockNetceptorForWorkceptor, mockKubeAPI *mock_workceptor.MockKubeAPIer, w *workceptor.Workceptor, ctx context.Context) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 			},
 			stdinErr: func() *error {
@@ -621,7 +621,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				cancelCtx, cancel := context.WithCancel(ctx)
 				mockBaseWorkUnit.EXPECT().GetContext().Return(cancelCtx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetStatusLock()
 
@@ -740,7 +740,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				readyPod := &corev1.Pod{
@@ -807,7 +807,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				// Return the test context so cancellation propagates properly
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
@@ -958,7 +958,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
@@ -1030,7 +1030,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
@@ -1102,7 +1102,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
@@ -1188,7 +1188,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
@@ -1270,7 +1270,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				failedPod := &corev1.Pod{
@@ -1325,7 +1325,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				// Pod exists but doesn't have the expected worker container
@@ -1375,7 +1375,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				oomKilledPod := &corev1.Pod{
@@ -1428,7 +1428,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				unknownPod := &corev1.Pod{
@@ -1481,7 +1481,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				evictedPod := &corev1.Pod{
@@ -1536,7 +1536,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetContext().Return(ctx).AnyTimes()
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 				runningPod := &corev1.Pod{
@@ -1603,7 +1603,7 @@ func TestKubeLoggingWithReconnect(t *testing.T) {
 
 			// Set up logger - capture output only if validation is enabled
 			var logBuffer bytes.Buffer
-			logger := logger.NewReceptorLogger("")
+			logger := logger.NewReceptorLogger()
 			if tt.validateLogs {
 				logger.SetOutput(&logBuffer)
 			}
@@ -2186,7 +2186,7 @@ func TestKubeLoggingWithReconnectSimple(t *testing.T) {
 		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(runningPod, nil).Times(1),
 		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(terminatedPod, nil).AnyTimes(),
 	)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 	// Set up the fake REST client
@@ -2236,7 +2236,7 @@ func TestRetryGetLogStreamResetValidation(t *testing.T) {
 	var logBuffer bytes.Buffer
 
 	// Create a real logger and capture its output
-	testLogger := logger.NewReceptorLogger("")
+	testLogger := logger.NewReceptorLogger()
 	testLogger.SetOutput(&logBuffer)
 
 	// Run the same test setup as TestKubeLoggingWithReconnectDuplicateDetection
@@ -2502,7 +2502,7 @@ func TestKubeLoggingWithReconnectDuplicateDetection(t *testing.T) {
 		mockKubeAPI.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(terminatedPod, nil).AnyTimes(),
 	)
 
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 	// Track how many times GetLogs is called to verify reconnection
@@ -2602,7 +2602,7 @@ func TestKubeUnitCancel(t *testing.T) {
 	mockBaseWorkUnit.EXPECT().GetCancel().Return(func() {})
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockNetceptor.EXPECT().NodeID().Return("NodeID").AnyTimes()
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 	// Mock the Delete method
@@ -2654,7 +2654,7 @@ func TestKubeUnitRelease(t *testing.T) {
 	mockBaseWorkUnit.EXPECT().GetCancel().Return(func() {})
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockNetceptor.EXPECT().NodeID().Return("NodeID").AnyTimes()
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 	// Mock the Delete method
@@ -2709,7 +2709,7 @@ func TestKubeUnitReleaseWithForce(t *testing.T) {
 	mockBaseWorkUnit.EXPECT().GetCancel().Return(func() {})
 	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 	mockNetceptor.EXPECT().NodeID().Return("NodeID").AnyTimes()
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 	// Mock the Delete method with an error
@@ -3309,7 +3309,7 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 
 			// Mock GetWorkceptor and logger for timeout parsing errors
 			if strings.Contains(tt.expectedErrorMsg, "time: invalid duration") {
-				logger := logger.NewReceptorLogger("")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
 			}
@@ -3706,7 +3706,7 @@ spec:
 			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
 			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
-			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 			ctx := context.Background()
 			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
@@ -3791,7 +3791,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 
 				// Mock error logging and status update for failed pod creation
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 			},
 			description: "Should handle CreatePod failures and exit early with error status",
@@ -3812,7 +3812,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 
 				// Mock error logging and status update for missing namespace
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 			},
 			description: "Should handle missing namespace error and exit early with error status",
@@ -3837,7 +3837,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 
 				// Mock warning and error logging (5 warnings + 1 error)
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 			},
 			description: "Should handle pod retrieval failures and exit with error status after retries",
@@ -3863,7 +3863,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 
 				// Mock warning logging for context cancellation
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			description: "Should handle context cancellation and exit early with warning",
 		},
@@ -3900,7 +3900,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 
 				// Mock error logging for stdout file creation failure
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
 			},
 			description: "Should handle successful pod retrieval but fail on stdout file creation",
@@ -3937,7 +3937,7 @@ func TestKubeUnit_RunWorkUsingLogger(t *testing.T) {
 
 				// Mock warning messages for the two failed attempts
 				mockBWU.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+				mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 				// After successful retrieval, try to create stdout file but fail
 				mockBWU.EXPECT().UnitDir().Return("/nonexistent/path/for/stdout")
@@ -4776,7 +4776,7 @@ func TestKubeUnit_RunWorkUsingLogger_ExitCode1SetsFinished(t *testing.T) {
 			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
 			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
-			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+			mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 			ctx := context.Background()
 			w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
@@ -4996,7 +4996,7 @@ func TestKubeUnit_RunWorkUsingLogger_ContainerStateSwitch(t *testing.T) {
 			mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
 			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
-			logger := logger.NewReceptorLogger("test")
+			logger := logger.NewReceptorLogger()
 			mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 
 			ctx := context.Background()
@@ -5271,7 +5271,7 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), testNamespace, gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("pod creation failed"))
 
 				// Mock error logging and status updates
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			},
@@ -5354,7 +5354,7 @@ func TestKubeUnit_RunWorkUsingTCP(t *testing.T) {
 				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil).AnyTimes()
 
 				// Mock logging
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
@@ -5449,7 +5449,7 @@ func TestKubeUnit_ConnectUsingKubeconfig(t *testing.T) {
 				mockAPI.EXPECT().BuildConfigFromFlags("", gomock.Any()).Return(nil, fmt.Errorf("no kubeconfig found"))
 
 				// Mock logger for error handling
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 			},
 			expectError: true,
@@ -5490,7 +5490,7 @@ func TestKubeUnit_ConnectUsingKubeconfig(t *testing.T) {
 				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(nil, fmt.Errorf("connection failed"))
 
 				// Mock logger for error handling
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 			},
 			expectError: true, // Will fail at clientset creation but covers kubeconfig path
@@ -5523,7 +5523,7 @@ func TestKubeUnit_ConnectUsingKubeconfig(t *testing.T) {
 				mockAPI.EXPECT().NewForConfig(gomock.Any()).Return(nil, fmt.Errorf("connection failed"))
 
 				// Mock logger for error handling
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 			},
 			expectError: true, // Will fail at clientset creation
@@ -5660,7 +5660,7 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil).AnyTimes()
 
 				// Mock logging
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
@@ -5713,7 +5713,7 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 				mockAPI.EXPECT().UntilWithSync(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(watchEvent, nil).AnyTimes()
 
 				// Mock logging and status updates for error handling
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
@@ -5752,7 +5752,7 @@ func TestKubeUnit_RunWorkUsingTCP_ExtensiveErrorPaths(t *testing.T) {
 				mockAPI.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("context cancelled")).AnyTimes()
 
 				// Mock logging
-				logger := logger.NewReceptorLogger("test")
+				logger := logger.NewReceptorLogger()
 				mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 				mockBWU.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 				mockBWU.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
@@ -5861,7 +5861,7 @@ func TestKubeUnit_StatusTransitionToFinished(t *testing.T) {
 	mockKubeAPI := mock_workceptor.NewMockKubeAPIer(ctrl)
 
 	mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()
-	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test")).AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 	ctx := context.Background()
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
@@ -6120,7 +6120,7 @@ func TestGetSleepDuration(t *testing.T) {
 			mockAPI := mock_workceptor.NewMockKubeAPIer(mockCtrl)
 
 			// Mock basic methods needed for GetSleepDuration
-			logger := logger.NewReceptorLogger("test")
+			logger := logger.NewReceptorLogger()
 			mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(mockCtrl)
 			mockNetceptor.EXPECT().GetLogger().Return(logger).AnyTimes()
 			mockNetceptor.EXPECT().NodeID().Return("test-node").AnyTimes()

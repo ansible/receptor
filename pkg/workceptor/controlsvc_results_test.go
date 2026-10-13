@@ -31,7 +31,7 @@ func TestControlFuncResultsDoesNotCloseConnection(t *testing.T) {
 	// Set up mock NetceptorForWorkceptor with expected function calls.
 	mockNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNC.EXPECT().NodeID().Return("testnode").AnyTimes()
-	mockNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 	mockNC.EXPECT().AddWorkCommand("testwork", false).Return(nil)
 
 	// Create Workceptor with the mocked netceptor.

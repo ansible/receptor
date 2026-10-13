@@ -94,7 +94,7 @@ Bdt96MbGrC0=
 			args: args{
 				cert:             testGoodCert,
 				expectedHostname: "foobar",
-				logger:           logger.NewReceptorLogger("test"),
+				logger:           logger.NewReceptorLogger(),
 			},
 			want:    true,               // found
 			want1:   []string{"foobar"}, // ReceptorNames
@@ -105,7 +105,7 @@ Bdt96MbGrC0=
 			args: args{
 				cert:             testGoodCert,
 				expectedHostname: "foobaz-server",
-				logger:           logger.NewReceptorLogger("test"),
+				logger:           logger.NewReceptorLogger(),
 			},
 			want:    false,
 			want1:   []string{"foobar"},
@@ -116,7 +116,7 @@ Bdt96MbGrC0=
 			args: args{
 				cert:             testUglyCert,
 				expectedHostname: "foobaz-server",
-				logger:           logger.NewReceptorLogger("test"),
+				logger:           logger.NewReceptorLogger(),
 			},
 			want:    false,
 			want1:   uglyWant1,

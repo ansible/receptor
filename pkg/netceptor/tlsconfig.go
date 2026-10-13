@@ -158,8 +158,35 @@ func (cfg TLSServerConfig) PrepareTLSServerConfig(n *Netceptor) (*tls.Config, er
 	}
 
 	if tlscfg.ClientAuth != tls.NoClientCert {
-		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, //nolint:gosec // G123: custom peer verification is intentional
-			"", ExpectedHostnameTypeDNS, VerifyClient, n.Logger)
+		// VerifyPeerCertificate must be set on the config returned by
+		// GetConfigForClient: when GetConfigForClient is non-nil (as it always
+		// is here) the top-level VerifyPeerCertificate is never used.
+		//
+		// Pre-handshake TLS failures happen before the Receptor handshake, so
+		// no remote_id is known yet. Attribute them to the transport peer so
+		// the line can be correlated with the peer's own backend logs.
+		//
+		// Note: Netceptor.listen replaces GetConfigForClient with
+		// GetConfigForClientOverride for QUIC service listeners, where the
+		// transport peer is itself a Receptor Addr and remote_id is used
+		// instead.
+		tlscfg.GetConfigForClient = func(hi *tls.ClientHelloInfo) (*tls.Config, error) { //nolint:gosec // G123: custom peer verification is intentional
+			clone := tlscfg.Clone()
+			clone.GetConfigForClient = nil
+			transport := make(map[string]string, 2)
+			if hi.Conn != nil {
+				if addr := hi.Conn.LocalAddr(); addr != nil {
+					transport["local_addr"] = addr.String()
+				}
+				if addr := hi.Conn.RemoteAddr(); addr != nil {
+					transport["remote_addr"] = addr.String()
+				}
+			}
+			clone.VerifyPeerCertificate = ReceptorVerifyFunc(clone, pinnedFingerprints, //nolint:gosec // G123: custom peer verification is intentional
+				"", ExpectedHostnameTypeDNS, VerifyClient, n.Logger.WithExtraSuffix(transport))
+
+			return clone, nil
+		}
 	}
 
 	return tlscfg, nil
@@ -439,9 +466,21 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 			certs[i] = cert
 		}
 
+		// When the peer is not already known from the connection (the static
+		// server config path), fall back to the Receptor names claimed by the
+		// presented certificate so the line still identifies who it is about.
+		// Where expectedHostname is set, the connection already supplies the
+		// peer identity and must not be overwritten by a claimed certificate name.
+		log := logger
+		if expectedHostname == "" {
+			if names, err := utils.ReceptorNames(certs[0].Extensions); err == nil && len(names) > 0 {
+				log = log.WithExtraSuffix(map[string]string{"remote_id": strings.Join(names, ",")})
+			}
+		}
+
 		// Check pinned fingerprints if provided.
 		if err := verifyPinnedFingerprint(certs[0], pinnedFingerprints); err != nil {
-			logger.Error("%s", err)
+			log.Error("%s", err)
 
 			return err
 		}
@@ -449,7 +488,7 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 		// Build verification options.
 		opts, err := buildVerifyOptions(tlscfg, verifyType, expectedHostname, expectedHostnameType)
 		if err != nil {
-			logger.Error("%s", err)
+			log.Error("%s", err)
 
 			return err
 		}
@@ -465,15 +504,15 @@ func ReceptorVerifyFunc(tlscfg *tls.Config, pinnedFingerprints [][]byte, expecte
 			if errors.As(err, &hostnameError) {
 				handledError = handleHostnameError(hostnameError)
 			}
-			logger.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", handledError, tlscfg.RootCAs, tlscfg.ServerName)
+			log.Error("RVF failed verify: %s\nRootCAs: %v\nServerName: %s", handledError, tlscfg.RootCAs, tlscfg.ServerName)
 
 			return handledError
 		}
 
 		// Verify Receptor node ID if required.
 		if expectedHostnameType == ExpectedHostnameTypeReceptor {
-			if err := verifyReceptorNodeID(certs[0], expectedHostname, logger); err != nil {
-				logger.Error("%s", err)
+			if err := verifyReceptorNodeID(certs[0], expectedHostname, log); err != nil {
+				log.Error("%s", err)
 
 				return err
 			}

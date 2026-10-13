@@ -25,11 +25,10 @@ import (
 )
 
 const (
-	expectedWebsocketListenerError   = "Expected Websocket Listener, got nil"
-	newWebsocketDialerError          = "NewWebsockerDialer return error: %+v"
-	websocketListenerExpectedError   = "Websocket listener expected, nil returned"
-	websocketsTestNewWebsocketDialer = "websockets_test.go>TestNewWebsocketDialer"
-	wssTestTesting                   = "wss://test.testing"
+	expectedWebsocketListenerError = "Expected Websocket Listener, got nil"
+	newWebsocketDialerError        = "NewWebsockerDialer return error: %+v"
+	websocketListenerExpectedError = "Websocket listener expected, nil returned"
+	wssTestTesting                 = "wss://test.testing"
 )
 
 func setupTLSCfg(t *testing.T) tls.Certificate {

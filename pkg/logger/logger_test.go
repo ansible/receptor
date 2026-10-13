@@ -146,7 +146,7 @@ func TestSanitizedLog(t *testing.T) {
 			registerLogger:        false,
 		},
 		{
-			name:                  "simple message",
+			name:                  "no prefix",
 			level:                 InfoLevel,
 			format:                "noprefix %s",
 			args:                  []interface{}{"ok"},
@@ -190,7 +190,7 @@ func TestSanitizedLog(t *testing.T) {
 			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 
-			rl.SanitizedLog(tc.level, tc.format, tc.args...)
+			rl.sanitizedLog(tc.level, tc.format, tc.args...)
 
 			got := buf.String()
 
@@ -210,6 +210,30 @@ func TestSanitizedLog(t *testing.T) {
 				t.Error("expected registered logger function to be called")
 			}
 		})
+	}
+}
+
+func TestLogWithInvalidLevel(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+	SetGlobalLogLevel(DebugLevel)
+
+	origLogger := GetRegisteredLogger()
+	defer RegisterLogger(origLogger)
+	RegisterLogger(nil)
+
+	var buf bytes.Buffer
+	rl := NewReceptorLogger()
+	rl.SetOutput(&buf)
+
+	rl.log(9999, "bad\nmessage %d", 7)
+
+	got := buf.String()
+	if !strings.Contains(got, "Log entry received with invalid level: badmessage 7") {
+		t.Errorf("expected sanitized invalid level error, got: %q", got)
+	}
+	if strings.Contains(strings.TrimSuffix(got, "\n"), "\n") {
+		t.Errorf("expected embedded newlines removed, got: %q", got)
 	}
 }
 
@@ -451,56 +475,179 @@ func TestTraceCfgPrepare(t *testing.T) {
 	}
 }
 
-func assertSuffixFieldsPresent(t *testing.T, logLine string, expected map[string]string) {
-	t.Helper()
-	for k, v := range expected {
-		needle := `"` + k + `":"` + v + `"`
-		if !strings.Contains(logLine, needle) {
-			t.Errorf("expected key-value pair %s not found in log: %s", needle, logLine)
+// syncBuffer is a concurrency-safe writer for capturing log output.
+type syncBuffer struct {
+	m   sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	return b.buf.String()
+}
+
+func TestLoggerAppendsSuffix(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+	SetGlobalLogLevel(DebugLevel)
+
+	var buf bytes.Buffer
+	rl := NewReceptorLogger().WithExtraSuffix(map[string]string{"node_id": "control-a"})
+	rl.SetOutput(&buf)
+
+	rl.Info("plain line\n")
+	rl.SanitizedInfo("sanitized line\n")
+
+	got := buf.String()
+	if strings.Count(got, `"node_id":"control-a"`) != 2 {
+		t.Errorf("expected node_id on every line, got: %q", got)
+	}
+	if strings.Count(got, "\n") != 2 {
+		t.Errorf("expected one line per log call, got: %q", got)
+	}
+}
+
+func TestEmptySuffixAddsNothing(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+	SetGlobalLogLevel(DebugLevel)
+
+	var buf bytes.Buffer
+	rl := NewReceptorLogger()
+	rl.SetOutput(&buf)
+
+	rl.Info("plain line")
+
+	got := strings.TrimSuffix(buf.String(), "\n")
+	if !strings.HasSuffix(got, "plain line") {
+		t.Errorf("expected no suffix, got: %q", got)
+	}
+}
+
+func TestWithSuffixInheritsOutput(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+	SetGlobalLogLevel(DebugLevel)
+
+	var buf bytes.Buffer
+	parent := NewReceptorLogger()
+	parent.SetOutput(&buf)
+
+	child := parent.WithExtraSuffix(map[string]string{"node_id": "control-a", "remote_id": "execution-a"})
+	child.Info("child line")
+
+	got := buf.String()
+	if !strings.Contains(got, `"remote_id":"execution-a"`) {
+		t.Errorf("expected child suffix in parent's output, got: %q", got)
+	}
+	if !strings.Contains(got, "child line") {
+		t.Errorf("expected message body in output, got: %q", got)
+	}
+}
+
+// TestConcurrentSuffixIsolation validates that
+// per-connection remote_id must never leak into another goroutine's lines.
+func TestConcurrentSuffixIsolation(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+	SetGlobalLogLevel(DebugLevel)
+
+	out := &syncBuffer{}
+	parent := NewReceptorLogger()
+	parent.SetOutput(out)
+
+	const goroutines = 16
+
+	const lines = 50
+
+	var wg sync.WaitGroup
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			remoteID := fmt.Sprintf("execution-%d", i)
+			rl := parent.WithExtraSuffix(map[string]string{"node_id": "control-a", "remote_id": remoteID})
+			for j := 0; j < lines; j++ {
+				rl.Info("work on %s is %d", remoteID, j)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for _, line := range strings.Split(out.String(), "\n") {
+		if line == "" {
+			continue
+		}
+		idx := strings.Index(line, "work on ")
+		if idx == -1 {
+			continue
+		}
+		var loggedRemote string
+		if _, err := fmt.Sscanf(line[idx:], "work on %s", &loggedRemote); err != nil {
+			t.Fatalf("could not parse log line %q: %v", line, err)
+		}
+		if !strings.Contains(line, `"remote_id":"`+loggedRemote+`"`) {
+			t.Errorf("remote_id does not match the emitting goroutine: %s", line)
 		}
 	}
 }
 
-func TestGetLoggerWithSuffix(t *testing.T) {
-	SetGlobalLogLevel(4)
+// TestConcurrentLevelLabelsStayConsistent validates that the
+// level label and the message must be emitted atomically, so a line logged at
+// one level can never carry another goroutine's level label.
+func TestConcurrentLevelLabelsStayConsistent(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+	SetGlobalLogLevel(TraceLevel)
 
-	t.Run("initial suffix", func(t *testing.T) {
-		var logBuffer bytes.Buffer
-		testname := "Initial Suffix Example"
-		suffix := map[string]string{
-			"node_id":   "controller",
-			"remote_id": "hop",
-		}
-		receptorLogger := NewReceptorLoggerWithSuffix(suffix)
-		receptorLogger.SetOutput(&logBuffer)
+	out := &syncBuffer{}
+	rl := NewReceptorLogger()
+	rl.SetOutput(out)
 
-		receptorLogger.Error("%s", testname)
-		if !strings.Contains(logBuffer.String(), testname) {
-			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
-		}
-		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
-	})
-	t.Run("updated suffix", func(t *testing.T) {
-		var logBuffer bytes.Buffer
-		testname := "Updated Suffix Example"
-		suffix := map[string]string{
-			"node_id":   "controller",
-			"remote_id": "hop",
-		}
-		receptorLogger := NewReceptorLoggerWithSuffix(suffix)
-		receptorLogger.SetOutput(&logBuffer)
+	levels := []struct {
+		name string
+		log  func(string, ...interface{})
+	}{
+		{"INFO", rl.Info},
+		{"DEBUG", rl.Debug},
+		{"TRACE", rl.Trace},
+		{"WARNING", rl.Warning},
+		{"ERROR", rl.Error},
+	}
 
-		updated := map[string]string{
-			"cost": "12",
-		}
-		receptorLogger.UpdateSuffix(updated)
-		receptorLogger.SanitizedError("%s", testname)
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		l := levels[i%len(levels)]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				l.log("%s level marker", l.name)
+			}
+		}()
+	}
+	wg.Wait()
 
-		if !strings.Contains(logBuffer.String(), testname) {
-			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
+	for _, line := range strings.Split(out.String(), "\n") {
+		if line == "" {
+			continue
 		}
-
-		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
-		assertSuffixFieldsPresent(t, logBuffer.String(), updated)
-	})
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			t.Fatalf("empty log line")
+		}
+		level := fields[0]
+		if !strings.Contains(line, level+" level marker") {
+			t.Errorf("level label does not match the message: %q", line)
+		}
+	}
 }

@@ -179,12 +179,15 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 func (s *Netceptor) GetConfigForClientOverride(tlscfg *tls.Config) func(*tls.ClientHelloInfo) (*tls.Config, error) {
 	return func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
 		clientTLSCfg := tlscfg.Clone()
-		remoteAdrr := hi.Conn.RemoteAddr().String()
-		remoteNode, _, err := utils.AddressToHostPort(remoteAdrr)
+		if hi.Conn == nil {
+			return clientTLSCfg, nil
+		}
+		remoteAddr := hi.Conn.RemoteAddr().String()
+		remoteNode, _, err := utils.AddressToHostPort(remoteAddr)
 		if err != nil {
 			return nil, err
 		}
-		clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger) //nolint:gosec // G123: custom peer verification is intentional
+		clientTLSCfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, [][]byte{}, remoteNode, ExpectedHostnameTypeReceptor, VerifyClient, s.Logger.WithExtraSuffix(map[string]string{"remote_id": remoteNode})) //nolint:gosec // G123: custom peer verification is intentional
 
 		return clientTLSCfg, nil
 	}
@@ -532,7 +535,12 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
+	remoteAddr := c.RemoteAddr()
+	log := c.s.Logger
+	if addr, ok := remoteAddr.(Addr); ok && addr.node != "" {
+		log = log.WithExtraSuffix(map[string]string{"remote_id": addr.node})
+	}
+	log.Debug("closing connection from service %s to %s", c.pc.LocalService(), remoteAddr.String())
 
 	return c.qc.CloseWithError(0, "normal close")
 }

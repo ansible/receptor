@@ -116,6 +116,7 @@ func TestPacketConn(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockNetceptorForPacketConn := mock_netceptor.NewMockNetcForPacketConn(ctrl)
+	pcLogger := logger.NewReceptorLogger("")
 
 	packetConnTestCases := []struct {
 		name                   string
@@ -143,14 +144,14 @@ func TestPacketConn(t *testing.T) {
 			"test",
 			func(ctx context.Context) {
 				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
-				mockNetceptorForPacketConn.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test"))
+				mockNetceptorForPacketConn.EXPECT().GetLogger().Return(pcLogger)
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{}))).Times(4)
 			},
 			func(pc netceptor.PacketConner) interface{} {
-				return pc.GetLogger().Logger.Prefix()
+				return pc.GetLogger()
 			},
-			"test",
-			"Expected Logger prefix to be test, but got %v",
+			pcLogger,
+			"Expected GetLogger to return the netceptor logger, but got %v",
 		},
 		{
 			"ReadFrom Error",

@@ -6,6 +6,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -614,4 +615,84 @@ func TestConnectionRejectedPeerIsLogged(t *testing.T) {
 	}) {
 		t.Fatalf("rejection log message not observed\nlogs:\n%s", m.LogWriter.String())
 	}
+}
+
+// TestConcurrentConnectionsHaveIsolatedLogContext submits work to multiple
+// non-existent nodes simultaneously and verifies that each retry log entry
+// records only the identity of its own target node, not that of any other
+// concurrent operation.
+func TestConcurrentConnectionsHaveIsolatedLogContext(t *testing.T) {
+	t.Parallel()
+
+	m := twoNodeMesh()
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	targets := []string{"execution-b", "execution-c", "execution-d"}
+	submitConcurrentWork(t, m.GetNodes()["control"].GetControlSocket(), targets)
+
+	for _, target := range targets {
+		ctxWait, cancelWait := context.WithTimeout(context.Background(), 30*time.Second)
+		waitForLogLine(t, ctxWait, m.LogWriter.String, "Connection to "+target+" failed")
+		cancelWait()
+	}
+
+	for _, target := range targets {
+		assertRetryLogEntriesAreIsolated(t, m.LogWriter.String(), target)
+	}
+}
+
+// assertRetryLogEntriesAreIsolated fails if a retry log entry for target lacks
+// node_id=control or references a remote node other than target.
+func assertRetryLogEntriesAreIsolated(t *testing.T, logs, target string) {
+	t.Helper()
+
+	for _, line := range strings.Split(logs, "\n") {
+		if !strings.Contains(line, "Connection to "+target+" failed") {
+			continue
+		}
+		if !strings.Contains(line, `"node_id":"control"`) {
+			t.Errorf("retry log entry for %s missing node_id: %q", target, line)
+		}
+		if strings.Contains(line, `"remote_id"`) && !strings.Contains(line, `"remote_id":"`+target+`"`) {
+			t.Errorf("retry log entry for %s references unexpected remote node: %q", target, line)
+		}
+	}
+}
+
+// submitConcurrentWork submits echosleepshort work to each target, using one
+// control connection per goroutine to avoid racing on the socket.
+func submitConcurrentWork(t *testing.T, socketPath string, targets []string) {
+	t.Helper()
+
+	var wg sync.WaitGroup
+	for _, target := range targets {
+		target := target
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c := NewReceptorControl()
+			if err := c.Connect(socketPath); err != nil {
+				t.Errorf("failed to connect to control socket: %v", err)
+
+				return
+			}
+			defer c.Close() //nolint:errcheck
+			cmd := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","node":"` + target + `","params":""}`
+			if _, err := c.WorkSubmitJSON(cmd); err != nil {
+				t.Errorf("failed to submit work to %s: %v", target, err)
+			}
+		}()
+	}
+	wg.Wait()
 }

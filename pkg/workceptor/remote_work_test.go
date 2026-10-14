@@ -486,6 +486,47 @@ func TestRemoteWorkLifecycleOperations(t *testing.T) {
 	}
 }
 
+func TestRemoteWorkStartWithExpiration(t *testing.T) {
+	t.Parallel()
+	contextWithCancel, cancel := context.WithCancel(context.Background())
+	wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, contextWithCancel)
+
+	t.Cleanup(func() {
+		cancel()
+		time.Sleep(200 * time.Millisecond)
+	})
+
+	remoteExtraData := &workceptor.RemoteExtraData{
+		RemoteNode:   "execution",
+		RemoteParams: make(map[string]string),
+		Expiration:   time.Now().Add(time.Hour),
+	}
+
+	statusLock := &sync.RWMutex{}
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+		return &workceptor.StatusFileData{}
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+		ExtraData: remoteExtraData,
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().ID().Return("test-id").Times(1)
+
+	tmpDir := filepath.Join("/tmp", "start_with_expiration")
+	messages := []string{
+		"execution\n",
+		"Work unit created with ID execution. Send stdin data and EOF.\n",
+		"OK\n",
+		"{\"State\": 1, \"Detail\": \"Running\", \"StdoutSize\": 0}\n",
+	}
+	createRemoteWorkNetworkSetup(t, ctrl, contextWithCancel, messages, mockNetceptor, mockBaseWorkUnit, tmpDir, remoteExtraData, true)
+
+	if err := wu.Start(); err != nil {
+		t.Errorf("Unexpected error starting work unit with expiration: %v", err)
+	}
+}
+
 func TestRemoteWorkConnectToRemoteEnhanced(t *testing.T) {
 	t.Parallel()
 
@@ -719,6 +760,392 @@ func TestRemoteWorkGetConnectionCryptoErrors(t *testing.T) {
 				t.Errorf("Expected State=0, got: %d", capturedState)
 			}
 		})
+	}
+}
+
+func TestGetConnectionSurfacesRetryableErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		dialError      error
+		extraData      interface{}
+		expectContains string
+	}{
+		{
+			name:      "retryable error writes Detail with remote node name",
+			dialError: fmt.Errorf("connection refused"),
+			extraData: &workceptor.RemoteExtraData{
+				RemoteNode: "execution", TLSClient: "test-client",
+				RemoteWorkType: "test-work", RemoteParams: make(map[string]string),
+			},
+			expectContains: "Connection to execution failed: connection refused",
+		},
+		{
+			name:           "retryable error without RemoteExtraData uses fallback",
+			dialError:      fmt.Errorf("dial timeout"),
+			extraData:      nil,
+			expectContains: "Connection to remote node failed: dial timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// 1.5s allows two GetConnection iterations (1s retry delay) so the
+			// idempotency check (status.Detail == newDetail → return) fires on
+			// the second call with the same error.
+			ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+			defer cancel()
+
+			wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
+
+			remoteExtraData := &workceptor.RemoteExtraData{
+				RemoteNode:     "execution",
+				TLSClient:      "test-client",
+				RemoteWorkType: "test-work",
+				RemoteParams:   make(map[string]string),
+			}
+
+			statusLock := &sync.RWMutex{}
+			var capturedDetail string
+
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+				ExtraData: remoteExtraData,
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+				status := &workceptor.StatusFileData{
+					Detail:    capturedDetail,
+					ExtraData: tt.extraData,
+				}
+				updateFunc.(func(*workceptor.StatusFileData))(status)
+				capturedDetail = status.Detail
+			}).AnyTimes()
+
+			mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+			mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, tt.dialError).AnyTimes()
+
+			conn, reader := wu.(interface {
+				GetConnection(context.Context) (net.Conn, *bufio.Reader)
+			}).GetConnection(ctx)
+
+			if conn != nil || reader != nil {
+				t.Error("Expected nil connection and reader")
+			}
+			if !strings.Contains(capturedDetail, tt.expectContains) {
+				t.Errorf("Expected detail to contain %q, got: %s", tt.expectContains, capturedDetail)
+			}
+		})
+	}
+}
+
+func TestGetConnectionDoesNotOverwriteTerminalDetail(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		state int
+		want  string
+	}{
+		{name: "succeeded", state: workceptor.WorkStateSucceeded, want: "original detail"},
+		{name: "failed", state: workceptor.WorkStateFailed, want: "original detail"},
+		{name: "canceled", state: workceptor.WorkStateCanceled, want: "original detail"},
+		{name: "running", state: workceptor.WorkStateRunning, want: "Connection to execution failed: connection refused"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+
+			wu, mockBaseWorkUnit, mockNetceptor, w, _ := createRemoteWorkTestSetup(t, ctx)
+
+			remoteExtraData := &workceptor.RemoteExtraData{
+				RemoteNode:     "execution",
+				TLSClient:      "test-client",
+				RemoteWorkType: "test-work",
+				RemoteParams:   make(map[string]string),
+			}
+
+			statusLock := &sync.RWMutex{}
+			detail := "original detail"
+
+			mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+				return &workceptor.StatusFileData{}
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+				ExtraData: remoteExtraData,
+			}).AnyTimes()
+			mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+			mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+				status := &workceptor.StatusFileData{
+					State:     tt.state,
+					Detail:    detail,
+					ExtraData: remoteExtraData,
+				}
+				updateFunc.(func(*workceptor.StatusFileData))(status)
+				detail = status.Detail
+			}).AnyTimes()
+
+			mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+			mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(nil, fmt.Errorf("connection refused")).AnyTimes()
+
+			wu.(interface {
+				GetConnection(context.Context) (net.Conn, *bufio.Reader)
+			}).GetConnection(ctx)
+
+			if detail != tt.want {
+				t.Errorf("Expected detail %q, got %q", tt.want, detail)
+			}
+		})
+	}
+}
+
+// statusDetailRecorder holds the unit Detail that the monitor goroutines update concurrently.
+type statusDetailRecorder struct {
+	mu     sync.Mutex
+	detail string
+}
+
+func (r *statusDetailRecorder) apply(updateFunc interface{}, extraData *workceptor.RemoteExtraData) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	status := &workceptor.StatusFileData{Detail: r.detail, ExtraData: extraData}
+	updateFunc.(func(*workceptor.StatusFileData))(status)
+	r.detail = status.Detail
+}
+
+func (r *statusDetailRecorder) get() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.detail
+}
+
+func waitForDetail(r *statusDetailRecorder, want string) bool {
+	for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if strings.Contains(r.get(), want) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// newStatusStreamErrorConn returns a conn whose handshake succeeds and whose status
+// exchange fails: writes fail when failWrite is set, otherwise reads fail.
+func newStatusStreamErrorConn(ctx context.Context, ctrl *gomock.Controller, failWrite bool) *netceptor.Conn {
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockQuicConnection := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+	helloSent := false
+	mockQuicStream.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if helloSent {
+			return 0, fmt.Errorf("connection reset")
+		}
+		helloSent = true
+		msg := "execution\n"
+		copy(b, msg)
+
+		return len(msg), nil
+	}).AnyTimes()
+	mockQuicStream.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if failWrite {
+			return 0, fmt.Errorf("broken pipe")
+		}
+
+		return len(b), nil
+	}).AnyTimes()
+	mockQuicStream.EXPECT().Close().Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetReadDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
+
+	var cancelFunc context.CancelFunc = func() {}
+	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
+	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
+	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+	mockQuicConnection.EXPECT().LocalAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+
+	return netceptor.NewConn(
+		netceptor.New(ctx, "test-node"),
+		mockPacketConner,
+		mockQuicConnection,
+		mockQuicStream,
+		make(chan struct{}),
+		&sync.Once{},
+		ctx,
+	)
+}
+
+func runMonitorStatusStreamErrorTest(t *testing.T, failWrite bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+
+	wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+
+	remoteExtraData := &workceptor.RemoteExtraData{
+		RemoteStarted:  true,
+		RemoteNode:     "execution",
+		RemoteUnitID:   "remoteunit",
+		RemoteWorkType: "echoint",
+		RemoteParams:   make(map[string]string),
+	}
+	recorder := &statusDetailRecorder{}
+
+	// monitorRemoteStdout cancels the shared job context if it cannot open the stdout file,
+	// which would stop the status goroutine before it writes, so the dir must exist.
+	unitDir := t.TempDir()
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+		return &workceptor.StatusFileData{}
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: remoteExtraData}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().ID().Return("test-id").AnyTimes()
+	mockBaseWorkUnit.EXPECT().Load().Return(nil).AnyTimes()
+	mockBaseWorkUnit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UnitDir().Return(unitDir).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().LastUpdateError().Return(nil).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+		recorder.apply(updateFunc, remoteExtraData)
+	}).AnyTimes()
+
+	mockConn := newStatusStreamErrorConn(ctx, ctrl, failWrite)
+	mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockConn, nil).AnyTimes()
+
+	if err := wu.Restart(); err != nil {
+		t.Fatalf("Unexpected error restarting work unit: %v", err)
+	}
+
+	want := "Connection to execution failed"
+	if !waitForDetail(recorder, want) {
+		t.Errorf("Expected detail to contain %q, got: %q", want, recorder.get())
+	}
+}
+
+func TestRemoteWorkMonitorSurfacesStatusStreamErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		failWrite bool
+	}{
+		{name: "status write error", failWrite: true},
+		{name: "status read error", failWrite: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			runMonitorStatusStreamErrorTest(t, tt.failWrite)
+		})
+	}
+}
+
+func TestGetConnectionClearsStaleDetailOnSuccess(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	wu, mockBaseWorkUnit, mockNetceptor, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+
+	remoteExtraData := &workceptor.RemoteExtraData{
+		RemoteNode:     "execution",
+		TLSClient:      "test-client",
+		RemoteWorkType: "test-work",
+		RemoteParams:   make(map[string]string),
+	}
+
+	statusLock := &sync.RWMutex{}
+	detail := "Connection to execution failed: connection refused"
+
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+		return &workceptor.StatusFileData{}
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+		ExtraData: remoteExtraData,
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(updateFunc interface{}) {
+		status := &workceptor.StatusFileData{
+			Detail:    detail,
+			ExtraData: remoteExtraData,
+		}
+		updateFunc.(func(*workceptor.StatusFileData))(status)
+		detail = status.Detail
+	}).AnyTimes()
+
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockQuicConnection := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+	helloSent := false
+	mockQuicStream.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if !helloSent {
+			helloSent = true
+			msg := "execution\n"
+			copy(b, msg)
+
+			return len(msg), nil
+		}
+
+		return 0, ctx.Err()
+	}).AnyTimes()
+	mockQuicStream.EXPECT().Write(gomock.Any()).Return(0, nil).AnyTimes()
+	mockQuicStream.EXPECT().Close().Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetReadDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
+
+	var cancelFunc context.CancelFunc = func() {}
+	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
+	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
+	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+	mockQuicConnection.EXPECT().LocalAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+
+	mockConn := netceptor.NewConn(
+		netceptor.New(ctx, "test-node"),
+		mockPacketConner,
+		mockQuicConnection,
+		mockQuicStream,
+		make(chan struct{}),
+		&sync.Once{},
+		ctx,
+	)
+
+	mockNetceptor.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNetceptor.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockConn, nil)
+
+	conn, _ := wu.(interface {
+		GetConnection(context.Context) (net.Conn, *bufio.Reader)
+	}).GetConnection(ctx)
+
+	if conn == nil {
+		t.Fatal("Expected non-nil connection")
+	}
+	if detail != "" {
+		t.Errorf("Expected detail to be cleared, got: %s", detail)
 	}
 }
 

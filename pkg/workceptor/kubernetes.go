@@ -1745,16 +1745,19 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	if kw.authMethod == "runtime" && ked.KubeConfig == "" {
 		return fmt.Errorf("param secret_kube_config must be provided if AuthMethod=runtime")
 	}
-	// pod_name check first: it is the most specific constraint and its message names all
+	// adoptMode attaches to a pod that already exists, so every pod-creation param conflicts with it.
+	adoptMode := userPodName != ""
+	// adopt mode check first: it is the most specific constraint and its message names all
 	// conflicting params. The secret_kube_pod check below would fire first on a 3-way
-	// conflict and produce an incomplete error that omits pod_name.
-	if userPodName != "" {
+	// conflict and produce an incomplete error that omits the other params.
+	if adoptMode {
 		if userPod != "" || userParams != "" || userCommand != "" || userImage != "" {
-			return fmt.Errorf("params kube_command, kube_image, kube_params, secret_kube_pod not compatible with pod_name")
+			return fmt.Errorf("params kube_command, kube_image, kube_params, secret_kube_pod not compatible with adopt mode")
 		}
-		// RunWorkUsingLogger fails the unit on an empty namespace. Catching it here means the
-		// submitter is told at submit time instead of discovering it from a failed work unit.
-		if ked.KubeNamespace == "" {
+		// RunWorkUsingLogger fails the unit on an empty namespace. kubeconfig and runtime auth fill
+		// it from the kubeconfig context when connecting; in-cluster auth has no fallback, so only
+		// there can an empty namespace be rejected at submit time instead of failing the work unit.
+		if kw.authMethod == "incluster" && ked.KubeNamespace == "" {
 			return fmt.Errorf("param kube_namespace must be provided with pod_name")
 		}
 	}
@@ -1778,21 +1781,21 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	if userImage != "" {
 		ked.Image = userImage
 	}
-	if userPod != "" {
+	switch {
+	case userPod != "":
 		ked.KubePod = userPod
 		ked.Image = ""
 		ked.Command = ""
 		kw.baseParams = ""
-	} else if userPodName == "" {
-		ked.Params = combineParams(kw.baseParams, userParams)
-	}
-	if userPodName != "" {
+	case adoptMode:
 		ked.PodName = userPodName
 		ked.KubePod = ""
 		ked.Image = ""
 		ked.Command = ""
 		ked.Params = ""
 		kw.baseParams = ""
+	default:
+		ked.Params = combineParams(kw.baseParams, userParams)
 	}
 
 	return nil

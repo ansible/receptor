@@ -3339,6 +3339,7 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 	tests := []struct {
 		name             string
 		params           map[string]string
+		authMethod       string // defaults to incluster
 		configNamespace  string
 		allowRuntimeAuth bool
 		allowRuntimeCmd  bool
@@ -3377,10 +3378,20 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 			name:             "Rejected without a namespace",
 			params:           map[string]string{"pod_name": "automation-job-7-abcde"},
 			configNamespace:  "",
+			allowRuntimeAuth: true, // Prepare() only allows an empty node namespace when runtime auth is allowed
 			allowRuntimePod:  true,
 			expectError:      true,
 			expectedErrorMsg: "param kube_namespace must be provided with pod_name",
-			description:      "Fail at submit time rather than after the work unit is already running",
+			description:      "In-cluster auth has no namespace fallback, so fail at submit time rather than as a failed work unit",
+		},
+		{
+			name:            "Namespace may come from the kubeconfig context",
+			params:          map[string]string{"pod_name": "automation-job-7-abcde"},
+			authMethod:      "kubeconfig",
+			configNamespace: "",
+			allowRuntimePod: true,
+			expectedPodName: "automation-job-7-abcde",
+			description:     "connectUsingKubeconfig fills an empty namespace from the context before the unit runs, so submit must not reject it",
 		},
 		{
 			name: "Rejected alongside a pod definition",
@@ -3391,7 +3402,7 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 			configNamespace:  "aap",
 			allowRuntimePod:  true,
 			expectError:      true,
-			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with pod_name",
+			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with adopt mode",
 			description:      "secret_kube_pod describes a pod to create; pod_name names one that already exists",
 		},
 		{
@@ -3404,7 +3415,7 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 			allowRuntimeCmd:  true,
 			allowRuntimePod:  true,
 			expectError:      true,
-			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with pod_name",
+			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with adopt mode",
 			description:      "An existing pod is already running its command",
 		},
 	}
@@ -3427,8 +3438,12 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 
 			mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 
+			authMethod := tt.authMethod
+			if authMethod == "" {
+				authMethod = "incluster"
+			}
 			kubeConfig := workceptor.KubeWorkerCfg{
-				AuthMethod:          "incluster",
+				AuthMethod:          authMethod,
 				StreamMethod:        "logger",
 				Namespace:           tt.configNamespace,
 				AllowRuntimeAuth:    tt.allowRuntimeAuth,

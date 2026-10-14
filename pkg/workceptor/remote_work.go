@@ -28,11 +28,8 @@ const errMsgRemoteExtraDataMissing = "remote ExtraData missing"
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnitForWorkUnit
-	// jobMutex protects access to topJC, which manages the lifecycle of monitor goroutines.
-	// This lock is separate from the status lock because lifecycle management is orthogonal to status updates.
-	jobMutex *sync.RWMutex
-	topJC    *utils.JobContext
-	logger   *logger.ReceptorLogger
+	topJC  *utils.JobContext
+	logger *logger.ReceptorLogger
 }
 
 // RemoteExtraData is the content of the ExtraData JSON field for a remote work unit.
@@ -145,6 +142,10 @@ func (rw *remoteUnit) handleConnectionError(err error) bool {
 // successful poll, and clearStaleConnectionDetail clears it on reconnect.
 func (rw *remoteUnit) surfaceRetryableError(errStr string) {
 	rw.UpdateFullStatus(func(status *StatusFileData) {
+		// Don't overwrite a terminal result with a transient connection failure.
+		if status.State == WorkStateSucceeded || status.State == WorkStateFailed || status.State == WorkStateCanceled {
+			return
+		}
 		remoteNode := "remote node"
 		if red, ok := status.ExtraData.(*RemoteExtraData); ok {
 			remoteNode = red.RemoteNode
@@ -718,40 +719,24 @@ func (rw *remoteUnit) startOrRestart(start bool) error {
 	if start && red.RemoteStarted {
 		return fmt.Errorf("unit was already started")
 	}
-	rw.jobMutex.Lock()
 	newJobStarted := rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, true)
-	rw.jobMutex.Unlock()
 	if !newJobStarted {
 		return fmt.Errorf("start or monitor process already running")
 	}
 	if start || !red.RemoteStarted {
 		if !red.Expiration.IsZero() {
-			rw.jobMutex.RLock()
-			jc := rw.topJC
-			rw.jobMutex.RUnlock()
-			go rw.setExpiration(jc)
+			go rw.setExpiration(rw.topJC)
 		}
 
-		rw.jobMutex.RLock()
-		jc := rw.topJC
-		rw.jobMutex.RUnlock()
-
-		return rw.runAndMonitor(jc, false, rw.StartRemoteUnit)
+		return rw.runAndMonitor(rw.topJC, false, rw.StartRemoteUnit)
 	} else if red.LocalReleased || red.LocalCancelled {
-		rw.jobMutex.RLock()
-		jc := rw.topJC
-		rw.jobMutex.RUnlock()
-
-		return rw.runAndMonitor(jc, red.LocalReleased, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+		return rw.runAndMonitor(rw.topJC, red.LocalReleased, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, red.LocalReleased)
 		})
 	}
 	go func() {
-		rw.jobMutex.RLock()
-		jc := rw.topJC
-		rw.jobMutex.RUnlock()
-		rw.monitorRemoteUnit(jc)
-		jc.WorkerDone()
+		rw.monitorRemoteUnit(rw.topJC)
+		rw.topJC.WorkerDone()
 	}()
 
 	return nil
@@ -786,11 +771,8 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 	})
 	// if remote work has not started, don't attempt to connect to remote
 	if !remoteStarted {
-		rw.jobMutex.Lock()
-		jc := rw.topJC
-		rw.jobMutex.Unlock()
-		jc.Cancel()
-		jc.Wait()
+		rw.topJC.Cancel()
+		rw.topJC.Wait()
 		if release {
 			return rw.BaseWorkUnitForWorkUnit.Release(true)
 		}
@@ -808,14 +790,9 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 
 		return rw.BaseWorkUnitForWorkUnit.Release(true)
 	}
-	rw.jobMutex.Lock()
 	rw.topJC.NewJob(rw.GetWorkceptor().ctx, 1, false)
-	rw.jobMutex.Unlock()
-	rw.jobMutex.RLock()
-	jc := rw.topJC
-	rw.jobMutex.RUnlock()
 
-	return rw.runAndMonitor(jc, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	return rw.runAndMonitor(rw.topJC, release, func(ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
 		return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, release)
 	})
 }
@@ -846,7 +823,6 @@ func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workTyp
 	red := &RemoteExtraData{}
 	red.RemoteParams = make(map[string]string)
 	rw.SetStatusExtraData(red)
-	rw.jobMutex = &sync.RWMutex{}
 	rw.topJC = &utils.JobContext{RunningLock: &sync.Mutex{}}
 
 	return rw

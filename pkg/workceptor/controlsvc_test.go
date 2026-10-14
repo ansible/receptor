@@ -844,3 +844,15 @@ func Test_workceptorCommandTypeInitFromJSON_ResultsStartpos(t *testing.T) {
 		})
 	}
 }
+
+func Test_strIntFromMapMissingIsErrFieldMissing(t *testing.T) {
+	if _, err := strFromMap(map[string]interface{}{}, "x"); !errors.Is(err, ErrFieldMissing) {
+		t.Errorf("strFromMap absent: got %v, want ErrFieldMissing", err)
+	}
+	if _, err := intFromMap(map[string]interface{}{}, "x"); !errors.Is(err, ErrFieldMissing) {
+		t.Errorf("intFromMap absent: got %v, want ErrFieldMissing", err)
+	}
+	if _, err := strFromMap(map[string]interface{}{"x": 1}, "x"); errors.Is(err, ErrFieldMissing) {
+		t.Errorf("strFromMap malformed: got ErrFieldMissing: %v", err)
+	}
+}

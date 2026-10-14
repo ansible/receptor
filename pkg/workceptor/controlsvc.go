@@ -95,7 +95,7 @@ func (t *workceptorCommandType) InitFromString(params string) (controlsvc.Contro
 func strFromMap(config map[string]interface{}, name string) (string, error) {
 	value, ok := config[name]
 	if !ok {
-		return "", fmt.Errorf("field %s missing", name)
+		return "", fmt.Errorf("field %s %w", name, ErrFieldMissing)
 	}
 	valueStr, ok := value.(string)
 	if !ok {
@@ -109,7 +109,7 @@ func strFromMap(config map[string]interface{}, name string) (string, error) {
 func intFromMap(config map[string]interface{}, name string) (int64, error) {
 	value, ok := config[name]
 	if !ok {
-		return 0, fmt.Errorf("field %s missing", name)
+		return 0, fmt.Errorf("field %s %w", name, ErrFieldMissing)
 	}
 	valueInt, ok := value.(int64)
 	if ok {
@@ -130,12 +130,12 @@ func intFromMap(config map[string]interface{}, name string) (int64, error) {
 // ErrFieldMissing reports that an optional field was absent from the command.
 // Callers may default such a field, but must not default one that is present
 // and malformed — see Test_boolFromMapDistinguishesMissingFromMalformed.
-var ErrFieldMissing = errors.New("field missing")
+var ErrFieldMissing = errors.New("missing")
 
 func boolFromMap(config map[string]interface{}, name string) (bool, error) {
 	value, ok := config[name]
 	if !ok {
-		return false, fmt.Errorf("field %s: %w", name, ErrFieldMissing)
+		return false, fmt.Errorf("field %s %w", name, ErrFieldMissing)
 	}
 	switch typedValue := value.(type) {
 	case bool:

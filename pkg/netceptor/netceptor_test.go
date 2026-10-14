@@ -661,7 +661,7 @@ func TestFirewalling(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	lastUnreachLock.RLock()
-	lum := lastUnreachMsg //nolint:ifshort
+	lum := lastUnreachMsg
 	lastUnreachLock.RUnlock()
 	if lum == nil {
 		t.Fatal("did not receive expected unreachable message")
@@ -829,7 +829,7 @@ func TestAllowedPeers(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	lastUnreachLock.RLock()
-	lum := lastUnreachMsg //nolint:ifshort
+	lum := lastUnreachMsg
 	lastUnreachLock.RUnlock()
 	if lum == nil {
 		t.Fatal("did not receive expected unreachable message")

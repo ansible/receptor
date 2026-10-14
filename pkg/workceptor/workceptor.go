@@ -346,7 +346,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	}
 	ident := fi.Name()
 	w.activeUnitsLock.RLock()
-	_, ok := w.activeUnits[ident] //nolint:ifshort
+	_, ok := w.activeUnits[ident]
 	w.activeUnitsLock.RUnlock()
 	if !ok {
 		statusFilename := path.Join(unitdir, "status")

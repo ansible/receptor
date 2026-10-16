@@ -143,14 +143,14 @@ func TestPacketConn(t *testing.T) {
 			"test",
 			func(ctx context.Context) {
 				mockNetceptorForPacketConn.EXPECT().Context().Return(ctx)
-				mockNetceptorForPacketConn.EXPECT().GetLogger().Return(logger.NewReceptorLogger("test"))
+				mockNetceptorForPacketConn.EXPECT().GetLogger().Return(logger.NewReceptorLogger())
 				mockNetceptorForPacketConn.EXPECT().GetUnreachableBroker().Return(utils.NewBroker(ctx, reflect.TypeOf(netceptor.UnreachableNotification{}))).Times(4)
 			},
 			func(pc netceptor.PacketConner) interface{} {
-				return pc.GetLogger().Logger.Prefix()
+				return pc.GetLogger() != nil
 			},
-			"test",
-			"Expected Logger prefix to be test, but got %v",
+			true,
+			"Expected Logger to be non-nil, but got %v",
 		},
 		{
 			"ReadFrom Error",

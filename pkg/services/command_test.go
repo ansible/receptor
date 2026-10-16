@@ -15,7 +15,7 @@ import (
 func setUpCommandMocks(ctrl *gomock.Controller) (*mock_services.MockNetCForCommandService, *mock_services.MockUtilsLib) {
 	mockNetceptor := mock_services.NewMockNetCForCommandService(ctrl)
 	mockUtilsLib := mock_services.NewMockUtilsLib(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
 	return mockNetceptor, mockUtilsLib

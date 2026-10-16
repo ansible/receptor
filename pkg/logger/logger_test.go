@@ -1,16 +1,14 @@
-package logger_test
+package logger
 
 import (
 	"bytes"
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/ansible/receptor/pkg/logger"
 )
 
 func TestGetLogLevelByName(t *testing.T) {
-	receptorLogger := logger.NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 
 	testCases := []struct {
 		name  string
@@ -34,7 +32,7 @@ func TestGetLogLevelByName(t *testing.T) {
 }
 
 func TestGetLogLevelByNameWithError(t *testing.T) {
-	receptorLogger := logger.NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 	_, err := receptorLogger.GetLogLevelByName("does not exist")
 	if err == nil {
 		t.Error("should have error")
@@ -42,7 +40,7 @@ func TestGetLogLevelByNameWithError(t *testing.T) {
 }
 
 func TestLogLevelToName(t *testing.T) {
-	receptorLogger := logger.NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 
 	testCases := []struct {
 		level int
@@ -66,7 +64,7 @@ func TestLogLevelToName(t *testing.T) {
 }
 
 func TestLogLevelToNameWithError(t *testing.T) {
-	receptorLogger := logger.NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 	_, err := receptorLogger.LogLevelToName(123)
 	if err == nil {
 		t.Error("should have error")
@@ -80,18 +78,18 @@ func TestLoglevelCfgInit(t *testing.T) {
 		wantLevel int
 		wantErr   bool
 	}{
-		{"error", "error", logger.ErrorLevel, false},
-		{"warning", "warning", logger.WarningLevel, false},
-		{"info", "info", logger.InfoLevel, false},
-		{"debug", "DEBUG", logger.DebugLevel, false},
-		{"trace", "trace", logger.TraceLevel, false},
+		{"error", "error", ErrorLevel, false},
+		{"warning", "warning", WarningLevel, false},
+		{"info", "info", InfoLevel, false},
+		{"debug", "DEBUG", DebugLevel, false},
+		{"trace", "trace", TraceLevel, false},
 		{"invalid", "garbage", 0, true},
 		{"empty", "", 0, true},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := logger.LoglevelCfg{Level: tt.level}
+			cfg := LoglevelCfg{Level: tt.level}
 			err := cfg.Init()
 			if tt.wantErr {
 				if err == nil {
@@ -103,25 +101,24 @@ func TestLoglevelCfgInit(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error for level %q: %v", tt.level, err)
 			}
-			got := logger.GetLogLevel()
+			got := GetLogLevel()
 			if got != tt.wantLevel {
 				t.Errorf("expected log level %d, got %d", tt.wantLevel, got)
 			}
-			logger.SetGlobalLogLevel(logger.InfoLevel) // Reset to default after test
+			SetGlobalLogLevel(InfoLevel) // Reset to default after test
 		})
 	}
 }
 
 func TestSanitizedLog(t *testing.T) {
 	// Save and restore global logger and log level
-	origLogger := logger.GetLogLevel()
-	defer logger.SetGlobalLogLevel(origLogger)
-	logger.SetGlobalLogLevel(logger.DebugLevel)
+	origLogger := GetLogLevel()
+	defer SetGlobalLogLevel(origLogger)
+	SetGlobalLogLevel(DebugLevel)
 
 	testCases := []struct {
 		name                  string
 		level                 int
-		prefix                string
 		format                string
 		args                  []interface{}
 		expectContains        []string
@@ -130,19 +127,17 @@ func TestSanitizedLog(t *testing.T) {
 		loggerCheck           func(t *testing.T, level int, format string, v ...interface{})
 	}{
 		{
-			name:                  "valid level with prefix and newline",
-			level:                 logger.InfoLevel,
-			prefix:                "testPrefix",
+			name:                  "valid level with newline",
+			level:                 InfoLevel,
 			format:                "hello\nworld %d",
 			args:                  []interface{}{42},
-			expectContains:        []string{"testPrefix INFO", "helloworld 42"},
+			expectContains:        []string{"INFO", "helloworld 42"},
 			expectNoNewlineInside: true,
 			registerLogger:        false,
 		},
 		{
 			name:                  "invalid log level triggers error",
 			level:                 9999,
-			prefix:                "testPrefix",
 			format:                "bad\nmessage %d",
 			args:                  []interface{}{7},
 			expectContains:        []string{"Log entry received with invalid level: badmessage 7"},
@@ -151,8 +146,7 @@ func TestSanitizedLog(t *testing.T) {
 		},
 		{
 			name:                  "no prefix",
-			level:                 logger.InfoLevel,
-			prefix:                "",
+			level:                 InfoLevel,
 			format:                "noprefix %s",
 			args:                  []interface{}{"ok"},
 			expectContains:        []string{"INFO", "noprefix ok"},
@@ -161,15 +155,14 @@ func TestSanitizedLog(t *testing.T) {
 		},
 		{
 			name:                  "logger function registered",
-			level:                 logger.InfoLevel,
-			prefix:                "testPrefix",
+			level:                 InfoLevel,
 			format:                "delegated %d",
 			args:                  []interface{}{1},
 			expectContains:        []string{},
 			expectNoNewlineInside: false,
 			registerLogger:        true,
 			loggerCheck: func(t *testing.T, level int, format string, v ...interface{}) {
-				if level != logger.InfoLevel || format != "delegated %d" || v[0].(int) != 1 {
+				if level != InfoLevel || format != "delegated %d" || v[0].(int) != 1 {
 					t.Errorf("logger delegate called with wrong args: %v %v %v", level, format, v)
 				}
 			},
@@ -178,25 +171,25 @@ func TestSanitizedLog(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			oldLogger := logger.GetRegisteredLogger()
-			defer logger.RegisterLogger(oldLogger)
+			oldLogger := GetRegisteredLogger()
+			defer RegisterLogger(oldLogger)
 			var called bool
 			if tc.registerLogger {
-				logger.RegisterLogger(func(level int, format string, v ...interface{}) {
+				RegisterLogger(func(level int, format string, v ...interface{}) {
 					called = true
 					if tc.loggerCheck != nil {
 						tc.loggerCheck(t, level, format, v...)
 					}
 				})
 			} else {
-				logger.RegisterLogger(nil)
+				RegisterLogger(nil)
 			}
 
 			var buf bytes.Buffer
-			rl := logger.NewReceptorLogger(tc.prefix)
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 
-			rl.SanitizedLog(tc.level, tc.format, tc.args...)
+			rl.sanitizedLog(tc.level, tc.format, tc.args...)
 
 			got := buf.String()
 
@@ -221,8 +214,8 @@ func TestSanitizedLog(t *testing.T) {
 
 func TestDebugPayload(t *testing.T) {
 	var logBuffer bytes.Buffer
-	logger.SetGlobalLogLevel(4)
-	receptorLogger := logger.NewReceptorLogger("testDebugPayload")
+	SetGlobalLogLevel(4)
+	receptorLogger := NewReceptorLogger()
 	receptorLogger.SetOutput(&logBuffer)
 	payload := "Testing debugPayload"
 	workUnitID := "1234"
@@ -260,26 +253,26 @@ func TestDebugPayload(t *testing.T) {
 }
 
 func TestGetLogLevel(t *testing.T) {
-	origLevel := logger.GetLogLevel()
-	defer logger.SetGlobalLogLevel(origLevel)
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
 
-	for _, level := range []int{logger.ErrorLevel, logger.WarningLevel, logger.InfoLevel, logger.DebugLevel, logger.TraceLevel} {
-		logger.SetGlobalLogLevel(level)
-		if got := logger.GetLogLevel(); got != level {
+	for _, level := range []int{ErrorLevel, WarningLevel, InfoLevel, DebugLevel, TraceLevel} {
+		SetGlobalLogLevel(level)
+		if got := GetLogLevel(); got != level {
 			t.Errorf("GetLogLevel() = %d, want %d", got, level)
 		}
 	}
 }
 
 func TestLogMethods(t *testing.T) {
-	origLevel := logger.GetLogLevel()
-	defer logger.SetGlobalLogLevel(origLevel)
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
 
-	origLogger := logger.GetRegisteredLogger()
-	defer logger.RegisterLogger(origLogger)
-	logger.RegisterLogger(nil)
+	origLogger := GetRegisteredLogger()
+	defer RegisterLogger(origLogger)
+	RegisterLogger(nil)
 
-	type logCall func(rl *logger.ReceptorLogger, msg string)
+	type logCall func(rl *ReceptorLogger, msg string)
 
 	cases := []struct {
 		name      string
@@ -287,17 +280,17 @@ func TestLogMethods(t *testing.T) {
 		levelName string
 		call      logCall
 	}{
-		{"Warning", logger.WarningLevel, "WARNING", func(rl *logger.ReceptorLogger, msg string) { rl.Warning("%s", msg) }},
-		{"Info", logger.InfoLevel, "INFO", func(rl *logger.ReceptorLogger, msg string) { rl.Info("%s", msg) }},
-		{"Debug", logger.DebugLevel, "DEBUG", func(rl *logger.ReceptorLogger, msg string) { rl.Debug("%s", msg) }},
-		{"Trace", logger.TraceLevel, "TRACE", func(rl *logger.ReceptorLogger, msg string) { rl.Trace("%s", msg) }},
+		{"Warning", WarningLevel, "WARNING", func(rl *ReceptorLogger, msg string) { rl.Warning("%s", msg) }},
+		{"Info", InfoLevel, "INFO", func(rl *ReceptorLogger, msg string) { rl.Info("%s", msg) }},
+		{"Debug", DebugLevel, "DEBUG", func(rl *ReceptorLogger, msg string) { rl.Debug("%s", msg) }},
+		{"Trace", TraceLevel, "TRACE", func(rl *ReceptorLogger, msg string) { rl.Trace("%s", msg) }},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name+"/emits at level", func(t *testing.T) {
-			logger.SetGlobalLogLevel(tc.minLevel)
+			SetGlobalLogLevel(tc.minLevel)
 			var buf bytes.Buffer
-			rl := logger.NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			got := buf.String()
@@ -310,9 +303,9 @@ func TestLogMethods(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/suppressed below level", func(t *testing.T) {
-			logger.SetGlobalLogLevel(tc.minLevel - 1)
+			SetGlobalLogLevel(tc.minLevel - 1)
 			var buf bytes.Buffer
-			rl := logger.NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			if buf.Len() != 0 {
@@ -323,14 +316,14 @@ func TestLogMethods(t *testing.T) {
 }
 
 func TestSanitizedLogMethods(t *testing.T) {
-	origLevel := logger.GetLogLevel()
-	defer logger.SetGlobalLogLevel(origLevel)
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
 
-	origLogger := logger.GetRegisteredLogger()
-	defer logger.RegisterLogger(origLogger)
-	logger.RegisterLogger(nil)
+	origLogger := GetRegisteredLogger()
+	defer RegisterLogger(origLogger)
+	RegisterLogger(nil)
 
-	type logCall func(rl *logger.ReceptorLogger, msg string)
+	type logCall func(rl *ReceptorLogger, msg string)
 
 	cases := []struct {
 		name      string
@@ -338,17 +331,17 @@ func TestSanitizedLogMethods(t *testing.T) {
 		levelName string
 		call      logCall
 	}{
-		{"SanitizedWarning", logger.WarningLevel, "WARNING", func(rl *logger.ReceptorLogger, msg string) { rl.SanitizedWarning("%s", msg) }},
-		{"SanitizedInfo", logger.InfoLevel, "INFO", func(rl *logger.ReceptorLogger, msg string) { rl.SanitizedInfo("%s", msg) }},
-		{"SanitizedDebug", logger.DebugLevel, "DEBUG", func(rl *logger.ReceptorLogger, msg string) { rl.SanitizedDebug("%s", msg) }},
-		{"SanitizedTrace", logger.TraceLevel, "TRACE", func(rl *logger.ReceptorLogger, msg string) { rl.SanitizedTrace("%s", msg) }},
+		{"SanitizedWarning", WarningLevel, "WARNING", func(rl *ReceptorLogger, msg string) { rl.SanitizedWarning("%s", msg) }},
+		{"SanitizedInfo", InfoLevel, "INFO", func(rl *ReceptorLogger, msg string) { rl.SanitizedInfo("%s", msg) }},
+		{"SanitizedDebug", DebugLevel, "DEBUG", func(rl *ReceptorLogger, msg string) { rl.SanitizedDebug("%s", msg) }},
+		{"SanitizedTrace", TraceLevel, "TRACE", func(rl *ReceptorLogger, msg string) { rl.SanitizedTrace("%s", msg) }},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name+"/emits at level", func(t *testing.T) {
-			logger.SetGlobalLogLevel(tc.minLevel)
+			SetGlobalLogLevel(tc.minLevel)
 			var buf bytes.Buffer
-			rl := logger.NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			got := buf.String()
@@ -361,9 +354,9 @@ func TestSanitizedLogMethods(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/suppressed below level", func(t *testing.T) {
-			logger.SetGlobalLogLevel(tc.minLevel - 1)
+			SetGlobalLogLevel(tc.minLevel - 1)
 			var buf bytes.Buffer
-			rl := logger.NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			if buf.Len() != 0 {
@@ -372,9 +365,9 @@ func TestSanitizedLogMethods(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/strips embedded newlines", func(t *testing.T) {
-			logger.SetGlobalLogLevel(tc.minLevel)
+			SetGlobalLogLevel(tc.minLevel)
 			var buf bytes.Buffer
-			rl := logger.NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "line1\nline2")
 			got := strings.TrimSuffix(buf.String(), "\n")
@@ -386,80 +379,26 @@ func TestSanitizedLogMethods(t *testing.T) {
 }
 
 func TestSetShowTrace(t *testing.T) {
-	origLevel := logger.GetLogLevel()
-	defer logger.SetGlobalLogLevel(origLevel)
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
 
-	logger.SetGlobalLogLevel(logger.InfoLevel)
-	rl := logger.NewReceptorLogger("")
+	SetGlobalLogLevel(InfoLevel)
+	rl := NewReceptorLogger()
 	rl.SetShowTrace(true)
-	if logger.GetLogLevel() != logger.TraceLevel {
-		t.Errorf("expected TraceLevel after SetShowTrace(true), got %d", logger.GetLogLevel())
+	if GetLogLevel() != TraceLevel {
+		t.Errorf("expected TraceLevel after SetShowTrace(true), got %d", GetLogLevel())
 	}
 }
 
 func TestTraceCfgPrepare(t *testing.T) {
-	origLevel := logger.GetLogLevel()
-	defer logger.SetGlobalLogLevel(origLevel)
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
 
-	cfg := logger.TraceCfg{}
+	cfg := TraceCfg{}
 	if err := cfg.Prepare(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if logger.GetLogLevel() != logger.TraceLevel {
-		t.Errorf("expected TraceLevel after TraceCfg.Prepare(), got %d", logger.GetLogLevel())
+	if GetLogLevel() != TraceLevel {
+		t.Errorf("expected TraceLevel after TraceCfg.Prepare(), got %d", GetLogLevel())
 	}
-}
-
-func assertSuffixFieldsPresent(t *testing.T, logLine string, expected map[string]string) {
-	t.Helper()
-	for k, v := range expected {
-		needle := `"` + k + `":"` + v + `"`
-		if !strings.Contains(logLine, needle) {
-			t.Errorf("expected key-value pair %s not found in log: %s", needle, logLine)
-		}
-	}
-}
-
-func TestGetLoggerWithSuffix(t *testing.T) {
-	logger.SetGlobalLogLevel(4)
-
-	t.Run("initial suffix", func(t *testing.T) {
-		var logBuffer bytes.Buffer
-		testname := "Initial Suffix Example"
-		suffix := map[string]string{
-			"node_id":   "controller",
-			"remote_id": "hop",
-		}
-		receptorLogger := logger.NewReceptorLoggerWithSuffix("", suffix)
-		receptorLogger.SetOutput(&logBuffer)
-
-		receptorLogger.Error("%s", testname)
-		if !strings.Contains(logBuffer.String(), testname) {
-			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
-		}
-		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
-	})
-	t.Run("updated suffix", func(t *testing.T) {
-		var logBuffer bytes.Buffer
-		testname := "Updated Suffix Example"
-		suffix := map[string]string{
-			"node_id":   "controller",
-			"remote_id": "hop",
-		}
-		receptorLogger := logger.NewReceptorLoggerWithSuffix("", suffix)
-		receptorLogger.SetOutput(&logBuffer)
-
-		updated := map[string]string{
-			"cost": "12",
-		}
-		receptorLogger.UpdateSuffix(updated)
-		receptorLogger.SanitizedError("%s", testname)
-
-		if !strings.Contains(logBuffer.String(), testname) {
-			t.Errorf("expected log message %s not found in log: %s", testname, logBuffer.String())
-		}
-
-		assertSuffixFieldsPresent(t, logBuffer.String(), suffix)
-		assertSuffixFieldsPresent(t, logBuffer.String(), updated)
-	})
 }

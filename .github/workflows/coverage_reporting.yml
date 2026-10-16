@@ -60,6 +60,41 @@ jobs:
         run: nox --no-install --session coverage
         working-directory: ./receptorctl
 
+      - name: Run receptor-python-worker coverage
+        run: bash receptor-python-worker/run_coverage.sh # NOSONAR
+
+      - name: Merge python-worker coverage into receptorctl coverage XML
+        run: |
+          python3 - <<'EOF'
+          import xml.etree.ElementTree as ET
+
+          r = ET.parse('receptorctl/receptorctl_coverage.xml').getroot()
+          w = ET.parse('receptor-python-worker/python_worker_coverage.xml').getroot()
+
+          # Append python-worker <source> entries so SonarCloud can resolve
+          # the short filenames (e.g. "work.py") against the correct base dir,
+          # exactly like it does for the receptorctl entries.
+          r_sources = r.find('sources')
+          for src in w.find('sources'):
+              r_sources.append(src)
+
+          r_pkgs = r.find('packages')
+          for pkg in w.find('packages'):
+              r_pkgs.append(pkg)
+
+          for attr in ('lines-valid', 'lines-covered', 'branches-valid', 'branches-covered'):
+              r.set(attr, str(int(r.get(attr, 0)) + int(w.get(attr, 0))))
+
+          total = int(r.get('lines-valid', 0))
+          covered = int(r.get('lines-covered', 0))
+          r.set('line-rate', f'{covered/total:.4f}' if total else '0')
+
+          ET.indent(r)
+          ET.ElementTree(r).write('receptorctl/receptorctl_coverage.xml',
+                                  xml_declaration=True, encoding='unicode')
+          print('Merged receptor-python-worker coverage into receptorctl_coverage.xml')
+          EOF
+
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v7
         if: github.event_name == 'push' && github.repository == 'ansible/receptor'
@@ -68,7 +103,7 @@ jobs:
         with:
           args: >
             -Dsonar.go.coverage.reportPaths=coverage.txt
-            -Dsonar.python.coverage.reportPaths=receptorctl/receptorctl_coverage.xml
+            -Dsonar.python.coverage.reportPaths=receptorctl/receptorctl_coverage.xml,receptor-python-worker/python_worker_coverage.xml
 
       - name: Upload Code Coverage Report from Receptor Unit Tests
         uses: actions/upload-artifact@v7
@@ -100,3 +135,9 @@ jobs:
         with:
           name: receptorctl-coverage-report
           path: receptorctl/receptorctl_coverage.xml
+
+      - name: Upload Code Coverage Report from receptor-python-worker Unit Tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-worker-coverage-report
+          path: receptor-python-worker/python_worker_coverage.xml

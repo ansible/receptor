@@ -44,6 +44,15 @@ def print_error(message, nl=True):
     click.echo(click.style(f"ERROR: {message}", fg="red"), err=True, nl=nl)
 
 
+def normalize_version(version):
+    """Normalize version string for comparison (e.g. 'v1.6.5' -> '1.6.5')."""
+    if isinstance(version, str):
+        version = version.strip()
+        if version.startswith(("v", "V")):
+            return version[1:]
+    return version
+
+
 @click.group(cls=IgnoreRequiredWithHelp)
 @click.pass_context
 @click.option(
@@ -106,7 +115,9 @@ def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
             '{"command":"status","requested_fields":["Version"]}'
         )["Version"]
         # If they mismatch throw a stderr warning
-        if ctx.obj["receptorVersion"] != ctx.obj["receptorctlVersion"]:
+        if normalize_version(ctx.obj["receptorVersion"]) != normalize_version(
+            ctx.obj["receptorctlVersion"]
+        ):
             click.echo(
                 click.style(
                     "Warning: receptorctl and receptor are different versions, they may not be compatible",  # noqa E501

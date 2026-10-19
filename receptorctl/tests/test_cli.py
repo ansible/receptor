@@ -223,3 +223,59 @@ def test_adopt_cli_reports_control_request_error():
 
     assert result.exit_code == 101
     assert "controller unavailable" in result.stderr
+
+
+def test_normalize_version():
+    assert commands.normalize_version("1.6.5") == "1.6.5"
+    assert commands.normalize_version("v1.6.5") == "1.6.5"
+    assert commands.normalize_version("V1.6.5") == "1.6.5"
+    assert commands.normalize_version("v2.0.0-rc1") == "2.0.0-rc1"
+    assert commands.normalize_version("  v1.6.5  ") == "1.6.5"
+    assert commands.normalize_version("Unknown") == "Unknown"
+    assert commands.normalize_version("") == ""
+    assert commands.normalize_version(None) is None
+
+
+class DummyVersionController:
+    def __init__(self, version):
+        self.version = version
+
+    def simple_command(self, cmd):
+        return {"Version": self.version}
+
+
+@pytest.mark.parametrize(
+    "receptor_ver, receptorctl_ver, expect_warning",
+    [
+        ("v1.6.5", "1.6.5", False),
+        ("1.6.5", "v1.6.5", False),
+        ("v1.6.5", "v1.6.5", False),
+        ("1.6.5", "1.6.5", False),
+        ("v1.7.0", "1.6.5", True),
+        ("1.7.0", "v1.6.5", True),
+        ("Unknown", "1.6.5", True),
+    ],
+)
+def test_cli_version_warning_with_leading_v(monkeypatch, receptor_ver, receptorctl_ver, expect_warning):
+    monkeypatch.setattr(
+        commands,
+        "ReceptorControl",
+        lambda *args, **kwargs: DummyVersionController(receptor_ver),
+    )
+    monkeypatch.setattr(
+        "importlib.metadata.version",
+        lambda pkg: receptorctl_ver,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(commands.cli, ["--socket", "/dummy.sock", "version"])
+
+    assert result.exit_code == 0
+    warning_text = "Warning: receptorctl and receptor are different versions"
+    if expect_warning:
+        assert warning_text in result.output
+    else:
+        assert warning_text not in result.output
+
+    assert f"receptorctl  {receptorctl_ver}" in result.output
+    assert f"receptor     {receptor_ver}" in result.output

@@ -256,7 +256,9 @@ class DummyVersionController:
         ("Unknown", "1.6.5", True),
     ],
 )
-def test_cli_version_warning_with_leading_v(monkeypatch, receptor_ver, receptorctl_ver, expect_warning):
+def test_cli_version_warning_with_leading_v(
+    monkeypatch, receptor_ver, receptorctl_ver, expect_warning
+):
     monkeypatch.setattr(
         commands,
         "ReceptorControl",

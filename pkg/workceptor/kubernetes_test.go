@@ -3337,17 +3337,18 @@ func TestKubeUnit_SetFromParams(t *testing.T) {
 // `work submit`, and gets `work cancel` for free because Cancel() deletes kw.Pod.
 func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 	tests := []struct {
-		name             string
-		params           map[string]string
-		authMethod       string // defaults to incluster
-		configNamespace  string
-		allowRuntimeAuth bool
-		allowRuntimeCmd  bool
-		allowRuntimePod  bool
-		expectError      bool
-		expectedErrorMsg string
-		expectedPodName  string
-		description      string
+		name               string
+		params             map[string]string
+		authMethod         string // defaults to incluster
+		configNamespace    string
+		allowRuntimeAuth   bool
+		allowRuntimeCmd    bool
+		allowRuntimeParams bool
+		allowRuntimePod    bool
+		expectError        bool
+		expectedErrorMsg   string
+		expectedPodName    string
+		description        string
 	}{
 		{
 			name:            "Attaches to an existing pod",
@@ -3402,7 +3403,7 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 			configNamespace:  "aap",
 			allowRuntimePod:  true,
 			expectError:      true,
-			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with adopt mode",
+			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod, pod_pending_timeout not compatible with adopt mode",
 			description:      "secret_kube_pod describes a pod to create; pod_name names one that already exists",
 		},
 		{
@@ -3415,8 +3416,21 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 			allowRuntimeCmd:  true,
 			allowRuntimePod:  true,
 			expectError:      true,
-			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod not compatible with adopt mode",
+			expectedErrorMsg: "params kube_command, kube_image, kube_params, secret_kube_pod, pod_pending_timeout not compatible with adopt mode",
 			description:      "An existing pod is already running its command",
+		},
+		{
+			name: "Rejected alongside pod_pending_timeout",
+			params: map[string]string{
+				"pod_name":            "automation-job-7-abcde",
+				"pod_pending_timeout": "5m",
+			},
+			configNamespace:    "aap",
+			allowRuntimeParams: true,
+			allowRuntimePod:    true,
+			expectError:        true,
+			expectedErrorMsg:   "params kube_command, kube_image, kube_params, secret_kube_pod, pod_pending_timeout not compatible with adopt mode",
+			description:        "pod_pending_timeout only bounds CreatePod's wait, which adopt mode never calls; silently accepting it would hide a no-op",
 		},
 	}
 
@@ -3448,6 +3462,7 @@ func TestKubeUnit_SetFromParams_PodName(t *testing.T) {
 				Namespace:           tt.configNamespace,
 				AllowRuntimeAuth:    tt.allowRuntimeAuth,
 				AllowRuntimeCommand: tt.allowRuntimeCmd,
+				AllowRuntimeParams:  tt.allowRuntimeParams,
 				AllowRuntimePod:     tt.allowRuntimePod,
 			}
 			kubeUnit := kubeConfig.NewkubeWorker(mockBaseWorkUnit, w, "", "", mockKubeAPI).(*workceptor.KubeUnit)

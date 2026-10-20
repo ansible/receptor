@@ -1751,8 +1751,9 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	// conflicting params. The secret_kube_pod check below would fire first on a 3-way
 	// conflict and produce an incomplete error that omits the other params.
 	if adoptMode {
-		if userPod != "" || userParams != "" || userCommand != "" || userImage != "" {
-			return fmt.Errorf("params kube_command, kube_image, kube_params, secret_kube_pod not compatible with adopt mode")
+		// pod_pending_timeout only bounds the wait in CreatePod, which adopt mode never calls.
+		if userPod != "" || userParams != "" || userCommand != "" || userImage != "" || podPendingTimeoutString != "" {
+			return fmt.Errorf("params kube_command, kube_image, kube_params, secret_kube_pod, pod_pending_timeout not compatible with adopt mode")
 		}
 		// RunWorkUsingLogger fails the unit on an empty namespace. kubeconfig and runtime auth fill
 		// it from the kubeconfig context when connecting; in-cluster auth has no fallback, so only

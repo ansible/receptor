@@ -1052,6 +1052,15 @@ func TestWorkAdoptRemoteUnreachableIsSurfaced(t *testing.T) {
 			localUnitID, status.State, status.Detail, status.StdoutSize,
 			localStdoutSize(t, nodes["node2"], localUnitID))
 	}
+
+	// A control-service partition is a retryable connection failure, not a terminal one --
+	// handleConnectionError only fails the unit for a crypto error before RemoteStarted.
+	// Pin down that this specific scenario takes the Detail path, not the Failed path, so a
+	// regression that starts failing the unit here doesn't slip through the generous check
+	// above.
+	if status.State == workceptor.WorkStateFailed || !strings.Contains(strings.ToLower(status.Detail), "connection") {
+		t.Fatalf("expected a nonterminal unit with connection error in detail, got State=%d Detail=%q", status.State, status.Detail)
+	}
 }
 
 // TestWorkAdoptRemoteFailureDetectionControl is the positive control for the test above.

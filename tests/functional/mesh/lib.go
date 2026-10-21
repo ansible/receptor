@@ -26,6 +26,11 @@ type LibMesh struct {
 	DataDir   string
 	LogWriter *utils.TestLogWriter
 	Context   context.Context
+	// AfterInit, when set, is called after every node's logger has been
+	// redirected to LogWriter but before listeners start and connections are
+	// established. Use it to swap individual node loggers before any
+	// connection-related log entries are written.
+	AfterInit func(nodes map[string]*LibNode)
 }
 
 // NewLibMesh constructs a new LibMesh.
@@ -80,6 +85,10 @@ func (m *LibMesh) Start(_ string) error {
 		// Comment out the line below to print test logs to stdout.
 		// Note that some assertions will fail by doing this.
 		node.netceptorInstance.Logger.SetOutput(m.LogWriter)
+	}
+
+	if m.AfterInit != nil {
+		m.AfterInit(m.GetNodes())
 	}
 
 	// Start listeners first, we connect below
@@ -274,6 +283,7 @@ type LibNode struct {
 	TLSClientConfigs       []*netceptor.TLSClientConfig
 	WorkSigningKey         *workceptor.SigningKeyPrivateCfg
 	WorkVerificationKey    *workceptor.VerifyingKeyPublicCfg
+	AllowedPeers           []string
 }
 
 type listenerName string
@@ -464,11 +474,14 @@ func (n *LibNode) TCPListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 	cost := listenerCfg.GetCost()
 	nodeCost := listenerCfg.GetNodeCost()
 
-	err = n.netceptorInstance.AddBackend(
-		backend,
+	backendOpts := []func(*netceptor.BackendInfo){
 		netceptor.BackendConnectionCost(cost),
 		netceptor.BackendNodeCost(nodeCost),
-	)
+	}
+	if len(n.AllowedPeers) > 0 {
+		backendOpts = append(backendOpts, netceptor.BackendAllowedPeers(n.AllowedPeers))
+	}
+	err = n.netceptorInstance.AddBackend(backend, backendOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -507,11 +520,14 @@ func (n *LibNode) UDPListen(listenerCfg ListenerCfg) (*BackendInfo, error) {
 	cost := listenerCfg.GetCost()
 	nodeCost := listenerCfg.GetNodeCost()
 
-	err = n.netceptorInstance.AddBackend(
-		backend,
+	backendOpts := []func(*netceptor.BackendInfo){
 		netceptor.BackendConnectionCost(cost),
 		netceptor.BackendNodeCost(nodeCost),
-	)
+	}
+	if len(n.AllowedPeers) > 0 {
+		backendOpts = append(backendOpts, netceptor.BackendAllowedPeers(n.AllowedPeers))
+	}
+	err = n.netceptorInstance.AddBackend(backend, backendOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -555,11 +571,14 @@ func (n *LibNode) WebsocketListen(listenerCfg ListenerCfg) (*BackendInfo, error)
 	cost := listenerCfg.GetCost()
 	nodeCost := listenerCfg.GetNodeCost()
 
-	err = n.netceptorInstance.AddBackend(
-		backend,
+	backendOpts := []func(*netceptor.BackendInfo){
 		netceptor.BackendConnectionCost(cost),
 		netceptor.BackendNodeCost(nodeCost),
-	)
+	}
+	if len(n.AllowedPeers) > 0 {
+		backendOpts = append(backendOpts, netceptor.BackendAllowedPeers(n.AllowedPeers))
+	}
+	err = n.netceptorInstance.AddBackend(backend, backendOpts...)
 	if err != nil {
 		return nil, err
 	}

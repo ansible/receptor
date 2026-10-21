@@ -15,6 +15,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -96,36 +97,79 @@ func getCryptoErrorDetail(errStr string) string {
 	return ""
 }
 
+// clearStaleConnectionDetail removes a transient "Connection to ..." message left by a
+// previous retry so it does not persist on a unit that ends up completing successfully.
+func (rw *remoteUnit) clearStaleConnectionDetail() {
+	rw.UpdateFullStatus(func(status *StatusFileData) {
+		if strings.HasPrefix(status.Detail, "Connection to ") {
+			status.Detail = ""
+		}
+	})
+}
+
+// handleConnectionError logs the error and updates unit status. Returns true when the
+// error is fatal (crypto) and the caller should stop retrying.
+func (rw *remoteUnit) handleConnectionError(err error) bool {
+	rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
+		rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
+	errStr := err.Error()
+
+	detail := getCryptoErrorDetail(errStr)
+	if detail != "" {
+		shouldExit := false
+		rw.UpdateFullStatus(func(status *StatusFileData) {
+			status.Detail = detail
+			if red, ok := status.ExtraData.(*RemoteExtraData); ok && !red.RemoteStarted {
+				shouldExit = true
+				status.State = WorkStateFailed
+			}
+		})
+		if shouldExit {
+			rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
+		}
+
+		return shouldExit
+	}
+
+	rw.surfaceRetryableError(errStr)
+
+	return false
+}
+
+// surfaceRetryableError writes a connection-failure message into the unit's Detail so
+// that a client polling the status can distinguish a stalled transfer from a slow one.
+// The message clears itself: monitorRemoteStatus overwrites Detail on the next
+// successful poll, and clearStaleConnectionDetail clears it on reconnect.
+func (rw *remoteUnit) surfaceRetryableError(errStr string) {
+	rw.UpdateFullStatus(func(status *StatusFileData) {
+		// Don't overwrite a terminal result with a transient connection failure.
+		if status.State == WorkStateSucceeded || status.State == WorkStateFailed || status.State == WorkStateCanceled {
+			return
+		}
+		remoteNode := "remote node"
+		if red, ok := status.ExtraData.(*RemoteExtraData); ok {
+			remoteNode = red.RemoteNode
+		}
+		newDetail := fmt.Sprintf("Connection to %s failed: %s", remoteNode, errStr)
+		if status.Detail == newDetail {
+			return
+		}
+		status.Detail = newDetail
+	})
+}
+
 // GetConnection retries connectToRemote until connected or the context expires.
 func (rw *remoteUnit) GetConnection(ctx context.Context) (net.Conn, *bufio.Reader) {
 	connectDelay := utils.NewIncrementalDuration(SuccessWorkSleep, MaxWorkSleep, 1.5)
 	for {
 		conn, reader, err := rw.ConnectToRemote(ctx)
 		if err == nil {
+			rw.clearStaleConnectionDetail()
+
 			return conn, reader
 		}
-		rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
-			rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
-		errStr := err.Error()
-
-		// Only return on CRYPTO errors, others are retryable.
-		detail := getCryptoErrorDetail(errStr)
-		if detail != "" {
-			shouldExit := false
-			rw.UpdateFullStatus(func(status *StatusFileData) {
-				status.Detail = detail
-				if red, ok := status.ExtraData.(*RemoteExtraData); ok && !red.RemoteStarted {
-					shouldExit = true
-					status.State = WorkStateFailed
-				}
-			})
-
-			if shouldExit {
-				// Log the helpful error message so it appears in logs, not just status file
-				rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
-
-				return nil, nil
-			}
+		if rw.handleConnectionError(err) {
+			return nil, nil
 		}
 		select {
 		case <-ctx.Done():
@@ -351,6 +395,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		_, err := fmt.Fprintf(conn, "work status %s\n", remoteUnitID)
 		if err != nil {
+			rw.surfaceRetryableError(err.Error())
 			rw.GetWorkceptor().nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
 			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
 			if cerr != nil {
@@ -362,6 +407,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
+			rw.surfaceRetryableError(err.Error())
 			rw.GetWorkceptor().nc.GetLogger().Debug("Read error reading from %s: %s\n", remoteNode, err)
 			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
 			if cerr != nil {
@@ -516,7 +562,8 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
-				rw.GetWorkceptor().nc.GetLogger().Warning("Remote node %s did not stream results\n", remoteNode)
+				rw.GetWorkceptor().nc.GetLogger().Warning("Remote node %s did not stream results for unit %s (signwork=%v): %s\n",
+					remoteNode, red.RemoteUnitID, red.SignWork, strings.TrimSpace(status))
 
 				continue
 			}
@@ -776,7 +823,7 @@ func newRemoteWorker(bwu BaseWorkUnitForWorkUnit, w *Workceptor, unitID, workTyp
 	red := &RemoteExtraData{}
 	red.RemoteParams = make(map[string]string)
 	rw.SetStatusExtraData(red)
-	rw.topJC = &utils.JobContext{}
+	rw.topJC = &utils.JobContext{RunningLock: &sync.Mutex{}}
 
 	return rw
 }

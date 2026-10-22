@@ -315,6 +315,53 @@ func (kw *KubeUnit) GetSleepDuration(multipler int) time.Duration {
 	return sleepDuration
 }
 
+// streamStdinWithRetry sends the work unit's payload to the pod, retrying a failed stream.
+//
+// The API server dials the kubelet to open this stream, so it fails while the kubelet on the node has
+// no serving certificate yet -- with "error dialing backend: remote error: tls: internal error". On a
+// node that has just joined the cluster that is a wait rather than a fault: the kubelet-serving CSR is
+// approved shortly after the node registers, and the stream succeeds once it is. Backing off the same
+// way the caller does while waiting for the container to start lets RECEPTOR_KUBE_RETRY_COUNT span that
+// window; a fixed short delay cannot, whatever it is set to.
+func (kw *KubeUnit) streamStdinWithRetry(exec remotecommand.Executor, stdin *STDinReader, podNamespace, podName string) error {
+	var err error
+	prevDelay, curDelay := 1, 1
+
+	for retries := kw.GetKubeRetryCount(); retries > 0; retries-- {
+		err = kw.KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
+			Stdin: stdin,
+			Tty:   false,
+		})
+		if err == nil {
+			return nil
+		}
+		if retries == 1 {
+			break
+		}
+
+		delay := kw.GetSleepDuration(curDelay)
+
+		// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
+		kw.GetWorkceptor().nc.GetLogger().Warning(
+			"Error streaming stdin to pod %s/%s. Will retry %d more times. Next retry in %d seconds. Error: %s",
+			podNamespace,
+			podName,
+			retries-1,
+			int(math.Ceil(delay.Seconds())),
+			err,
+		)
+
+		select {
+		case <-kw.GetContext().Done():
+			return err
+		case <-time.After(delay):
+		}
+		prevDelay, curDelay = GetNextFibonacciValues(prevDelay, curDelay)
+	}
+
+	return err
+}
+
 func (kw *KubeUnit) kubeLoggingConnectionHandler(timestamps bool, sinceTime time.Time) (io.ReadCloser, error) {
 	var logStream io.ReadCloser
 	var err error
@@ -1113,26 +1160,7 @@ func (kw *KubeUnit) RunWorkUsingLogger() {
 				status.Detail = "Sending stdin to pod"
 			})
 
-			var err error
-			for retries := kw.GetKubeRetryCount(); retries > 0; retries-- {
-				err = kw.KubeAPIWrapperInstance.StreamWithContext(kw.GetContext(), exec, remotecommand.StreamOptions{
-					Stdin: stdin,
-					Tty:   false,
-				})
-				if err != nil {
-					// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
-					kw.GetWorkceptor().nc.GetLogger().Warning(
-						"Error streaming stdin to pod %s/%s. Will retry %d more times. Error: %s",
-						podNamespace,
-						podName,
-						retries,
-						err,
-					)
-					time.Sleep(200 * time.Millisecond)
-				} else {
-					break
-				}
-			}
+			err := kw.streamStdinWithRetry(exec, stdin, podNamespace, podName)
 
 			if err != nil {
 				stdinErr = err
@@ -1717,6 +1745,7 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	userCommand := ""
 	userImage := ""
 	userPod := ""
+	userPodName := ""
 	podPendingTimeoutString := ""
 	values := []value{
 		{name: "kube_command", permission: kw.allowRuntimeCommand, setter: setString(&userCommand)},
@@ -1725,6 +1754,7 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 		{name: "kube_namespace", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeNamespace)},
 		{name: "secret_kube_config", permission: kw.allowRuntimeAuth, setter: setString(&ked.KubeConfig)},
 		{name: "secret_kube_pod", permission: kw.allowRuntimePod, setter: setString(&userPod)},
+		{name: "pod_name", permission: kw.allowRuntimePod, setter: setString(&userPodName)},
 		{name: "pod_pending_timeout", permission: kw.allowRuntimeParams, setter: setString(&podPendingTimeoutString)},
 	}
 	for i := range values {
@@ -1742,6 +1772,23 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	}
 	if kw.authMethod == "runtime" && ked.KubeConfig == "" {
 		return fmt.Errorf("param secret_kube_config must be provided if AuthMethod=runtime")
+	}
+	// adoptMode attaches to a pod that already exists, so every pod-creation param conflicts with it.
+	adoptMode := userPodName != ""
+	// adopt mode check first: it is the most specific constraint and its message names all
+	// conflicting params. The secret_kube_pod check below would fire first on a 3-way
+	// conflict and produce an incomplete error that omits the other params.
+	if adoptMode {
+		// pod_pending_timeout only bounds the wait in CreatePod, which adopt mode never calls.
+		if userPod != "" || userParams != "" || userCommand != "" || userImage != "" || podPendingTimeoutString != "" {
+			return fmt.Errorf("params kube_command, kube_image, kube_params, secret_kube_pod, pod_pending_timeout not compatible with adopt mode")
+		}
+		// RunWorkUsingLogger fails the unit on an empty namespace. kubeconfig and runtime auth fill
+		// it from the kubeconfig context when connecting; in-cluster auth has no fallback, so only
+		// there can an empty namespace be rejected at submit time instead of failing the work unit.
+		if kw.authMethod == "incluster" && ked.KubeNamespace == "" {
+			return fmt.Errorf("param kube_namespace must be provided with pod_name")
+		}
 	}
 	if userPod != "" && (userParams != "" || userCommand != "" || userImage != "") {
 		return fmt.Errorf("params kube_command, kube_image, kube_params not compatible with secret_kube_pod")
@@ -1763,12 +1810,20 @@ func (kw *KubeUnit) SetFromParams(params map[string]string) error {
 	if userImage != "" {
 		ked.Image = userImage
 	}
-	if userPod != "" {
+	switch {
+	case userPod != "":
 		ked.KubePod = userPod
 		ked.Image = ""
 		ked.Command = ""
 		kw.baseParams = ""
-	} else {
+	case adoptMode:
+		ked.PodName = userPodName
+		ked.KubePod = ""
+		ked.Image = ""
+		ked.Command = ""
+		ked.Params = ""
+		kw.baseParams = ""
+	default:
 		ked.Params = combineParams(kw.baseParams, userParams)
 	}
 

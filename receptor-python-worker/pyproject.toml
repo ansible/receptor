@@ -4,6 +4,7 @@ authors = [{name = "Red Hat", email = "info@ansible.com"}]
 description = "The receptor-python-worker command is called by Receptor to supervise the operation of a Python worker plugin."
 readme = "README.md"
 license = "Apache-2.0"
+requires-python = ">=3.10"
 dynamic = ["version"]
 
 [build-system]
@@ -12,6 +13,16 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "setuptools>=69.0.0",
+]
+
+[tool.coverage.report]
+skip_empty = true
 
 [project.scripts]
 receptor-python-worker = "receptor_python_worker:run"

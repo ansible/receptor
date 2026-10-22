@@ -454,7 +454,9 @@ sequenceDiagram
             
             alt Stdin stream success
                 KubeUnit->>KubeUnit: UpdateBasicStatus(WorkStateRunning)
-            else Stdin stream error
+            else Stdin stream error, retries remaining
+                Note over KubeUnit: Wait with Fibonacci backoff<br/>(RECEPTOR_KUBE_TIMEOUT_START × 1, 1, 2, 3, 5…,<br/>max 5 min), then retry StreamWithContext
+            else Stdin stream error, retries exhausted
                 KubeUnit->>KubeUnit: UpdateBasicStatus(WorkStateFailed)
             end
         and Stream stdout from pod (goroutine 2)
@@ -715,7 +717,7 @@ flowchart TD
     SPDYCreationError --> FailSPDY[Handle:<br/>Mark work as Failed immediately<br/>No retries]
 
     StdinStreamError --> RetryStdin{Retries<br/>remaining?}
-    RetryStdin -->|Yes| RetryStdinAction[Retry StreamWithContext<br/>200ms delay between retries<br/>Max: GetKubeRetryCount times]
+    RetryStdin -->|Yes| RetryStdinAction[Retry StreamWithContext<br/>Fibonacci backoff from RECEPTOR_KUBE_TIMEOUT_START<br/>capped at 5 min, no wait after the last attempt<br/>Max: GetKubeRetryCount attempts]
     RetryStdinAction --> RetryStdin
     RetryStdin -->|No| FailStdin[Mark work as Failed<br/>Signal stdout to stop]
     
@@ -844,6 +846,7 @@ This section documents how the Kubernetes worker handles various error condition
 - ✅ **Retry in log stream**: `kubeLoggingConnectionHandler()` retries up to `GetKubeRetryCount()` times with simple delay (not Fibonacci)
 - ✅ **Retry in Get pod**: When resuming, retries 5 times with 200ms delay
 - ✅ **Retry in log reconnection**: Main loop retries getting pod with Fibonacci backoff
+- ✅ **Retry in stdin stream**: `streamStdinWithRetry()` makes up to `GetKubeRetryCount()` attempts, waiting between them with Fibonacci backoff (`RECEPTOR_KUBE_TIMEOUT_START` × 1, 1, 2, 3, 5…, capped at 5 minutes) and stopping early if the work unit's context is canceled. This covers `error dialing backend` while a newly joined node's kubelet has no serving certificate yet. Each failed attempt logs how many retries remain and when the next one starts
 
 **Impact:** Initial connection failure causes immediate job failure. However, transient connection issues during execution are retried.
 

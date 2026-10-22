@@ -163,6 +163,51 @@ class TestCLI:
         )
 
 
+class VersionController:
+    def __init__(self, receptor_version):
+        self.receptor_version = receptor_version
+
+    def simple_command(self, command):
+        return {"Version": self.receptor_version}
+
+
+@pytest.mark.parametrize(
+    "receptorctl_version, receptor_version, expected",
+    [
+        ("1.6.5", "1.6.5", True),
+        ("1.6.5", "v1.6.5", True),
+        ("v1.6.5", "1.6.5", True),
+        ("1.6.5", "v1.6.4", False),
+        ("1.6.5", "Unknown", False),
+    ],
+)
+def test_versions_match(receptorctl_version, receptor_version, expected):
+    assert commands.versions_match(receptorctl_version, receptor_version) is expected
+
+
+@pytest.mark.parametrize(
+    "receptor_prefix, receptor_suffix, warns",
+    [
+        ("", "", False),
+        ("v", "", False),
+        ("v", ".1", True),
+    ],
+)
+def test_cli_version_mismatch_warning(monkeypatch, receptor_prefix, receptor_suffix, warns):
+    receptorctl_version = "1.6.5"
+    receptor_version = f"{receptor_prefix}{receptorctl_version}{receptor_suffix}"
+    monkeypatch.setattr(commands.importlib.metadata, "version", lambda name: receptorctl_version)
+    monkeypatch.setattr(
+        commands, "ReceptorControl", lambda *args, **kwargs: VersionController(receptor_version)
+    )
+
+    result = CliRunner().invoke(commands.cli, ["--socket", "unused", "version"])
+
+    assert result.exit_code == 0
+    assert f"receptor     {receptor_version}" in result.stdout
+    assert ("different versions" in result.stderr) is warns
+
+
 class AdoptController:
     def __init__(self, error=None):
         self.error = error

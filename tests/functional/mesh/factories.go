@@ -239,6 +239,24 @@ func treeMesh(proto string) *LibMesh {
 	return &m
 }
 
+// twoNodeMesh creates a minimal mesh with a "control" listener node and an
+// "execution-a" node that dials out to it.
+func twoNodeMesh() *LibMesh {
+	m := NewLibMesh()
+
+	control := m.NewLibNode("control")
+	control.ListenerCfgs = map[listenerName]ListenerCfg{
+		listenerName("tcp"): newListenerCfg("tcp", "", 1, nil),
+	}
+
+	execA := m.NewLibNode("execution-a")
+	execA.Connections = []Connection{
+		{RemoteNode: control, Protocol: "tcp"},
+	}
+
+	return &m
+}
+
 // used in work_test.go.
 func workTestMesh(workPluginName workPlugin) *LibMesh {
 	caKey, caCrt, err := utils.GenerateCA("ca", "localhost")

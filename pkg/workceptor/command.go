@@ -6,6 +6,7 @@ package workceptor
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -334,7 +335,8 @@ func (cw *commandUnit) Restart() error {
 	if err := cw.Load(); err != nil {
 		return err
 	}
-	state := cw.Status().State
+	status := cw.Status()
+	state := status.State
 	if IsComplete(state) {
 		// Job already complete - no need to restart monitoring
 		return nil
@@ -343,9 +345,28 @@ func (cw *commandUnit) Restart() error {
 		// Job never started - mark it failed
 		cw.UpdateBasicStatus(WorkStateFailed, "Pending at restart", stdoutSize(cw.UnitDir()))
 	}
+	if state == WorkStateRunning {
+		// The goroutine that waited on the worker died with the previous receptor, so nothing will ever
+		// write the final status of a worker that died with it. Without this the unit reads Running forever.
+		if ced, ok := status.ExtraData.(*CommandExtraData); ok && ced.Pid > 0 && !processRunning(ced.Pid) {
+			cw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Process %d no longer running after restart", ced.Pid), stdoutSize(cw.UnitDir()))
+		}
+	}
 	go cw.MonitorLocalStatus()
 
 	return nil
+}
+
+// processRunning reports whether a process with this PID exists. Only a definite "already finished"
+// counts as gone: any other error, including platforms that cannot signal, reads as running.
+func processRunning(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return true
+	}
+	defer proc.Release()
+
+	return !errors.Is(proc.Signal(syscall.Signal(0)), os.ErrProcessDone)
 }
 
 // Cancel stops a running job.

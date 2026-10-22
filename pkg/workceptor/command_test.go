@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 	"testing"
@@ -174,6 +175,43 @@ func TestRestart(t *testing.T) {
 				})
 				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any())
 				mockBaseWorkUnit.EXPECT().UnitDir()
+			},
+			errorCatch: func(err error, t *testing.T) {
+				if err != nil {
+					t.Error(err)
+				}
+			},
+		},
+		{
+			name: "running with a dead process is marked failed",
+			expectedCalls: func() {
+				mockBaseWorkUnit.EXPECT().Load().Return(nil)
+				statusLock := &sync.RWMutex{}
+				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{State: workceptor.WorkStateRunning})
+				// A PID above any kernel's pid_max cannot belong to a live process.
+				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+					ExtraData: &workceptor.CommandExtraData{Pid: 2147483646},
+				})
+				mockBaseWorkUnit.EXPECT().UnitDir()
+				mockBaseWorkUnit.EXPECT().UpdateBasicStatus(workceptor.WorkStateFailed, gomock.Any(), gomock.Any())
+			},
+			errorCatch: func(err error, t *testing.T) {
+				if err != nil {
+					t.Error(err)
+				}
+			},
+		},
+		{
+			name: "running with a live process is left running",
+			expectedCalls: func() {
+				mockBaseWorkUnit.EXPECT().Load().Return(nil)
+				statusLock := &sync.RWMutex{}
+				mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).Times(2)
+				mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{State: workceptor.WorkStateRunning})
+				mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{
+					ExtraData: &workceptor.CommandExtraData{Pid: os.Getpid()},
+				})
 			},
 			errorCatch: func(err error, t *testing.T) {
 				if err != nil {

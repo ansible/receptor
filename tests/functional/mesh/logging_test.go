@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -321,5 +322,70 @@ func TestConnectionRejectedPeerIsLogged(t *testing.T) {
 		return strings.Contains(m.LogWriter.String(), "rejected connection with node execution-a because it is not in the allowed peers list")
 	}) {
 		t.Fatalf("rejection log message not observed\nlogs:\n%s", m.LogWriter.String())
+	}
+}
+
+// TestConcurrentConnectionsHaveIsolatedLogContext submits work to multiple
+// non-existent nodes simultaneously and verifies that each retry log entry
+// records only the identity of its own target node, not that of any other
+// concurrent operation.
+func TestConcurrentConnectionsHaveIsolatedLogContext(t *testing.T) {
+	t.Parallel()
+
+	m := twoNodeMesh()
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	socketPath := m.GetNodes()["control"].GetControlSocket()
+	targets := []string{"execution-b", "execution-c", "execution-d"}
+
+	// Each goroutine uses its own control connection to avoid racing on the socket.
+	var wg sync.WaitGroup
+	for _, target := range targets {
+		target := target
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c := NewReceptorControl()
+			if err := c.Connect(socketPath); err != nil {
+				return
+			}
+			cmd := `{"command":"work","subcommand":"submit","worktype":"echosleepshort","node":"` + target + `","params":""}`
+			c.WorkSubmitJSON(cmd) //nolint:errcheck
+		}()
+	}
+	wg.Wait()
+
+	for _, target := range targets {
+		target := target
+		ctxWait, cancelWait := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelWait()
+		if !utils.CheckUntilTimeout(ctxWait, 500*time.Millisecond, func() bool {
+			return strings.Contains(m.LogWriter.String(), "Connection to "+target+" failed")
+		}) {
+			t.Logf("control logs:\n%s", m.LogWriter.String())
+			t.Fatalf("no retry log entries for %s observed", target)
+		}
+	}
+
+	for _, target := range targets {
+		for _, line := range strings.Split(m.LogWriter.String(), "\n") {
+			if !strings.Contains(line, "Connection to "+target+" failed") {
+				continue
+			}
+			if strings.Contains(line, `"remote_id"`) && !strings.Contains(line, `"remote_id":"`+target+`"`) {
+				t.Errorf("retry log entry for %s references unexpected remote node: %q", target, line)
+			}
+		}
 	}
 }

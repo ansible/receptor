@@ -21,7 +21,7 @@ type stubNetceptorForStdinRetry struct {
 }
 
 func (s *stubNetceptorForStdinRetry) GetLogger() *logger.ReceptorLogger {
-	return logger.NewReceptorLogger("stdin-retry-test")
+	return logger.NewReceptorLogger()
 }
 
 type stubKubeAPIForStdinRetry struct {

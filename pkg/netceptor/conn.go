@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/qlog"
@@ -131,7 +132,7 @@ func (s *Netceptor) listen(ctx context.Context, service string, tlscfg *tls.Conf
 		hopsToLive:   s.maxForwardingHops,
 	}
 	pc.StartUnreachable()
-	s.Logger.Debug("%s added service %s to listener registry", s.nodeID, service)
+	s.Logger.Debug("%s added service %s to listener registry %s", s.nodeID, service, logger.NodeIDContext(s.nodeID))
 	s.listenerRegistry[service] = pc
 	cfg := &quic.Config{
 		Tracer:                  qlog.DefaultConnectionTracer,
@@ -293,7 +294,7 @@ func (li *Listener) AcceptLoop(ctx context.Context) {
 			if ok {
 				go MonitorUnreachable(li.pc, doneChan, rAddr, connCancel)
 			} else {
-				li.s.Logger.Debug("Remote address is not a Receptor address, skipping unreachable monitoring")
+				li.s.Logger.Debug("Remote address is not a Receptor address, skipping unreachable monitoring %s", logger.NodeIDContext(li.s.nodeID))
 			}
 			go func() {
 				defer connCancel()
@@ -529,7 +530,7 @@ func (c *Conn) CloseConnection() error {
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})
-	c.s.Logger.Debug("closing connection from service %s to %s", c.pc.LocalService(), c.RemoteAddr().String())
+	c.s.Logger.Debug("closing connection from service %s to %s %s", c.pc.LocalService(), c.RemoteAddr().String(), logger.NodeIDContext(c.s.nodeID))
 
 	return c.qc.CloseWithError(0, "normal close")
 }

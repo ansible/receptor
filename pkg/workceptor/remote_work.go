@@ -189,6 +189,20 @@ func (rw *remoteUnit) connectAndRun(ctx context.Context, action actionFunc) erro
 	return action(ctx, conn, reader)
 }
 
+// runActionAsync connects to the remote node and runs action. If the connection cannot
+// be established, failure is called instead. Intended to be launched as a goroutine.
+func (rw *remoteUnit) runActionAsync(ctx context.Context, action actionFunc, failure func()) {
+	conn, reader := rw.GetConnection(ctx)
+	if conn != nil {
+		err := action(ctx, conn, reader)
+		if err != nil {
+			rw.GetWorkceptor().nc.GetLogger().Error("Error running action function: %s", err)
+		}
+	} else {
+		failure()
+	}
+}
+
 // getConnectionAndRun retries connecting to a host and, once the connection succeeds, runs an action function.
 // If firstTimeSync is true, a single attempt is made on the calling goroutine. If the initial attempt fails to
 // connect or firstTimeSync is false, we run return ErrPending to the caller.
@@ -201,17 +215,7 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 			return err
 		}
 	}
-	go func() {
-		conn, reader := rw.GetConnection(ctx)
-		if conn != nil {
-			err := action(ctx, conn, reader)
-			if err != nil {
-				rw.GetWorkceptor().nc.GetLogger().Error("Error running action function: %s", err)
-			}
-		} else {
-			failure()
-		}
-	}()
+	go rw.runActionAsync(ctx, action, failure)
 
 	return ErrPending
 }

@@ -11,9 +11,9 @@ import (
 	"github.com/ansible/receptor/tests/utils"
 )
 
-// TestNodeIDPresentInAllStructuredLogLines verifies that every structured log
-// line emitted by a mesh node identifies the node that produced it.
-func TestNodeIDPresentInAllStructuredLogLines(t *testing.T) {
+// TestNodeIDPresentInAllLogLines verifies that every log line emitted by a mesh
+// node — structured or plain — identifies the node that produced it.
+func TestNodeIDPresentInAllLogLines(t *testing.T) {
 	t.Parallel()
 
 	m := twoNodeMesh()
@@ -30,12 +30,21 @@ func TestNodeIDPresentInAllStructuredLogLines(t *testing.T) {
 		t.Fatal(err, m.DataDir)
 	}
 
+	rc := NewReceptorControl()
+	if err := rc.Connect(m.GetNodes()["control"].GetControlSocket()); err != nil {
+		t.Fatalf("control socket connect: %v", err)
+	}
+	defer rc.Close()
+	if _, err := rc.Ping("execution-a"); err != nil {
+		t.Fatalf("ping execution-a: %v", err)
+	}
+
 	for _, line := range strings.Split(m.LogWriter.String(), "\n") {
-		if !strings.HasSuffix(line, "}") {
+		if line == "" {
 			continue
 		}
 		if !strings.Contains(line, `"node_id"`) {
-			t.Errorf("log line with structured context is missing node_id: %q", line)
+			t.Errorf("log line missing node_id: %s", line)
 		}
 	}
 }

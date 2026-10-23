@@ -1473,7 +1473,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		}
 		s.listenerLock.RLock()
 		pc, ok := s.listenerRegistry[md.ToService]
-		if !ok || pc.context.Err() != nil {
+		if !ok || pc.isDone() {
 			s.listenerLock.RUnlock()
 			if md.FromNode == s.nodeID {
 				return fmt.Errorf(ProblemServiceUnknown) //nolint:staticcheck
@@ -1490,7 +1490,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		}
 		s.listenerLock.RUnlock()
 		select {
-		case <-pc.context.Done():
+		case <-pc.done:
 			close(pc.recvChan)
 
 			return nil

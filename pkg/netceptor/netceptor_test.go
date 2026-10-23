@@ -1040,7 +1040,7 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 	if !exists {
 		t.Error("Expected new connection to be established after removing canceled connection")
 	}
-	if exists && newConn.Context.Err() != nil {
+	if exists && newConn.isDone() {
 		t.Error("Expected new connection to have valid context")
 	}
 
@@ -1078,7 +1078,8 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 
 				return ctx, cancel
 			},
-			expectedMsg: "context deadline exceeded",
+			// connInfo reports cancellation, not the parent's deadline error.
+			expectedMsg: "context canceled",
 		},
 	}
 
@@ -1118,7 +1119,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 			if !exists {
 				t.Error("Expected new connection to be established after removing connection with context error")
 			}
-			if exists && newConn.Context.Err() != nil {
+			if exists && newConn.isDone() {
 				t.Error("Expected new connection to have valid context")
 			}
 
@@ -1235,7 +1236,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 
 	// Create an existing connection with the canceled context.
 	existingConn := &connInfo{
-		Context:          canceledCtx,
+		done:             canceledCtx.Done(),
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte),
@@ -1261,7 +1262,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	if !exists {
 		t.Fatal("Existing connection should be in the connections map")
 	}
-	if storedConn.Context.Err() == nil {
+	if !storedConn.isDone() {
 		t.Fatal("Existing connection context should be canceled")
 	}
 
@@ -1326,7 +1327,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	if finalConnectionCount != initialConnectionCount {
 		t.Errorf("Expected connection count to remain the same (%d), but got %d", initialConnectionCount, finalConnectionCount)
 	}
-	if stillExists && replacementConn.Context.Err() != nil {
+	if stillExists && replacementConn.isDone() {
 		t.Error("The replacement connection should have a valid (non-canceled) context")
 	}
 	if stillExists && replacementConn == existingConn {
@@ -1359,7 +1360,7 @@ func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
 	if finalFinalCount != 1 {
 		t.Errorf("Expected exactly 1 connection after cleanup, but got %d", finalFinalCount)
 	}
-	if finalExists && finalConn.Context.Err() != nil {
+	if finalExists && finalConn.isDone() {
 		t.Error("Final connection should have valid context")
 	}
 
@@ -1430,7 +1431,7 @@ func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID st
 // createExistingConnectionWithContext creates an existing connection with the given context.
 func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx context.Context, cancel context.CancelFunc) {
 	existingConn := &connInfo{
-		Context:          ctx,
+		done:             ctx.Done(),
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte),
@@ -1604,7 +1605,7 @@ func TestProtoWriterDoesNotDropBufferedMessagesOnContextCancel(t *testing.T) {
 
 	s := New(ctx, "test-node")
 	ci := &connInfo{
-		Context:          ctx,
+		done:             ctx.Done(),
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufSize),
@@ -1666,7 +1667,7 @@ func TestProtoWriterLogsDroppedMessagesOnContextCancel(t *testing.T) {
 	s.Logger.SetOutput(&logBuf)
 
 	ci := &connInfo{
-		Context:          ctx,
+		done:             ctx.Done(),
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufSize),
@@ -1717,7 +1718,7 @@ func TestWriteChanBufferDecouplesSendersFromProtoWriter(t *testing.T) {
 	defer sess.Close()
 
 	ci := &connInfo{
-		Context:          ctx,
+		done:             ctx.Done(),
 		CancelFunc:       cancel,
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufferSize),

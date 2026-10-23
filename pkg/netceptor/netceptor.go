@@ -1853,17 +1853,13 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					if ok {
 						remoteNodeAccepted = false
 					}
-					var connError error
-					connError = nil
-
-					// Verify that the existing connection is valid
+					// Verify that the existing connection is valid. connInfo only
+					// tracks the done channel, so the terminal context error is
+					// not available; keep this message cause-neutral.
 					if ok && existingConn != nil && existingConn.isDone() {
-						connError = context.Canceled
-					}
-					if ok && connError != nil {
-						s.Logger.Error("Context for existing connection error: %s", connError)
+						s.Logger.Error("Existing connection for %s is no longer valid; replacing it", remoteNodeID)
 						s.connLock.Unlock()
-						// Remove the canceled connection to prevent resource leak
+						// Remove the invalid connection to prevent resource leak
 						s.removeConnection(remoteNodeID)
 						s.connLock.Lock()
 						remoteNodeAccepted = true // Allow the new connection to proceed

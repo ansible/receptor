@@ -1044,21 +1044,22 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 		t.Error("Expected new connection to have valid context")
 	}
 
-	// Verify context error was logged using helper.
-	if !checkLogForMessage(logCapture, "Context for existing connection error", "context canceled") {
-		t.Error("Expected error message about context for existing connection was not logged")
+	// Verify the invalid connection was logged using helper.
+	if !checkLogForMessage(logCapture, "Existing connection for", "is no longer valid") {
+		t.Error("Expected message about the invalid existing connection was not logged")
 	}
 }
 
-// TestRunProtocolLogsContextErrorForExistingConnection specifically tests that
-// the "Context for existing connection error" message is logged when an existing
-// connection has a context error.
-func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
-	// Test different types of context errors using table-driven approach
+// TestRunProtocolLogsInvalidExistingConnection verifies that runProtocol logs a
+// cause-neutral message when it replaces an existing connection whose context
+// has ended. connInfo only tracks the done channel, so the terminal context
+// error (canceled vs deadline exceeded) is not available here.
+func TestRunProtocolLogsInvalidExistingConnection(t *testing.T) {
+	const expectedMsg = "is no longer valid"
+
 	testCases := []struct {
-		name        string
-		createCtx   func() (context.Context, context.CancelFunc)
-		expectedMsg string
+		name      string
+		createCtx func() (context.Context, context.CancelFunc)
 	}{
 		{
 			name: "canceled context",
@@ -1068,18 +1069,15 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 
 				return ctx, cancel
 			},
-			expectedMsg: "context canceled",
 		},
 		{
-			name: "timeout context",
+			name: "expired context",
 			createCtx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				time.Sleep(2 * time.Millisecond) // Ensure it times out
 
 				return ctx, cancel
 			},
-			// connInfo reports cancellation, not the parent's deadline error.
-			expectedMsg: "context canceled",
 		},
 	}
 
@@ -1117,15 +1115,15 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 			s.connLock.RUnlock()
 
 			if !exists {
-				t.Error("Expected new connection to be established after removing connection with context error")
+				t.Error("Expected new connection to be established after removing invalid connection")
 			}
 			if exists && newConn.isDone() {
 				t.Error("Expected new connection to have valid context")
 			}
 
-			// Verify the specific error message was logged using helper.
-			if !checkLogForMessage(logCapture, "Context for existing connection error", tc.expectedMsg) {
-				t.Errorf("Expected to find log message containing 'Context for existing connection error' and '%s'", tc.expectedMsg)
+			// Verify the neutral message was logged using helper.
+			if !checkLogForMessage(logCapture, "Existing connection for", expectedMsg) {
+				t.Errorf("Expected to find log message containing 'Existing connection for' and '%s'", expectedMsg)
 			}
 		})
 	}

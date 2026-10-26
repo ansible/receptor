@@ -1206,8 +1206,7 @@ func (s *Netceptor) printRoutingTable() {
 		for peer := range s.knownConnectionCosts[conn] {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
-		_, _ = fmt.Fprintf(sb, "\n")
-		s.Logger.Log(logLevel, "%s", sb.String())
+		s.Logger.Log(logLevel, "%s\n", sb.String())
 	}
 	s.Logger.Log(logLevel, "Routing Table:\n")
 	for node := range s.routingTable {
@@ -1483,7 +1482,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		}
 		s.listenerLock.RLock()
 		pc, ok := s.listenerRegistry[md.ToService]
-		if !ok || pc.context.Err() != nil {
+		if !ok || pc.isDone() {
 			s.listenerLock.RUnlock()
 			if md.FromNode == s.nodeID {
 				return fmt.Errorf(ProblemServiceUnknown) //nolint:staticcheck
@@ -1500,7 +1499,7 @@ func (s *Netceptor) handleMessageData(md *MessageData) error {
 		}
 		s.listenerLock.RUnlock()
 		select {
-		case <-pc.context.Done():
+		case <-pc.done:
 			close(pc.recvChan)
 
 			return nil

@@ -307,7 +307,7 @@ type captureNetLib struct {
 }
 
 func (c *captureNetLib) Listen(network, addr string) (net.Listener, error) {
-	ln, err := (&net.ListenConfig{}).Listen(context.Background(), network, addr)
+	ln, err := c.NetTCPWrapper.Listen(network, addr)
 	if err == nil {
 		c.ch <- ln
 	}
@@ -323,7 +323,7 @@ type captureNetterUDP struct {
 }
 
 func (c *captureNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
-	conn, err := net.ListenUDP(network, laddr)
+	conn, err := c.NetUDPWrapper.ListenUDP(network, laddr)
 	if err == nil {
 		c.ch <- conn
 	}

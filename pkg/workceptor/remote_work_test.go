@@ -1,3 +1,6 @@
+//go:build !no_workceptor
+// +build !no_workceptor
+
 package workceptor_test
 
 import (
@@ -1386,4 +1389,152 @@ func assertRemoteWorkTypePersisted(t *testing.T, expected bool, persisted <-chan
 	case <-time.After(10 * time.Second):
 		t.Fatal("remote work type was not persisted")
 	}
+}
+
+// newRunActionConn returns a conn whose handshake succeeds ("execution\n") and whose
+// subsequent reads block until ctx is done. It is the minimal setup required for
+// GetConnection to return a non-nil conn so that runActionAsync can call its action.
+func newRunActionConn(t *testing.T, ctx context.Context, ctrl *gomock.Controller) *netceptor.Conn {
+	t.Helper()
+	mockPc := mock_netceptor.NewMockPacketConner(ctrl)
+	mockQc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQs := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+	helloSent := false
+	mockQs.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if !helloSent {
+			helloSent = true
+
+			return copy(b, "execution\n"), nil
+		}
+		<-ctx.Done()
+
+		return 0, ctx.Err()
+	}).AnyTimes()
+	mockQs.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) { return len(b), nil }).AnyTimes()
+	mockQs.EXPECT().Close().Return(nil).AnyTimes()
+	mockQs.EXPECT().SetReadDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQs.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQs.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
+
+	var cancelFn context.CancelFunc = func() {}
+	mockPc.EXPECT().Cancel().Return(&cancelFn).AnyTimes()
+	mockPc.EXPECT().Close().Return(nil).AnyTimes()
+	mockPc.EXPECT().LocalService().Return("test-service").AnyTimes()
+	mockPc.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	mockQc.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockQc.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+	mockQc.EXPECT().LocalAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+
+	nc := netceptor.New(ctx, "test-node")
+	t.Cleanup(nc.Shutdown)
+
+	return netceptor.NewConn(nc, mockPc, mockQc, mockQs, make(chan struct{}), &sync.Once{}, ctx)
+}
+
+func setupRunActionMocks(t *testing.T, mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, w *workceptor.Workceptor) {
+	t.Helper()
+	remoteExtraData := &workceptor.RemoteExtraData{
+		RemoteNode:     "execution",
+		TLSClient:      "test-client",
+		RemoteWorkType: "test-work",
+		RemoteParams:   make(map[string]string),
+	}
+	statusLock := &sync.RWMutex{}
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().Return(&workceptor.StatusFileData{}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: remoteExtraData}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+}
+
+// TestRunActionAsync_callsFailureWhenConnectionFails verifies that failure() is called
+// when GetConnection returns nil (context already cancelled, dial always fails).
+func TestRunActionAsync_callsFailureWhenConnectionFails(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	_, mockBaseWorkUnit, mockNc, w, _ := createRemoteWorkTestSetup(t, ctx)
+	setupRunActionMocks(t, mockBaseWorkUnit, w)
+
+	mockNc.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNc.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("connection refused")).AnyTimes()
+
+	rw := workceptor.NewTestRemoteUnit(mockBaseWorkUnit)
+
+	cancel() // pre-cancel so GetConnection exits immediately after the first failed dial
+
+	failureCalled := false
+	actionCalled := false
+	rw.RunActionAsync(ctx,
+		func(_ context.Context, _ net.Conn, _ *bufio.Reader) error { actionCalled = true; return nil },
+		func() { failureCalled = true },
+	)
+
+	if !failureCalled {
+		t.Error("failure() was not called when connection was nil")
+	}
+	if actionCalled {
+		t.Error("action() should not have been called when connection failed")
+	}
+}
+
+// TestRunActionAsync_callsActionWhenConnectionSucceeds verifies that action() receives
+// a non-nil conn when GetConnection succeeds.
+func TestRunActionAsync_callsActionWhenConnectionSucceeds(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, mockBaseWorkUnit, mockNc, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+	setupRunActionMocks(t, mockBaseWorkUnit, w)
+
+	mockNc.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNc.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(newRunActionConn(t, ctx, ctrl), nil)
+
+	rw := workceptor.NewTestRemoteUnit(mockBaseWorkUnit)
+
+	actionCalled := false
+	failureCalled := false
+	rw.RunActionAsync(ctx,
+		func(_ context.Context, conn net.Conn, _ *bufio.Reader) error {
+			if conn == nil {
+				t.Error("action received nil conn")
+			}
+			actionCalled = true
+
+			return nil
+		},
+		func() { failureCalled = true },
+	)
+
+	if !actionCalled {
+		t.Error("action() was not called when connection succeeded")
+	}
+	if failureCalled {
+		t.Error("failure() should not have been called when connection succeeded")
+	}
+}
+
+// TestRunActionAsync_logsActionErrorWithoutPropagating verifies that an error returned
+// by action() is logged but does not cause runActionAsync to propagate or panic.
+func TestRunActionAsync_logsActionErrorWithoutPropagating(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, mockBaseWorkUnit, mockNc, w, ctrl := createRemoteWorkTestSetup(t, ctx)
+	setupRunActionMocks(t, mockBaseWorkUnit, w)
+
+	mockNc.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNc.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(newRunActionConn(t, ctx, ctrl), nil)
+
+	rw := workceptor.NewTestRemoteUnit(mockBaseWorkUnit)
+
+	rw.RunActionAsync(ctx,
+		func(_ context.Context, _ net.Conn, _ *bufio.Reader) error {
+			return fmt.Errorf("action failed")
+		},
+		func() { t.Error("failure() should not be called when connection succeeded") },
+	)
+	// If we reach here without panic, the error was absorbed correctly.
 }

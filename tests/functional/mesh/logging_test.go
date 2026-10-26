@@ -529,11 +529,12 @@ func TestUDPProxyLogsHaveNodeID(t *testing.T) {
 // TestKubeWorkerLogsHaveNodeID verifies that log lines emitted by kubernetes.go
 // via GetLogger() carry node_id in their structured suffix.
 //
-// The "completed successfully" Info line is emitted inside
-// RunWorkUsingLogger once the pod exits 0. It is only reachable through a real
-// Kubernetes API server, so this test runs against the KinD cluster that CI
-// provisions and is skipped locally when SKIP_KUBE=1.
+// The "completed successfully" Info line is emitted by KubeLoggingWithReconnect
+// once the pod exits 0. It is only reachable through a real Kubernetes API
+// server, so this test runs against the KinD cluster that CI provisions and is
+// skipped locally when SKIP_KUBE=1.
 func TestKubeWorkerLogsHaveNodeID(t *testing.T) {
+	t.Parallel()
 	checkSkipKube(t)
 
 	m := NewLibMesh()
@@ -570,7 +571,12 @@ func TestKubeWorkerLogsHaveNodeID(t *testing.T) {
 		t.Fatal(err, m.DataDir)
 	}
 
-	// "completed successfully" is logged by runWorkUsingLogger when the pod exits 0.
+	// The log write happens in a goroutine that may lag behind the status
+	// update AssertWorkSucceeded observes, so poll before asserting.
+	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelLog()
+
+	waitForLogLine(t, ctxLog, m.LogWriter.String, "completed successfully")
 	assertLogLineHasNodeID(t, m.LogWriter.String(), "completed successfully")
 }
 

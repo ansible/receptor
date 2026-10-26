@@ -65,6 +65,7 @@ func (m *LibMesh) NewLibNode(nodeID string) *LibNode {
 		},
 		ControlSocket: filepath.Join(m.DataDir, nodeID+".sock"),
 		backends:      make(map[string]BackendInfo),
+		logWriter:     m.LogWriter,
 	}
 
 	m.nodes[nodeID] = &node
@@ -81,10 +82,6 @@ func (m *LibMesh) Start(_ string) error {
 		if err != nil {
 			return err
 		}
-
-		// Comment out the line below to print test logs to stdout.
-		// Note that some assertions will fail by doing this.
-		node.netceptorInstance.Logger.SetOutput(m.LogWriter)
 	}
 
 	if m.AfterInit != nil {
@@ -318,6 +315,7 @@ type LibNode struct {
 	Connections            []Connection
 	ListenerCfgs           map[listenerName]ListenerCfg
 	netceptorInstance      *netceptor.Netceptor
+	logWriter              *utils.TestLogWriter
 	workceptorInstance     *workceptor.Workceptor
 	backends               map[string]BackendInfo
 	controlServer          *controlsvc.Server
@@ -660,6 +658,11 @@ func (n *LibNode) StartLocalServices() error {
 	if n.netceptorInstance == nil {
 		n.netceptorInstance = netceptor.New(context.Background(), n.GetID())
 	}
+
+	// Redirect the netceptor's logger before the control service emits its
+	// startup log lines. Comment out the line below to print test logs to
+	// stdout; note that some assertions will fail by doing this.
+	n.netceptorInstance.Logger.SetOutput(n.logWriter)
 
 	ctx, canceller := context.WithCancel(context.Background())
 	n.controlerServerContext = ctx

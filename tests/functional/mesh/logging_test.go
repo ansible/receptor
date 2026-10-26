@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/services"
 	net_interface "github.com/ansible/receptor/pkg/services/interfaces"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -272,7 +271,6 @@ func TestNodeReconnectionIsLogged(t *testing.T) {
 	if err := execA.StartLocalServices(); err != nil {
 		t.Fatal(err, m.DataDir)
 	}
-	execA.netceptorInstance.Logger.SetOutput(m.LogWriter)
 	if err := execA.StartListeners(); err != nil {
 		t.Fatal(err, m.DataDir)
 	}
@@ -365,10 +363,6 @@ func assertLogLineHasNodeID(t *testing.T, logs, substr string) {
 
 // TestControlSvcLogsHaveNodeID verifies that the "Running control service" log
 // line emitted by controlsvc.go carries node_id in its structured suffix.
-//
-// "Running control service" is logged synchronously inside
-// RunControlSvc, which is called before the mesh wires nodes to m.LogWriter.
-// To capture it, we pre-create the netceptor with the log writer already set.
 func TestControlSvcLogsHaveNodeID(t *testing.T) {
 	t.Parallel()
 
@@ -378,10 +372,6 @@ func TestControlSvcLogsHaveNodeID(t *testing.T) {
 	control.ListenerCfgs = map[listenerName]ListenerCfg{
 		listenerName("tcp"): newListenerCfg("tcp", "", 1, nil),
 	}
-	// Pre-create the netceptor with our writer so the synchronous
-	// "Running control service" Info line logged by RunControlSvc is captured.
-	control.netceptorInstance = netceptor.New(context.Background(), "control")
-	control.netceptorInstance.Logger.SetOutput(m.LogWriter)
 
 	execA := m.NewLibNode("execution-a")
 	execA.Connections = []Connection{{RemoteNode: control, Protocol: "tcp"}}

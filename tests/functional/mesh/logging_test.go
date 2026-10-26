@@ -331,16 +331,17 @@ func (c *captureNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (net_in
 	return conn, err
 }
 
-// hasLogLineWithNodeID reports whether logs has a line containing substr that
-// also carries a structured node_id suffix.
-func hasLogLineWithNodeID(logs, substr string) bool {
-	for _, line := range strings.Split(logs, "\n") {
-		if strings.Contains(line, substr) && strings.Contains(line, `"node_id"`) {
-			return true
-		}
-	}
+// waitForLogLine polls until logsFn returns logs containing a line with substr.
+// Use it before assertLogLineHasNodeID when the log write may lag behind the
+// action that triggers it.
+func waitForLogLine(t *testing.T, ctx context.Context, logsFn func() string, substr string) {
+	t.Helper()
 
-	return false
+	if !utils.CheckUntilTimeout(ctx, 100*time.Millisecond, func() bool {
+		return strings.Contains(logsFn(), substr)
+	}) {
+		t.Fatalf("no %q log line captured\nlogs:\n%s", substr, logsFn())
+	}
 }
 
 // assertLogLineHasNodeID fails if logs has no line containing substr, or if any
@@ -470,11 +471,8 @@ func TestTCPProxyLogsHaveNodeID(t *testing.T) {
 	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelLog()
 
-	if !utils.CheckUntilTimeout(ctxLog, 100*time.Millisecond, func() bool {
-		return hasLogLineWithNodeID(m.LogWriter.String(), "error connecting on Receptor network")
-	}) {
-		t.Fatalf("no 'error connecting on Receptor network' log line with node_id\nlogs:\n%s", m.LogWriter.String())
-	}
+	waitForLogLine(t, ctxLog, m.LogWriter.String, "error connecting on Receptor network")
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "error connecting on Receptor network")
 }
 
 // TestUDPProxyLogsHaveNodeID verifies that the error logged when a UDP proxy
@@ -524,11 +522,8 @@ func TestUDPProxyLogsHaveNodeID(t *testing.T) {
 	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelLog()
 
-	if !utils.CheckUntilTimeout(ctxLog, 100*time.Millisecond, func() bool {
-		return hasLogLineWithNodeID(m.LogWriter.String(), "Error sending packet on Receptor network")
-	}) {
-		t.Fatalf("no 'Error sending packet on Receptor network' log line with node_id\nlogs:\n%s", m.LogWriter.String())
-	}
+	waitForLogLine(t, ctxLog, m.LogWriter.String, "Error sending packet on Receptor network")
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "Error sending packet on Receptor network")
 }
 
 // TestKubeWorkerLogsHaveNodeID verifies that log lines emitted by kubernetes.go

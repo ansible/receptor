@@ -228,6 +228,7 @@ func TestMeshShutdown(t *testing.T) {
 			// parallel and ws runs over TCP, so an unscoped lsof check would
 			// also see the ws subtest's sockets.
 			tcpPorts := m.TCPListenerPorts()
+			udpPorts := m.UDPListenerPorts()
 
 			m.Destroy()
 			m.WaitForShutdown()
@@ -238,7 +239,7 @@ func TestMeshShutdown(t *testing.T) {
 			switch protocol {
 			case "tcp", "ws":
 				if len(tcpPorts) == 0 {
-					break
+					t.Fatalf("no TCP listener ports found for %s mesh", protocol)
 				}
 				// Scope the check to this mesh's own ports so the sibling
 				// ws/tcp subtests do not cause a false failure.
@@ -262,11 +263,17 @@ func TestMeshShutdown(t *testing.T) {
 					t.Errorf("Timed out while waiting for backends to close:%s\n", out.String())
 				}
 			case "udp":
+				if len(udpPorts) == 0 {
+					t.Fatalf("no UDP listener ports found for %s mesh", protocol)
+				}
+				// Scope the check to this mesh's own ports so sockets from
+				// other tests do not cause a false failure.
+				lsofFilter := "UDP:" + strings.Join(udpPorts, ",")
 				done := false
 				var out bytes.Buffer
 				for timeout := 10 * time.Second; timeout > 0 && !done; {
 					out = bytes.Buffer{}
-					cmd := exec.CommandContext(context.Background(), "lsof", "-tap", fmt.Sprint(pid), "-i", "UDP")
+					cmd := exec.CommandContext(context.Background(), "lsof", "-tap", fmt.Sprint(pid), "-i", lsofFilter)
 					cmd.Stdout = &out
 					cmd.Run()
 					if !strings.Contains(out.String(), fmt.Sprint(pid)) {

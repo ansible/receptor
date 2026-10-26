@@ -317,16 +317,17 @@ func (c *captureNetLib) Listen(network, addr string) (net.Listener, error) {
 	return ln, err
 }
 
-// captureNetterUDP wraps services.NetUDPWrapper, sending the bound address to ch.
+// captureNetterUDP wraps services.NetUDPWrapper, sending the connection it
+// creates to ch so the test can close the proxy listener.
 type captureNetterUDP struct {
 	services.NetUDPWrapper
-	ch chan *net.UDPAddr
+	ch chan net_interface.UDPConnInterface
 }
 
 func (c *captureNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
 	conn, err := net.ListenUDP(network, laddr)
 	if err == nil {
-		c.ch <- conn.LocalAddr().(*net.UDPAddr)
+		c.ch <- conn
 	}
 
 	return conn, err
@@ -468,11 +469,13 @@ func TestTCPProxyLogsHaveNodeID(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for TCP proxy listener")
 	}
+	defer ln.Close()
 
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatalf("dial proxy: %v", err)
 	}
+	defer conn.Close()
 
 	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelLog()
@@ -482,10 +485,6 @@ func TestTCPProxyLogsHaveNodeID(t *testing.T) {
 	}) {
 		t.Fatalf("no 'error connecting on Receptor network' log line with node_id\nlogs:\n%s", m.LogWriter.String())
 	}
-
-	// Close as soon as the assertion passes so the listener does not remain open
-	conn.Close()
-	ln.Close()
 }
 
 // TestUDPProxyLogsHaveNodeID verifies that the error logged when a UDP proxy
@@ -494,13 +493,13 @@ func TestUDPProxyLogsHaveNodeID(t *testing.T) {
 	t.Parallel()
 
 	m := twoNodeMesh()
-	addrCh := make(chan *net.UDPAddr, 1)
+	connCh := make(chan net_interface.UDPConnInterface, 1)
 	m.AfterInit = func(nodes map[string]*LibNode) {
 		n := nodes["control"].GetNetceptor()
 		go services.UDPProxyServiceInbound( //nolint:errcheck
 			n, "127.0.0.1", 0,
 			"nonexistent-node", "nonexistent-svc",
-			&captureNetterUDP{ch: addrCh},
+			&captureNetterUDP{ch: connCh},
 		)
 	}
 
@@ -517,17 +516,19 @@ func TestUDPProxyLogsHaveNodeID(t *testing.T) {
 		t.Fatal(err, m.DataDir)
 	}
 
-	var udpAddr *net.UDPAddr
+	var uc net_interface.UDPConnInterface
 	select {
-	case udpAddr = <-addrCh:
+	case uc = <-connCh:
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for UDP proxy listener")
 	}
+	defer uc.Close()
 
-	conn, err := (&net.Dialer{}).DialContext(ctx, "udp", udpAddr.String())
+	conn, err := (&net.Dialer{}).DialContext(ctx, "udp", uc.LocalAddr().String())
 	if err != nil {
 		t.Fatalf("dial udp proxy: %v", err)
 	}
+	defer conn.Close()
 	_, _ = conn.Write([]byte("ping"))
 
 	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
@@ -538,10 +539,6 @@ func TestUDPProxyLogsHaveNodeID(t *testing.T) {
 	}) {
 		t.Fatalf("no 'Error sending packet on Receptor network' log line with node_id\nlogs:\n%s", m.LogWriter.String())
 	}
-
-	// Close as soon as the assertion passes so the socket does not remain
-	// visible to the process-wide lsof check in TestMeshShutdown.
-	conn.Close()
 }
 
 // TestKubeWorkerLogsHaveNodeID verifies that log lines emitted by kubernetes.go

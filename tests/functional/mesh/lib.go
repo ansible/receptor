@@ -144,6 +144,29 @@ func (m *LibMesh) TCPListenerPorts() []string {
 	return ports
 }
 
+// UDPListenerPorts returns the unique port numbers that this mesh's UDP
+// backends are bound to. Use the result to scope an lsof check to exactly the
+// ports this mesh opened rather than all UDP connections in the process.
+func (m *LibMesh) UDPListenerPorts() []string {
+	seen := map[string]bool{}
+	var ports []string
+	for _, node := range m.GetNodes() {
+		for _, bi := range node.backends {
+			if bi.protocol != "udp" || bi.listener == nil {
+				continue
+			}
+			_, port, err := net.SplitHostPort(bi.listener.GetAddr())
+			if err != nil || seen[port] {
+				continue
+			}
+			seen[port] = true
+			ports = append(ports, port)
+		}
+	}
+
+	return ports
+}
+
 // Shutdown stops all running Netceptors and their backends.
 func (m *LibMesh) Destroy() {
 	for _, node := range m.GetNodes() {

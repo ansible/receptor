@@ -185,6 +185,38 @@ func TestTraceroute(t *testing.T) {
 	}
 }
 
+// waitForPortsClosed polls lsof until the process no longer holds any of the
+// given ports open. The check is scoped to this mesh's own ports because the
+// sibling tcp/ws/udp subtests run in parallel and ws runs over TCP, so an
+// unscoped check would also see their sockets.
+func waitForPortsClosed(t *testing.T, pid int, proto string, ports []string) {
+	t.Helper()
+
+	if len(ports) == 0 {
+		t.Fatalf("no %s listener ports found for %s mesh", strings.ToUpper(proto), proto)
+	}
+
+	lsofProto := "TCP"
+	if proto == "udp" {
+		lsofProto = "UDP"
+	}
+	lsofFilter := lsofProto + ":" + strings.Join(ports, ",")
+
+	var out bytes.Buffer
+	for timeout := 10 * time.Second; timeout > 0; timeout -= 100 * time.Millisecond {
+		out.Reset()
+		cmd := exec.CommandContext(context.Background(), "lsof", "-tap", fmt.Sprint(pid), "-i", lsofFilter)
+		cmd.Stdout = &out
+		cmd.Run()
+		if !strings.Contains(out.String(), fmt.Sprint(pid)) {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	t.Errorf("Timed out while waiting for backends to close:%s\n", out.String())
+}
+
 // Test that a mesh starts and that connections are what we expect.
 //
 //nolint:tparallel
@@ -223,38 +255,24 @@ func TestMeshShutdown(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			// Capture the exact ports this mesh's backends were bound to
+			// before tearing down. The sibling tcp/ws/udp subtests run in
+			// parallel and ws runs over TCP, so an unscoped lsof check would
+			// also see the ws subtest's sockets.
+			tcpPorts := m.TCPListenerPorts()
+			udpPorts := m.UDPListenerPorts()
+
 			m.Destroy()
 			m.WaitForShutdown()
 
-			var lsofProto string
-			switch protocol {
-			case "tcp":
-				lsofProto = "TCP"
-			case "ws":
-				lsofProto = "TCP"
-			case "udp":
-				lsofProto = "UDP"
-			}
-
 			// Check that the connections are closed
 			pid := os.Getpid()
-			done := false
-			var out bytes.Buffer
-			for timeout := 10 * time.Second; timeout > 0 && !done; {
-				out = bytes.Buffer{}
-				cmd := exec.CommandContext(context.Background(), "lsof", "-tap", fmt.Sprint(pid), "-i", lsofProto)
-				cmd.Stdout = &out
-				cmd.Run()
-				if !strings.Contains(out.String(), fmt.Sprint(pid)) {
-					done = true
 
-					break
-				}
-				time.Sleep(100 * time.Millisecond)
-				timeout -= 100 * time.Millisecond
-			}
-			if done == false {
-				t.Errorf("Timed out while waiting for backends to close:%s\n", out.String())
+			switch protocol {
+			case "tcp", "ws":
+				waitForPortsClosed(t, pid, protocol, tcpPorts)
+			case "udp":
+				waitForPortsClosed(t, pid, protocol, udpPorts)
 			}
 		})
 	}

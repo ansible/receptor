@@ -65,6 +65,7 @@ func (m *LibMesh) NewLibNode(nodeID string) *LibNode {
 		},
 		ControlSocket: filepath.Join(m.DataDir, nodeID+".sock"),
 		backends:      make(map[string]BackendInfo),
+		logWriter:     m.LogWriter,
 	}
 
 	m.nodes[nodeID] = &node
@@ -81,10 +82,6 @@ func (m *LibMesh) Start(_ string) error {
 		if err != nil {
 			return err
 		}
-
-		// Comment out the line below to print test logs to stdout.
-		// Note that some assertions will fail by doing this.
-		node.netceptorInstance.Logger.SetOutput(m.LogWriter)
 	}
 
 	if m.AfterInit != nil {
@@ -118,6 +115,53 @@ func (m *LibMesh) GetNodes() map[string]*LibNode {
 // GetDataDir returns the path to the data directory for this mesh.
 func (m *LibMesh) GetDataDir() string {
 	return m.DataDir
+}
+
+// TCPListenerPorts returns the unique port numbers that this mesh's TCP and
+// WebSocket (which runs over TCP) backends are bound to. Use the result to
+// scope an lsof check to exactly the ports this mesh opened rather than all
+// TCP connections in the process.
+func (m *LibMesh) TCPListenerPorts() []string {
+	seen := map[string]bool{}
+	var ports []string
+	for _, node := range m.GetNodes() {
+		for _, bi := range node.backends {
+			if bi.protocol != "tcp" && bi.protocol != "ws" || bi.listener == nil {
+				continue
+			}
+			_, port, err := net.SplitHostPort(bi.listener.GetAddr())
+			if err != nil || seen[port] {
+				continue
+			}
+			seen[port] = true
+			ports = append(ports, port)
+		}
+	}
+
+	return ports
+}
+
+// UDPListenerPorts returns the unique port numbers that this mesh's UDP
+// backends are bound to. Use the result to scope an lsof check to exactly the
+// ports this mesh opened rather than all UDP connections in the process.
+func (m *LibMesh) UDPListenerPorts() []string {
+	seen := map[string]bool{}
+	var ports []string
+	for _, node := range m.GetNodes() {
+		for _, bi := range node.backends {
+			if bi.protocol != "udp" || bi.listener == nil {
+				continue
+			}
+			_, port, err := net.SplitHostPort(bi.listener.GetAddr())
+			if err != nil || seen[port] {
+				continue
+			}
+			seen[port] = true
+			ports = append(ports, port)
+		}
+	}
+
+	return ports
 }
 
 // Shutdown stops all running Netceptors and their backends.
@@ -271,6 +315,7 @@ type LibNode struct {
 	Connections            []Connection
 	ListenerCfgs           map[listenerName]ListenerCfg
 	netceptorInstance      *netceptor.Netceptor
+	logWriter              *utils.TestLogWriter
 	workceptorInstance     *workceptor.Workceptor
 	backends               map[string]BackendInfo
 	controlServer          *controlsvc.Server
@@ -613,6 +658,11 @@ func (n *LibNode) StartLocalServices() error {
 	if n.netceptorInstance == nil {
 		n.netceptorInstance = netceptor.New(context.Background(), n.GetID())
 	}
+
+	// Redirect the netceptor's logger before the control service emits its
+	// startup log lines. Comment out the line below to print test logs to
+	// stdout; note that some assertions will fail by doing this.
+	n.netceptorInstance.Logger.SetOutput(n.logWriter)
 
 	ctx, canceller := context.WithCancel(context.Background())
 	n.controlerServerContext = ctx

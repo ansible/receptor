@@ -3,11 +3,15 @@ package mesh
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/pkg/services"
+	net_interface "github.com/ansible/receptor/pkg/services/interfaces"
+	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/tests/utils"
 )
 
@@ -267,7 +271,6 @@ func TestNodeReconnectionIsLogged(t *testing.T) {
 	if err := execA.StartLocalServices(); err != nil {
 		t.Fatal(err, m.DataDir)
 	}
-	execA.netceptorInstance.Logger.SetOutput(m.LogWriter)
 	if err := execA.StartListeners(); err != nil {
 		t.Fatal(err, m.DataDir)
 	}
@@ -295,6 +298,286 @@ func TestNodeReconnectionIsLogged(t *testing.T) {
 		t.Errorf("expected at least 2 'Connection established with execution-a' entries (initial + reconnect), got %d\nlogs:\n%s",
 			strings.Count(m.LogWriter.String(), "Connection established with execution-a"), m.LogWriter.String())
 	}
+}
+
+// captureNetLib wraps services.NetTCPWrapper, sending the listener it creates to ch.
+type captureNetLib struct {
+	services.NetTCPWrapper
+	ch chan net.Listener
+}
+
+func (c *captureNetLib) Listen(network, addr string) (net.Listener, error) {
+	ln, err := c.NetTCPWrapper.Listen(network, addr)
+	if err == nil {
+		c.ch <- ln
+	}
+
+	return ln, err
+}
+
+// captureNetterUDP wraps services.NetUDPWrapper, sending the connection it
+// creates to ch so the test can close the proxy listener.
+type captureNetterUDP struct {
+	services.NetUDPWrapper
+	ch chan net_interface.UDPConnInterface
+}
+
+func (c *captureNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (net_interface.UDPConnInterface, error) {
+	conn, err := c.NetUDPWrapper.ListenUDP(network, laddr)
+	if err == nil {
+		c.ch <- conn
+	}
+
+	return conn, err
+}
+
+// waitForLogLine polls until logsFn returns logs containing a line with substr.
+// Use it before assertLogLineHasNodeID when the log write may lag behind the
+// action that triggers it.
+func waitForLogLine(t *testing.T, ctx context.Context, logsFn func() string, substr string) {
+	t.Helper()
+
+	if !utils.CheckUntilTimeout(ctx, 100*time.Millisecond, func() bool {
+		return strings.Contains(logsFn(), substr)
+	}) {
+		t.Fatalf("no %q log line captured\nlogs:\n%s", substr, logsFn())
+	}
+}
+
+// assertLogLineHasNodeID fails if logs has no line containing substr, or if any
+// such line lacks a structured node_id suffix.
+func assertLogLineHasNodeID(t *testing.T, logs, substr string) {
+	t.Helper()
+
+	if !strings.Contains(logs, substr) {
+		t.Fatalf("no %q log line captured\nlogs:\n%s", substr, logs)
+	}
+	for _, line := range strings.Split(logs, "\n") {
+		if !strings.Contains(line, substr) {
+			continue
+		}
+		if !strings.Contains(line, `"node_id"`) {
+			t.Errorf("%q log line missing node_id: %s", substr, line)
+		}
+	}
+}
+
+// TestControlSvcLogsHaveNodeID verifies that the "Running control service" log
+// line emitted by controlsvc.go carries node_id in its structured suffix.
+func TestControlSvcLogsHaveNodeID(t *testing.T) {
+	t.Parallel()
+
+	m := NewLibMesh()
+
+	control := m.NewLibNode("control")
+	control.ListenerCfgs = map[listenerName]ListenerCfg{
+		listenerName("tcp"): newListenerCfg("tcp", "", 1, nil),
+	}
+
+	execA := m.NewLibNode("execution-a")
+	execA.Connections = []Connection{{RemoteNode: control, Protocol: "tcp"}}
+
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "Running control service")
+}
+
+// TestWorkceptorLogsHaveNodeID verifies that log lines emitted by workceptor.go
+// carry node_id in their structured suffix.
+//
+// The "Error locating unit" Error fires synchronously in
+// StartUnit when the requested unit ID does not exist.
+func TestWorkceptorLogsHaveNodeID(t *testing.T) {
+	t.Parallel()
+
+	m := twoNodeMesh()
+	m.AfterInit = func(nodes map[string]*LibNode) {
+		// StartUnit with a nonexistent ID makes scanForUnit log via GetLogger().Error.
+		_ = nodes["control"].workceptorInstance.StartUnit("nonexistent-unit-for-nodecheck")
+	}
+
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "Error locating unit")
+}
+
+// TestTCPProxyLogsHaveNodeID verifies that the error logged when a TCP proxy
+// cannot reach the target Receptor node carries node_id in its suffix.
+func TestTCPProxyLogsHaveNodeID(t *testing.T) {
+	t.Parallel()
+
+	m := twoNodeMesh()
+	listenerCh := make(chan net.Listener, 1)
+	m.AfterInit = func(nodes map[string]*LibNode) {
+		n := nodes["control"].GetNetceptor()
+		go services.TCPProxyServiceInbound( //nolint:errcheck
+			n, "127.0.0.1", 0, nil,
+			"nonexistent-node", "echo-svc", nil,
+			&captureNetLib{ch: listenerCh},
+			nil,
+			&services.UtilsTCPWrapper{},
+		)
+	}
+
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	var ln net.Listener
+	select {
+	case ln = <-listenerCh:
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for TCP proxy listener")
+	}
+	defer ln.Close()
+
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial proxy: %v", err)
+	}
+	defer conn.Close()
+
+	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelLog()
+
+	waitForLogLine(t, ctxLog, m.LogWriter.String, "error connecting on Receptor network")
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "error connecting on Receptor network")
+}
+
+// TestUDPProxyLogsHaveNodeID verifies that the error logged when a UDP proxy
+// cannot forward a packet to the target Receptor service carries node_id.
+func TestUDPProxyLogsHaveNodeID(t *testing.T) {
+	t.Parallel()
+
+	m := twoNodeMesh()
+	connCh := make(chan net_interface.UDPConnInterface, 1)
+	m.AfterInit = func(nodes map[string]*LibNode) {
+		n := nodes["control"].GetNetceptor()
+		go services.UDPProxyServiceInbound( //nolint:errcheck
+			n, "127.0.0.1", 0,
+			"nonexistent-node", "nonexistent-svc",
+			&captureNetterUDP{ch: connCh},
+		)
+	}
+
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	var uc net_interface.UDPConnInterface
+	select {
+	case uc = <-connCh:
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for UDP proxy listener")
+	}
+	defer uc.Close()
+
+	conn, err := (&net.Dialer{}).DialContext(ctx, "udp", uc.LocalAddr().String())
+	if err != nil {
+		t.Fatalf("dial udp proxy: %v", err)
+	}
+	defer conn.Close()
+	_, _ = conn.Write([]byte("ping"))
+
+	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelLog()
+
+	waitForLogLine(t, ctxLog, m.LogWriter.String, "Error sending packet on Receptor network")
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "Error sending packet on Receptor network")
+}
+
+// TestKubeWorkerLogsHaveNodeID verifies that log lines emitted by kubernetes.go
+// via GetLogger() carry node_id in their structured suffix.
+//
+// The "completed successfully" Info line is emitted by KubeLoggingWithReconnect
+// once the pod exits 0. It is only reachable through a real Kubernetes API
+// server, so this test runs against the KinD cluster that CI provisions and is
+// skipped locally when SKIP_KUBE=1.
+func TestKubeWorkerLogsHaveNodeID(t *testing.T) {
+	t.Parallel()
+	checkSkipKube(t)
+
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.workerConfigs = []workceptor.WorkerConfig{
+		workTestConfigs["kube"]["echosleepshort"],
+	}
+
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	nodes := m.GetNodes()
+	controller := NewReceptorControl()
+	if err := controller.Connect(nodes["node1"].GetControlSocket()); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	unitID, err := controller.WorkStart("echosleepshort")
+	if err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	if err := controller.AssertWorkSucceeded(ctx, unitID); err != nil {
+		t.Fatal(err, m.DataDir)
+	}
+
+	// The log write happens in a goroutine that may lag behind the status
+	// update AssertWorkSucceeded observes, so poll before asserting.
+	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelLog()
+
+	waitForLogLine(t, ctxLog, m.LogWriter.String, "completed successfully")
+	assertLogLineHasNodeID(t, m.LogWriter.String(), "completed successfully")
 }
 
 // TestConnectionRejectedPeerIsLogged verifies that when a node's connection is

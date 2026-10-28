@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -190,7 +191,11 @@ type connInfo struct {
 	Cost             float64
 	lastReceivedData time.Time
 	lastReceivedLock *sync.RWMutex
-	logger           *logger.ReceptorLogger
+	// logger is bound to the base logger at construction and upgraded to the
+	// per-connection logger (with remote_id) once the handshake reveals the
+	// remote node ID. The reader and writer goroutines start before that, so
+	// it is accessed atomically.
+	logger atomic.Pointer[logger.ReceptorLogger]
 }
 
 type nodeInfo struct {
@@ -285,6 +290,17 @@ func makeNetworkName(nodeID string) string {
 	}
 }
 
+// logSuffix renders structured log fields as JSON so that values containing
+// quotes or backslashes cannot corrupt the log line.
+func logSuffix(fields map[string]string) string {
+	b, err := json.Marshal(fields)
+	if err != nil {
+		return ""
+	}
+
+	return string(b)
+}
+
 // NewWithConsts constructs a new Receptor network protocol instance, specifying operational constants.
 func NewWithConsts(ctx context.Context, nodeID string,
 	mtu int, routeUpdateTime time.Duration, serviceAdTime time.Duration, seenUpdateExpireTime time.Duration,
@@ -329,7 +345,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		serverTLSConfigs:         make(map[string]*tls.Config),
 		firewallLock:             &sync.RWMutex{},
 		workCommandsLock:         &sync.RWMutex{},
-		Logger:                   logger.NewReceptorLogger(""),
+		Logger:                   logger.NewReceptorLogger(logSuffix(map[string]string{"node_id": nodeID})),
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
@@ -342,7 +358,6 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		MinVersion: tls.VersionTLS12,
 	}
 	s.AddNameHash(nodeID)
-	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -1185,22 +1200,21 @@ func (s *Netceptor) GetEphemeralService() string {
 // Prints the routing table.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	logLevel, _ := s.Logger.GetLogLevelByName("Info")
-	if s.Logger.GetLogLevel() < logLevel {
+	if s.Logger.GetLogLevel() < logger.InfoLevel {
 		return
 	}
-	s.Logger.Log(logLevel, "Known Connections:\n")
+	s.Logger.Info("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
 		sb := &strings.Builder{}
 		_, _ = fmt.Fprintf(sb, "   %s: ", conn)
 		for peer := range s.knownConnectionCosts[conn] {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
-		s.Logger.Log(logLevel, "%s\n", sb.String())
+		s.Logger.Info("%s\n", sb.String())
 	}
-	s.Logger.Log(logLevel, "Routing Table:\n")
+	s.Logger.Info("Routing Table:\n")
 	for node := range s.routingTable {
-		s.Logger.Log(logLevel, "   %s via %s\n", node, s.routingTable[node])
+		s.Logger.Info("   %s via %s\n", node, s.routingTable[node])
 	}
 }
 
@@ -1569,7 +1583,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 		}
 		if err != nil {
 			if err != io.EOF && ci.Context.Err() == nil {
-				ci.logger.Error("Backend receiving error %s\n", err)
+				ci.logger.Load().Error("Backend receiving error %s\n", err)
 			}
 			ci.CancelFunc()
 
@@ -1597,7 +1611,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 				dropped++
 			}
 			if dropped > 0 {
-				ci.logger.Warning("dropping %d queued message(s): connection closed before delivery\n", dropped)
+				ci.logger.Load().Warning("dropping %d queued message(s): connection closed before delivery\n", dropped)
 			}
 
 			return
@@ -1608,7 +1622,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 			err := sess.Send(message)
 			if err != nil {
 				if ci.Context.Err() == nil {
-					ci.logger.Error("Backend sending error %s\n", err)
+					ci.logger.Load().Error("Backend sending error %s\n", err)
 				}
 				ci.CancelFunc()
 
@@ -1698,6 +1712,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 	established := false
 	remoteEstablished := false
 	remoteNodeID := ""
+	connLogger := s.Logger
 	connectionCost := bi.connectionCost
 	defer func() {
 		_ = sess.Close()
@@ -1719,8 +1734,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 		WriteChan:        make(chan []byte, writeChanBufferSize),
 		Cost:             connectionCost,
 		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
 	}
+	ci.logger.Store(s.Logger)
 	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
@@ -1735,21 +1750,21 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 				case MsgTypeData:
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
-						s.Logger.Error("Error translating data to message struct: %s\n", err)
+						connLogger.Error("Error translating data to message struct: %s\n", err)
 
 						continue
 					}
-					s.Logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
+					connLogger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
 						message.FromNode, message.FromService, message.ToNode, message.ToService, remoteNodeID)
 					err = s.handleMessageData(message)
 					if err != nil {
-						s.Logger.Error("Error handling message data: %s\n", err)
+						connLogger.Error("Error handling message data: %s\n", err)
 					}
 				case MsgTypeRoute:
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
-						s.Logger.Error("Error unpacking routing update: %s\n", err)
+						connLogger.Error("Error unpacking routing update: %s\n", err)
 
 						continue
 					}
@@ -1783,17 +1798,17 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 				case MsgTypeServiceAdvertisement:
 					err := s.handleServiceAdvertisement(data, remoteNodeID)
 					if err != nil {
-						s.Logger.Error("Error handling service advertisement: %s\n", err)
+						connLogger.Error("Error handling service advertisement: %s\n", err)
 
 						continue
 					}
 				case MsgTypeReject:
-					s.Logger.Warning("Received a rejection message from peer.")
+					connLogger.Warning("Received a rejection message from peer.")
 					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
 				default:
-					s.Logger.Warning("Unknown message type\n")
+					connLogger.Warning("Unknown message type\n")
 				}
 			} else {
 				// Connection not established
@@ -1806,12 +1821,13 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						continue
 					}
 					remoteNodeID = ri.ForwardingNode
+					connLogger = s.Logger.WithSuffix(
+						logSuffix(map[string]string{"node_id": s.nodeID, "remote_id": remoteNodeID}))
+					ci.logger.Store(connLogger)
 					// Decide whether the remote node is acceptable
 					if remoteNodeID == s.nodeID {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
-					suffix := map[string]string{"remote_id": remoteNodeID}
-					s.GetLogger().UpdateSuffix(suffix)
 					remoteNodeAccepted := true
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
@@ -1849,7 +1865,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						connError = existingConn.Context.Err()
 					}
 					if ok && connError != nil {
-						s.Logger.Error("Context for existing connection error: %s", connError)
+						connLogger.Error("Context for existing connection error: %s", connError)
 						s.connLock.Unlock()
 						// Remove the canceled connection to prevent resource leak
 						s.removeConnection(remoteNodeID)
@@ -1877,7 +1893,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 
 						return nil
 					}
-					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
+					connLogger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
 					s.AddNameHash(remoteNodeID)
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]
@@ -1911,7 +1927,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					}
 					established = true
 				} else if msgType == MsgTypeReject {
-					s.Logger.Warning("Received a rejection message from peer.")
+					connLogger.Warning("Received a rejection message from peer.")
 					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")

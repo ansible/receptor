@@ -1624,6 +1624,20 @@ func TestWriteChanBufferDecouplesSendersFromProtoWriter(t *testing.T) {
 	}
 }
 
+// singleSessionBackend is a Backend that delivers one pre-created session and
+// then stops, mimicking a listener that accepted a single connection.
+type singleSessionBackend struct {
+	session BackendSession
+}
+
+func (b *singleSessionBackend) Start(_ context.Context, _ *sync.WaitGroup) (chan BackendSession, error) {
+	sessChan := make(chan BackendSession, 1)
+	sessChan <- b.session
+	close(sessChan)
+
+	return sessChan, nil
+}
+
 // newRoutingUpdateMessage builds a network-encoded routing update message
 // from the given peer node, as the peer would send it at handshake time.
 func newRoutingUpdateMessage(t *testing.T, s *Netceptor, nodeID, updateID string) []byte {
@@ -1651,4 +1665,164 @@ func newMockBackendSession() *mockBackendSession {
 		recvData: make(chan []byte, 10),
 		closed:   make(chan struct{}),
 	}
+}
+
+// TestBackendErrorLogCarriesRemoteID verifies that the "Backend error" line,
+// emitted by AddBackend when runProtocol returns an error, identifies the
+// remote peer via the structured remote_id suffix. In the OurNodeRejectsPeer
+// case the error text itself already names the peer ("rejected connection with
+// node %s"), since the handshake revealed its node ID before the rejection;
+// PeerRejectsUs exercises the one error text that carries no peer identifier
+// ("remote node rejected the connection"), where the suffix is the only
+// carrier of the peer's identity.
+func TestBackendErrorLogCarriesRemoteID(t *testing.T) {
+	peerNode := "peer-node"
+
+	cases := []struct {
+		name     string
+		expected string
+		// backendInfoFn optionally configures the backend info; nil means
+		// AddBackend is called without the option.
+		backendInfoFn func(bi *BackendInfo)
+		// setup injects the messages the mock peer sends.
+		setup func(t *testing.T, s *Netceptor, session *mockBackendSession)
+	}{
+		{
+			name:          "OurNodeRejectsPeer",
+			expected:      "not in the allowed peers list",
+			backendInfoFn: func(bi *BackendInfo) { bi.allowedPeers = []string{"some-other-node"} },
+			setup: func(t *testing.T, s *Netceptor, session *mockBackendSession) {
+				// Routing update from a peer that is not in the allowed
+				// peers list: runProtocol learns the peer's node ID from it,
+				// then rejects the connection and returns an error.
+				session.recvData <- newRoutingUpdateMessage(t, s, peerNode, "test-update-rejection")
+			},
+		},
+		{
+			name:     "PeerRejectsUs",
+			expected: "remote node rejected the connection",
+			setup: func(t *testing.T, s *Netceptor, session *mockBackendSession) {
+				// First message: routing update that establishes the connection.
+				session.recvData <- newRoutingUpdateMessage(t, s, peerNode, "test-update-establish")
+				// Second message: the peer rejects the established connection.
+				rejectMsg, err := s.translateStructToNetwork(MsgTypeReject, make([]string, 0))
+				if err != nil {
+					t.Fatalf("Failed to create reject message: %v", err)
+				}
+				session.recvData <- rejectMsg
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, logCapture := createNetceptorWithLogCapture(t, "test-node")
+			mockSession := newMockBackendSession()
+			tc.setup(t, s, mockSession)
+
+			var err error
+			if tc.backendInfoFn != nil {
+				err = s.AddBackend(&singleSessionBackend{session: mockSession}, tc.backendInfoFn)
+			} else {
+				err = s.AddBackend(&singleSessionBackend{session: mockSession})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			logCapture.WaitFor(t, 5*time.Second, "Backend error", tc.expected)
+			if !logCapture.Contains("Backend error", `"remote_id":"`+peerNode+`"`) {
+				t.Errorf("Backend error line does not identify the remote peer via remote_id; logs:\n%s", logCapture.String())
+			}
+		})
+	}
+}
+
+// startEstablishedMockPeer creates a Netceptor with captured logs and a mock
+// backend session whose first message completes the handshake with peerNode.
+// It returns the session so tests can inject further peer traffic.
+func startEstablishedMockPeer(t *testing.T, localNode, peerNode string) (*Netceptor, *mockBackendSession, *utils.LogCapture) {
+	t.Helper()
+
+	s, logCapture := createNetceptorWithLogCapture(t, localNode)
+	mockSession, bi := createMockSessionAndBackendInfo(t, s, peerNode)
+	if err := s.AddBackend(&singleSessionBackend{session: mockSession}, func(b *BackendInfo) {
+		*b = *bi
+	}); err != nil {
+		t.Fatalf("AddBackend failed: %v", err)
+	}
+	logCapture.WaitFor(t, 5*time.Second, "Connection established with", peerNode)
+
+	return s, mockSession, logCapture
+}
+
+// injectRoutingUpdate delivers a routing update to the running protocol loop.
+func injectRoutingUpdate(t *testing.T, s *Netceptor, session *mockBackendSession, ru *routingUpdate) {
+	t.Helper()
+
+	msg, err := s.translateStructToNetwork(MsgTypeRoute, ru)
+	if err != nil {
+		t.Fatalf("Failed to create routing update message: %v", err)
+	}
+	session.recvData <- msg
+}
+
+// TestDuplicateSuspicionLogCarriesRemoteID pins the "suspecting a duplicate
+// node" line. The text names the update origin, not the connection that
+// delivered it; the remote_id suffix identifies that connection.
+func TestDuplicateSuspicionLogCarriesRemoteID(t *testing.T) {
+	s, session, logCapture := startEstablishedMockPeer(t, "test-node", "peer-node")
+
+	injectRoutingUpdate(t, s, session, &routingUpdate{
+		NodeID:             "other-node",
+		ForwardingNode:     "peer-node",
+		UpdateEpoch:        1,
+		UpdateSequence:     1,
+		Connections:        map[string]float64{},
+		UpdateID:           "duplicate-suspicion",
+		SuspectedDuplicate: 7,
+	})
+
+	logCapture.WaitFor(t, 5*time.Second, "suspecting a duplicate node", `"remote_id":"peer-node"`)
+}
+
+// TestDuplicateNodeIDLogCarriesRemoteID pins the "Duplicate node ID detected"
+// line, emitted when a peer forwards an update carrying our own node ID with a
+// newer epoch.
+func TestDuplicateNodeIDLogCarriesRemoteID(t *testing.T) {
+	s, session, logCapture := startEstablishedMockPeer(t, "test-node", "peer-node")
+
+	injectRoutingUpdate(t, s, session, &routingUpdate{
+		NodeID:         s.nodeID,
+		ForwardingNode: "peer-node",
+		UpdateEpoch:    s.epoch + 1,
+		UpdateSequence: 1,
+		Connections:    map[string]float64{},
+		UpdateID:       "duplicate-node-id",
+	})
+
+	logCapture.WaitFor(t, 5*time.Second, "Duplicate node ID", `"remote_id":"peer-node"`)
+}
+
+// TestConnectionTimeoutLogCarriesRemoteID pins the "Timing out connection"
+// line. monitorConnectionAging checks every 5 seconds, so the established
+// connection is observed as idle on the next tick.
+func TestConnectionTimeoutLogCarriesRemoteID(t *testing.T) {
+	// The idle timeout must be set at construction: the aging monitor reads it
+	// concurrently, so it cannot be changed after the node starts.
+	s := NewWithConsts(context.Background(), "test-node", defaultMTU, defaultRouteUpdateTime,
+		defaultServiceAdTime, defaultSeenUpdateExpireTime, defaultMaxForwardingHops, time.Millisecond)
+	t.Cleanup(s.Shutdown)
+	logCapture := utils.NewLogCapture()
+	s.Logger.SetOutput(logCapture)
+
+	mockSession, bi := createMockSessionAndBackendInfo(t, s, "peer-node")
+	if err := s.AddBackend(&singleSessionBackend{session: mockSession}, func(b *BackendInfo) {
+		*b = *bi
+	}); err != nil {
+		t.Fatalf("AddBackend failed: %v", err)
+	}
+	logCapture.WaitFor(t, 5*time.Second, "Connection established with", "peer-node")
+
+	logCapture.WaitFor(t, 10*time.Second, "Timing out connection", `"remote_id":"peer-node"`)
 }

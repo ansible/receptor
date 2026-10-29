@@ -37,8 +37,14 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 	mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
 
 	messageIndex := 0
+	// ReadStringContext's internal goroutine can outlive the call that started it, so a
+	// stale reader may still invoke Read after the caller has reconnected and started a
+	// new Read on the same mock stream. Protect the shared cursor against that overlap.
+	var messageIndexLock sync.Mutex
 	// Set up reads to return different messages based on the provided list
 	readExpectation := mockQuicStream.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		messageIndexLock.Lock()
+		defer messageIndexLock.Unlock()
 		if messageIndex < len(messages) {
 			msg := messages[messageIndex]
 			messageIndex++
@@ -1493,6 +1499,8 @@ func startFakeControlListener(t *testing.T, n2 *netceptor.Netceptor, handle func
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
+				// A dialer that closes before streaming its init byte
+				// surfaces here as a per-connection error; keep serving.
 				select {
 				case <-listener.DoneChan:
 					return
@@ -1526,6 +1534,31 @@ func startFakeControlService(t *testing.T, n2 *netceptor.Netceptor, node string,
 			}
 		}
 	})
+}
+
+// waitForControlDial dials until the control service is reachable.
+func waitForControlDial(t *testing.T, n1 *netceptor.Netceptor, node string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var lastErr error
+	ready := testutils.CheckUntilTimeout(ctx, 50*time.Millisecond, func() bool {
+		dialCtx, dialCancel := context.WithTimeout(context.Background(), time.Second)
+		defer dialCancel()
+		conn, err := n1.DialContext(dialCtx, node, "control", nil)
+		if err != nil {
+			lastErr = err
+
+			return false
+		}
+		_ = conn.CloseConnection()
+
+		return true
+	})
+	if !ready {
+		t.Fatalf("timed out waiting for control service on %s: %v", node, lastErr)
+	}
 }
 
 // waitForControlService waits for the advertisement to propagate and verifies
@@ -1571,7 +1604,6 @@ func waitForControlService(t *testing.T, n1 *netceptor.Netceptor, node string) {
 // the two-node handshake. It returns the mocked base unit and its unit dir.
 func newRemoteCloseTestUnit(t *testing.T, ctx context.Context, n1 *netceptor.Netceptor, status workceptor.StatusFileData) (*mock_workceptor.MockBaseWorkUnitForWorkUnit, string) {
 	t.Helper()
-
 	ctrl := gomock.NewController(t)
 	base := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
 	w, err := workceptor.New(ctx, n1, t.TempDir())
@@ -1685,4 +1717,462 @@ func TestRemoteWorkStdoutCloseErrorLogCarriesRemoteID(t *testing.T) {
 	job.Wait()
 
 	logCapture.WaitFor(t, 5*time.Second, "Error closing", "stdout", logRemoteID(logTestRemoteNode))
+}
+
+// newRemoteLogTestEnv builds a Workceptor backed by the handshake-suffixed
+// n1 logger, plus a mocked base work unit whose status is controlled by the
+// caller. Because w.nc is the real n1, every rw.GetWorkceptor().nc.GetLogger()
+// call observes the remote_id set during the handshake.
+func newRemoteLogTestEnv(t *testing.T, ctx context.Context, n1 *netceptor.Netceptor, red *workceptor.RemoteExtraData, status workceptor.StatusFileData, unitDir string, lastUpdateError error) (*workceptor.Workceptor, *mock_workceptor.MockBaseWorkUnitForWorkUnit) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	base := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	w, err := workceptor.New(ctx, n1, t.TempDir())
+	if err != nil {
+		t.Fatalf("could not create workceptor: %v", err)
+	}
+	t.Cleanup(w.Cancel)
+
+	expectRemoteUnitStatusSources(base, w, red, status)
+	base.EXPECT().LastUpdateError().Return(lastUpdateError).AnyTimes()
+	if unitDir != "" {
+		base.EXPECT().UnitDir().Return(unitDir).AnyTimes()
+		base.EXPECT().StatusFileName().Return(filepath.Join(unitDir, "status")).AnyTimes()
+	}
+	base.EXPECT().UpdateBasicStatus(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	base.EXPECT().UpdateFullStatus(gomock.Any()).Do(func(update func(*workceptor.StatusFileData)) {
+		update(&workceptor.StatusFileData{ExtraData: red})
+	}).AnyTimes()
+
+	return w, base
+}
+
+// remoteMonitorOptions configures a remote monitor test environment.
+type remoteMonitorOptions struct {
+	// remote is the unit's remote extra data, and status its initial status.
+	remote *workceptor.RemoteExtraData
+	status workceptor.StatusFileData
+	// unitDir, when set, is where the unit's status and stdout files live.
+	unitDir string
+	// lastUpdateError is what the mocked LastUpdateError returns.
+	lastUpdateError error
+	// service, when non-nil, advertises a fake control service on the remote
+	// node and handles each request line with it.
+	service func(conn net.Conn, req string) bool
+	// dialOnly skips the hello check, for fake services that do not greet.
+	dialOnly bool
+}
+
+// remoteMonitorEnv is the shared fixture for remote monitor logging tests: the
+// two connected nodes, the log capture, the mocked unit and its job context.
+type remoteMonitorEnv struct {
+	ctx     context.Context
+	capture *testutils.LogCapture
+	unit    *mock_workceptor.MockBaseWorkUnitForWorkUnit
+	job     *utils.JobContext
+}
+
+// newRemoteMonitorEnv connects the two nodes, optionally starts a fake control
+// service, builds the mocked unit and creates a job context for the monitor.
+func newRemoteMonitorEnv(t *testing.T, opts remoteMonitorOptions) *remoteMonitorEnv {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	n1, n2, capture := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
+	if opts.service != nil {
+		startFakeControlService(t, n2, logTestRemoteNode, opts.service)
+		if opts.dialOnly {
+			waitForControlDial(t, n1, logTestRemoteNode)
+		} else {
+			waitForControlService(t, n1, logTestRemoteNode)
+		}
+	}
+
+	_, unit := newRemoteLogTestEnv(t, ctx, n1, opts.remote, opts.status, opts.unitDir, opts.lastUpdateError)
+	job := &utils.JobContext{}
+	job.NewJob(ctx, 1, false)
+
+	return &remoteMonitorEnv{ctx: ctx, capture: capture, unit: unit, job: job}
+}
+
+// startStdout launches monitorRemoteStdout on the shared job context.
+func (e *remoteMonitorEnv) startStdout() {
+	go workceptor.MonitorRemoteStdoutForTest(e.unit, e.job)
+}
+
+// startStatus launches monitorRemoteStatus on the shared job context.
+func (e *remoteMonitorEnv) startStatus(forRelease bool) {
+	go workceptor.MonitorRemoteStatusForTest(e.unit, e.job, forRelease)
+}
+
+// cancel cancels the job context mid-test.
+func (e *remoteMonitorEnv) cancel() {
+	e.job.Cancel()
+}
+
+// wait joins the monitor goroutine.
+func (e *remoteMonitorEnv) wait() {
+	e.job.Wait()
+}
+
+// newRemoteExtraData builds status extra data targeting the remote node.
+func newRemoteExtraData() *workceptor.RemoteExtraData {
+	return &workceptor.RemoteExtraData{
+		RemoteNode:   logTestRemoteNode,
+		RemoteUnitID: "remote-unit",
+		RemoteParams: make(map[string]string),
+	}
+}
+
+// TestRemoteWorkStdoutErrorLogCarriesRemoteID verifies that the workceptor
+// "Could not open stdout file" error, emitted while monitoring a remote work
+// unit, identifies the remote peer via the structured remote_id suffix. The
+// message text names only the local file, so the suffix is the only carrier
+// of the peer's identity.
+func TestRemoteWorkStdoutErrorLogCarriesRemoteID(t *testing.T) {
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{remote: newRemoteExtraData()})
+
+	// A path whose parent is a regular file can never be opened.
+	blocker := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(blocker, "stdout")).AnyTimes()
+
+	env.startStdout()
+	env.capture.WaitFor(t, 5*time.Second, "Could not open stdout file", logRemoteID(logTestRemoteNode))
+	// Join the monitor goroutine so it cannot touch the mock after the
+	// test (and the gomock controller) has finished.
+	env.wait()
+}
+
+// TestRemoteWorkStatusFileReadErrorLogCarriesRemoteID pins the
+// "Could not read status file" line emitted by monitorRemoteStdout.
+func TestRemoteWorkStatusFileReadErrorLogCarriesRemoteID(t *testing.T) {
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		unitDir: unitDir,
+	})
+	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
+	env.unit.EXPECT().Load().Return(errors.New("status unreadable")).AnyTimes()
+
+	env.startStdout()
+	env.capture.WaitFor(t, 5*time.Second, "Could not read status file", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkRemoteErrorLogCarriesRemoteID pins the "Remote error" line
+// emitted by monitorRemoteStatus.
+func TestRemoteWorkRemoteErrorLogCarriesRemoteID(t *testing.T) {
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "ERROR\tboom\n")
+
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 5*time.Second, "Remote error", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkStatusUnmarshalErrorLogCarriesRemoteID pins the
+// "Error unmarshalling JSON" line emitted by monitorRemoteStatus.
+func TestRemoteWorkStatusUnmarshalErrorLogCarriesRemoteID(t *testing.T) {
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "not-json\n")
+
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 5*time.Second, "Error unmarshalling JSON", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkStatusWriteRetryExceededLogCarriesRemoteID pins the
+// "Exceeded retries for updating status file" line emitted by
+// monitorRemoteStatus.
+func TestRemoteWorkStatusWriteRetryExceededLogCarriesRemoteID(t *testing.T) {
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:          newRemoteExtraData(),
+		status:          workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		lastUpdateError: errors.New("status write failed"),
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, `{"State":1}`+"\n")
+
+			return true
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 10*time.Second, "Exceeded retries for updating status file", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkCryptoErrorDetailLogCarriesRemoteID pins the bare "%s" crypto
+// detail line emitted by handleConnectionError.
+func TestRemoteWorkCryptoErrorDetailLogCarriesRemoteID(t *testing.T) {
+	red := newRemoteExtraData()
+	red.RemoteStarted = false
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{remote: red})
+
+	shouldExit := workceptor.HandleConnectionErrorForTest(env.unit, errors.New("CRYPTO_ERROR: handshake failed"))
+	if !shouldExit {
+		t.Fatal("expected a crypto error before the remote started to be fatal")
+	}
+
+	env.capture.WaitFor(t, 5*time.Second, "TLS error connecting to remote service", logRemoteID(logTestRemoteNode))
+}
+
+// TestRemoteWorkCreateSignatureErrorLogCarriesRemoteID pins the
+// "could not create signature to get results" line emitted by
+// monitorRemoteStdout.
+func TestRemoteWorkCreateSignatureErrorLogCarriesRemoteID(t *testing.T) {
+	unitDir := t.TempDir()
+	red := newRemoteExtraData()
+	red.SignWork = true
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  red,
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 100},
+		unitDir: unitDir,
+		service: func(_ net.Conn, _ string) bool {
+			return true
+		},
+	})
+	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
+	env.unit.EXPECT().Load().Return(nil).AnyTimes()
+
+	env.startStdout()
+	env.capture.WaitFor(t, 5*time.Second, "could not create signature to get results", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID pins the
+// "Could not copy to stdout file" line emitted by monitorRemoteStdout.
+func TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID(t *testing.T) {
+	streamStarted := make(chan struct{})
+	release := make(chan struct{})
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "Streaming results\n")
+			_, _ = io.WriteString(conn, "partial")
+			close(streamStarted)
+			<-release
+
+			return false
+		},
+	})
+	stdoutPath := filepath.Join(unitDir, "stdout")
+	env.unit.EXPECT().StdoutFileName().Return(stdoutPath).AnyTimes()
+	env.unit.EXPECT().Load().Return(nil).AnyTimes()
+
+	env.startStdout()
+
+	<-streamStarted
+	// Wait until io.Copy has written the streamed bytes before cancelling the
+	// read, otherwise the cancellation is observed by the earlier read and the
+	// copy error this test pins is never reached.
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer waitCancel()
+	if !testutils.CheckUntilTimeout(waitCtx, 5*time.Millisecond, func() bool {
+		info, err := os.Stat(stdoutPath)
+
+		return err == nil && info.Size() > 0
+	}) {
+		t.Fatal("timed out waiting for the stdout copy to start")
+	}
+	env.cancel()
+	close(release)
+
+	env.capture.WaitFor(t, 5*time.Second, "Could not copy to stdout file", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkInLoopStdoutOpenErrorLogCarriesRemoteID pins the in-loop
+// "Could not open stdout file" line emitted by monitorRemoteStdout.
+func TestRemoteWorkInLoopStdoutOpenErrorLogCarriesRemoteID(t *testing.T) {
+	unitDir := t.TempDir()
+	blocker := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "Streaming results\n")
+			_, _ = io.WriteString(conn, "0123456789")
+
+			return false
+		},
+	})
+	// Calls 1 and 2 are the pre-loop open and the first in-loop open. The
+	// third call is the second loop iteration's open, which must fail.
+	stdoutCalls := 0
+	env.unit.EXPECT().StdoutFileName().DoAndReturn(func() string {
+		stdoutCalls++
+		if stdoutCalls <= 2 {
+			return filepath.Join(unitDir, "stdout")
+		}
+
+		return filepath.Join(blocker, "stdout")
+	}).AnyTimes()
+	env.unit.EXPECT().Load().Return(nil).AnyTimes()
+
+	env.startStdout()
+	env.capture.WaitFor(t, 10*time.Second, "Could not open stdout file", logRemoteID(logTestRemoteNode))
+	env.wait()
+
+	// The identical message is also emitted by the pre-loop open, so prove the
+	// in-loop branch actually ran.
+	if stdoutCalls < 3 {
+		t.Errorf("expected at least 3 StdoutFileName calls (pre-loop plus two in-loop opens), got %d", stdoutCalls)
+	}
+}
+
+// TestRemoteWorkActionErrorLogCarriesRemoteID pins the
+// "Error running action function" line emitted by getConnectionAndRun.
+func TestRemoteWorkActionErrorLogCarriesRemoteID(t *testing.T) {
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		service: func(_ net.Conn, _ string) bool {
+			return true
+		},
+	})
+
+	actionDone := make(chan struct{})
+	_ = workceptor.GetConnectionAndRunForTest(env.unit, env.ctx, false, func(context.Context, net.Conn, *bufio.Reader) error {
+		defer close(actionDone)
+
+		return errors.New("action boom")
+	}, func() {})
+
+	env.capture.WaitFor(t, 5*time.Second, "Error running action function", logRemoteID(logTestRemoteNode))
+	// Join the action goroutine so it cannot touch the mock after the test.
+	<-actionDone
+}
+
+// TestRemoteWorkConnectAndRunErrorLogCarriesRemoteID pins the
+// "Error with connect and run" line emitted by cancelOrRelease.
+func TestRemoteWorkConnectAndRunErrorLogCarriesRemoteID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	n1, n2, logCapture := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
+
+	// Reply with a hello naming the wrong node so ConnectToRemote fails
+	// immediately on the mismatch instead of waiting out its hello timeout.
+	startFakeControlListener(t, n2, func(conn net.Conn) {
+		_, _ = io.WriteString(conn, "wrong-node\n")
+		_ = conn.Close()
+	})
+	waitForControlDial(t, n1, logTestRemoteNode)
+
+	red := newRemoteExtraData()
+	red.RemoteStarted = true
+	w, mockBaseWorkUnit := newRemoteLogTestEnv(t, ctx, n1, red, workceptor.StatusFileData{State: workceptor.WorkStateRunning}, "", nil)
+	mockBaseWorkUnit.EXPECT().Init(gomock.Any(), "", "", gomock.Any()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().SetStatusExtraData(gomock.Any()).AnyTimes()
+	mockBaseWorkUnit.EXPECT().Release(true).Return(nil).AnyTimes()
+
+	unit := workceptor.NewRemoteWorker(mockBaseWorkUnit, w, "", "")
+	if err := unit.Release(true); err != nil {
+		t.Fatal(err)
+	}
+
+	logCapture.WaitFor(t, 5*time.Second, "Error with connect and run", logRemoteID(logTestRemoteNode))
+}
+
+// TestRemoteWorkConnectionErrorLogCarriesRemoteID pins the "Connection to %s
+// failed" line emitted by handleConnectionError.
+func TestRemoteWorkConnectionErrorLogCarriesRemoteID(t *testing.T) {
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{remote: newRemoteExtraData()})
+
+	_ = workceptor.HandleConnectionErrorForTest(env.unit, errors.New("connection boom"))
+
+	env.capture.WaitFor(t, 5*time.Second, "Connection to", logRemoteID(logTestRemoteNode))
+}
+
+// TestRemoteWorkAdoptedNotStartedLogCarriesRemoteID pins the "Adopted work
+// unit ... has not started" line emitted by monitorRemoteStatus.
+func TestRemoteWorkAdoptedNotStartedLogCarriesRemoteID(t *testing.T) {
+	red := newRemoteExtraData()
+	red.Adopted = true
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: red,
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, `{"State":0}`+"\n")
+
+			return true
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 5*time.Second, "has not started", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkDidNotStreamResultsLogCarriesRemoteID pins the "did not stream
+// results" line emitted by monitorRemoteStdout when the remote answers the
+// results request without announcing a stream.
+func TestRemoteWorkDidNotStreamResultsLogCarriesRemoteID(t *testing.T) {
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "not streaming\n")
+
+			return true
+		},
+	})
+	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
+	env.unit.EXPECT().Load().Return(nil).AnyTimes()
+
+	env.startStdout()
+	env.capture.WaitFor(t, 5*time.Second, "did not stream results", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkReleaseErrorLogCarriesRemoteID pins the "Error releasing unit"
+// line emitted after a successful connection when releasing the unit fails.
+func TestRemoteWorkReleaseErrorLogCarriesRemoteID(t *testing.T) {
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		unitDir: unitDir,
+		service: func(_ net.Conn, _ string) bool {
+			return true
+		},
+	})
+	env.unit.EXPECT().Release(false).Return(errors.New("release boom")).AnyTimes()
+
+	go func() {
+		_ = workceptor.RunAndMonitorForTest(env.unit, env.job, true, func(context.Context, net.Conn, *bufio.Reader) error {
+			return nil
+		})
+	}()
+
+	env.capture.WaitFor(t, 5*time.Second, "Error releasing unit", logRemoteID(logTestRemoteNode))
+	env.wait()
 }

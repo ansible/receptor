@@ -127,6 +127,24 @@ func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.Wo
 	return workUnit, mockBaseWorkUnit, mockNetceptor, w, ctrl
 }
 
+// expectRemoteUnitStatusSources stubs the read-only status accessors that
+// remote work unit monitoring calls on its base unit.
+func expectRemoteUnitStatusSources(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, w *workceptor.Workceptor, red *workceptor.RemoteExtraData, status workceptor.StatusFileData) {
+	// gomock evaluates Return once: every GetStatusLock() call returns this same
+	// mutex, which remoteUnit.UnredactedStatus relies on (it takes RLock and
+	// RUnlock via separate calls).
+	statusLock := &sync.RWMutex{}
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
+		s := status
+
+		return &s
+	}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: red}).AnyTimes()
+	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
+	mockBaseWorkUnit.EXPECT().ID().Return("test-id").AnyTimes()
+}
+
 func TestRemoteWorkUnredactedStatus(t *testing.T) {
 	ctx := context.Background()
 	wu, mockBaseWorkUnit, _, _, _ := createRemoteWorkTestSetup(t, ctx) //nolint:dogsled
@@ -1009,13 +1027,7 @@ func runMonitorStatusStreamErrorTest(t *testing.T, failWrite bool) {
 	// monitorRemoteStdout cancels the shared job context if it cannot open the stdout file,
 	// which would stop the status goroutine before it writes, so the dir must exist.
 	unitDir := t.TempDir()
-	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
-		return &workceptor.StatusFileData{}
-	}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: remoteExtraData}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-	mockBaseWorkUnit.EXPECT().ID().Return("test-id").AnyTimes()
+	expectRemoteUnitStatusSources(mockBaseWorkUnit, w, remoteExtraData, workceptor.StatusFileData{})
 	mockBaseWorkUnit.EXPECT().Load().Return(nil).AnyTimes()
 	mockBaseWorkUnit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
 	mockBaseWorkUnit.EXPECT().UnitDir().Return(unitDir).AnyTimes()
@@ -1251,14 +1263,7 @@ func runRemoteWorkAdoptedUnitTest(t *testing.T, tt remoteWorkAdoptedUnitTestCase
 
 func setupRemoteWorkAdoptedObservations(t *testing.T, tt remoteWorkAdoptedUnitTestCase, mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, w *workceptor.Workceptor, remoteExtraData *workceptor.RemoteExtraData) *remoteWorkAdoptedUnitObservations {
 	t.Helper()
-	statusLock := &sync.RWMutex{}
-	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
-		return &workceptor.StatusFileData{}
-	}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetStatusCopy().Return(workceptor.StatusFileData{ExtraData: remoteExtraData}).AnyTimes()
-	mockBaseWorkUnit.EXPECT().GetWorkceptor().Return(w).AnyTimes()
-	mockBaseWorkUnit.EXPECT().ID().Return("test-id").AnyTimes()
+	expectRemoteUnitStatusSources(mockBaseWorkUnit, w, remoteExtraData, workceptor.StatusFileData{})
 
 	observations := &remoteWorkAdoptedUnitObservations{
 		failed:                   make(chan workceptor.StatusFileData, 1),

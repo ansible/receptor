@@ -380,7 +380,7 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	nodes := make([]*Netceptor, netsize)
 	backends := make([]*ExternalBackend, netsize)
 	routingChans := make([]chan map[string]string, netsize)
-	logWriter := utils.NewTestLogWriter()
+	logWriter := utils.NewLogCapture()
 	defer func() {
 		t.Log(logWriter.String())
 	}()
@@ -999,8 +999,8 @@ func TestTracerCreatesNonEmptyFiles(t *testing.T) {
 
 	// Verify the "exporting qlog failed ... file already closed" error was not logged
 	logs := strings.Split(logBuffer.String(), "\n")
-	logCapture := &logCapture{messages: logs}
-	if checkLogForMessage(logCapture, "exporting qlog failed", "file already closed") {
+	logCapture := utils.NewLogCapture(logs...)
+	if logCapture.Contains("exporting qlog failed", "file already closed") {
 		t.Error("Node logs contained error about qlog file already closed")
 	}
 }
@@ -1010,7 +1010,7 @@ func TestTracerCreatesNonEmptyFiles(t *testing.T) {
 func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 	// Set up using helper.
 	ctx := context.Background()
-	s, logCapture := createNetceptorWithLogCapture("test-node")
+	s, logCapture := createNetceptorWithLogCapture(t, "test-node")
 	remoteNodeID := "existing-node"
 
 	// Create canceled context and existing connection using helper.
@@ -1045,7 +1045,7 @@ func TestRunProtocolExistingConnWithCanceledContext(t *testing.T) {
 	}
 
 	// Verify context error was logged using helper.
-	if !checkLogForMessage(logCapture, "Context for existing connection error", "context canceled") {
+	if !logCapture.Contains("Context for existing connection error", "context canceled") {
 		t.Error("Expected error message about context for existing connection was not logged")
 	}
 }
@@ -1086,7 +1086,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set up using helper (fresh instance for each subtest).
 			ctx := context.Background()
-			s, logCapture := createNetceptorWithLogCapture("test-node")
+			s, logCapture := createNetceptorWithLogCapture(t, "test-node")
 			remoteNodeID := "error-node-" + tc.name
 
 			// Create context with error.
@@ -1123,7 +1123,7 @@ func TestRunProtocolLogsContextErrorForExistingConnection(t *testing.T) {
 			}
 
 			// Verify the specific error message was logged using helper.
-			if !checkLogForMessage(logCapture, "Context for existing connection error", tc.expectedMsg) {
+			if !logCapture.Contains("Context for existing connection error", tc.expectedMsg) {
 				t.Errorf("Expected to find log message containing 'Context for existing connection error' and '%s'", tc.expectedMsg)
 			}
 		})
@@ -1140,30 +1140,10 @@ func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
 	remoteNodeID := "removal-test-node"
 
 	// Create mock session with routing update.
-	mockSession := &mockBackendSession{
-		sendData: make(chan []byte, 10),
-		recvData: make(chan []byte, 10),
-		closed:   make(chan struct{}),
-	}
-
-	// Prepare initial routing update message.
-	routingUpdate := &routingUpdate{
-		NodeID:             remoteNodeID,
-		ForwardingNode:     remoteNodeID,
-		UpdateEpoch:        1,
-		UpdateSequence:     1,
-		Connections:        make(map[string]float64),
-		UpdateID:           "removal-test-update",
-		SuspectedDuplicate: 0,
-	}
-
-	msgBytes, err := s.translateStructToNetwork(MsgTypeRoute, routingUpdate)
-	if err != nil {
-		t.Fatalf("Failed to create routing update message: %v", err)
-	}
+	mockSession := newMockBackendSession()
 
 	// Send the routing update message to establish connection.
-	mockSession.recvData <- msgBytes
+	mockSession.recvData <- newRoutingUpdateMessage(t, s, remoteNodeID, "removal-test-update")
 
 	bi := &BackendInfo{
 		connectionCost: 1.0,
@@ -1223,170 +1203,85 @@ func TestRunProtocolLogsConnectionRemoval(t *testing.T) {
 // runProtocol detects an existing connection with a canceled context, it properly
 // removes that connection from s.connections and allows the new connection to proceed.
 func TestRunProtocolRemovesExistingConnectionWithCanceledContext(t *testing.T) {
-	// Set up a Netceptor instance.
-	ctx := context.Background()
-	s := New(ctx, "test-node")
+	ctx := t.Context()
+	s, _ := createNetceptorWithLogCapture(t, "test-node")
+	const remoteNodeID = "leak-test-node"
 
-	remoteNodeID := "leak-test-node"
-
-	// Create a canceled context for the existing connection.
+	// Seed the connections map with a connection whose context is already canceled.
 	canceledCtx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel it immediately
+	cancel()
+	createExistingConnectionWithContext(s, remoteNodeID, canceledCtx, cancel)
 
-	// Create an existing connection with the canceled context.
-	existingConn := &connInfo{
-		Context:          canceledCtx,
-		CancelFunc:       cancel,
-		ReadChan:         make(chan []byte),
-		WriteChan:        make(chan []byte),
-		Cost:             1.0,
-		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
-	}
-
-	// Add the existing connection to the connections map.
-	s.connLock.Lock()
-	if s.connections == nil {
-		s.connections = make(map[string]*connInfo)
-	}
-	s.connections[remoteNodeID] = existingConn
-	initialConnectionCount := len(s.connections)
-	s.connLock.Unlock()
-
-	// Verify the existing connection is there and has a canceled context.
-	s.connLock.RLock()
-	storedConn, exists := s.connections[remoteNodeID]
-	s.connLock.RUnlock()
-
-	if !exists {
+	before := snapshotConnection(s, remoteNodeID)
+	if !before.exists {
 		t.Fatal("Existing connection should be in the connections map")
 	}
-	if storedConn.Context.Err() == nil {
+	if before.conn.Context.Err() == nil {
 		t.Fatal("Existing connection context should be canceled")
 	}
 
-	// Create a mock session that will try to connect with the same remoteNodeID.
-	mockSession := &mockBackendSession{
-		sendData: make(chan []byte, 10),
-		recvData: make(chan []byte, 10),
-		closed:   make(chan struct{}),
-	}
-
-	// Prepare the routing update message.
-	routingUpdate := &routingUpdate{
-		NodeID:             remoteNodeID,
-		ForwardingNode:     remoteNodeID,
-		UpdateEpoch:        1,
-		UpdateSequence:     1,
-		Connections:        make(map[string]float64),
-		UpdateID:           "leak-test-update",
-		SuspectedDuplicate: 0,
-	}
-
-	msgBytes, err := s.translateStructToNetwork(MsgTypeRoute, routingUpdate)
-	if err != nil {
-		t.Fatalf("Failed to create routing update message: %v", err)
-	}
-
-	// Send the routing update message to the mock session.
-	mockSession.recvData <- msgBytes
-
-	bi := &BackendInfo{
-		connectionCost: 1.0,
-		nodeCost:       make(map[string]float64),
-		allowedPeers:   []string{remoteNodeID},
-	}
-
-	// Call runProtocol - this should detect the existing connection with canceled context and replace it.
-	go func() {
-		err = s.runProtocol(ctx, mockSession, bi)
-		if err != nil {
-			t.Logf("runProtocol finished with: %v", err)
+	// runProtocol should detect the canceled connection, remove it, and replace it.
+	mockSession, bi := createMockSessionAndBackendInfo(t, s, remoteNodeID)
+	done := runProtocolAsync(s, ctx, mockSession, bi)
+	t.Cleanup(func() {
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Error("runProtocol did not exit after context cancellation")
 		}
-	}()
+	})
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if !utils.CheckUntilTimeout(waitCtx, 5*time.Millisecond, func() bool {
+		c := snapshotConnection(s, remoteNodeID)
 
-	// Wait for the connection to be processed.
-	time.Sleep(100 * time.Millisecond)
+		return c.exists && c.conn != before.conn
+	}) {
+		t.Fatal("timed out waiting for the replacement connection")
+	}
 
-	// THE KEY TEST: Verify that the canceled connection was removed and replaced.
-	s.connLock.RLock()
-	finalConnectionCount := len(s.connections)
-	stillExists := false
-	var replacementConn *connInfo
-	if conn, ok := s.connections[remoteNodeID]; ok {
-		stillExists = true
-		replacementConn = conn
+	after := snapshotConnection(s, remoteNodeID)
+	if !after.exists {
+		t.Fatal("Expected a new connection to be established after removing canceled connection")
 	}
-	s.connLock.RUnlock()
-
-	// Verify the connection was replaced, not leaked.
-	if !stillExists {
-		t.Error("Expected a new connection to be established after removing canceled connection")
+	if after.count != before.count {
+		t.Errorf("Expected connection count to remain the same (%d), but got %d", before.count, after.count)
 	}
-	if finalConnectionCount != initialConnectionCount {
-		t.Errorf("Expected connection count to remain the same (%d), but got %d", initialConnectionCount, finalConnectionCount)
-	}
-	if stillExists && replacementConn.Context.Err() != nil {
+	if after.conn.Context.Err() != nil {
 		t.Error("The replacement connection should have a valid (non-canceled) context")
 	}
-	if stillExists && replacementConn == existingConn {
+	if after.conn == before.conn {
 		t.Error("The replacement connection should be a different connection object than the original")
 	}
 
-	// Additional verification: try to connect again with the same node ID.
-	// This should now fail normally because there's a valid existing connection.
-	mockSession2 := &mockBackendSession{
-		sendData: make(chan []byte, 10),
-		recvData: make(chan []byte, 10),
-		closed:   make(chan struct{}),
+	// A second attempt with the same node ID must now fail because a valid connection exists.
+	mockSession2, _ := createMockSessionAndBackendInfo(t, s, remoteNodeID)
+	err := s.runProtocol(ctx, mockSession2, bi)
+	if err == nil {
+		t.Fatal("Expected second connection attempt to fail due to existing valid connection")
 	}
-	mockSession2.recvData <- msgBytes
-
-	err2 := s.runProtocol(ctx, mockSession2, bi)
-	if err2 == nil {
-		t.Error("Expected second connection attempt to fail due to existing valid connection")
-	}
-	if err2 != nil && !strings.Contains(err2.Error(), "it connected using a node ID we are already connected to") {
-		t.Errorf("Expected second connection to be rejected due to existing connection, got: %v", err2)
+	if !strings.Contains(err.Error(), "it connected using a node ID we are already connected to") {
+		t.Errorf("Expected second connection to be rejected due to existing connection, got: %v", err)
 	}
 
-	// Final verification: should still have exactly one connection.
-	s.connLock.RLock()
-	finalFinalCount := len(s.connections)
-	finalConn, finalExists := s.connections[remoteNodeID]
-	s.connLock.RUnlock()
-
-	if finalFinalCount != 1 {
-		t.Errorf("Expected exactly 1 connection after cleanup, but got %d", finalFinalCount)
+	final := snapshotConnection(s, remoteNodeID)
+	if final.count != 1 {
+		t.Errorf("Expected exactly 1 connection after cleanup, but got %d", final.count)
 	}
-	if finalExists && finalConn.Context.Err() != nil {
+	if final.exists && final.conn.Context.Err() != nil {
 		t.Error("Final connection should have valid context")
 	}
-
-	t.Logf("SUCCESS: Canceled connection was properly removed and replaced with valid connection")
-}
-
-// logCapture is a simple writer that captures log messages for testing.
-type logCapture struct {
-	messages []string
-	mutex    sync.Mutex
-}
-
-func (lc *logCapture) Write(p []byte) (n int, err error) {
-	lc.mutex.Lock()
-	defer lc.mutex.Unlock()
-	lc.messages = append(lc.messages, string(p))
-
-	return len(p), nil
 }
 
 // Helper functions for test setup to reduce code duplication.
 
 // createNetceptorWithLogCapture creates a Netceptor instance with log capture setup.
-func createNetceptorWithLogCapture(nodeID string) (*Netceptor, *logCapture) {
+func createNetceptorWithLogCapture(t *testing.T, nodeID string) (*Netceptor, *utils.LogCapture) {
+	t.Helper()
 	ctx := context.Background()
 	s := New(ctx, nodeID)
-	logCapture := &logCapture{messages: make([]string, 0)}
+	t.Cleanup(s.Shutdown)
+	logCapture := utils.NewLogCapture()
 	s.Logger.SetOutput(logCapture)
 
 	return s, logCapture
@@ -1394,29 +1289,10 @@ func createNetceptorWithLogCapture(nodeID string) (*Netceptor, *logCapture) {
 
 // createMockSessionAndBackendInfo creates a mock session and backend info for testing.
 func createMockSessionAndBackendInfo(t *testing.T, s *Netceptor, remoteNodeID string) (*mockBackendSession, *BackendInfo) {
-	mockSession := &mockBackendSession{
-		sendData: make(chan []byte, 10),
-		recvData: make(chan []byte, 10),
-		closed:   make(chan struct{}),
-	}
+	mockSession := newMockBackendSession()
 
 	// Create routing update message.
-	routingUpdate := &routingUpdate{
-		NodeID:             remoteNodeID,
-		ForwardingNode:     remoteNodeID,
-		UpdateEpoch:        1,
-		UpdateSequence:     1,
-		Connections:        make(map[string]float64),
-		UpdateID:           "test-update-" + remoteNodeID,
-		SuspectedDuplicate: 0,
-	}
-
-	msgBytes, err := s.translateStructToNetwork(MsgTypeRoute, routingUpdate)
-	if err != nil {
-		t.Fatalf("Failed to create routing update message: %v", err)
-	}
-
-	mockSession.recvData <- msgBytes
+	mockSession.recvData <- newRoutingUpdateMessage(t, s, remoteNodeID, "test-update-"+remoteNodeID)
 
 	bi := &BackendInfo{
 		connectionCost: 1.0,
@@ -1447,26 +1323,34 @@ func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx 
 	s.connLock.Unlock()
 }
 
-// checkLogForMessage checks if the log contains a message with the given substrings.
-func checkLogForMessage(logCapture *logCapture, substrings ...string) bool {
-	logCapture.mutex.Lock()
-	defer logCapture.mutex.Unlock()
+// connSnapshot is a consistent view of the connections map for a single node ID.
+type connSnapshot struct {
+	conn   *connInfo
+	exists bool
+	count  int
+}
 
-	for _, msg := range logCapture.messages {
-		allFound := true
-		for _, substr := range substrings {
-			if !strings.Contains(msg, substr) {
-				allFound = false
+// snapshotConnection returns the connection for nodeID (if any) and the total connection count.
+func snapshotConnection(s *Netceptor, nodeID string) connSnapshot {
+	s.connLock.RLock()
+	defer s.connLock.RUnlock()
 
-				break
-			}
-		}
-		if allFound {
-			return true
-		}
-	}
+	conn, exists := s.connections[nodeID]
 
-	return false
+	return connSnapshot{conn: conn, exists: exists, count: len(s.connections)}
+}
+
+// runProtocolAsync runs runProtocol in a goroutine so the test can observe its
+// side effects. The returned channel receives the result once the context is
+// canceled (t.Context() is canceled before the test's cleanup functions run);
+// callers should drain it in a cleanup to ensure the goroutine has exited.
+func runProtocolAsync(s *Netceptor, ctx context.Context, session BackendSession, bi *BackendInfo) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		done <- s.runProtocol(ctx, session, bi)
+	}()
+
+	return done
 }
 
 // mockBackendSession implements BackendSession for testing.
@@ -1737,5 +1621,119 @@ func TestWriteChanBufferDecouplesSendersFromProtoWriter(t *testing.T) {
 
 	if blocked > 0 {
 		t.Errorf("%d/%d sends blocked: buffer did not decouple senders from the slow writer", blocked, bufferSize)
+	}
+}
+
+// singleSessionBackend is a Backend that delivers one pre-created session and
+// then stops, mimicking a listener that accepted a single connection.
+type singleSessionBackend struct {
+	session BackendSession
+}
+
+func (b *singleSessionBackend) Start(_ context.Context, _ *sync.WaitGroup) (chan BackendSession, error) {
+	sessChan := make(chan BackendSession, 1)
+	sessChan <- b.session
+	close(sessChan)
+
+	return sessChan, nil
+}
+
+// newRoutingUpdateMessage builds a network-encoded routing update message
+// from the given peer node, as the peer would send it at handshake time.
+func newRoutingUpdateMessage(t *testing.T, s *Netceptor, nodeID, updateID string) []byte {
+	t.Helper()
+	routingUpdate := &routingUpdate{
+		NodeID:         nodeID,
+		ForwardingNode: nodeID,
+		UpdateEpoch:    1,
+		UpdateSequence: 1,
+		Connections:    make(map[string]float64),
+		UpdateID:       updateID,
+	}
+	msgBytes, err := s.translateStructToNetwork(MsgTypeRoute, routingUpdate)
+	if err != nil {
+		t.Fatalf("Failed to create routing update message: %v", err)
+	}
+
+	return msgBytes
+}
+
+// newMockBackendSession creates a mock session with buffered channels.
+func newMockBackendSession() *mockBackendSession {
+	return &mockBackendSession{
+		sendData: make(chan []byte, 10),
+		recvData: make(chan []byte, 10),
+		closed:   make(chan struct{}),
+	}
+}
+
+// TestBackendErrorLogCarriesRemoteID verifies that the "Backend error" line,
+// emitted by AddBackend when runProtocol returns an error, identifies the
+// remote peer via the structured remote_id suffix. In the OurNodeRejectsPeer
+// case the error text itself already names the peer ("rejected connection with
+// node %s"), since the handshake revealed its node ID before the rejection;
+// PeerRejectsUs exercises the one error text that carries no peer identifier
+// ("remote node rejected the connection"), where the suffix is the only
+// carrier of the peer's identity.
+func TestBackendErrorLogCarriesRemoteID(t *testing.T) {
+	peerNode := "peer-node"
+
+	cases := []struct {
+		name     string
+		expected string
+		// backendInfoFn optionally configures the backend info; nil means
+		// AddBackend is called without the option.
+		backendInfoFn func(bi *BackendInfo)
+		// setup injects the messages the mock peer sends.
+		setup func(t *testing.T, s *Netceptor, session *mockBackendSession)
+	}{
+		{
+			name:          "OurNodeRejectsPeer",
+			expected:      "not in the allowed peers list",
+			backendInfoFn: func(bi *BackendInfo) { bi.allowedPeers = []string{"some-other-node"} },
+			setup: func(t *testing.T, s *Netceptor, session *mockBackendSession) {
+				// Routing update from a peer that is not in the allowed
+				// peers list: runProtocol learns the peer's node ID from it,
+				// then rejects the connection and returns an error.
+				session.recvData <- newRoutingUpdateMessage(t, s, peerNode, "test-update-rejection")
+			},
+		},
+		{
+			name:     "PeerRejectsUs",
+			expected: "remote node rejected the connection",
+			setup: func(t *testing.T, s *Netceptor, session *mockBackendSession) {
+				// First message: routing update that establishes the connection.
+				session.recvData <- newRoutingUpdateMessage(t, s, peerNode, "test-update-establish")
+				// Second message: the peer rejects the established connection.
+				rejectMsg, err := s.translateStructToNetwork(MsgTypeReject, make([]string, 0))
+				if err != nil {
+					t.Fatalf("Failed to create reject message: %v", err)
+				}
+				session.recvData <- rejectMsg
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, logCapture := createNetceptorWithLogCapture(t, "test-node")
+			mockSession := newMockBackendSession()
+			tc.setup(t, s, mockSession)
+
+			var err error
+			if tc.backendInfoFn != nil {
+				err = s.AddBackend(&singleSessionBackend{session: mockSession}, tc.backendInfoFn)
+			} else {
+				err = s.AddBackend(&singleSessionBackend{session: mockSession})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			logCapture.WaitFor(t, 5*time.Second, "Backend error", tc.expected)
+			if !logCapture.Contains("Backend error", `"remote_id":"`+peerNode+`"`) {
+				t.Errorf("Backend error line does not identify the remote peer via remote_id; logs:\n%s", logCapture.String())
+			}
+		})
 	}
 }

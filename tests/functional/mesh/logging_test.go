@@ -11,6 +11,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/services"
 	net_interface "github.com/ansible/receptor/pkg/services/interfaces"
+	pkgutils "github.com/ansible/receptor/pkg/utils"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/tests/utils"
 )
@@ -268,6 +269,24 @@ func TestNodeReconnectionIsLogged(t *testing.T) {
 	execA := nodes["execution-a"]
 
 	execA.Shutdown()
+
+	// Shutdown returns once the backends stop, but the control service releases
+	// its Unix socket lock in a goroutine. Wait until the lock is free before
+	// restarting, otherwise StartLocalServices races with the old listener and
+	// fails to acquire it.
+	lockPath := execA.GetControlSocket() + ".lock"
+	if !utils.CheckUntilTimeout(ctx, 10*time.Millisecond, func() bool {
+		lock, err := pkgutils.TryFLock(lockPath)
+		if err != nil {
+			return false
+		}
+		_ = lock.Unlock()
+
+		return true
+	}) {
+		t.Fatal("control socket lock was not released after shutdown", m.DataDir)
+	}
+
 	if err := execA.StartLocalServices(); err != nil {
 		t.Fatal(err, m.DataDir)
 	}

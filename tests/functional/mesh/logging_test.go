@@ -122,8 +122,8 @@ func TestPerNodeLogWriterIsolation(t *testing.T) {
 
 	m := twoNodeMesh()
 
-	controlWriter := utils.NewTestLogWriter()
-	executionWriter := utils.NewTestLogWriter()
+	controlWriter := utils.NewLogCapture()
+	executionWriter := utils.NewLogCapture()
 	m.AfterInit = func(nodes map[string]*LibNode) {
 		nodes["control"].netceptorInstance.Logger.SetOutput(controlWriter)
 		nodes["execution-a"].netceptorInstance.Logger.SetOutput(executionWriter)
@@ -331,31 +331,16 @@ func (c *captureNetterUDP) ListenUDP(network string, laddr *net.UDPAddr) (net_in
 	return conn, err
 }
 
-// waitForLogLine polls until logsFn returns logs containing a line with substr.
-// Use it before assertLogLineHasNodeID when the log write may lag behind the
-// action that triggers it.
-func waitForLogLine(t *testing.T, ctx context.Context, logsFn func() string, substr string) {
-	t.Helper()
-
-	if !utils.CheckUntilTimeout(ctx, 100*time.Millisecond, func() bool {
-		return strings.Contains(logsFn(), substr)
-	}) {
-		t.Fatalf("no %q log line captured\nlogs:\n%s", substr, logsFn())
-	}
-}
-
 // assertLogLineHasNodeID fails if logs has no line containing substr, or if any
 // such line lacks a structured node_id suffix.
-func assertLogLineHasNodeID(t *testing.T, logs, substr string) {
+func assertLogLineHasNodeID(t *testing.T, capture *utils.LogCapture, substr string) {
 	t.Helper()
 
-	if !strings.Contains(logs, substr) {
-		t.Fatalf("no %q log line captured\nlogs:\n%s", substr, logs)
+	lines := capture.LinesContaining(substr)
+	if len(lines) == 0 {
+		t.Fatalf("no %q log line captured\nlogs:\n%s", substr, capture.String())
 	}
-	for _, line := range strings.Split(logs, "\n") {
-		if !strings.Contains(line, substr) {
-			continue
-		}
+	for _, line := range lines {
 		if !strings.Contains(line, `"node_id"`) {
 			t.Errorf("%q log line missing node_id: %s", substr, line)
 		}
@@ -390,7 +375,7 @@ func TestControlSvcLogsHaveNodeID(t *testing.T) {
 		t.Fatal(err, m.DataDir)
 	}
 
-	assertLogLineHasNodeID(t, m.LogWriter.String(), "Running control service")
+	assertLogLineHasNodeID(t, m.LogWriter, "Running control service")
 }
 
 // TestWorkceptorLogsHaveNodeID verifies that log lines emitted by workceptor.go
@@ -420,7 +405,7 @@ func TestWorkceptorLogsHaveNodeID(t *testing.T) {
 		t.Fatal(err, m.DataDir)
 	}
 
-	assertLogLineHasNodeID(t, m.LogWriter.String(), "Error locating unit")
+	assertLogLineHasNodeID(t, m.LogWriter, "Error locating unit")
 }
 
 // TestTCPProxyLogsHaveNodeID verifies that the error logged when a TCP proxy
@@ -468,11 +453,8 @@ func TestTCPProxyLogsHaveNodeID(t *testing.T) {
 	}
 	defer conn.Close()
 
-	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelLog()
-
-	waitForLogLine(t, ctxLog, m.LogWriter.String, "error connecting on Receptor network")
-	assertLogLineHasNodeID(t, m.LogWriter.String(), "error connecting on Receptor network")
+	m.LogWriter.WaitFor(t, 10*time.Second, "error connecting on Receptor network")
+	assertLogLineHasNodeID(t, m.LogWriter, "error connecting on Receptor network")
 }
 
 // TestUDPProxyLogsHaveNodeID verifies that the error logged when a UDP proxy
@@ -519,11 +501,8 @@ func TestUDPProxyLogsHaveNodeID(t *testing.T) {
 	defer conn.Close()
 	_, _ = conn.Write([]byte("ping"))
 
-	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelLog()
-
-	waitForLogLine(t, ctxLog, m.LogWriter.String, "Error sending packet on Receptor network")
-	assertLogLineHasNodeID(t, m.LogWriter.String(), "Error sending packet on Receptor network")
+	m.LogWriter.WaitFor(t, 10*time.Second, "Error sending packet on Receptor network")
+	assertLogLineHasNodeID(t, m.LogWriter, "Error sending packet on Receptor network")
 }
 
 // TestKubeWorkerLogsHaveNodeID verifies that log lines emitted by kubernetes.go
@@ -573,11 +552,8 @@ func TestKubeWorkerLogsHaveNodeID(t *testing.T) {
 
 	// The log write happens in a goroutine that may lag behind the status
 	// update AssertWorkSucceeded observes, so poll before asserting.
-	ctxLog, cancelLog := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelLog()
-
-	waitForLogLine(t, ctxLog, m.LogWriter.String, "completed successfully")
-	assertLogLineHasNodeID(t, m.LogWriter.String(), "completed successfully")
+	m.LogWriter.WaitFor(t, 10*time.Second, "completed successfully")
+	assertLogLineHasNodeID(t, m.LogWriter, "completed successfully")
 }
 
 // TestConnectionRejectedPeerIsLogged verifies that when a node's connection is

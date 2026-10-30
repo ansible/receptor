@@ -24,7 +24,7 @@ type LibMesh struct {
 	Name      string // Only used for generating test names
 	nodes     map[string]*LibNode
 	DataDir   string
-	LogWriter *utils.TestLogWriter
+	LogWriter *utils.LogCapture
 	Context   context.Context
 	// AfterInit, when set, is called after every node's logger has been
 	// redirected to LogWriter but before listeners start and connections are
@@ -50,7 +50,7 @@ func NewLibMesh() LibMesh {
 
 	return LibMesh{
 		nodes:     make(map[string]*LibNode),
-		LogWriter: utils.NewTestLogWriter(),
+		LogWriter: utils.NewLogCapture(),
 		DataDir:   tempdir,
 		Context:   context.Background(),
 	}
@@ -315,7 +315,7 @@ type LibNode struct {
 	Connections            []Connection
 	ListenerCfgs           map[listenerName]ListenerCfg
 	netceptorInstance      *netceptor.Netceptor
-	logWriter              *utils.TestLogWriter
+	logWriter              *utils.LogCapture
 	workceptorInstance     *workceptor.Workceptor
 	backends               map[string]BackendInfo
 	controlServer          *controlsvc.Server

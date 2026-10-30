@@ -185,12 +185,22 @@ type MessageData struct {
 type connInfo struct {
 	ReadChan         chan []byte
 	WriteChan        chan []byte
-	Context          context.Context
+	done             <-chan struct{}
 	CancelFunc       context.CancelFunc
 	Cost             float64
 	lastReceivedData time.Time
 	lastReceivedLock *sync.RWMutex
 	logger           *logger.ReceptorLogger
+}
+
+// isDone reports whether the connection has been canceled.
+func (ci *connInfo) isDone() bool {
+	select {
+	case <-ci.done:
+		return true
+	default:
+		return false
+	}
 }
 
 type nodeInfo struct {
@@ -913,7 +923,7 @@ func (s *Netceptor) flood(message []byte, excludeConn string) {
 			go func(conn string, ci *connInfo) {
 				select {
 				case ci.WriteChan <- message:
-				case <-ci.Context.Done():
+				case <-ci.done:
 					s.Logger.Debug("connInfo for connection %s cancelled during flood write", conn)
 				}
 			}(conn, ci)
@@ -1128,7 +1138,7 @@ func (s *Netceptor) forwardMessage(md *MessageData) error {
 	message[1]--
 	s.Logger.Trace("    Forwarding data length %d via %s\n", len(md.Data), nextHop)
 	select {
-	case <-c.Context.Done():
+	case <-c.done:
 		return fmt.Errorf("connInfo cancelled while forwarding message")
 	case c.WriteChan <- message:
 	}
@@ -1568,7 +1578,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 			continue
 		}
 		if err != nil {
-			if err != io.EOF && ci.Context.Err() == nil {
+			if err != io.EOF && !ci.isDone() {
 				ci.logger.Error("Backend receiving error %s\n", err)
 			}
 			ci.CancelFunc()
@@ -1579,7 +1589,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 		ci.lastReceivedData = time.Now()
 		ci.lastReceivedLock.Unlock()
 		select {
-		case <-ci.Context.Done():
+		case <-ci.done:
 			return
 		case ci.ReadChan <- buf:
 		}
@@ -1590,7 +1600,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 func (ci *connInfo) protoWriter(sess BackendSession) {
 	for {
 		select {
-		case <-ci.Context.Done():
+		case <-ci.done:
 			dropped := 0
 			for len(ci.WriteChan) > 0 {
 				<-ci.WriteChan
@@ -1607,7 +1617,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 			}
 			err := sess.Send(message)
 			if err != nil {
-				if ci.Context.Err() == nil {
+				if !ci.isDone() {
 					ci.logger.Error("Backend sending error %s\n", err)
 				}
 				ci.CancelFunc()
@@ -1631,7 +1641,7 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 		s.Logger.Debug("Sending initial connection message\n")
 		select {
 		case ci.WriteChan <- ri:
-		case <-ci.Context.Done():
+		case <-ci.done:
 			return
 		}
 		count++
@@ -1646,7 +1656,7 @@ func (s *Netceptor) sendInitialConnectMessage(ci *connInfo, initDoneChan chan bo
 			return
 		case <-time.After(1 * time.Second):
 			continue
-		case <-ci.Context.Done():
+		case <-ci.done:
 			return
 		case <-initDoneChan:
 			s.Logger.Debug("Stopping initial updates\n")
@@ -1660,7 +1670,7 @@ func (s *Netceptor) sendRejectMessage(ci *connInfo) {
 	rejMsg, err := s.translateStructToNetwork(MsgTypeReject, make([]string, 0))
 	if err == nil {
 		select {
-		case <-ci.Context.Done():
+		case <-ci.done:
 		case ci.WriteChan <- rejMsg:
 		}
 	}
@@ -1721,7 +1731,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 		lastReceivedLock: &sync.RWMutex{},
 		logger:           s.Logger,
 	}
-	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
+	connCtx, connCancel := context.WithCancel(ctx)
+	ci.done, ci.CancelFunc = connCtx.Done(), connCancel
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
 	initDoneChan := make(chan bool)
@@ -1841,17 +1852,13 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					if ok {
 						remoteNodeAccepted = false
 					}
-					var connError error
-					connError = nil
-
-					// Verify that the existing connection is valid
-					if ok && existingConn != nil {
-						connError = existingConn.Context.Err()
-					}
-					if ok && connError != nil {
-						s.Logger.Error("Context for existing connection error: %s", connError)
+					// Verify that the existing connection is valid. connInfo only
+					// tracks the done channel, so the terminal context error is
+					// not available; keep this message cause-neutral.
+					if ok && existingConn != nil && existingConn.isDone() {
+						s.Logger.Error("Existing connection for %s is no longer valid; replacing it", remoteNodeID)
 						s.connLock.Unlock()
-						// Remove the canceled connection to prevent resource leak
+						// Remove the invalid connection to prevent resource leak
 						s.removeConnection(remoteNodeID)
 						s.connLock.Lock()
 						remoteNodeAccepted = true // Allow the new connection to proceed
@@ -1872,7 +1879,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						s.removeConnection(remoteNodeID)
 
 						return nil
-					case <-ci.Context.Done():
+					case <-ci.done:
 						s.removeConnection(remoteNodeID)
 
 						return nil
@@ -1897,7 +1904,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						s.removeConnection(remoteNodeID)
 
 						return nil
-					case <-ci.Context.Done():
+					case <-ci.done:
 						s.removeConnection(remoteNodeID)
 
 						return nil
@@ -1906,7 +1913,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					case s.updateRoutingTableChan <- 0:
 					case <-ctx.Done():
 						return nil
-					case <-ci.Context.Done():
+					case <-ci.done:
 						return nil
 					}
 					established = true
@@ -1917,7 +1924,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					return fmt.Errorf("remote node rejected the connection")
 				}
 			}
-		case <-ci.Context.Done():
+		case <-ci.done:
 			s.removeConnection(remoteNodeID)
 
 			return nil

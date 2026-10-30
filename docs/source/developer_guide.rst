@@ -36,11 +36,12 @@ It is strongly recommmended to install the pre-commit yaml so that the linters r
 
 .. code-block:: bash
 
-    cd $HOME
-    go get github.com/golangci/golangci-lint/cmd/golangci-lint
     pip install pre-commit
     cd receptor
     pre-commit install
+
+You can also run the linters directly with ``make lint``.
+The Makefile installs the ``golangci-lint`` version used in CI when the binary is missing or does not match, so there is no need to install it manually.
 
 See `Pre commit <https://pre-commit.com/>`_ and `Golangci-lint <https://golangci-lint.run/>`_ for more details on installing and using these tools.
 

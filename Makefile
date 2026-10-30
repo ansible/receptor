@@ -95,15 +95,21 @@ kubectl:
 		chmod 0700 $(KUBECTL_BINARY); \
 	fi
 
-GOLANGCI_LINT_VERSION ?= v1.60.3
+GOLANGCI_LINT_VERSION ?= v2.12.2
 GOLANGCI_LINT_BINARY := $(shell go env GOPATH)/bin/golangci-lint
 
-lint: $(GOLANGCI_LINT_BINARY)
-	@$(GOLANGCI_LINT_BINARY) run cmd/... pkg/... example/...
-
-$(GOLANGCI_LINT_BINARY):
-	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(shell go env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
+lint:
+	@if [ ! -x "$(GOLANGCI_LINT_BINARY)" ] || \
+		! "$(GOLANGCI_LINT_BINARY)" version 2>/dev/null | grep -qF "$(GOLANGCI_LINT_VERSION:v%=%)"; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
+		tmp=$$(mktemp); \
+		curl -sSfL -o "$$tmp" https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh; \
+		rc=$$?; \
+		if [ $$rc -eq 0 ]; then sh "$$tmp" -b "$(shell go env GOPATH)/bin" "$(GOLANGCI_LINT_VERSION)"; rc=$$?; fi; \
+		rm -f "$$tmp"; \
+		exit $$rc; \
+	fi
+	@$(GOLANGCI_LINT_BINARY) run ./...
 
 receptorctl-lint: receptor
 	@cd receptorctl && nox -s lint

@@ -130,7 +130,11 @@ func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.Wo
 // expectRemoteUnitStatusSources stubs the read-only status accessors that
 // remote work unit monitoring calls on its base unit.
 func expectRemoteUnitStatusSources(mockBaseWorkUnit *mock_workceptor.MockBaseWorkUnitForWorkUnit, w *workceptor.Workceptor, red *workceptor.RemoteExtraData, status workceptor.StatusFileData) {
-	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(&sync.RWMutex{}).AnyTimes()
+	// gomock evaluates Return once: every GetStatusLock() call returns this same
+	// mutex, which remoteUnit.UnredactedStatus relies on (it takes RLock and
+	// RUnlock via separate calls).
+	statusLock := &sync.RWMutex{}
+	mockBaseWorkUnit.EXPECT().GetStatusLock().Return(statusLock).AnyTimes()
 	mockBaseWorkUnit.EXPECT().GetStatusWithoutExtraData().DoAndReturn(func() *workceptor.StatusFileData {
 		s := status
 

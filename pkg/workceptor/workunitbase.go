@@ -410,6 +410,20 @@ func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
 	return &status
 }
 
+// releaseState is implemented by work units that track whether Release has
+// claimed them. It is deliberately separate from WorkUnit so release awareness
+// does not become a requirement for external WorkUnit implementations.
+type releaseState interface {
+	IsReleased() bool
+}
+
+// isReleased reports whether v tracks a released state and has been released.
+func isReleased(v any) bool {
+	rs, ok := v.(releaseState)
+
+	return ok && rs.IsReleased()
+}
+
 // IsReleased reports whether Release has claimed this unit and removed its
 // directory. A canceled unit that was not released still has its files, so
 // callers must not treat WorkStateCanceled alone as proof that no more output

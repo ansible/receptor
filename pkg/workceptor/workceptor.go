@@ -511,9 +511,11 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 	ctxChild, cancel := context.WithCancel(ctx)
 	go func() {
 		defer func() {
-			err = stdout.Close()
-			if err != nil {
-				w.nc.GetLogger().Error("Error closing stdout %s", stdoutFilename)
+			if stdout != nil {
+				err = stdout.Close()
+				if err != nil {
+					w.nc.GetLogger().Error("Error closing stdout %s", stdoutFilename)
+				}
 			}
 			resultClose()
 			cancel()
@@ -525,7 +527,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			switch {
 			case err == nil:
 			case os.IsNotExist(err):
-				if IsComplete(unit.Status().State) || unit.IsReleased() {
+				if IsComplete(unit.Status().State) || isReleased(unit) {
 					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
 					return
@@ -557,7 +559,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 					if os.IsNotExist(err) {
 						failures++
 						if failures > 3 {
-							if unit.IsReleased() {
+							if isReleased(unit) {
 								// Release removed the directory while the reader
 								// still holds the open handle. That is expected;
 								// the reader drains the handle before closing the

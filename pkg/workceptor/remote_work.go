@@ -359,6 +359,11 @@ func (rw *remoteUnit) updateRemoteWorkType(currentType, remoteType string) (stri
 	return persistedType, nil
 }
 
+// IsReleased reports whether the local proxy directory was released.
+func (rw *remoteUnit) IsReleased() bool {
+	return isReleased(rw.BaseWorkUnitForWorkUnit)
+}
+
 // monitorRemoteStatus monitors the remote status file and copies results to the local one.
 func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool) {
 	defer func() {
@@ -495,6 +500,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		err = stdout.Close()
 	}
 	if err != nil {
+		if rw.IsReleased() || mw.Err() != nil {
+			rw.GetWorkceptor().nc.GetLogger().Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
+
+			return
+		}
 		rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 		return

@@ -31,7 +31,6 @@ type BaseWorkUnitForWorkUnit interface {
 	CancelContext()
 	ID() string
 	Init(w *Workceptor, unitID string, workType string, fs FileSystemer)
-	IsReleased() bool
 	LastUpdateError() error
 	Load() error
 	MonitorLocalStatus()
@@ -62,6 +61,11 @@ type commandUnit struct {
 	baseParams         string
 	allowRuntimeParams bool
 	done               bool
+}
+
+// IsReleased reports whether the underlying base unit was released.
+func (u *commandUnit) IsReleased() bool {
+	return isReleased(u.BaseWorkUnitForWorkUnit)
 }
 
 // CommandExtraData is the content of the ExtraData JSON field for a command worker.

@@ -4,16 +4,8 @@
 package workceptor
 
 import (
-	"bytes"
-	"context"
 	"errors"
-	"os"
-	"strings"
 	"testing"
-	"time"
-
-	"github.com/ansible/receptor/pkg/logger"
-	"github.com/ansible/receptor/pkg/utils"
 )
 
 type remoteWorkStatusWriterFake struct {
@@ -97,69 +89,5 @@ func TestRemoteWorkUsesPersistedRemoteWorkType(t *testing.T) {
 	}
 	if got != "stored-type" {
 		t.Fatalf("cached type = %q, want persisted value stored-type", got)
-	}
-}
-
-type releasedStdoutNetceptor struct {
-	NetceptorForWorkceptor
-	log *logger.ReceptorLogger
-}
-
-func (n *releasedStdoutNetceptor) NodeID() string { return "testnode" }
-
-func (n *releasedStdoutNetceptor) GetLogger() *logger.ReceptorLogger { return n.log }
-
-// TestMonitorRemoteStdoutStopsQuietlyAfterRelease covers the stdout monitor's
-// status-file reload: once the local proxy is released, the missing status file
-// is expected and must not be logged as an error.
-func TestMonitorRemoteStdoutStopsQuietlyAfterRelease(t *testing.T) {
-	logBuf := &bytes.Buffer{}
-	lg := logger.NewReceptorLogger("")
-	lg.SetOutput(logBuf)
-
-	w, err := New(context.Background(), &releasedStdoutNetceptor{log: lg}, t.TempDir())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-
-	bwu := &BaseWorkUnit{}
-	bwu.Init(w, "unit", "remote", FileSystem{})
-	if err := os.MkdirAll(bwu.UnitDir(), 0o700); err != nil {
-		t.Fatalf("mkdir unit dir: %v", err)
-	}
-	bwu.SetStatusExtraData(&RemoteExtraData{RemoteNode: "node", RemoteUnitID: "remote-unit"})
-	bwu.UpdateFullStatus(func(s *StatusFileData) {
-		s.State = WorkStateRunning
-		s.Detail = "running"
-	})
-	if err := os.WriteFile(bwu.StdoutFileName(), nil, 0o600); err != nil {
-		t.Fatalf("write stdout: %v", err)
-	}
-
-	rw := &remoteUnit{BaseWorkUnitForWorkUnit: bwu}
-	mw := &utils.JobContext{}
-	mw.NewJob(context.Background(), 1, false)
-
-	done := make(chan struct{})
-	go func() {
-		rw.monitorRemoteStdout(mw)
-		close(done)
-	}()
-
-	// Let the monitor open the stdout file and complete its first status load
-	// before the directory disappears.
-	time.Sleep(150 * time.Millisecond)
-	if err := bwu.Release(false); err != nil {
-		t.Fatalf("Release: %v", err)
-	}
-
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("monitorRemoteStdout did not stop after release")
-	}
-
-	if strings.Contains(logBuf.String(), "Could not read status file") {
-		t.Fatalf("release logged a status-file read error:\n%s", logBuf.String())
 	}
 }

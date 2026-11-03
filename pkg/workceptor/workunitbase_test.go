@@ -508,6 +508,9 @@ func TestReleaseFailureRestoresState(t *testing.T) {
 	if got := unit.Status().State; got != workceptor.WorkStateSucceeded {
 		t.Fatalf("state after failed release = %d, want %d", got, workceptor.WorkStateSucceeded)
 	}
+	if got := unit.Status().Detail; got != "test unit" {
+		t.Fatalf("detail after failed release = %q, want %q", got, "test unit")
+	}
 	if unit.IsReleased() {
 		t.Fatal("released flag left set after failed release")
 	}

@@ -554,6 +554,13 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 				case <-time.After(1 * time.Second):
 					_, err := os.Stat(stdoutFilename)
 					if os.IsNotExist(err) {
+						if IsTerminal(unit.Status().State) {
+							// The unit finished or was released; the file being
+							// gone is expected, not a read failure (AAP-97861).
+							statChan <- struct{}{}
+
+							return
+						}
 						failures++
 						if failures > 3 {
 							w.nc.GetLogger().Error("Exceeded retries for reading stdout %s", stdoutFilename)

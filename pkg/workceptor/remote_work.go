@@ -451,6 +451,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		rw.UpdateBasicStatus(si.State, si.Detail, si.StdoutSize)
 		updateErr := rw.LastUpdateError()
+		if errors.Is(updateErr, ErrUnitReleased) {
+			// The local proxy directory was released; stop monitoring.
+			return
+		}
 		if remoteWorkType == "" && si.WorkType != "" {
 			remoteWorkType, updateErr = rw.updateRemoteWorkType(remoteWorkType, si.WorkType)
 		}

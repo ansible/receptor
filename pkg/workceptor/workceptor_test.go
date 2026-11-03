@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -443,5 +445,57 @@ func TestListKnownUnitIDs(t *testing.T) {
 			t.Parallel()
 			w.ListKnownUnitIDs()
 		})
+	}
+}
+
+// TestReleaseWhileStdoutStreaming releases a running unit while GetResults is
+// mid-stream. The reader must deliver the bytes still held by its open handle
+// and stop without "Exceeded retries for reading stdout".
+func TestReleaseWhileStdoutStreaming(t *testing.T) {
+	const stdoutBytes = 1 << 20
+	w, _, logBuf := newTestUnit(t, "unit1", stdoutBytes, workceptor.WorkStateRunning, true, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := w.GetResults(ctx, "unit1", 0)
+	if err != nil {
+		t.Fatalf("GetResults: %v", err)
+	}
+
+	var firstChunk int
+	select {
+	case chunk := <-ch:
+		firstChunk = len(chunk)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first stdout chunk")
+	}
+
+	if err := w.ReleaseUnit("unit1", false); err != nil {
+		t.Fatalf("ReleaseUnit: %v", err)
+	}
+
+	// Drain slowly so the reader is still mid-stream when the release is
+	// noticed, then confirm it delivers everything written before release.
+	received := make(chan int)
+	go func() {
+		total := firstChunk
+		for chunk := range ch {
+			total += len(chunk)
+			time.Sleep(200 * time.Millisecond)
+		}
+		received <- total
+	}()
+	select {
+	case total := <-received:
+		if total != stdoutBytes {
+			t.Fatalf("stdout after release = %d bytes, want %d (truncated)", total, stdoutBytes)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("stdout reader did not exit after release")
+	}
+
+	if strings.Contains(logBuf.String(), "Exceeded retries for reading stdout") {
+		t.Fatalf("release produced stdout-retry ERROR spam:\n%s", logBuf.String())
 	}
 }

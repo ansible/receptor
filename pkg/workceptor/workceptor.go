@@ -525,7 +525,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			switch {
 			case err == nil:
 			case os.IsNotExist(err):
-				if IsTerminal(unit.Status().State) {
+				if IsComplete(unit.Status().State) || unit.IsReleased() {
 					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
 					return
@@ -544,6 +544,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			break
 		}
 		filePos := startPos
+		drainUntilEOF := false
 		statChan := make(chan struct{}, 1)
 		go func() {
 			failures := 0
@@ -554,15 +555,17 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 				case <-time.After(1 * time.Second):
 					_, err := os.Stat(stdoutFilename)
 					if os.IsNotExist(err) {
-						if IsTerminal(unit.Status().State) {
-							// The unit finished or was released; the file being
-							// gone is expected, not a read failure (AAP-97861).
-							statChan <- struct{}{}
-
-							return
-						}
 						failures++
 						if failures > 3 {
+							if unit.IsReleased() {
+								// Release removed the directory while the reader
+								// still holds the open handle. That is expected;
+								// the reader drains the handle before closing the
+								// stream.
+								statChan <- struct{}{}
+
+								return
+							}
 							w.nc.GetLogger().Error("Exceeded retries for reading stdout %s", stdoutFilename)
 							statChan <- struct{}{}
 
@@ -583,7 +586,9 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 				case <-ctx.Done():
 					return
 				case <-statChan:
-					return
+					// Stop after draining the already-open handle: bytes written
+					// before the directory was removed are still readable.
+					drainUntilEOF = true
 				default:
 					var newPos int64
 					newPos, err = stdout.Seek(filePos, 0)
@@ -614,6 +619,11 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 				}
 			}
 			if err == io.EOF {
+				if drainUntilEOF {
+					w.nc.GetLogger().Debug("Stdout drained after release - closing channel for: %s \n", unitID)
+
+					return
+				}
 				unitStatus := unit.Status()
 				if IsComplete(unitStatus.State) && filePos >= unitStatus.StdoutSize {
 					w.nc.GetLogger().Debug("Stdout complete - closing channel for: %s \n", unitID)

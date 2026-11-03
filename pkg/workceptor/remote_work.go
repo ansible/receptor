@@ -510,6 +510,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		}
 		err := rw.Load()
 		if err != nil {
+			if rw.IsReleased() || mw.Err() != nil {
+				rw.GetWorkceptor().nc.GetLogger().Debug("Stopped reading status file %s: %s\n", rw.StatusFileName(), err)
+
+				return
+			}
 			rw.GetWorkceptor().nc.GetLogger().Error("Could not read status file %s: %s\n", rw.StatusFileName(), err)
 
 			return
@@ -609,6 +614,13 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					errmsg = "read operation cancelled"
 				} else {
 					errmsg = err.Error()
+				}
+				if rw.IsReleased() || mw.Err() != nil {
+					// Cancelling or releasing closed the stream on purpose; the
+					// copy error is expected.
+					rw.GetWorkceptor().nc.GetLogger().Debug("Stopped copying to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
+
+					continue
 				}
 				rw.GetWorkceptor().nc.GetLogger().Warning("Could not copy to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
 

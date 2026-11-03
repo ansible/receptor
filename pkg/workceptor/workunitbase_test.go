@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -348,5 +349,212 @@ func TestMonitorLocalStatus(t *testing.T) {
 
 			bwu.CancelContext()
 		})
+	}
+}
+
+type syncBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.b.Write(p)
+}
+
+func (s *syncBuf) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.b.String()
+}
+
+// failingFS lets a release fail the way a busy/NFS-backed data dir can.
+type failingFS struct {
+	workceptor.FileSystem
+	err error
+}
+
+func (f failingFS) RemoveAll(string) error { return f.err }
+
+// testUnit adapts BaseWorkUnit to the WorkUnit interface for release tests.
+type testUnit struct {
+	*workceptor.BaseWorkUnit
+}
+
+func (u *testUnit) Cancel() error {
+	u.CancelContext()
+
+	return nil
+}
+
+func (u *testUnit) Restart() error { return nil }
+
+func (u *testUnit) Start() error { return nil }
+
+// newTestUnit builds a Workceptor plus a unit registered in its active-unit map,
+// so tests can release the unit or read its results without a real worker.
+func newTestUnit(t *testing.T, unitID string, stdoutBytes int, state int, createDir bool, unitFS workceptor.FileSystemer) (*workceptor.Workceptor, *testUnit, *syncBuf) {
+	t.Helper()
+	if unitFS == nil {
+		unitFS = workceptor.FileSystem{}
+	}
+	ctrl := gomock.NewController(t)
+	nc := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	nc.EXPECT().NodeID().Return("testnode").AnyTimes()
+	logBuf := &syncBuf{}
+	lg := logger.NewReceptorLogger("")
+	lg.SetOutput(logBuf)
+	nc.EXPECT().GetLogger().Return(lg).AnyTimes()
+
+	w, err := workceptor.New(context.Background(), nc, t.TempDir())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	bwu := &workceptor.BaseWorkUnit{}
+	bwu.Init(w, unitID, "ansible-runner", unitFS)
+	unit := &testUnit{BaseWorkUnit: bwu}
+	if createDir {
+		if err := os.MkdirAll(bwu.UnitDir(), 0o700); err != nil {
+			t.Fatalf("mkdir unit dir: %v", err)
+		}
+	}
+
+	stdout := bytes.Repeat([]byte("x"), stdoutBytes)
+	if stdoutBytes > 0 {
+		if err := os.WriteFile(bwu.StdoutFileName(), stdout, 0o600); err != nil {
+			t.Fatalf("write stdout: %v", err)
+		}
+	}
+	bwu.UpdateFullStatus(func(s *workceptor.StatusFileData) {
+		s.State = state
+		s.Detail = "test unit"
+		s.StdoutSize = int64(len(stdout))
+	})
+
+	w.AddActiveUnitForTest(unitID, unit)
+
+	return w, unit, logBuf
+}
+
+// TestReleaseWhileStatusWriterActive runs the in-process status writer (the
+// path used by the remote proxy monitor) against a running unit while it is
+// released. It must not surface an ENOENT on status.lock.
+func TestReleaseWhileStatusWriterActive(t *testing.T) {
+	_, unit, logBuf := newTestUnit(t, "unit2", 0, workceptor.WorkStateRunning, true, nil)
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	errCh := make(chan error, 512)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			unit.UpdateBasicStatus(workceptor.WorkStateRunning, "running", 0)
+			if err := unit.LastUpdateError(); err != nil {
+				select {
+				case errCh <- err:
+				default:
+				}
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	if err := unit.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	time.Sleep(250 * time.Millisecond)
+	close(stop)
+	wg.Wait()
+	close(errCh)
+
+	var errs []string
+	for err := range errCh {
+		errs = append(errs, err.Error())
+	}
+	for _, e := range errs {
+		if strings.Contains(e, "no such file or directory") || strings.Contains(e, "status.lock") {
+			t.Fatalf("release raced the status writer (%d errors), e.g.: %s", len(errs), e)
+		}
+	}
+	if strings.Contains(logBuf.String(), "Error updating status file") {
+		t.Fatalf("release logged status-write errors:\n%s", logBuf.String())
+	}
+
+	unit.UpdateBasicStatus(workceptor.WorkStateRunning, "after release", 0)
+	if err := unit.LastUpdateError(); !errors.Is(err, workceptor.ErrUnitReleased) {
+		t.Fatalf("post-release basic status error = %v, want ErrUnitReleased", err)
+	}
+}
+
+// TestReleaseFailureRestoresState guards the retry path: a failed RemoveAll
+// must not leave a live unit marked canceled/released.
+func TestReleaseFailureRestoresState(t *testing.T) {
+	_, unit, _ := newTestUnit(t, "unit3", 0, workceptor.WorkStateSucceeded, true, failingFS{err: errors.New("device busy")})
+
+	if err := unit.Release(false); err == nil {
+		t.Fatal("expected Release to fail")
+	}
+	if got := unit.Status().State; got != workceptor.WorkStateSucceeded {
+		t.Fatalf("state after failed release = %d, want %d", got, workceptor.WorkStateSucceeded)
+	}
+	if unit.IsReleased() {
+		t.Fatal("released flag left set after failed release")
+	}
+}
+
+// TestMissingDirIsNotReportedAsReleased ensures a stray ENOENT (bad data dir,
+// filesystem fault) is still a real error, not silently treated as a release.
+func TestMissingDirIsNotReportedAsReleased(t *testing.T) {
+	_, unit, _ := newTestUnit(t, "unit4", 0, workceptor.WorkStateRunning, false, nil)
+
+	unit.UpdateBasicStatus(workceptor.WorkStateRunning, "running", 0)
+	err := unit.LastUpdateError()
+	if err == nil || !strings.Contains(err.Error(), "no such file or directory") {
+		t.Fatalf("expected ENOENT for a unit that was never released, got %v", err)
+	}
+}
+
+// TestUpdateFullStatusReleasedMapsENOENT covers the full-status update variant
+// of the released-unit ENOENT mapping (UpdateBasicStatus is covered above).
+func TestUpdateFullStatusReleasedMapsENOENT(t *testing.T) {
+	_, unit, _ := newTestUnit(t, "unit5", 0, workceptor.WorkStateRunning, true, nil)
+
+	if err := unit.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	if !unit.IsReleased() {
+		t.Fatal("Release did not record the released state")
+	}
+	unit.UpdateFullStatus(func(s *workceptor.StatusFileData) { s.Detail = "after release" })
+	if err := unit.LastUpdateError(); !errors.Is(err, workceptor.ErrUnitReleased) {
+		t.Fatalf("LastUpdateError = %v, want ErrUnitReleased", err)
+	}
+}
+
+// TestForceReleaseFailureMarksReleased covers the force branch where RemoveAll
+// still fails: force-release is best-effort, so the unit is reported released
+// even though the files could not be removed.
+func TestForceReleaseFailureMarksReleased(t *testing.T) {
+	_, unit, _ := newTestUnit(t, "unit6", 0, workceptor.WorkStateSucceeded, true, failingFS{err: errors.New("device busy")})
+
+	if err := unit.Release(true); err != nil {
+		t.Fatalf("force Release returned %v, want nil (pre-existing force semantics)", err)
+	}
+	if got := unit.Status().State; got != workceptor.WorkStateCanceled {
+		t.Fatalf("state after force release = %d, want %d", got, workceptor.WorkStateCanceled)
+	}
+	if !unit.IsReleased() {
+		t.Fatal("force release did not record the released state")
 	}
 }

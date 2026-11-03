@@ -11,6 +11,7 @@ type WorkUnit interface {
 	SetFromParams(params map[string]string) error
 	UpdateBasicStatus(state int, detail string, stdoutSize int64)
 	UpdateFullStatus(statusFunc func(*StatusFileData))
+	IsReleased() bool
 	LastUpdateError() error
 	Status() *StatusFileData
 	UnredactedStatus() *StatusFileData

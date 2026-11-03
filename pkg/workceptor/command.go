@@ -31,6 +31,7 @@ type BaseWorkUnitForWorkUnit interface {
 	CancelContext()
 	ID() string
 	Init(w *Workceptor, unitID string, workType string, fs FileSystemer)
+	IsReleased() bool
 	LastUpdateError() error
 	Load() error
 	MonitorLocalStatus()

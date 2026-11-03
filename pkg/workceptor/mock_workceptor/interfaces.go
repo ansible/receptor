@@ -68,6 +68,20 @@ func (mr *MockWorkUnitMockRecorder) ID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockWorkUnit)(nil).ID))
 }
 
+// IsReleased mocks base method.
+func (m *MockWorkUnit) IsReleased() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsReleased")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsReleased indicates an expected call of IsReleased.
+func (mr *MockWorkUnitMockRecorder) IsReleased() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsReleased", reflect.TypeOf((*MockWorkUnit)(nil).IsReleased))
+}
+
 // LastUpdateError mocks base method.
 func (m *MockWorkUnit) LastUpdateError() error {
 	m.ctrl.T.Helper()

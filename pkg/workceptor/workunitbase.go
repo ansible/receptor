@@ -43,11 +43,6 @@ func IsComplete(workState int) bool {
 	return workState == WorkStateSucceeded || workState == WorkStateFailed
 }
 
-// IsTerminal returns true if the unit has finished or has been released.
-func IsTerminal(workState int) bool {
-	return IsComplete(workState) || workState == WorkStateCanceled
-}
-
 // ErrUnitReleased is returned when a status update races the removal of the
 // unit directory by Release. It is terminal: callers must stop, not retry.
 var ErrUnitReleased = errors.New("work unit directory was released")
@@ -415,6 +410,17 @@ func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
 	return &status
 }
 
+// IsReleased reports whether Release has claimed this unit and removed its
+// directory. A canceled unit that was not released still has its files, so
+// callers must not treat WorkStateCanceled alone as proof that no more output
+// will appear.
+func (bwu *BaseWorkUnit) IsReleased() bool {
+	bwu.statusLock.RLock()
+	defer bwu.statusLock.RUnlock()
+
+	return bwu.released
+}
+
 // Status returns a copy of the status currently loaded in memory (use Load to get it from disk).
 func (bwu *BaseWorkUnit) Status() *StatusFileData {
 	return bwu.UnredactedStatus()
@@ -435,8 +441,8 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 
 	// Mark the unit terminal before deleting its files so in-flight readers and
 	// writers see a released unit instead of racing a directory that is being
-	// removed (AAP-97861). If removal fails, the unit still exists: restore the
-	// previous state so it is not misreported as canceled/released.
+	// removed. If removal fails, the unit still exists: restore the previous
+	// state so it is not misreported as canceled/released.
 	prevState := bwu.status.State
 	prevDetail := bwu.status.Detail
 	bwu.released = true
@@ -453,10 +459,9 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 		err := bwu.fs.RemoveAll(bwu.UnitDir())
 		if err != nil {
 			if force {
-				// Force ignores removal errors by design; the unit dir may still
-				// exist, so do not claim it was released.
-				restoreState()
-
+				// Force ignores removal errors by design: the caller asked to
+				// drop the unit even if its files cannot be removed. Keep the
+				// released state so it is not reported as a live unit.
 				break
 			}
 

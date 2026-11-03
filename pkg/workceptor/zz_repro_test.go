@@ -209,6 +209,11 @@ func TestReproReleaseWhileStatusWriterActive(t *testing.T) {
 	if strings.Contains(logBuf.String(), "Error updating status file") {
 		t.Fatalf("release logged status-write errors:\n%s", logBuf.String())
 	}
+
+	unit.UpdateBasicStatus(WorkStateRunning, "after release", 0)
+	if err := unit.LastUpdateError(); !errors.Is(err, ErrUnitReleased) {
+		t.Fatalf("post-release basic status error = %v, want ErrUnitReleased", err)
+	}
 }
 
 // TestReleaseFailureRestoresState guards the retry path: a failed RemoveAll

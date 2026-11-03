@@ -525,7 +525,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			switch {
 			case err == nil:
 			case os.IsNotExist(err):
-				if IsComplete(unit.Status().State) {
+				if IsTerminal(unit.Status().State) {
 					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
 					return

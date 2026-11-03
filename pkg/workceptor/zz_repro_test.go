@@ -190,7 +190,7 @@ func TestReproReleaseWhileStatusWriterActive(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 	if err := w.ReleaseUnit("unit2", false); err != nil {
-		t.Logf("ReleaseUnit returned: %v", err)
+		t.Fatalf("ReleaseUnit: %v", err)
 	}
 	time.Sleep(250 * time.Millisecond)
 	close(stop)

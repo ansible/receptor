@@ -410,16 +410,11 @@ func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
 	return &status
 }
 
-// releaseState is implemented by work units that track whether Release has
-// claimed them. It is deliberately separate from WorkUnit so release awareness
-// does not become a requirement for external WorkUnit implementations.
-type releaseState interface {
-	IsReleased() bool
-}
-
 // isReleased reports whether v tracks a released state and has been released.
+// The optional interface is checked inline so release awareness does not become
+// a requirement for external WorkUnit implementations.
 func isReleased(v any) bool {
-	rs, ok := v.(releaseState)
+	rs, ok := v.(interface{ IsReleased() bool })
 
 	return ok && rs.IsReleased()
 }

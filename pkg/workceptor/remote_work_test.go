@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,8 +18,11 @@ import (
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ansible/receptor/pkg/workceptor/mock_workceptor"
+	testutils "github.com/ansible/receptor/tests/utils"
+	"github.com/prep/socketpair"
 	"go.uber.org/mock/gomock"
 )
 
@@ -119,6 +124,7 @@ func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.Wo
 	if err != nil {
 		t.Errorf("Error while creating Workceptor: %v", err)
 	}
+	t.Cleanup(w.Cancel)
 
 	mockBaseWorkUnit.EXPECT().Init(w, "", "", workceptor.FileSystem{})
 	mockBaseWorkUnit.EXPECT().SetStatusExtraData(gomock.Any())
@@ -1391,4 +1397,292 @@ func assertRemoteWorkTypePersisted(t *testing.T, expected bool, persisted <-chan
 	case <-time.After(10 * time.Second):
 		t.Fatal("remote work type was not persisted")
 	}
+}
+
+const (
+	logTestLocalNode  = "node1"
+	logTestRemoteNode = "node2"
+)
+
+// logRemoteID returns the structured remote_id suffix the handshake assigns to
+// the shared logger.
+func logRemoteID(node string) string {
+	return `"remote_id":"` + node + `"`
+}
+
+// connectTwoNetceptorNodes creates two real Netceptor nodes connected via
+// external backends over a Unix socket pair, and returns the local node with
+// its log output captured. After the handshake, the local node's shared logger
+// carries the remote peer's identity, so log lines that go through
+// rw.GetWorkceptor().nc.GetLogger() are stamped with it without any logger
+// being constructed by the test.
+func connectTwoNetceptorNodes(t *testing.T, ctx context.Context, localNode, remoteNode string) (*netceptor.Netceptor, *netceptor.Netceptor, *testutils.LogCapture) {
+	t.Helper()
+
+	n1 := netceptor.New(ctx, localNode)
+	logCapture := testutils.NewLogCapture()
+	n1.Logger.SetOutput(logCapture)
+
+	n2 := netceptor.New(ctx, remoteNode)
+	n2.Logger.SetOutput(io.Discard)
+
+	b1, err := netceptor.NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n1.AddBackend(b1); err != nil {
+		t.Fatal(err)
+	}
+
+	b2, err := netceptor.NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n2.AddBackend(b2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe before connecting: the initial routing-update flood fires
+	// as soon as the backends are linked, and the next one only lands at
+	// defaultRouteUpdateTime, which would exhaust the timeout below.
+	routesChan := n1.SubscribeRoutingUpdates()
+
+	c1, c2, err := socketpair.New("unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b1.NewConnection(netceptor.MessageConnFromNetConn(c1), true)
+	b2.NewConnection(netceptor.MessageConnFromNetConn(c2), true)
+	t.Cleanup(func() {
+		_ = c1.Close()
+		_ = c2.Close()
+	})
+	t.Cleanup(n1.Shutdown)
+	t.Cleanup(n2.Shutdown)
+
+	// Wait for the local node to establish routing to the remote node.
+	timeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	for {
+		select {
+		case <-timeout.Done():
+			t.Fatalf("timed out waiting for %s to connect to %s; logs:\n%s", localNode, remoteNode, logCapture.String())
+		case routes, ok := <-routesChan:
+			if !ok {
+				t.Fatalf("routing update subscription closed before %s connected to %s; logs:\n%s", localNode, remoteNode, logCapture.String())
+			}
+			if routes != nil {
+				if _, ok := routes[remoteNode]; ok {
+					return n1, n2, logCapture
+				}
+			}
+		}
+	}
+}
+
+// startFakeControlListener advertises a "control" service on n2 and hands each
+// accepted connection to handle.
+func startFakeControlListener(t *testing.T, n2 *netceptor.Netceptor, handle func(net.Conn)) {
+	t.Helper()
+	listener, err := n2.ListenAndAdvertise("control", nil, nil)
+	if err != nil {
+		t.Fatalf("could not listen on control service: %v", err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				select {
+				case <-listener.DoneChan:
+					return
+				default:
+					continue
+				}
+			}
+			go handle(conn)
+		}
+	}()
+}
+
+// startFakeControlService advertises a "control" service on n2 that greets the
+// caller with the node ID and delegates each request line to handle. handle
+// returns false to close the connection after the request.
+func startFakeControlService(t *testing.T, n2 *netceptor.Netceptor, node string, handle func(conn net.Conn, req string) bool) {
+	t.Helper()
+	startFakeControlListener(t, n2, func(conn net.Conn) {
+		defer conn.Close()
+		if _, err := fmt.Fprintf(conn, "%s\n", node); err != nil {
+			return
+		}
+		reader := bufio.NewReader(conn)
+		for {
+			req, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if !handle(conn, strings.TrimSpace(req)) {
+				return
+			}
+		}
+	})
+}
+
+// waitForControlService waits for the advertisement to propagate and verifies
+// that the service greets the caller with the node ID.
+func waitForControlService(t *testing.T, n1 *netceptor.Netceptor, node string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var lastErr error
+	greeted := testutils.CheckUntilTimeout(ctx, 50*time.Millisecond, func() bool {
+		dialCtx, dialCancel := context.WithTimeout(context.Background(), time.Second)
+		defer dialCancel()
+		conn, err := n1.DialContext(dialCtx, node, "control", nil)
+		if err != nil {
+			lastErr = err
+
+			return false
+		}
+		defer func() { _ = conn.CloseConnection() }()
+		_ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		hello, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			lastErr = err
+
+			return false
+		}
+		if !strings.Contains(hello, node) {
+			lastErr = fmt.Errorf("control service on %s greeted with %q", node, strings.TrimSpace(hello))
+
+			return false
+		}
+
+		return true
+	})
+	if !greeted {
+		t.Fatalf("timed out waiting for control service on %s: %v", node, lastErr)
+	}
+}
+
+// newRemoteCloseTestUnit builds a remote unit owned by a Workceptor backed by
+// the real n1 logger, so the assertions below observe the remote_id set during
+// the two-node handshake. It returns the mocked base unit and its unit dir.
+func newRemoteCloseTestUnit(t *testing.T, ctx context.Context, n1 *netceptor.Netceptor, status workceptor.StatusFileData) (*mock_workceptor.MockBaseWorkUnitForWorkUnit, string) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	base := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
+	w, err := workceptor.New(ctx, n1, t.TempDir())
+	if err != nil {
+		t.Fatalf("could not create workceptor: %v", err)
+	}
+	t.Cleanup(w.Cancel)
+
+	red := &workceptor.RemoteExtraData{
+		RemoteNode:   logTestRemoteNode,
+		RemoteUnitID: "remote-unit",
+		RemoteParams: make(map[string]string),
+	}
+	unitDir := t.TempDir()
+	expectRemoteUnitStatusSources(base, w, red, status)
+	base.EXPECT().UpdateFullStatus(gomock.Any()).AnyTimes()
+	base.EXPECT().Load().Return(nil).AnyTimes()
+	base.EXPECT().UnitDir().Return(unitDir).AnyTimes()
+	base.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
+
+	return base, unitDir
+}
+
+// TestRemoteWorkStdinCloseErrorLogCarriesRemoteID pins the "Error closing"
+// line emitted by StartRemoteUnit when the stdin handle fails to close. The
+// message names only the local file, so the remote_id suffix is the only
+// carrier of the peer's identity.
+func TestRemoteWorkStdinCloseErrorLogCarriesRemoteID(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	n1, n2, logCapture := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
+
+	// Fake control service that completes the submit handshake: greeting,
+	// submit command, ID response, stdin until EOF, then OK.
+	startFakeControlListener(t, n2, func(conn net.Conn) {
+		defer conn.Close()
+		if _, err := fmt.Fprintf(conn, "%s\n", logTestRemoteNode); err != nil {
+			return
+		}
+		reader := bufio.NewReader(conn)
+		if _, err := reader.ReadString('\n'); err != nil {
+			return
+		}
+		if _, err := io.WriteString(conn, "Work unit created with ID unit1. Send stdin data and EOF.\n"); err != nil {
+			return
+		}
+		if _, err := io.Copy(io.Discard, reader); err != nil {
+			return
+		}
+		_, _ = io.WriteString(conn, "OK\n")
+	})
+	waitForControlService(t, n1, logTestRemoteNode)
+
+	mockBaseWorkUnit, unitDir := newRemoteCloseTestUnit(t, ctx, n1, workceptor.StatusFileData{State: workceptor.WorkStateRunning})
+
+	// StartRemoteUnit opens <UnitDir>/stdin, so it must exist.
+	if err := os.WriteFile(filepath.Join(unitDir, "stdin"), []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	restore := workceptor.SetCloseFileForTest(func(*os.File) error { return errors.New("close boom") })
+	t.Cleanup(restore)
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer dialCancel()
+	conn, err := n1.DialContext(dialCtx, logTestRemoteNode, "control", nil)
+	if err != nil {
+		t.Fatalf("could not dial control service: %v", err)
+	}
+	reader := bufio.NewReader(conn)
+	if _, err := reader.ReadString('\n'); err != nil {
+		t.Fatalf("could not read control greeting: %v", err)
+	}
+
+	if err := workceptor.StartRemoteUnitForTest(mockBaseWorkUnit, ctx, conn, reader); err != nil {
+		t.Fatalf("StartRemoteUnit failed: %v", err)
+	}
+
+	logCapture.WaitFor(t, 5*time.Second, "Error closing", "stdin", logRemoteID(logTestRemoteNode))
+}
+
+// TestRemoteWorkStdoutCloseErrorLogCarriesRemoteID pins the "Error closing"
+// line emitted by monitorRemoteStdout when the stdout handle fails to close.
+func TestRemoteWorkStdoutCloseErrorLogCarriesRemoteID(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	n1, n2, logCapture := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
+
+	// StdoutSize matches the streamed payload so that, once it is copied, the
+	// next loop iteration sees a complete unit and returns, running the
+	// deferred close.
+	status := workceptor.StatusFileData{State: workceptor.WorkStateSucceeded, StdoutSize: int64(len("partial"))}
+	startFakeControlService(t, n2, logTestRemoteNode, func(conn net.Conn, _ string) bool {
+		_, _ = io.WriteString(conn, "Streaming results\n")
+		_, _ = io.WriteString(conn, "partial")
+
+		return false
+	})
+	waitForControlService(t, n1, logTestRemoteNode)
+
+	mockBaseWorkUnit, _ := newRemoteCloseTestUnit(t, ctx, n1, status)
+
+	restore := workceptor.SetCloseFileForTest(func(*os.File) error { return errors.New("close boom") })
+	t.Cleanup(restore)
+
+	job := &utils.JobContext{}
+	job.NewJob(ctx, 1, false)
+	go workceptor.MonitorRemoteStdoutForTest(mockBaseWorkUnit, job)
+	job.Wait()
+
+	logCapture.WaitFor(t, 5*time.Second, "Error closing", "stdout", logRemoteID(logTestRemoteNode))
 }

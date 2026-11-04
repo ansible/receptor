@@ -3,10 +3,41 @@
 
 package workceptor
 
-import "github.com/ansible/receptor/pkg/controlsvc"
+import (
+	"bufio"
+	"context"
+	"net"
+	"os"
+
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/utils"
+)
 
 // NewWorkceptorCommandTypeForTest exposes the unexported work command type to
 // tests in the workceptor_test package.
 func NewWorkceptorCommandTypeForTest(w *Workceptor) controlsvc.ControlCommandType {
 	return &workceptorCommandType{w: w}
+}
+
+// StartRemoteUnitForTest invokes the unexported remote unit start attempt on a
+// unit built from the given base work unit, for tests in the workceptor_test
+// package.
+func StartRemoteUnitForTest(b BaseWorkUnitForWorkUnit, ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	return (&remoteUnit{BaseWorkUnitForWorkUnit: b}).StartRemoteUnit(ctx, conn, reader)
+}
+
+// MonitorRemoteStdoutForTest runs the unexported remote stdout monitor on a
+// unit built from the given base work unit, for tests in the workceptor_test
+// package.
+func MonitorRemoteStdoutForTest(b BaseWorkUnitForWorkUnit, mw *utils.JobContext) {
+	(&remoteUnit{BaseWorkUnitForWorkUnit: b}).monitorRemoteStdout(mw)
+}
+
+// SetCloseFileForTest replaces the file-close hook for the duration of a test
+// and returns a function that restores the previous hook.
+func SetCloseFileForTest(fn func(*os.File) error) func() {
+	old := closeFile
+	closeFile = fn
+
+	return func() { closeFile = old }
 }

@@ -1928,6 +1928,7 @@ func TestRemoteWorkCryptoErrorDetailLogCarriesRemoteID(t *testing.T) {
 	red := newRemoteExtraData()
 	red.RemoteStarted = false
 	env := newRemoteMonitorEnv(t, remoteMonitorOptions{remote: red})
+	env.job.WorkerDone()
 
 	shouldExit := workceptor.HandleConnectionErrorForTest(env.unit, errors.New("CRYPTO_ERROR: handshake failed"))
 	if !shouldExit {
@@ -1976,7 +1977,7 @@ func TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID(t *testing.T) {
 			close(streamStarted)
 			<-release
 
-			return false
+			return true
 		},
 	})
 	stdoutPath := filepath.Join(unitDir, "stdout")
@@ -2057,6 +2058,7 @@ func TestRemoteWorkActionErrorLogCarriesRemoteID(t *testing.T) {
 			return true
 		},
 	})
+	env.job.WorkerDone()
 
 	actionDone := make(chan struct{})
 	_ = workceptor.GetConnectionAndRunForTest(env.unit, env.ctx, false, func(context.Context, net.Conn, *bufio.Reader) error {
@@ -2104,6 +2106,7 @@ func TestRemoteWorkConnectAndRunErrorLogCarriesRemoteID(t *testing.T) {
 // failed" line emitted by handleConnectionError.
 func TestRemoteWorkConnectionErrorLogCarriesRemoteID(t *testing.T) {
 	env := newRemoteMonitorEnv(t, remoteMonitorOptions{remote: newRemoteExtraData()})
+	env.job.WorkerDone()
 
 	_ = workceptor.HandleConnectionErrorForTest(env.unit, errors.New("connection boom"))
 

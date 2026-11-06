@@ -8,11 +8,10 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 )
 
-func main() {
-	logger := logger.NewReceptorLogger("")
+func parseArgs(args []string) ([]string, bool) {
 	var isV2 bool
 	newArgs := []string{}
-	for _, arg := range os.Args {
+	for _, arg := range args {
 		if arg == "--config-v2" {
 			isV2 = true
 
@@ -21,6 +20,12 @@ func main() {
 		newArgs = append(newArgs, arg)
 	}
 
+	return newArgs, isV2
+}
+
+func main() {
+	logger := logger.NewReceptorLogger("")
+	newArgs, isV2 := parseArgs(os.Args)
 	os.Args = newArgs
 
 	if isV2 {

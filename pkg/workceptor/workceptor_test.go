@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -442,6 +444,147 @@ func TestListKnownUnitIDs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w.ListKnownUnitIDs()
+		})
+	}
+}
+
+// TestReleaseWhileStdoutStreaming releases a running unit while GetResults is
+// mid-stream. The reader must deliver the bytes still held by its open handle
+// and stop without "Exceeded retries for reading stdout".
+func TestReleaseWhileStdoutStreaming(t *testing.T) {
+	const stdoutBytes = 1 << 20
+	w, _, logBuf := newTestUnit(t, "unit1", stdoutBytes, workceptor.WorkStateRunning, true, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := w.GetResults(ctx, "unit1", 0)
+	if err != nil {
+		t.Fatalf("GetResults: %v", err)
+	}
+
+	var firstChunk int
+	select {
+	case chunk := <-ch:
+		firstChunk = len(chunk)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first stdout chunk")
+	}
+
+	if err := w.ReleaseUnit("unit1", false); err != nil {
+		t.Fatalf("ReleaseUnit: %v", err)
+	}
+
+	// Drain slowly so the reader is still mid-stream when the release is
+	// noticed, then confirm it delivers everything written before release.
+	received := make(chan int)
+	go func() {
+		total := firstChunk
+		for chunk := range ch {
+			total += len(chunk)
+			time.Sleep(200 * time.Millisecond)
+		}
+		received <- total
+	}()
+	select {
+	case total := <-received:
+		if total != stdoutBytes {
+			t.Fatalf("stdout after release = %d bytes, want %d (truncated)", total, stdoutBytes)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("stdout reader did not exit after release")
+	}
+
+	if strings.Contains(logBuf.String(), "Exceeded retries for reading stdout") {
+		t.Fatalf("release produced stdout-retry ERROR spam:\n%s", logBuf.String())
+	}
+}
+
+// TestReleaseBeforeStdoutExistsClosesResultsQuietly releases a unit before its
+// stdout file appears. GetResults must stop waiting and must not log a close
+// error for the handle it never opened.
+func TestReleaseBeforeStdoutExistsClosesResultsQuietly(t *testing.T) {
+	w, unit, logBuf := newTestUnit(t, "unit7", 0, workceptor.WorkStateRunning, true, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := w.GetResults(ctx, "unit7", 0)
+	if err != nil {
+		t.Fatalf("GetResults: %v", err)
+	}
+
+	// Let the open loop enter its wait before the directory disappears.
+	time.Sleep(100 * time.Millisecond)
+	if err := unit.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("expected the results channel to be closed")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("GetResults did not stop after release")
+	}
+
+	if strings.Contains(logBuf.String(), "Error closing stdout") {
+		t.Fatalf("release logged a stdout close error:\n%s", logBuf.String())
+	}
+	if strings.Contains(logBuf.String(), "completed without producing any stdout") {
+		t.Fatalf("release logged a completion warning:\n%s", logBuf.String())
+	}
+}
+
+// TestUnitsReportReleasedState ensures the unit wrappers expose the base unit's
+// released state without adding it to the exported WorkUnit interface.
+func TestUnitsReportReleasedState(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockNC.EXPECT().NodeID().Return("testnode").AnyTimes()
+	mockNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	w, err := workceptor.New(context.Background(), mockNC, t.TempDir())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		newWorker func(*workceptor.BaseWorkUnit) workceptor.WorkUnit
+	}{
+		{
+			name: "command",
+			newWorker: func(bwu *workceptor.BaseWorkUnit) workceptor.WorkUnit {
+				return workceptor.CommandWorkerCfg{}.NewWorker(bwu, w, "unit", "command")
+			},
+		},
+		{
+			name: "kubernetes",
+			newWorker: func(bwu *workceptor.BaseWorkUnit) workceptor.WorkUnit {
+				return workceptor.KubeWorkerCfg{}.NewWorker(bwu, w, "unit", "kubernetes")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bwu := &workceptor.BaseWorkUnit{}
+			wu := tt.newWorker(bwu)
+			rs, ok := wu.(interface{ IsReleased() bool })
+			if !ok {
+				t.Fatalf("%s unit does not report its released state", tt.name)
+			}
+			if rs.IsReleased() {
+				t.Fatalf("%s unit reported released before release", tt.name)
+			}
+			if err := bwu.Release(false); err != nil {
+				t.Fatalf("Release: %v", err)
+			}
+			if !rs.IsReleased() {
+				t.Fatalf("%s unit did not report released after release", tt.name)
+			}
 		})
 	}
 }

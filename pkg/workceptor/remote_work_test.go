@@ -1636,3 +1636,61 @@ func TestMonitorRemoteStdoutQuietWhenReleasedBeforeOpen(t *testing.T) {
 		t.Fatalf("release logged a stdout open error:\n%s", logBuf.String())
 	}
 }
+
+// TestMonitorRemoteStdoutQuietWhenReleasedDuringResultsHandshake covers the
+// second open guard: a release that lands after the local stdout file was opened
+// but before the results handshake completes must not log an error when the
+// streaming path reopens stdout.
+func TestMonitorRemoteStdoutQuietWhenReleasedDuringResultsHandshake(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	ctrl := gomock.NewController(t)
+	logBuf := &bytes.Buffer{}
+	rw, bwu, mockNC := newRemoteMonitorTestUnit(t, ctx, ctrl, logBuf)
+
+	bwu.UpdateFullStatus(func(s *workceptor.StatusFileData) {
+		s.State = workceptor.WorkStateRunning
+		s.StdoutSize = 1
+	})
+	if err := os.WriteFile(bwu.StdoutFileName(), nil, 0o600); err != nil {
+		t.Fatalf("write stdout: %v", err)
+	}
+
+	resultsRequested := make(chan struct{})
+	var resultsOnce sync.Once
+	conn, chunks := newScriptedConn(ctx, ctrl,
+		func() { resultsOnce.Do(func() { close(resultsRequested) }) },
+		nil)
+	mockNC.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNC.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
+
+	mw := &utils.JobContext{}
+	mw.NewJob(ctx, 1, false)
+	done := make(chan struct{})
+	go func() {
+		workceptor.MonitorRemoteStdoutForTest(rw, mw)
+		close(done)
+	}()
+
+	select {
+	case <-resultsRequested:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdout monitor never requested results")
+	}
+
+	// Release while the handshake is in flight: the local stdout file has already
+	// been opened once, and the streaming path is about to open it again.
+	if err := bwu.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	chunks <- scriptedChunk{data: "Streaming results\n"}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stdout monitor did not stop after release")
+	}
+	if strings.Contains(logBuf.String(), "Could not open stdout file") {
+		t.Fatalf("release logged a stdout open error:\n%s", logBuf.String())
+	}
+}

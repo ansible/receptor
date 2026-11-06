@@ -532,6 +532,9 @@ func TestReleaseBeforeStdoutExistsClosesResultsQuietly(t *testing.T) {
 	if strings.Contains(logBuf.String(), "Error closing stdout") {
 		t.Fatalf("release logged a stdout close error:\n%s", logBuf.String())
 	}
+	if strings.Contains(logBuf.String(), "completed without producing any stdout") {
+		t.Fatalf("release logged a completion warning:\n%s", logBuf.String())
+	}
 }
 
 // TestUnitsReportReleasedState ensures the unit wrappers expose the base unit's

@@ -527,7 +527,13 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			switch {
 			case err == nil:
 			case os.IsNotExist(err):
-				if IsComplete(unit.Status().State) || isReleased(unit) {
+				if isReleased(unit) {
+					// A unit released before it wrote stdout was not "completed"; keep this quiet.
+					w.nc.GetLogger().Debug("Unit released before producing any stdout\n")
+
+					return
+				}
+				if IsComplete(unit.Status().State) {
 					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
 					return

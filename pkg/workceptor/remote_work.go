@@ -588,6 +588,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			}
 			stdout, err := os.OpenFile(rw.StdoutFileName(), os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 			if err != nil {
+				if rw.IsReleased() || mw.Err() != nil {
+					rw.GetWorkceptor().nc.GetLogger().Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
+
+					return
+				}
 				rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 				return

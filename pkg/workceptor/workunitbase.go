@@ -419,10 +419,12 @@ func isReleased(v any) bool {
 	return ok && rs.IsReleased()
 }
 
-// IsReleased reports whether Release has claimed this unit and removed its
-// directory. A canceled unit that was not released still has its files, so
-// callers must not treat WorkStateCanceled alone as proof that no more output
-// will appear.
+// IsReleased reports whether Release has claimed this unit: the unit's logical
+// release state. A successful release also removes the directory, but a forced
+// release keeps this state even when removal fails, so the directory may still
+// exist. A canceled unit that was not released still has its files, so callers
+// must not treat WorkStateCanceled alone as proof that no more output will
+// appear.
 func (bwu *BaseWorkUnit) IsReleased() bool {
 	bwu.statusLock.RLock()
 	defer bwu.statusLock.RUnlock()

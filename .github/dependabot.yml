@@ -40,3 +40,8 @@ updates:
     labels:
       - "dependencies"
       - "pip"
+    ignore:
+      # The click upper bound is deliberate (see #1553): 8.4 is a feature
+      # release with CLI-facing changes and there is no advisory to chase.
+      - dependency-name: "click"
+        versions: [">=8.4.0"]

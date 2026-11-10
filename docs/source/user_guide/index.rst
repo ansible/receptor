@@ -44,6 +44,7 @@ This guide describes how to use receptor in multiple environments and uses the f
 
    basic_usage
    configuration_options
+   profiling
    connecting_nodes
    pull_connectivity
    edge_networks

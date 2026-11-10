@@ -25,6 +25,10 @@ import (
 
 const errMsgRemoteExtraDataMissing = "remote ExtraData missing"
 
+// closeFile closes a file. It is a package variable so tests can simulate a
+// close error on the paths that log one.
+var closeFile = func(f *os.File) error { return f.Close() }
+
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnitForWorkUnit
@@ -267,9 +271,9 @@ func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader
 		return fmt.Errorf("error opening stdin file: %s", err)
 	}
 	defer func() {
-		err := stdin.Close()
+		err := closeFile(stdin)
 		if err != nil {
-			MainInstance.nc.GetLogger().Error("Error closing %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
+			rw.GetWorkceptor().nc.GetLogger().Error("Error closing %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
 		}
 	}()
 	_, err = io.Copy(conn, stdin)
@@ -574,9 +578,9 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				return
 			}
 			defer func() {
-				err := stdout.Close()
+				err := closeFile(stdout)
 				if err != nil {
-					MainInstance.nc.GetLogger().Error("Error closing %s: %s", rw.StdoutFileName(), err)
+					rw.GetWorkceptor().nc.GetLogger().Error("Error closing %s: %s", rw.StdoutFileName(), err)
 				}
 			}()
 			doneChan := make(chan struct{})

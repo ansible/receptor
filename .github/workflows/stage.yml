@@ -53,7 +53,7 @@ jobs:
           exit 0
 
       - name: Checkout receptor
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.REF }}
 

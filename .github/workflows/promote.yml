@@ -11,7 +11,7 @@ jobs:
       TAG: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -28,7 +28,7 @@ jobs:
           registry: quay.io
 
       - name: Copy Image to Quay
-        uses: akhilerm/tag-push-action@v2.2.0
+        uses: akhilerm/tag-push-action@v2.3.0
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: |
@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Push floating tag to Quay
-        uses: akhilerm/tag-push-action@v2.2.0
+        uses: akhilerm/tag-push-action@v2.3.0
         with:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
@@ -89,7 +89,7 @@ jobs:
       VERSION: ${{github.event.release.tag_name}}
     steps:
       - name: Checkout Receptor
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v5

@@ -4,6 +4,11 @@
 package workceptor
 
 import (
+	"bufio"
+	"context"
+	"net"
+	"os"
+
 	"github.com/ansible/receptor/pkg/controlsvc"
 	"github.com/ansible/receptor/pkg/utils"
 )
@@ -24,14 +29,32 @@ func (w *Workceptor) AddActiveUnitForTest(unitID string, unit WorkUnit) {
 	w.activeUnits[unitID] = unit
 }
 
-// MonitorRemoteStatusForTest exposes the unexported status monitor to tests in
-// the workceptor_test package.
-func MonitorRemoteStatusForTest(u WorkUnit, mw *utils.JobContext, forRelease bool) {
-	u.(*remoteUnit).monitorRemoteStatus(mw, forRelease)
+// StartRemoteUnitForTest invokes the unexported remote unit start attempt on a
+// unit built from the given base work unit, for tests in the workceptor_test
+// package.
+func StartRemoteUnitForTest(b BaseWorkUnitForWorkUnit, ctx context.Context, conn net.Conn, reader *bufio.Reader) error {
+	return (&remoteUnit{BaseWorkUnitForWorkUnit: b}).StartRemoteUnit(ctx, conn, reader)
 }
 
-// MonitorRemoteStdoutForTest exposes the unexported stdout monitor to tests in
-// the workceptor_test package.
-func MonitorRemoteStdoutForTest(u WorkUnit, mw *utils.JobContext) {
-	u.(*remoteUnit).monitorRemoteStdout(mw)
+// MonitorRemoteStatusForTest runs the unexported remote status monitor on a
+// unit built from the given base work unit, for tests in the workceptor_test
+// package.
+func MonitorRemoteStatusForTest(b BaseWorkUnitForWorkUnit, mw *utils.JobContext, forRelease bool) {
+	(&remoteUnit{BaseWorkUnitForWorkUnit: b}).monitorRemoteStatus(mw, forRelease)
+}
+
+// MonitorRemoteStdoutForTest runs the unexported remote stdout monitor on a
+// unit built from the given base work unit, for tests in the workceptor_test
+// package.
+func MonitorRemoteStdoutForTest(b BaseWorkUnitForWorkUnit, mw *utils.JobContext) {
+	(&remoteUnit{BaseWorkUnitForWorkUnit: b}).monitorRemoteStdout(mw)
+}
+
+// SetCloseFileForTest replaces the file-close hook for the duration of a test
+// and returns a function that restores the previous hook.
+func SetCloseFileForTest(fn func(*os.File) error) func() {
+	old := closeFile
+	closeFile = fn
+
+	return func() { closeFile = old }
 }

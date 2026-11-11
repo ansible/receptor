@@ -36,7 +36,7 @@ Among other data it captures the following memory metrics:
 .. note::
 
     * ``alloc_*`` measures churn, not retention. A service that allocates 2 GB/s and frees 2 GB/s has enormous ``alloc_space`` and no dangling data. High ``alloc_space`` predicts GC CPU cost, not memory growth.
-    * ``inuse_*`` measures retention. This is the actual "how much memory is the program holding" number.
+    * ``inuse_*`` measures retention. This is the actual "how much heap memory is the program holding" number.
 
 Configuring Pyroscope
 ---------------------
@@ -63,12 +63,15 @@ Add the following block to the receptor configuration file:
     - pyroscope-client:
         applicationName: receptor
         serverAddress: http://host.containers.internal:4040
-        disableGCRuns: false
-        uploadRate: "15s"
+        uploadRate: "uploadRate: 30s"
         tags:
           env: prod
         profileTypes:
           - ProfileGoroutines
+
+``uploadRate`` is parsed as a YAML mapping, so its value must include the ``uploadRate`` key again as shown above; the example sets a 30-second interval, and the default is 15s.
+
+``profileTypes`` adds to the default profile types (``ProfileCPU``, ``ProfileAllocObjects``, ``ProfileAllocSpace``, ``ProfileInuseObjects`` and ``ProfileInuseSpace``); it does not replace them.
 
 Assuming receptor is running inside a container, restart receptor for the configuration to take effect:
 

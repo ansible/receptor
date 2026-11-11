@@ -63,6 +63,11 @@ type commandUnit struct {
 	done               bool
 }
 
+// IsReleased reports whether the underlying base unit was released.
+func (u *commandUnit) IsReleased() bool {
+	return isReleased(u.BaseWorkUnitForWorkUnit)
+}
+
 // CommandExtraData is the content of the ExtraData JSON field for a command worker.
 type CommandExtraData struct {
 	Pid    int

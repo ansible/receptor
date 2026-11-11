@@ -6,8 +6,10 @@ package workceptor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strconv"
@@ -40,6 +42,10 @@ const errMsgErrorClosing = "Error closing %s: %s"
 func IsComplete(workState int) bool {
 	return workState == WorkStateSucceeded || workState == WorkStateFailed
 }
+
+// ErrUnitReleased is returned when a status update races the removal of the
+// unit directory by Release. It is terminal: callers must stop, not retry.
+var ErrUnitReleased = errors.New("work unit directory was released")
 
 // WorkStateToString returns a string representation of a WorkState.
 func WorkStateToString(workState int) string {
@@ -81,6 +87,7 @@ type BaseWorkUnit struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	fs                  FileSystemer
+	released            bool
 }
 
 // Init initializes the basic work unit data, in memory only.
@@ -98,6 +105,7 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string, fs 
 	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
 	bwu.fs = fs
+	bwu.released = false
 }
 
 // Error logs message with unitID prepended.
@@ -310,11 +318,16 @@ func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	defer bwu.statusLock.Unlock()
 
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
+	if err != nil && bwu.released && errors.Is(err, fs.ErrNotExist) {
+		// Only a unit that Release actually removed is terminal; a stray ENOENT
+		// (bad data dir, filesystem fault) stays a real error.
+		err = ErrUnitReleased
+	}
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
 
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrUnitReleased) {
 		bwu.w.nc.GetLogger().Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
 }
@@ -338,11 +351,14 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 	defer bwu.statusLock.Unlock()
 
 	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize)
+	if err != nil && bwu.released && errors.Is(err, fs.ErrNotExist) {
+		err = ErrUnitReleased
+	}
 	bwu.lastUpdateErrorLock.Lock()
 	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
 
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrUnitReleased) {
 		bwu.w.nc.GetLogger().Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
 }
@@ -394,6 +410,28 @@ func (bwu *BaseWorkUnit) getStatus() *StatusFileData {
 	return &status
 }
 
+// isReleased reports whether v tracks a released state and has been released.
+// The optional interface is checked inline so release awareness does not become
+// a requirement for external WorkUnit implementations.
+func isReleased(v any) bool {
+	rs, ok := v.(interface{ IsReleased() bool })
+
+	return ok && rs.IsReleased()
+}
+
+// IsReleased reports whether Release has claimed this unit: the unit's logical
+// release state. A successful release also removes the directory, but a forced
+// release keeps this state even when removal fails, so the directory may still
+// exist. A canceled unit that was not released still has its files, so callers
+// must not treat WorkStateCanceled alone as proof that no more output will
+// appear.
+func (bwu *BaseWorkUnit) IsReleased() bool {
+	bwu.statusLock.RLock()
+	defer bwu.statusLock.RUnlock()
+
+	return bwu.released
+}
+
 // Status returns a copy of the status currently loaded in memory (use Load to get it from disk).
 func (bwu *BaseWorkUnit) Status() *StatusFileData {
 	return bwu.UnredactedStatus()
@@ -411,14 +449,34 @@ func (bwu *BaseWorkUnit) UnredactedStatus() *StatusFileData {
 func (bwu *BaseWorkUnit) Release(force bool) error {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
+
+	// Mark the unit terminal before deleting its files so in-flight readers and
+	// writers see a released unit instead of racing a directory that is being
+	// removed. If removal fails, the unit still exists: restore the previous
+	// state so it is not misreported as canceled/released.
+	prevState := bwu.status.State
+	prevDetail := bwu.status.Detail
+	bwu.released = true
+	bwu.status.State = WorkStateCanceled
+	bwu.status.Detail = "Released"
+	restoreState := func() {
+		bwu.released = false
+		bwu.status.State = prevState
+		bwu.status.Detail = prevDetail
+	}
+
 	attemptsLeft := 3
 	for {
 		err := bwu.fs.RemoveAll(bwu.UnitDir())
-		if force {
-			break
-		} else if err != nil {
-			attemptsLeft--
+		if err != nil {
+			if force {
+				// Force ignores removal errors by design: the caller asked to
+				// drop the unit even if its files cannot be removed. Keep the
+				// released state so it is not reported as a live unit.
+				break
+			}
 
+			attemptsLeft--
 			if attemptsLeft > 0 {
 				bwu.w.nc.GetLogger().Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
 				time.Sleep(time.Second)
@@ -426,6 +484,7 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 				continue
 			}
 			bwu.w.nc.GetLogger().Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+			restoreState()
 
 			return err
 		}

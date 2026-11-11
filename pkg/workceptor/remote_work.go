@@ -363,6 +363,11 @@ func (rw *remoteUnit) updateRemoteWorkType(currentType, remoteType string) (stri
 	return persistedType, nil
 }
 
+// IsReleased reports whether the local proxy directory was released.
+func (rw *remoteUnit) IsReleased() bool {
+	return isReleased(rw.BaseWorkUnitForWorkUnit)
+}
+
 // monitorRemoteStatus monitors the remote status file and copies results to the local one.
 func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool) {
 	defer func() {
@@ -455,6 +460,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		rw.UpdateBasicStatus(si.State, si.Detail, si.StdoutSize)
 		updateErr := rw.LastUpdateError()
+		if errors.Is(updateErr, ErrUnitReleased) {
+			// The local proxy directory was released; stop monitoring.
+			return
+		}
 		if remoteWorkType == "" && si.WorkType != "" {
 			remoteWorkType, updateErr = rw.updateRemoteWorkType(remoteWorkType, si.WorkType)
 		}
@@ -495,6 +504,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		err = stdout.Close()
 	}
 	if err != nil {
+		if rw.IsReleased() || mw.Err() != nil {
+			rw.GetWorkceptor().nc.GetLogger().Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
+
+			return
+		}
 		rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 		return
@@ -510,6 +524,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		}
 		err := rw.Load()
 		if err != nil {
+			if rw.IsReleased() || mw.Err() != nil {
+				rw.GetWorkceptor().nc.GetLogger().Debug("Stopped reading status file %s: %s\n", rw.StatusFileName(), err)
+
+				return
+			}
 			rw.GetWorkceptor().nc.GetLogger().Error("Could not read status file %s: %s\n", rw.StatusFileName(), err)
 
 			return
@@ -573,6 +592,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			}
 			stdout, err := os.OpenFile(rw.StdoutFileName(), os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 			if err != nil {
+				if rw.IsReleased() || mw.Err() != nil {
+					rw.GetWorkceptor().nc.GetLogger().Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
+
+					return
+				}
 				rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 				return
@@ -609,6 +633,13 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					errmsg = "read operation cancelled"
 				} else {
 					errmsg = err.Error()
+				}
+				if rw.IsReleased() || mw.Err() != nil {
+					// Cancelling or releasing closed the stream on purpose; the
+					// copy error is expected.
+					rw.GetWorkceptor().nc.GetLogger().Debug("Stopped copying to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
+
+					continue
 				}
 				rw.GetWorkceptor().nc.GetLogger().Warning("Could not copy to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
 

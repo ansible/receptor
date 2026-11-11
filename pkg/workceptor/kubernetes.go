@@ -59,6 +59,11 @@ type KubeUnit struct {
 	podPendingTimeout      time.Duration
 }
 
+// IsReleased reports whether the underlying base unit was released.
+func (k *KubeUnit) IsReleased() bool {
+	return isReleased(k.BaseWorkUnitForWorkUnit)
+}
+
 // kubeExtraData is the content of the ExtraData JSON field for a Kubernetes worker.
 type KubeExtraData struct {
 	Image         string

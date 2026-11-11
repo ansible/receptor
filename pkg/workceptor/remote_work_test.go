@@ -2,6 +2,7 @@ package workceptor_test
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -1396,6 +1397,305 @@ func assertRemoteWorkTypePersisted(t *testing.T, expected bool, persisted <-chan
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("remote work type was not persisted")
+	}
+}
+
+type scriptedChunk struct {
+	data string
+	err  error
+}
+
+// newScriptedConn returns a mock netceptor connection that answers the node
+// handshake and then serves whatever chunks the test supplies.
+func newScriptedConn(ctx context.Context, ctrl *gomock.Controller, onWrite func(), onRead func(int)) (*netceptor.Conn, chan scriptedChunk) {
+	chunks := make(chan scriptedChunk, 8)
+	mockPacketConner := mock_netceptor.NewMockPacketConner(ctrl)
+	mockQuicConnection := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
+	mockQuicStream := mock_netceptor.NewMockQuicStreamForConn(ctrl)
+
+	reads := 0
+	mockQuicStream.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if reads == 0 {
+			reads++
+			copy(b, "execution\n")
+
+			return len("execution\n"), nil
+		}
+		if onRead != nil {
+			onRead(reads)
+		}
+		reads++
+		chunk := <-chunks
+		if chunk.err != nil {
+			return 0, chunk.err
+		}
+		copy(b, chunk.data)
+
+		return len(chunk.data), nil
+	}).AnyTimes()
+	mockQuicStream.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		if onWrite != nil {
+			onWrite()
+		}
+
+		return len(b), nil
+	}).AnyTimes()
+	mockQuicStream.EXPECT().Close().Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetReadDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
+	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
+
+	var cancelFunc context.CancelFunc = func() {}
+	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
+	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
+	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+	mockQuicConnection.EXPECT().LocalAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
+
+	return netceptor.NewConn(
+		netceptor.New(ctx, "test-node"),
+		mockPacketConner,
+		mockQuicConnection,
+		mockQuicStream,
+		make(chan struct{}),
+		&sync.Once{},
+		ctx,
+	), chunks
+}
+
+// newRemoteMonitorTestUnit builds a real base unit behind a remote worker so the
+// released flag and status writes behave as they do in production.
+func newRemoteMonitorTestUnit(t *testing.T, ctx context.Context, ctrl *gomock.Controller, logBuf *bytes.Buffer) (workceptor.WorkUnit, *workceptor.BaseWorkUnit, *mock_workceptor.MockNetceptorForWorkceptor) {
+	t.Helper()
+	mockNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockNC.EXPECT().NodeID().Return("testnode").AnyTimes()
+	lg := logger.NewReceptorLogger("")
+	lg.SetOutput(logBuf)
+	mockNC.EXPECT().GetLogger().Return(lg).AnyTimes()
+
+	w, err := workceptor.New(ctx, mockNC, t.TempDir())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	bwu := &workceptor.BaseWorkUnit{}
+	rw := workceptor.NewRemoteWorker(bwu, w, "unit", "remote")
+	if err := os.MkdirAll(bwu.UnitDir(), 0o700); err != nil {
+		t.Fatalf("mkdir unit dir: %v", err)
+	}
+	bwu.SetStatusExtraData(&workceptor.RemoteExtraData{
+		RemoteStarted:  true,
+		RemoteNode:     "execution",
+		RemoteUnitID:   "remoteunit",
+		RemoteParams:   map[string]string{},
+		RemoteWorkType: "echoint",
+	})
+
+	return rw, bwu, mockNC
+}
+
+// TestMonitorRemoteStatusStopsWhenUnitReleased covers the ErrUnitReleased guard:
+// a status write after the local proxy directory was removed must stop the
+// monitor instead of counting retries.
+func TestMonitorRemoteStatusStopsWhenUnitReleased(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ctrl := gomock.NewController(t)
+	logBuf := &bytes.Buffer{}
+	_, bwu, mockNC := newRemoteMonitorTestUnit(t, ctx, ctrl, logBuf)
+
+	statusRequested := make(chan struct{})
+	var once sync.Once
+	conn, chunks := newScriptedConn(ctx, ctrl, func() { once.Do(func() { close(statusRequested) }) }, nil)
+	mockNC.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNC.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
+
+	mw := &utils.JobContext{}
+	mw.NewJob(ctx, 1, false)
+	done := make(chan struct{})
+	go func() {
+		workceptor.MonitorRemoteStatusForTest(bwu, mw, false)
+		close(done)
+	}()
+
+	select {
+	case <-statusRequested:
+	case <-time.After(5 * time.Second):
+		t.Fatal("status monitor never sent a status request")
+	}
+
+	if err := bwu.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	chunks <- scriptedChunk{data: "{\"State\":1,\"Detail\":\"running\",\"StdoutSize\":0}\n"}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("status monitor did not stop after release")
+	}
+	if strings.Contains(logBuf.String(), "Error updating status file") {
+		t.Fatalf("release logged a status update error:\n%s", logBuf.String())
+	}
+}
+
+// TestMonitorRemoteStdoutStopsQuietlyAfterRelease covers the copy-error guard:
+// a read cancelled by release must not log a warning.
+func TestMonitorRemoteStdoutStopsQuietlyAfterRelease(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	ctrl := gomock.NewController(t)
+	logBuf := &bytes.Buffer{}
+	_, bwu, mockNC := newRemoteMonitorTestUnit(t, ctx, ctrl, logBuf)
+
+	bwu.UpdateFullStatus(func(s *workceptor.StatusFileData) {
+		s.State = workceptor.WorkStateRunning
+		s.StdoutSize = 1
+	})
+	if err := os.WriteFile(bwu.StdoutFileName(), nil, 0o600); err != nil {
+		t.Fatalf("write stdout: %v", err)
+	}
+
+	resultsRequested := make(chan struct{})
+	copying := make(chan struct{})
+	var resultsOnce, copyOnce sync.Once
+	conn, chunks := newScriptedConn(ctx, ctrl,
+		func() { resultsOnce.Do(func() { close(resultsRequested) }) },
+		func(reads int) {
+			if reads == 2 {
+				copyOnce.Do(func() { close(copying) })
+			}
+		})
+	mockNC.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNC.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
+
+	mw := &utils.JobContext{}
+	mw.NewJob(ctx, 1, false)
+	done := make(chan struct{})
+	go func() {
+		workceptor.MonitorRemoteStdoutForTest(bwu, mw)
+		close(done)
+	}()
+
+	select {
+	case <-resultsRequested:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdout monitor never requested results")
+	}
+	chunks <- scriptedChunk{data: "Streaming results\n"}
+	select {
+	case <-copying:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdout monitor never started copying")
+	}
+
+	if err := bwu.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	chunks <- scriptedChunk{err: errors.New("error code 499")}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stdout monitor did not stop after release")
+	}
+	if strings.Contains(logBuf.String(), "Could not copy to stdout file") {
+		t.Fatalf("release logged a stdout copy warning:\n%s", logBuf.String())
+	}
+}
+
+// TestMonitorRemoteStdoutQuietWhenReleasedBeforeOpen covers the open-error guard:
+// a release before the monitor opens stdout must not log an error.
+func TestMonitorRemoteStdoutQuietWhenReleasedBeforeOpen(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ctrl := gomock.NewController(t)
+	logBuf := &bytes.Buffer{}
+	_, bwu, _ := newRemoteMonitorTestUnit(t, ctx, ctrl, logBuf)
+
+	bwu.UpdateFullStatus(func(s *workceptor.StatusFileData) {
+		s.State = workceptor.WorkStateRunning
+	})
+	if err := bwu.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+
+	mw := &utils.JobContext{}
+	mw.NewJob(ctx, 1, false)
+	done := make(chan struct{})
+	go func() {
+		workceptor.MonitorRemoteStdoutForTest(bwu, mw)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdout monitor did not stop after release")
+	}
+	if strings.Contains(logBuf.String(), "Could not open stdout file") {
+		t.Fatalf("release logged a stdout open error:\n%s", logBuf.String())
+	}
+}
+
+// TestMonitorRemoteStdoutQuietWhenReleasedDuringResultsHandshake covers the
+// second open guard: a release that lands after the local stdout file was opened
+// but before the results handshake completes must not log an error when the
+// streaming path reopens stdout.
+func TestMonitorRemoteStdoutQuietWhenReleasedDuringResultsHandshake(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	ctrl := gomock.NewController(t)
+	logBuf := &bytes.Buffer{}
+	_, bwu, mockNC := newRemoteMonitorTestUnit(t, ctx, ctrl, logBuf)
+
+	bwu.UpdateFullStatus(func(s *workceptor.StatusFileData) {
+		s.State = workceptor.WorkStateRunning
+		s.StdoutSize = 1
+	})
+	if err := os.WriteFile(bwu.StdoutFileName(), nil, 0o600); err != nil {
+		t.Fatalf("write stdout: %v", err)
+	}
+
+	resultsRequested := make(chan struct{})
+	var resultsOnce sync.Once
+	conn, chunks := newScriptedConn(ctx, ctrl,
+		func() { resultsOnce.Do(func() { close(resultsRequested) }) },
+		nil)
+	mockNC.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, nil).AnyTimes()
+	mockNC.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
+
+	mw := &utils.JobContext{}
+	mw.NewJob(ctx, 1, false)
+	done := make(chan struct{})
+	go func() {
+		workceptor.MonitorRemoteStdoutForTest(bwu, mw)
+		close(done)
+	}()
+
+	select {
+	case <-resultsRequested:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdout monitor never requested results")
+	}
+
+	// Release while the handshake is in flight: the local stdout file has already
+	// been opened once, and the streaming path is about to open it again.
+	if err := bwu.Release(false); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	chunks <- scriptedChunk{data: "Streaming results\n"}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stdout monitor did not stop after release")
+	}
+	if strings.Contains(logBuf.String(), "Could not open stdout file") {
+		t.Fatalf("release logged a stdout open error:\n%s", logBuf.String())
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -261,12 +262,59 @@ func TestGetLogLevel(t *testing.T) {
 	origLevel := GetLogLevel()
 	defer SetGlobalLogLevel(origLevel)
 
+	rl := NewReceptorLogger("")
+
 	for _, level := range []int{ErrorLevel, WarningLevel, InfoLevel, DebugLevel, TraceLevel} {
 		SetGlobalLogLevel(level)
 		if got := GetLogLevel(); got != level {
 			t.Errorf("GetLogLevel() = %d, want %d", got, level)
 		}
+		if got := rl.GetLogLevel(); got != level {
+			t.Errorf("ReceptorLogger.GetLogLevel() = %d, want %d", got, level)
+		}
 	}
+}
+
+func TestSetGlobalQuietMode(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+
+	SetGlobalLogLevel(InfoLevel)
+	SetGlobalQuietMode()
+
+	if got := GetLogLevel(); got != 0 {
+		t.Errorf("GetLogLevel() after SetGlobalQuietMode() = %d, want 0", got)
+	}
+
+	var buf bytes.Buffer
+	rl := NewReceptorLogger("")
+	rl.SetOutput(&buf)
+	rl.Error("should not be logged")
+	if buf.Len() != 0 {
+		t.Errorf("expected no output in quiet mode, got: %q", buf.String())
+	}
+}
+
+func TestLogLevelConcurrent(t *testing.T) {
+	origLevel := GetLogLevel()
+	defer SetGlobalLogLevel(origLevel)
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for j := 0; j < 1000; j++ {
+				SetGlobalLogLevel(InfoLevel)
+				_ = GetLogLevel()
+			}
+		}()
+	}
+
+	wg.Wait()
 }
 
 func TestLogMethods(t *testing.T) {

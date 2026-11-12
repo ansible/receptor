@@ -7,12 +7,13 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ghjm/cmdline"
 	"github.com/spf13/viper"
 )
 
-var logLevel int
+var logLevel atomic.Int32
 
 // Log level constants.
 const (
@@ -25,12 +26,12 @@ const (
 
 // QuietMode turns off all log output.
 func SetGlobalQuietMode() {
-	logLevel = 0
+	logLevel.Store(0)
 }
 
-// SetLogLevel is a helper function for setting logLevel int.
+// SetGlobalLogLevel is a helper function for setting the global log level.
 func SetGlobalLogLevel(level int) {
-	logLevel = level
+	logLevel.Store(int32(level)) //nolint:gosec // G115: log levels are small constants (0-5)
 }
 
 // GetLogLevelByName is a helper function for returning level associated with log
@@ -48,7 +49,7 @@ func GetLogLevelByName(logName string) (int, error) {
 // This doesn't seem to be used anywhere.
 // GetLogLevel returns current log level.
 func GetLogLevel() int {
-	return logLevel
+	return int(logLevel.Load())
 }
 
 // LogLevelToName takes an int and returns the corresponding log level name.
@@ -140,12 +141,14 @@ func (rl *ReceptorLogger) SetOutput(w io.Writer) {
 
 // SetShowTrace enables trace-level logging.
 func (rl *ReceptorLogger) SetShowTrace(trace bool) {
-	SetGlobalLogLevel(TraceLevel)
+	if trace {
+		SetGlobalLogLevel(TraceLevel)
+	}
 }
 
 // GetLogLevel returns the log level.
 func (rl *ReceptorLogger) GetLogLevel() int {
-	return logLevel
+	return int(logLevel.Load())
 }
 
 // Error reports unexpected behavior, likely to result in termination.
@@ -245,7 +248,7 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 		prefix = strings.ToUpper(logLevelName) + " "
 	}
 
-	if logLevel >= level {
+	if int(logLevel.Load()) >= level {
 		rl.Logger.SetPrefix(prefix)
 		format, v = rl.appendSuffix(format, v)
 		rl.Printf(format, v...)
@@ -302,7 +305,7 @@ func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{
 		prefix = strings.ToUpper(logLevelName) + " "
 	}
 
-	if logLevel >= level {
+	if int(logLevel.Load()) >= level {
 		message, v := rl.appendSuffix(format, v)
 		message = fmt.Sprintf(message, v...)
 		sanMessage := strings.ReplaceAll(message, "\n", "")
@@ -377,7 +380,7 @@ func init() {
 	if version > 1 {
 		return
 	}
-	logLevel = InfoLevel
+	logLevel.Store(InfoLevel)
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 

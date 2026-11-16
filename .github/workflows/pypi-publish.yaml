@@ -14,6 +14,14 @@ on:  # yamllint disable-line rule:truthy
         required: false
         type: boolean
         default: false
+      environment:
+        description: "Deployment environment to publish from (selects the target index)"
+        required: true
+        type: choice
+        options:
+          - pypi
+          - testpypi
+        default: pypi
 
 jobs:
   build-receptorctl:
@@ -47,11 +55,12 @@ jobs:
           path: receptorctl/dist/
 
   publish-receptorctl:
-    name: Publish receptorctl to PyPI
+    name: Publish receptorctl distribution
     needs: build-receptorctl
     if: ${{ inputs.dry_run != true }}
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: ${{ inputs.environment || 'pypi' }}
     permissions:
       id-token: write
     steps:
@@ -61,7 +70,16 @@ jobs:
           name: receptorctl-dist
           path: dist/
 
-      - name: Publish to PyPI
+      - name: Check index URL is configured
+        if: ${{ vars.PYPI_INDEX_URL == '' }}
+        run: |
+          echo "::error::PYPI_INDEX_URL is not set on the '${{ inputs.environment || 'pypi' }}' environment"
+          exit 1
+
+      - name: Publish distribution
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist/
+          # Environment-scoped variable, e.g. https://upload.pypi.org/legacy/
+          # on pypi and https://test.pypi.org/legacy/ on testpypi.
+          repository-url: ${{ vars.PYPI_INDEX_URL }}

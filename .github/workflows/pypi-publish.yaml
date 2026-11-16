@@ -22,7 +22,7 @@ jobs:
       - name: Checkout Receptor
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: refs/tags/${{ env.TAG }}
 
       - name: Install python
         uses: actions/setup-python@v7

@@ -14,8 +14,8 @@ on:  # yamllint disable-line rule:truthy
         required: false
         type: boolean
         default: false
-      publish_target:
-        description: "Index to publish to"
+      environment:
+        description: "Deployment environment to publish from (selects the target index)"
         required: true
         type: choice
         options:
@@ -60,7 +60,7 @@ jobs:
     if: ${{ inputs.dry_run != true }}
     runs-on: ubuntu-latest
     environment:
-      name: ${{ inputs.publish_target || 'pypi' }}
+      name: ${{ inputs.environment || 'pypi' }}
     permissions:
       id-token: write
     steps:
@@ -74,5 +74,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist/
-          repository-url: >-
-            ${{ inputs.publish_target == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          # Environment-scoped variable, e.g. https://upload.pypi.org/legacy/
+          # on pypi and https://test.pypi.org/legacy/ on testpypi.
+          repository-url: ${{ vars.PYPI_INDEX_URL }}

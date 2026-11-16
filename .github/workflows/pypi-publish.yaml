@@ -18,8 +18,6 @@ jobs:
       contents: read
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
-    outputs:
-      should_publish: ${{ steps.check.outputs.should_publish }}
     steps:
       - name: Checkout Receptor
         uses: actions/checkout@v7
@@ -33,24 +31,11 @@ jobs:
         run: |
           python3 -m pip install build==1.5.0 --only-binary :all:
 
-      - name: Check if receptorctl version is already published
-        id: check
-        run: |
-          PUBLISHED_VERSION=$(curl --silent https://pypi.org/pypi/receptorctl/json | jq --raw-output '"v" + (.info.version // "")')
-          if [[ "$PUBLISHED_VERSION" == "$TAG" ]]; then
-            echo "receptorctl $TAG is already on PyPI, skipping"
-            echo "should_publish=false" >> $GITHUB_OUTPUT
-          else
-            echo "should_publish=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Build receptorctl
-        if: ${{ steps.check.outputs.should_publish == 'true' }}
         run: |
           make receptorctl_wheel receptorctl_sdist VERSION=$TAG
 
       - name: Upload distribution artifacts
-        if: ${{ steps.check.outputs.should_publish == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: receptorctl-dist
@@ -59,7 +44,6 @@ jobs:
   publish-receptorctl:
     name: Publish receptorctl to PyPI
     needs: build-receptorctl
-    if: ${{ needs.build-receptorctl.outputs.should_publish == 'true' }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

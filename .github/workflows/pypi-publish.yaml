@@ -14,6 +14,14 @@ on:  # yamllint disable-line rule:truthy
         required: false
         type: boolean
         default: false
+      publish_target:
+        description: "Index to publish to"
+        required: true
+        type: choice
+        options:
+          - pypi
+          - testpypi
+        default: pypi
 
 jobs:
   build-receptorctl:
@@ -51,7 +59,8 @@ jobs:
     needs: build-receptorctl
     if: ${{ inputs.dry_run != true }}
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: ${{ inputs.publish_target || 'pypi' }}
     permissions:
       id-token: write
     steps:
@@ -62,6 +71,14 @@ jobs:
           path: dist/
 
       - name: Publish to PyPI
+        if: ${{ inputs.publish_target != 'testpypi' }}
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist/
+
+      - name: Publish to TestPyPI
+        if: ${{ inputs.publish_target == 'testpypi' }}
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/
+          repository-url: https://test.pypi.org/legacy/

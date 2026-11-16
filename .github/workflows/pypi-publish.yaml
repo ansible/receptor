@@ -1,0 +1,67 @@
+---
+name: Publish receptorctl to PyPI
+on:  # yamllint disable-line rule:truthy
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and publish (e.g. v1.5.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Build the distribution without publishing to PyPI"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-receptorctl:
+    name: Build receptorctl distribution
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Checkout Receptor
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - name: Install python
+        uses: actions/setup-python@v7
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install build==1.5.0 --only-binary :all:
+
+      - name: Build receptorctl
+        run: |
+          make receptorctl_wheel receptorctl_sdist VERSION=$TAG
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: receptorctl-dist
+          path: receptorctl/dist/
+
+  publish-receptorctl:
+    name: Publish receptorctl to PyPI
+    needs: build-receptorctl
+    if: ${{ inputs.dry_run != true }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: receptorctl-dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/

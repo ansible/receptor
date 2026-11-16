@@ -9,6 +9,11 @@ on:  # yamllint disable-line rule:truthy
         description: "Release tag to build and publish (e.g. v1.5.0)"
         required: true
         type: string
+      dry_run:
+        description: "Build the distribution without publishing to PyPI"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-receptorctl:
@@ -44,6 +49,7 @@ jobs:
   publish-receptorctl:
     name: Publish receptorctl to PyPI
     needs: build-receptorctl
+    if: ${{ inputs.dry_run != true }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

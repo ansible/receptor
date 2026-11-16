@@ -70,6 +70,12 @@ jobs:
           name: receptorctl-dist
           path: dist/
 
+      - name: Check index URL is configured
+        if: ${{ vars.PYPI_INDEX_URL == '' }}
+        run: |
+          echo "::error::PYPI_INDEX_URL is not set on the '${{ inputs.environment || 'pypi' }}' environment"
+          exit 1
+
       - name: Publish distribution
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:

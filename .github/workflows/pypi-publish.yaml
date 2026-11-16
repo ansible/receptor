@@ -1,6 +1,8 @@
 ---
 name: Publish receptorctl to PyPI
 on:  # yamllint disable-line rule:truthy
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -15,14 +17,14 @@ jobs:
     permissions:
       contents: read
     env:
-      TAG: ${{ inputs.tag }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}
     steps:
       - name: Checkout Receptor
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Install python
         uses: actions/setup-python@v7

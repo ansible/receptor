@@ -50,37 +50,6 @@ jobs:
           src: ghcr.io/${{ github.repository }}:${{env.TAG}}
           dst: quay.io/${{ github.repository }}:${{env.FLOATING_TAG}}
 
-      - name: Install python
-        uses: actions/setup-python@v7
-
-      - name: Install dependencies
-        run: |
-          python3 -m pip install twine==7.0.0 build==1.5.0 --only-binary :all:
-
-      - name: Set official pypi info
-        run: echo pypi_repo=pypi >> $GITHUB_ENV
-        if: ${{ github.repository_owner == 'ansible' }}
-
-      - name: Set unofficial pypi info
-        run: echo pypi_repo=testpypi >> $GITHUB_ENV
-        if: ${{ github.repository_owner != 'ansible' }}
-
-      - name: Set receptor pypi version
-        run: echo RECEPTORCTL_PYPI_VERSION=$(curl --silent https://pypi.org/pypi/receptorctl/json | jq --raw-output '"v" + .info.version') >> $GITHUB_ENV
-
-      - name: Build receptorctl and upload to pypi
-        if: ${{ env.RECEPTORCTL_PYPI_VERSION != env.TAG }}
-        env:
-          PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          make receptorctl_wheel receptorctl_sdist VERSION=$TAG
-          twine upload \
-            -r ${{ env.pypi_repo }} \
-            -u "$PYPI_USERNAME" \
-            -p "$PYPI_PASSWORD" \
-            receptorctl/dist/*
-
   publish:
     runs-on: ubuntu-latest
     permissions:

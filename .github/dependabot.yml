@@ -8,6 +8,11 @@ updates:
     labels:
       - "dependencies"
       - "go"
+    groups:
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
     ignore:
       - dependency-name: "golang"
         versions: ["1.24", "1.25"]

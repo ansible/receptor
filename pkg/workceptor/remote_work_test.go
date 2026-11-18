@@ -2264,7 +2264,10 @@ func TestRemoteWorkCreateSignatureErrorLogCarriesRemoteID(t *testing.T) {
 // TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID pins the
 // "Could not copy to stdout file" line emitted by monitorRemoteStdout.
 func TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID(t *testing.T) {
-	streamStarted := make(chan struct{})
+	if _, err := os.Stat("/dev/full"); err != nil {
+		t.Skip("/dev/full is required to force a write error on the stdout file")
+	}
+	streamStarted := make(chan struct{}, 1)
 	release := make(chan struct{})
 	unitDir := t.TempDir()
 	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
@@ -2274,35 +2277,34 @@ func TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID(t *testing.T) {
 		service: func(conn net.Conn, _ string) bool {
 			_, _ = io.WriteString(conn, "Streaming results\n")
 			_, _ = io.WriteString(conn, "partial")
-			close(streamStarted)
+			select {
+			case streamStarted <- struct{}{}:
+			default:
+			}
 			<-release
 
 			return true
 		},
 	})
+	// Point the stdout file at /dev/full so the copy write fails without the
+	// context being cancelled or the unit released. Since #1625 those are
+	// treated as expected teardown and take the Debug path instead of the
+	// Warning this test pins.
 	stdoutPath := filepath.Join(unitDir, "stdout")
+	if err := os.Symlink("/dev/full", stdoutPath); err != nil {
+		t.Fatalf("failed to symlink stdout to /dev/full: %v", err)
+	}
 	env.unit.EXPECT().StdoutFileName().Return(stdoutPath).AnyTimes()
 	env.unit.EXPECT().Load().Return(nil).AnyTimes()
 
 	env.startStdout()
 
 	<-streamStarted
-	// Wait until io.Copy has written the streamed bytes before cancelling the
-	// read, otherwise the cancellation is observed by the earlier read and the
-	// copy error this test pins is never reached.
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer waitCancel()
-	if !testutils.CheckUntilTimeout(waitCtx, 5*time.Millisecond, func() bool {
-		info, err := os.Stat(stdoutPath)
-
-		return err == nil && info.Size() > 0
-	}) {
-		t.Fatal("timed out waiting for the stdout copy to start")
-	}
+	env.capture.WaitFor(t, 5*time.Second, "Could not copy to stdout file", logRemoteID(logTestRemoteNode))
+	// Stop the monitor now that the warning is pinned; the write error is
+	// permanent, so the loop would otherwise keep retrying.
 	env.cancel()
 	close(release)
-
-	env.capture.WaitFor(t, 5*time.Second, "Could not copy to stdout file", logRemoteID(logTestRemoteNode))
 	env.wait()
 }
 

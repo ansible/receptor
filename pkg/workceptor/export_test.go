@@ -50,13 +50,6 @@ func MonitorRemoteStdoutForTest(b BaseWorkUnitForWorkUnit, mw *utils.JobContext)
 	(&remoteUnit{BaseWorkUnitForWorkUnit: b}).monitorRemoteStdout(mw)
 }
 
-// MonitorRemoteStatusForTest runs the unexported remoteUnit status monitor on
-// a unit built from the given base work unit, for tests in the workceptor_test
-// package.
-func MonitorRemoteStatusForTest(b BaseWorkUnitForWorkUnit, mw *utils.JobContext, forRelease bool) {
-	(&remoteUnit{BaseWorkUnitForWorkUnit: b}).monitorRemoteStatus(mw, forRelease)
-}
-
 // HandleConnectionErrorForTest invokes the unexported connection error handler,
 // for tests in the workceptor_test package.
 func HandleConnectionErrorForTest(b BaseWorkUnitForWorkUnit, err error) bool {

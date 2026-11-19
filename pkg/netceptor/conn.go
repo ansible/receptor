@@ -379,6 +379,7 @@ func (s *Netceptor) Dial(node string, service string, tlscfg *tls.Config) (*Conn
 func (s *Netceptor) DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*Conn, error) {
 	_ = s.AddNameHash(node)
 	_ = s.AddNameHash(service)
+	// Create a dedicated packet connection owned by this dial.
 	pc, err := s.ListenPacket("")
 	if err != nil {
 		return nil, err
@@ -410,6 +411,7 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		})
 	}
 	cctx, ccancel := context.WithCancel(ctx)
+	// Close the packet connection if the dial fails or the node shuts down.
 	go func() {
 		select {
 		case <-okChan:
@@ -420,11 +422,13 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 			pcClose()
 		}
 	}()
+	// Cancel the dial if the remote service becomes unreachable.
 	doneChan := make(chan struct{}, 1)
 	go MonitorUnreachable(pc, doneChan, rAddr, ccancel)
 	_ = os.Setenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING", "1")
 	statelessResetKey := make([]byte, 32)
 	rand.Read(statelessResetKey)
+	// Dial QUIC over the packet connection.
 	tr := quic.Transport{
 		Conn:              pc,
 		StatelessResetKey: (*quic.StatelessResetKey)(statelessResetKey),
@@ -465,17 +469,15 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	close(okChan)
+	// Release the stream and packet connection when the connection or node ends.
+	// Do not watch doneChan here: Close() only closes the write side.
 	go func() {
 		select {
 		case <-qcAdapted.Context().Done():
-			_ = qs.Close()
-			_ = pc.Close()
 		case <-s.context.Done():
-			_ = qs.Close()
-			_ = pc.Close()
-		case <-doneChan:
-			return
 		}
+		_ = qs.Close()
+		_ = pc.Close()
 	}()
 	conn := NewConn(s, pc, qcAdapted, qs, doneChan, &sync.Once{}, cctx)
 
@@ -525,7 +527,6 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) CloseConnection() error {
-	c.pc.Cancel()
 	c.doneOnce.Do(func() {
 		close(c.doneChan)
 	})

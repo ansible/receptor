@@ -121,7 +121,7 @@ Run qvis locally:
 Pyroscope Client
 ^^^^^^^^^^^^^^^^
 
-Use pyroscope-client to implement pyroscope push-mode to profile receptor and push to a Pyroscope server.
+Use pyroscope-client to implement pyroscope push-mode to profile receptor and push to a Pyroscope server. See :doc:`profiling` for a complete setup and usage walkthrough.
 
 .. list-table:: Pyroscope client
     :header-rows: 1

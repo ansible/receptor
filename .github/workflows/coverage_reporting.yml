@@ -53,6 +53,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: go
           files: coverage.txt
+          disable_search: true
           flags: go
           fail_ci_if_error: false
 
@@ -110,6 +111,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: receptorctl
           files: receptorctl/receptorctl_coverage.xml
+          disable_search: true
           flags: receptorctl
           fail_ci_if_error: false
 

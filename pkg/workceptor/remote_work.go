@@ -29,6 +29,23 @@ const errMsgRemoteExtraDataMissing = "remote ExtraData missing"
 // close error on the paths that log one.
 var closeFile = func(f *os.File) error { return f.Close() }
 
+// closeConn closes a connection via its CloseConnection method. It is a
+// package variable so tests can simulate a close error on the paths that log
+// one.
+var closeConn = func(conn net.Conn) error {
+	return conn.(interface{ CloseConnection() error }).CloseConnection()
+}
+
+// marshalWorkResultsCommand encodes the results command sent by
+// monitorRemoteStdout. It is a package variable so tests can simulate an
+// encoding error on the path that logs one.
+var marshalWorkResultsCommand = json.Marshal
+
+// writeWorkResultsCommand writes the results command sent by
+// monitorRemoteStdout. It is a package variable so tests can simulate a write
+// error on the path that logs one.
+var writeWorkResultsCommand = func(conn net.Conn, b []byte) (int, error) { return conn.Write(b) }
+
 // remoteUnit implements the WorkUnit interface for the Receptor remote worker plugin.
 type remoteUnit struct {
 	BaseWorkUnitForWorkUnit
@@ -406,7 +423,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		if err != nil {
 			rw.surfaceRetryableError(err.Error())
 			rw.GetWorkceptor().nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
-			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+			cerr := closeConn(conn)
 			if cerr != nil {
 				rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to remote work unit %s: %s", remoteUnitID, cerr)
 			}
@@ -418,7 +435,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		if err != nil {
 			rw.surfaceRetryableError(err.Error())
 			rw.GetWorkceptor().nc.GetLogger().Debug("Read error reading from %s: %s\n", remoteNode, err)
-			cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+			cerr := closeConn(conn)
 			if cerr != nil {
 				rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection from node %s: %s", remoteNode, cerr)
 			}
@@ -542,7 +559,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			conn, reader := rw.GetConnection(mw)
 			defer func() {
 				if conn != nil {
-					cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+					cerr := closeConn(conn)
 					if cerr != nil {
 						rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
 					}
@@ -565,14 +582,14 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				}
 				workSubmitCmd["signature"] = signature
 			}
-			wscBytes, err := json.Marshal(workSubmitCmd)
+			wscBytes, err := marshalWorkResultsCommand(workSubmitCmd)
 			if err != nil {
 				rw.GetWorkceptor().nc.GetLogger().Error("error constructing work results command: %s", err)
 
 				return
 			}
 			wscBytes = append(wscBytes, '\n')
-			_, err = conn.Write(wscBytes)
+			_, err = writeWorkResultsCommand(conn, wscBytes)
 			if err != nil {
 				rw.GetWorkceptor().nc.GetLogger().Warning("Write error sending to %s: %s\n", remoteNode, err)
 
@@ -617,7 +634,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					if ok {
 						cr.CancelRead()
 					}
-					cerr := conn.(interface{ CloseConnection() error }).CloseConnection()
+					cerr := closeConn(conn)
 					if cerr != nil {
 						rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
 					}

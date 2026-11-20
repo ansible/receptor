@@ -127,7 +127,6 @@ type PacketConner interface {
 	SetReadDeadline(t time.Time) error
 	GetReadDeadline() time.Time
 	SetWriteDeadline(t time.Time) error
-	Cancel() *context.CancelFunc
 	LocalService() string
 	GetLogger() *logger.ReceptorLogger
 	StartUnreachable()

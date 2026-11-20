@@ -67,8 +67,6 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
 	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
 
-	var cancelFunc context.CancelFunc = func() {}
-	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
 	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
@@ -1001,8 +999,6 @@ func newStatusStreamErrorConn(ctx context.Context, ctrl *gomock.Controller, fail
 	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
 	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
 
-	var cancelFunc context.CancelFunc = func() {}
-	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
 	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
@@ -1139,8 +1135,6 @@ func TestGetConnectionClearsStaleDetailOnSuccess(t *testing.T) {
 	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
 	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
 
-	var cancelFunc context.CancelFunc = func() {}
-	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
 	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
@@ -1451,8 +1445,6 @@ func newScriptedConn(ctx context.Context, ctrl *gomock.Controller, onWrite func(
 	mockQuicStream.EXPECT().SetWriteDeadline(gomock.Any()).Return(nil).AnyTimes()
 	mockQuicStream.EXPECT().SetDeadline(gomock.Any()).Return(nil).AnyTimes()
 
-	var cancelFunc context.CancelFunc = func() {}
-	mockPacketConner.EXPECT().Cancel().Return(&cancelFunc).AnyTimes()
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
 	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()

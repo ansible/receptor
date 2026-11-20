@@ -211,11 +211,18 @@ func (w *Workceptor) createSignature(nodeID string) (string, error) {
 	return tokenString, nil
 }
 
-func (w *Workceptor) ShouldVerifySignature(workType string, signWork bool) bool {
-	// if work unit is remote, just get the signWork boolean from the
-	// remote extra data field
+// ShouldVerifySignature reports whether this node must verify a signature for
+// the given work type. The signWork argument is accepted for compatibility but
+// is not trusted: it comes from the node that submitted the work, so a
+// compromised hop could use it to switch verification off.
+func (w *Workceptor) ShouldVerifySignature(workType string, _ bool) bool {
+	// Remote work units proxy control commands to another node. Whether those
+	// commands must be signed is a property of this node's verification policy,
+	// not of the SignWork flag stored in the unit: that flag came from whichever
+	// node submitted the work, so trusting it here would let a compromised hop
+	// switch verification off.
 	if workType == "remote" {
-		return signWork
+		return w.VerifyingKey != ""
 	}
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workType]

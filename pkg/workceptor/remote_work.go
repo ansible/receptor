@@ -234,6 +234,10 @@ func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader
 	workSubmitCmd["node"] = red.RemoteNode
 	workSubmitCmd["worktype"] = red.RemoteWorkType
 	workSubmitCmd["tlsclient"] = red.TLSClient
+	// Carry the signing intent across hops. Without this the receiving node
+	// records SignWork=false for forwarded work and drops the signature when it
+	// re-submits to the next node.
+	workSubmitCmd["signwork"] = red.SignWork
 	if red.SignWork {
 		signature, err := rw.GetWorkceptor().createSignature(red.RemoteNode)
 		if err != nil {

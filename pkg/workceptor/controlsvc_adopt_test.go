@@ -80,7 +80,10 @@ func TestWorkceptorControlFuncAdopt(t *testing.T) {
 }
 
 func TestWorkceptorControlFuncAdoptRequiresValidSignatureOnTCP(t *testing.T) {
-	_, ctx, mockControlNC, mockCFO, commandType := newAdoptControlTest(t, nil)
+	w, ctx, mockControlNC, mockCFO, commandType := newAdoptControlTest(t, nil)
+	// Signature verification is local policy: only a node configured with a
+	// verifying key rejects unsigned remote-unit commands.
+	w.VerifyingKey = "/tmp/signworkpublic.pem"
 	mockCFO.EXPECT().RemoteAddr().Return(&net.TCPAddr{}).AnyTimes()
 	cmd, err := commandType.InitFromJSON(map[string]interface{}{
 		"subcommand": "adopt",

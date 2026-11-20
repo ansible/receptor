@@ -222,29 +222,97 @@ func TestShouldVerifySignature(t *testing.T) {
 	_, _, w := testSetup(t)
 
 	testCases := []struct {
-		name     string
-		workType string
+		name         string
+		workType     string
+		verifyingKey string
+		want         bool
 	}{
 		{
-			name:     "return with remote true",
-			workType: "remote",
+			name:         "remote with verification configured",
+			workType:     "remote",
+			verifyingKey: "/tmp/signworkpublic.pem",
+			want:         true,
 		},
 		{
-			name:     "return with false",
-			workType: "",
+			name:     "remote without verification configured",
+			workType: "remote",
+			want:     false,
+		},
+		{
+			name:         "unregistered work type is not verified",
+			workType:     "",
+			verifyingKey: "/tmp/signworkpublic.pem",
+			want:         false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			w.VerifyingKey = tc.verifyingKey
 			shouldVerifySignature := w.ShouldVerifySignature(tc.workType, true)
-			t.Log(shouldVerifySignature)
-			if tc.workType == "remote" && !shouldVerifySignature {
-				t.Errorf("expected: true, received: %t", shouldVerifySignature)
+			if shouldVerifySignature != tc.want {
+				t.Errorf("expected: %t, received: %t", tc.want, shouldVerifySignature)
 			}
+		})
+	}
+}
 
-			if tc.workType == "" && shouldVerifySignature {
-				t.Errorf("expected: false, received: %t", shouldVerifySignature)
+func TestEffectiveSignWork(t *testing.T) {
+	testCases := []struct {
+		name      string
+		params    map[string]interface{}
+		signature string
+		want      bool
+		wantErr   string
+	}{
+		{
+			name: "unsigned request without the flag",
+			want: false,
+		},
+		{
+			name:      "signature without the flag implies signed work",
+			signature: "signed-token",
+			want:      true,
+		},
+		{
+			name:      "explicit true with a signature",
+			params:    map[string]interface{}{"signwork": "true"},
+			signature: "signed-token",
+			want:      true,
+		},
+		{
+			name:   "explicit false without a signature",
+			params: map[string]interface{}{"signwork": "false"},
+			want:   false,
+		},
+		{
+			name:      "explicit false with a signature is rejected",
+			params:    map[string]interface{}{"signwork": "false"},
+			signature: "signed-token",
+			wantErr:   "cannot set signwork to false",
+		},
+		{
+			name:    "malformed flag is rejected",
+			params:  map[string]interface{}{"signwork": "yes"},
+			wantErr: "not convertible to a bool",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := workceptor.EffectiveSignWorkForTest(tc.params, tc.signature)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("error = %v, want substring %q", err, tc.wantErr)
+				}
+
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %t, want %t", got, tc.want)
 			}
 		})
 	}

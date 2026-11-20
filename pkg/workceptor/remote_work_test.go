@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -1984,6 +1985,75 @@ func TestRemoteWorkStdinCloseErrorLogCarriesRemoteID(t *testing.T) {
 	}
 
 	logCapture.WaitFor(t, 5*time.Second, "Error closing", "stdin", logRemoteID(logTestRemoteNode))
+}
+
+// TestRemoteWorkStartCarriesSignWork pins that a forwarded submit carries the
+// signwork flag. Without it the next node records SignWork=false and drops the
+// signature when it forwards the work again.
+func TestRemoteWorkStartCarriesSignWork(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	n1, n2, _ := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
+
+	submitCh := make(chan map[string]interface{}, 1)
+	startFakeControlListener(t, n2, func(conn net.Conn) {
+		defer conn.Close()
+		if _, err := fmt.Fprintf(conn, "%s\n", logTestRemoteNode); err != nil {
+			return
+		}
+		reader := bufio.NewReader(conn)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		payload := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(strings.TrimSpace(line)), &payload); err != nil {
+			return
+		}
+		submitCh <- payload
+		if _, err := io.WriteString(conn, "Work unit created with ID unit1. Send stdin data and EOF.\n"); err != nil {
+			return
+		}
+		if _, err := io.Copy(io.Discard, reader); err != nil {
+			return
+		}
+		_, _ = io.WriteString(conn, "OK\n")
+	})
+	waitForControlService(t, n1, logTestRemoteNode)
+
+	mockBaseWorkUnit, unitDir := newRemoteCloseTestUnit(t, ctx, n1, workceptor.StatusFileData{State: workceptor.WorkStateRunning})
+	if err := os.WriteFile(filepath.Join(unitDir, "stdin"), []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer dialCancel()
+	conn, err := n1.DialContext(dialCtx, logTestRemoteNode, "control", nil)
+	if err != nil {
+		t.Fatalf("could not dial control service: %v", err)
+	}
+	reader := bufio.NewReader(conn)
+	if _, err := reader.ReadString('\n'); err != nil {
+		t.Fatalf("could not read control greeting: %v", err)
+	}
+
+	if err := workceptor.StartRemoteUnitForTest(mockBaseWorkUnit, ctx, conn, reader); err != nil {
+		t.Fatalf("StartRemoteUnit failed: %v", err)
+	}
+
+	select {
+	case payload := <-submitCh:
+		signWork, ok := payload["signwork"]
+		if !ok {
+			t.Fatal("submit command did not carry signwork")
+		}
+		if signWork != false {
+			t.Fatalf("signwork = %v, want false", signWork)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no submit command was captured")
+	}
 }
 
 // TestRemoteWorkStdoutCloseErrorLogCarriesRemoteID pins the "Error closing"

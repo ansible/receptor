@@ -118,3 +118,75 @@ func TestControlFuncResultsDoesNotCloseConnection(t *testing.T) {
 		t.Fatalf("ControlFunc returned unexpected result: %v", result)
 	}
 }
+
+// TestControlFuncResultsUnsignedRemoteWithVerificationKey reproduces the TCP
+// client case: the node the client connected to has a work-verification key,
+// but the remote unit was submitted unsigned, so there is no signature to
+// check. Results must still be readable.
+func TestControlFuncResultsUnsignedRemoteWithVerificationKey(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	tmpDir := t.TempDir()
+	stdoutData := []byte("unsigned-ok\n")
+
+	mockNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	mockNC.EXPECT().NodeID().Return("testnode").AnyTimes()
+	mockNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w, err := workceptor.New(ctx, mockNC, tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A configured key must not make unsigned remote work require a signature.
+	w.VerifyingKey = "/tmp/signworkpublic.pem"
+
+	unit, err := w.AllocateRemoteUnit("remote-node", "echo", "testunit", "", "", false, map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit.UpdateBasicStatus(workceptor.WorkStateSucceeded, "", int64(len(stdoutData)))
+
+	unitDir := path.Join(tmpDir, "testnode", "testunit")
+	if err := os.WriteFile(path.Join(unitDir, "stdout"), stdoutData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmdType := workceptor.NewWorkceptorCommandTypeForTest(w)
+	cmd, err := cmdType.InitFromJSON(map[string]interface{}{
+		"command":    "work",
+		"subcommand": "results",
+		"unitid":     "testunit",
+		"startpos":   int64(0),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mockCfo := mock_controlsvc.NewMockControlFuncOperations(ctrl)
+	mockAddr := mock_utils.NewMockNetAddr(ctrl)
+	// A TCP client skips the unix-socket verification bypass.
+	mockAddr.EXPECT().Network().Return("tcp")
+	mockCfo.EXPECT().RemoteAddr().Return(mockAddr)
+	mockCfo.EXPECT().WriteToConn(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ string, ch chan []byte) error {
+			for b := range ch {
+				_ = b
+			}
+
+			return nil
+		},
+	)
+
+	mockNCCmd := mock_controlsvc.NewMockNetceptorForControlCommand(ctrl)
+
+	result, err := cmd.ControlFunc(ctx, mockNCCmd, mockCfo)
+	if err != nil {
+		t.Fatalf("ControlFunc returned %v; unsigned remote results must not require a signature", err)
+	}
+	if result != nil {
+		t.Fatalf("ControlFunc returned unexpected result: %v", result)
+	}
+}

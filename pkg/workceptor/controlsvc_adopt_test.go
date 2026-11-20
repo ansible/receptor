@@ -80,13 +80,50 @@ func TestWorkceptorControlFuncAdopt(t *testing.T) {
 }
 
 func TestWorkceptorControlFuncAdoptRequiresValidSignatureOnTCP(t *testing.T) {
-	_, ctx, mockControlNC, mockCFO, commandType := newAdoptControlTest(t, nil)
+	testCases := []struct {
+		name         string
+		verifyingKey string
+	}{
+		{name: "node with work-verification configured", verifyingKey: "/tmp/signworkpublic.pem"},
+		{name: "signing-only node keeps failing closed", verifyingKey: ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, ctx, mockControlNC, mockCFO, commandType := newAdoptControlTest(t, nil)
+			// Signature verification is local policy, but a unit submitted as
+			// signed must still be verified even when no verifying key is set.
+			w.VerifyingKey = tc.verifyingKey
+			mockCFO.EXPECT().RemoteAddr().Return(&net.TCPAddr{}).AnyTimes()
+			cmd, err := commandType.InitFromJSON(map[string]interface{}{
+				"subcommand": "adopt",
+				"node":       "remote-node",
+				"unitid":     "remote-unit",
+				"signwork":   "true",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := cmd.ControlFunc(ctx, mockControlNC, mockCFO); err == nil || err.Error() != "could not verify signature: signature is empty" {
+				t.Fatalf("ControlFunc error = %v, want missing-signature error", err)
+			}
+		})
+	}
+}
+
+func TestWorkceptorControlFuncCancelSignedRemoteUnitRequiresSignature(t *testing.T) {
+	w, ctx, mockControlNC, mockCFO, commandType := newAdoptControlTest(t, nil)
+	// Signing-only configuration: no work-verification key.
+	unit, err := w.AllocateRemoteUnit("remote-node", "work-type-1", "", "", "", true, map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.AddActiveUnitForTest(unit.ID(), unit)
+
 	mockCFO.EXPECT().RemoteAddr().Return(&net.TCPAddr{}).AnyTimes()
 	cmd, err := commandType.InitFromJSON(map[string]interface{}{
-		"subcommand": "adopt",
-		"node":       "remote-node",
-		"unitid":     "remote-unit",
-		"signwork":   "true",
+		"subcommand": "cancel",
+		"unitid":     unit.ID(),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -36,6 +36,12 @@ func StartRemoteUnitForTest(b BaseWorkUnitForWorkUnit, ctx context.Context, conn
 	return (&remoteUnit{BaseWorkUnitForWorkUnit: b}).StartRemoteUnit(ctx, conn, reader)
 }
 
+// EffectiveSignWorkForTest exposes the submit/adopt signwork resolution for
+// tests in the workceptor_test package.
+func EffectiveSignWorkForTest(params map[string]interface{}, signature string) (bool, error) {
+	return effectiveSignWork(params, signature)
+}
+
 // MonitorRemoteStatusForTest runs the unexported remote status monitor on a
 // unit built from the given base work unit, for tests in the workceptor_test
 // package.

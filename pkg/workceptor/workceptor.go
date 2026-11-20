@@ -211,9 +211,20 @@ func (w *Workceptor) createSignature(nodeID string) (string, error) {
 	return tokenString, nil
 }
 
+// ShouldVerifySignature reports whether this node must verify a signature for
+// the given work type. A local work type decides through its own
+// verifysignature setting. A remote unit is decided by the signwork flag
+// recorded when it was submitted: the node that executes the work owns the
+// acceptance policy, and only a unit submitted as signed has a signature for
+// the proxy to check. A node without a verifying key still fails closed for
+// signed work.
 func (w *Workceptor) ShouldVerifySignature(workType string, signWork bool) bool {
-	// if work unit is remote, just get the signWork boolean from the
-	// remote extra data field
+	// A remote work unit is a proxy for work that another node will execute, so
+	// the deciding policy belongs to that node. On the submitting node, only a
+	// unit that was itself submitted as signed has a signature to check here;
+	// requiring verification merely because a work-verification key happens to
+	// be configured would reject results for unsigned remote work. Signed units
+	// still fail closed when no key is available.
 	if workType == "remote" {
 		return signWork
 	}

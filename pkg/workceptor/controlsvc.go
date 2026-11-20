@@ -157,6 +157,26 @@ func boolFromMap(config map[string]interface{}, name string) (bool, error) {
 	return false, fmt.Errorf("field %s must be a string or a bool", name)
 }
 
+// effectiveSignWork resolves the signwork flag for an incoming submit or adopt
+// request. A signature is itself evidence that the submitter asked for signed
+// work, so a signed request may omit the flag (older submitters and forwarded
+// work do), but it must not set it to false: that would let a relay downgrade
+// work the origin signed.
+func effectiveSignWork(params map[string]interface{}, signature string) (bool, error) {
+	signWork, err := boolFromMap(params, "signwork")
+	if errors.Is(err, ErrFieldMissing) {
+		return signature != "", nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if signature != "" && !signWork {
+		return false, fmt.Errorf("signed work submission cannot set signwork to false")
+	}
+
+	return signWork, nil
+}
+
 func (t *workceptorCommandType) InitFromJSON(config map[string]interface{}) (controlsvc.ControlCommand, error) {
 	subCmd, err := strFromMap(config, "subcommand")
 	if err != nil {
@@ -304,13 +324,13 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if err != nil {
 			ttl = ""
 		}
-		signWork, err := boolFromMap(c.params, "signwork")
-		if err != nil && !errors.Is(err, ErrFieldMissing) {
-			return nil, err
-		}
 		signature, err := strFromMap(c.params, "signature")
 		if err != nil {
 			signature = ""
+		}
+		signWork, err := effectiveSignWork(c.params, signature)
+		if err != nil {
+			return nil, err
 		}
 		workUnitID, err := strFromMap(c.params, "workUnitID")
 		if err != nil {
@@ -513,13 +533,13 @@ func (c *workceptorCommand) ControlFunc(ctx context.Context, nc controlsvc.Netce
 		if err != nil {
 			tlsClient = ""
 		}
-		signWork, err := boolFromMap(c.params, "signwork")
-		if err != nil && !errors.Is(err, ErrFieldMissing) {
-			return nil, err
-		}
 		signature, err := strFromMap(c.params, "signature")
 		if err != nil {
 			signature = ""
+		}
+		signWork, err := effectiveSignWork(c.params, signature)
+		if err != nil {
+			return nil, err
 		}
 
 		err = c.processSignature("remote", signature, connIsUnix, signWork)

@@ -1161,3 +1161,67 @@ func TestWorkAdoptSignedVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestSignedWorkCancelRelease drives sign/verify through the remote control
+// path, which is separate from submission: the proxy unit on node1 signs each
+// cancel and release command, and node2 verifies it against the work type's
+// verifysignature setting.
+func TestSignedWorkCancelRelease(t *testing.T) {
+	t.Parallel()
+
+	privateKey, publicKey, err := utils.GenerateRSAPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewLibMesh()
+	node1 := m.NewLibNode("node1")
+	node1.WorkSigningKey = &workceptor.SigningKeyPrivateCfg{PrivateKey: privateKey}
+	node1.ListenerCfgs = map[listenerName]ListenerCfg{listenerName("tcp"): newListenerCfg("tcp", "", 1, nil)}
+
+	node2 := m.NewLibNode("node2")
+	node2.workerConfigs = []workceptor.WorkerConfig{
+		workceptor.CommandWorkerCfg{WorkType: "sleepy", Command: "bash", Params: "-c 'sleep 60'", VerifySignature: true},
+	}
+	node2.WorkVerificationKey = &workceptor.VerifyingKeyPublicCfg{PublicKey: publicKey}
+	node2.Connections = []Connection{{RemoteNode: node1, Protocol: "tcp"}}
+
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	if err := m.WaitForReady(ctx); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	controller := NewReceptorControl()
+	if err := controller.Connect(m.GetNodes()["node1"].GetControlSocket()); err != nil {
+		t.Fatal(err)
+	}
+
+	unitID, err := controller.WorkSubmitJSON(`{"command":"work","subcommand":"submit","worktype":"sleepy","node":"node2","signwork":"true"}`)
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	if err := controller.AssertWorkRunning(ctx, unitID); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	if _, err := controller.WorkCancel(unitID); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	if err := controller.AssertWorkCancelled(ctx, unitID); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	if _, err := controller.WorkRelease(unitID); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	if err := controller.AssertWorkReleased(ctx, unitID); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+}

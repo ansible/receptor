@@ -47,6 +47,16 @@ jobs:
       - name: Run receptor tests with coverage
         run: make coverage
 
+      - name: Upload Go coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          name: go
+          files: coverage.txt
+          disable_search: true
+          flags: go
+          fail_ci_if_error: false
+
       - name: Set up nox
         uses: wntrblm/nox@2026.10.20
         with:
@@ -94,6 +104,16 @@ jobs:
                                   xml_declaration=True, encoding='unicode')
           print('Merged receptor-python-worker coverage into receptorctl_coverage.xml')
           EOF
+
+      - name: Upload receptorctl coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          name: receptorctl
+          files: receptorctl/receptorctl_coverage.xml
+          disable_search: true
+          flags: receptorctl
+          fail_ci_if_error: false
 
       - name: SonarCube Static Scans (on push)
         uses: SonarSource/sonarqube-scan-action@v7

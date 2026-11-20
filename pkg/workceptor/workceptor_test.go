@@ -228,11 +228,13 @@ func TestShouldVerifySignature(t *testing.T) {
 		verifyingKey string
 		want         bool
 	}{
+		// A local work-verification key is not a policy that unsigned remote
+		// work must be signed: the target decides whether to accept it.
 		{
-			name:         "remote with verification configured",
+			name:         "unsigned remote on a node with a verification key is not verified",
 			workType:     "remote",
 			verifyingKey: "/tmp/signworkpublic.pem",
-			want:         true,
+			want:         false,
 		},
 		{
 			name:     "unsigned remote without verification configured",
@@ -244,6 +246,13 @@ func TestShouldVerifySignature(t *testing.T) {
 			workType: "remote",
 			signWork: true,
 			want:     true,
+		},
+		{
+			name:         "signed remote with verification configured is verified",
+			workType:     "remote",
+			signWork:     true,
+			verifyingKey: "/tmp/signworkpublic.pem",
+			want:         true,
 		},
 		{
 			name:         "unregistered work type is not verified",

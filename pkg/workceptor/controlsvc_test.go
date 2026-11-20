@@ -856,3 +856,63 @@ func Test_strIntFromMapMissingIsErrFieldMissing(t *testing.T) {
 		t.Errorf("strFromMap malformed: got ErrFieldMissing: %v", err)
 	}
 }
+
+// TestProcessSignatureRemoteUnitDoesNotUseLocalVerificationKey pins that the
+// "remote" unit policy is driven by the signwork flag recorded at submission.
+// The submitting node only has a signature to check when the work was submitted
+// as signed; a work-verification key on that node does not by itself require
+// unsigned remote work to carry one. Without this, `work results` for unsigned
+// remote work fails with "signature is empty" on any node that has a key.
+func TestProcessSignatureRemoteUnitDoesNotUseLocalVerificationKey(t *testing.T) {
+	testCases := []struct {
+		name         string
+		verifyingKey string
+		signature    string
+		connIsUnix   bool
+		signWork     bool
+		wantErr      string
+	}{
+		{
+			name:         "unsigned remote work with a local verification key",
+			verifyingKey: "/tmp/signworkpublic.pem",
+			connIsUnix:   false,
+			wantErr:      "",
+		},
+		{
+			name:       "unsigned remote work over a unix socket",
+			connIsUnix: true,
+			wantErr:    "",
+		},
+		{
+			name:       "signed remote work without a signature fails closed",
+			connIsUnix: false,
+			signWork:   true,
+			wantErr:    "could not verify signature: signature is empty",
+		},
+		{
+			name:         "signed remote work with a key but no signature fails closed",
+			verifyingKey: "/tmp/signworkpublic.pem",
+			connIsUnix:   false,
+			signWork:     true,
+			wantErr:      "could not verify signature: signature is empty",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &Workceptor{VerifyingKey: tc.verifyingKey}
+			c := &workceptorCommand{w: w}
+			err := c.processSignature("remote", tc.signature, tc.connIsUnix, tc.signWork)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("processSignature returned %v, want nil", err)
+				}
+
+				return
+			}
+			if err == nil || err.Error() != tc.wantErr {
+				t.Fatalf("processSignature error = %v, want %q", err, tc.wantErr)
+			}
+		})
+	}
+}

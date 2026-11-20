@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -236,8 +237,9 @@ func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader
 	workSubmitCmd["tlsclient"] = red.TLSClient
 	// Carry the signing intent across hops. Without this the receiving node
 	// records SignWork=false for forwarded work and drops the signature when it
-	// re-submits to the next node.
-	workSubmitCmd["signwork"] = red.SignWork
+	// re-submits to the next node. The control protocol requires submit
+	// parameters to be strings.
+	workSubmitCmd["signwork"] = strconv.FormatBool(red.SignWork)
 	if red.SignWork {
 		signature, err := rw.GetWorkceptor().createSignature(red.RemoteNode)
 		if err != nil {

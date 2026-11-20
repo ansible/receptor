@@ -224,6 +224,7 @@ func TestShouldVerifySignature(t *testing.T) {
 	testCases := []struct {
 		name         string
 		workType     string
+		signWork     bool
 		verifyingKey string
 		want         bool
 	}{
@@ -234,9 +235,15 @@ func TestShouldVerifySignature(t *testing.T) {
 			want:         true,
 		},
 		{
-			name:     "remote without verification configured",
+			name:     "unsigned remote without verification configured",
 			workType: "remote",
 			want:     false,
+		},
+		{
+			name:     "signed remote without verification configured stays fail-closed",
+			workType: "remote",
+			signWork: true,
+			want:     true,
 		},
 		{
 			name:         "unregistered work type is not verified",
@@ -249,7 +256,7 @@ func TestShouldVerifySignature(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			w.VerifyingKey = tc.verifyingKey
-			shouldVerifySignature := w.ShouldVerifySignature(tc.workType, true)
+			shouldVerifySignature := w.ShouldVerifySignature(tc.workType, tc.signWork)
 			if shouldVerifySignature != tc.want {
 				t.Errorf("expected: %t, received: %t", tc.want, shouldVerifySignature)
 			}

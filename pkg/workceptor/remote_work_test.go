@@ -2042,14 +2042,27 @@ func TestRemoteWorkStartCarriesSignWork(t *testing.T) {
 		t.Fatalf("StartRemoteUnit failed: %v", err)
 	}
 
+	ctrl := gomock.NewController(t)
+	parserNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	parserNC.EXPECT().NodeID().Return(logTestLocalNode).AnyTimes()
+	parserNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	parser, err := workceptor.New(ctx, parserNC, t.TempDir())
+	if err != nil {
+		t.Fatalf("could not create workceptor for payload parsing: %v", err)
+	}
+	commandType := workceptor.NewWorkceptorCommandTypeForTest(parser)
+
 	select {
 	case payload := <-submitCh:
+		if _, err := commandType.InitFromJSON(payload); err != nil {
+			t.Fatalf("forwarded submit payload rejected by the receiver parser: %v", err)
+		}
 		signWork, ok := payload["signwork"]
 		if !ok {
 			t.Fatal("submit command did not carry signwork")
 		}
-		if signWork != false {
-			t.Fatalf("signwork = %v, want false", signWork)
+		if signWork != "false" {
+			t.Fatalf("signwork = %#v, want %q", signWork, "false")
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("no submit command was captured")

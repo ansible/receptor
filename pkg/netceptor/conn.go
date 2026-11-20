@@ -469,8 +469,10 @@ func (s *Netceptor) DialContext(ctx context.Context, node string, service string
 		return nil, err
 	}
 	close(okChan)
-	// Release the stream and packet connection when the connection or node ends.
-	// Do not watch doneChan here: Close() only closes the write side.
+	// Release the stream and packet connection exactly once when the connection or node ends.
+	// doneChan is not a teardown signal (Close() also closes it; CloseConnection() closes it
+	// before QUIC). s.context.Done() is the only explicit node-shutdown path here: the dial
+	// goroutine stops watching it after okChan closes, and QUIC only dies later via ReadFrom.
 	go func() {
 		select {
 		case <-qcAdapted.Context().Done():

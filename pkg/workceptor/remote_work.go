@@ -625,7 +625,9 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				}
 			}()
 			doneChan := make(chan struct{})
+			cancelExited := make(chan struct{})
 			go func() {
+				defer close(cancelExited)
 				select {
 				case <-doneChan:
 					return
@@ -644,6 +646,10 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			}()
 			_, err = io.Copy(stdout, reader)
 			close(doneChan)
+			// Wait for the cancellation goroutine to exit so it cannot overlap
+			// with the deferred close below or with test cleanup that restores
+			// the closeConn hook.
+			<-cancelExited
 			if err != nil {
 				var errmsg string
 				if strings.HasSuffix(err.Error(), "error code 499") {

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2658,7 +2659,12 @@ func TestRemoteWorkStreamCloseErrorLogCarriesRemoteID(t *testing.T) {
 // closing connection to" line run from monitorRemoteStdout's cancellation
 // goroutine when the stdout copy is interrupted by the job context.
 func TestRemoteWorkStreamCancelCloseErrorLogCarriesRemoteID(t *testing.T) {
-	restore := workceptor.SetCloseConnForTest(func(net.Conn) error { return errors.New("close boom") })
+	var closeCalls atomic.Int32
+	restore := workceptor.SetCloseConnForTest(func(net.Conn) error {
+		closeCalls.Add(1)
+
+		return errors.New("close boom")
+	})
 	t.Cleanup(restore)
 
 	const payload = "streaming"
@@ -2696,6 +2702,13 @@ func TestRemoteWorkStreamCancelCloseErrorLogCarriesRemoteID(t *testing.T) {
 	env.cancel()
 	env.capture.WaitFor(t, 10*time.Second, "Error closing connection to", logRemoteID(logTestRemoteNode))
 	env.wait()
+
+	// Both the cancellation goroutine (which closes the connection to unblock
+	// io.Copy) and the deferred close must have run; if the goroutine were not
+	// joined, the deferred close alone could satisfy the log assertion above.
+	if got := closeCalls.Load(); got != 2 {
+		t.Fatalf("expected the cancellation goroutine and the deferred close to each close the connection once, got %d close call(s)", got)
+	}
 }
 
 // TestRemoteWorkResultsCommandErrorLogCarriesRemoteID pins the "error

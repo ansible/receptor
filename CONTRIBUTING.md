@@ -29,10 +29,7 @@ Have questions about this document or anything not covered here? Create a topic 
   - If collaborating with someone else on the same branch, consider using `--force-with-lease` instead of `--force`. This will prevent you from accidentally overwriting commits pushed by someone else. For more information, see [git push docs](https://git-scm.com/docs/git-push#git-push---force-with-leaseltrefnamegt).
 - If submitting a large code change, it's a good idea to create a [forum topic tagged with 'aap'](https://forum.ansible.com/tag/aap), and talk about what you would like to do or add first. This not only helps everyone know what's going on, it also helps save time and effort, if the community decides some changes are needed.
 - We ask all of our community members and contributors to adhere to the [Ansible code of conduct](http://docs.ansible.com/ansible/latest/community/code_of_conduct.html). If you have questions, or need assistance, please reach out to our community team at [codeofconduct@ansible.com](mailto:codeofconduct@ansible.com)
-
-## Setting up your development environment
-
-Our team uses [VS Code](https://code.visualstudio.com/) with the [Golang extension](https://marketplace.visualstudio.com/items?itemName=golang.Go) installed for our development environments. The instrustions below will show how to set up an environment using this tool set.
+- Follow the Go coding standards in [STANDARDS.md](STANDARDS.md).
 
 ### Fork and clone the Receptor repo
 
@@ -59,6 +56,8 @@ make container
 ```
 #### Running tests
 `make test`
+
+See the [developer guide](https://ansible.readthedocs.io/projects/receptor/en/latest/developer_guide.html) for debugging tips and details on running linters.
 
 ## What should I work on?
 

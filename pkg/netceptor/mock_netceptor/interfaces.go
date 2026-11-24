@@ -886,20 +886,6 @@ func (m *MockPacketConner) EXPECT() *MockPacketConnerMockRecorder {
 	return m.recorder
 }
 
-// Cancel mocks base method.
-func (m *MockPacketConner) Cancel() *context.CancelFunc {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Cancel")
-	ret0, _ := ret[0].(*context.CancelFunc)
-	return ret0
-}
-
-// Cancel indicates an expected call of Cancel.
-func (mr *MockPacketConnerMockRecorder) Cancel() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cancel", reflect.TypeOf((*MockPacketConner)(nil).Cancel))
-}
-
 // Close mocks base method.
 func (m *MockPacketConner) Close() error {
 	m.ctrl.T.Helper()

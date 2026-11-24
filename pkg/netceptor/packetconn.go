@@ -94,10 +94,6 @@ func (s *Netceptor) ListenPacketAndAdvertise(service string, tags map[string]str
 	return pc, nil
 }
 
-func (pc *PacketConn) Cancel() *context.CancelFunc {
-	return &pc.cancel
-}
-
 // isDone reports whether the PacketConn has been canceled.
 func (pc *PacketConn) isDone() bool {
 	select {
@@ -119,6 +115,11 @@ func (pc *PacketConn) StartUnreachable() {
 	pc.cancel = cancel
 	pc.unreachableSubs = utils.NewBroker(ctx, reflect.TypeOf(UnreachableNotification{}))
 	iChan := pc.s.GetUnreachableBroker().Subscribe()
+	if iChan == nil {
+		// The netceptor is already shut down; there is nothing to monitor and
+		// ranging over the nil channel would block this goroutine forever.
+		return
+	}
 	go func() {
 		<-pc.done
 		pc.s.GetUnreachableBroker().Unsubscribe(iChan)

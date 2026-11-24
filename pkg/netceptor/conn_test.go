@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/pkg/backends"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/netceptor/mock_netceptor"
 	"github.com/ansible/receptor/pkg/utils/mock_utils"
 	"github.com/quic-go/quic-go"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 )
 
@@ -217,10 +219,7 @@ func TestCloseConnection(t *testing.T) {
 	mockQc := mock_netceptor.NewMockQuicConnectionForConn(ctrl)
 	mockQc.EXPECT().CloseWithError(quic.ApplicationErrorCode(0), gomock.Eq("normal close")).Return(nil).Times(1)
 
-	// PacketConner should be cancelled
 	mockPc := mock_netceptor.NewMockPacketConner(ctrl)
-	mockPc.EXPECT().Cancel().Times(1)
-
 	// The CloseConnection method logs some information to the netceptor's Logger, so mock them
 	mockPc.EXPECT().LocalService().Return("test-local-service").Times(1)
 	mockQc.EXPECT().RemoteAddr().Return(netceptor.Addr{})
@@ -1753,5 +1752,246 @@ func TestGetConfigForClientOverride(t *testing.T) {
 		assert.Panics(t, func() {
 			overrideFunc(clientHello)
 		})
+	})
+}
+
+// newMeshedNetceptors creates two Netceptor nodes joined over loopback TCP and
+// waits for routing to converge.
+func newMeshedNetceptors(t *testing.T) (n1, n2 *netceptor.Netceptor) {
+	t.Helper()
+
+	ctx := context.Background()
+	n1 = netceptor.New(ctx, "node1")
+	n2 = netceptor.New(ctx, "node2")
+	t.Cleanup(func() {
+		n1.Shutdown()
+		n1.BackendWait()
+		n2.Shutdown()
+		n2.BackendWait()
+	})
+
+	b1, err := backends.NewTCPListener("127.0.0.1:0", nil, n1.GetLogger())
+	if err != nil {
+		t.Fatalf("failed to create TCP listener: %v", err)
+	}
+	if err = n1.AddBackend(b1); err != nil {
+		t.Fatalf("failed to add listener backend: %v", err)
+	}
+
+	b2, err := backends.NewTCPDialer(b1.GetAddr(), false, nil, n2.GetLogger())
+	if err != nil {
+		t.Fatalf("failed to create TCP dialer: %v", err)
+	}
+	if err = n2.AddBackend(b2); err != nil {
+		t.Fatalf("failed to add dialer backend: %v", err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	return n1, n2
+}
+
+// listenerRegistryLen reads the listener registry under its lock, so it is safe
+// while connection cleanup runs in the background.
+func listenerRegistryLen(n *netceptor.Netceptor) int {
+	lock := n.GetListenerLock()
+	lock.RLock()
+	defer lock.RUnlock()
+
+	return len(n.GetListenerRegistry())
+}
+
+// trackGoroutines records the goroutines running at call time and returns a
+// function that fails the test if new goroutines survive connection teardown.
+// Call the returned function while the nodes are still running: a node shutdown
+// would also stop leaked goroutines and hide them from the check.
+func trackGoroutines(t *testing.T) func() {
+	t.Helper()
+
+	baseline := goleak.IgnoreCurrent()
+
+	return func() {
+		t.Helper()
+		// goleak retries, which covers quic-go tearing connections down asynchronously.
+		assert.NoError(t, goleak.Find(baseline), "goroutine leak detected")
+	}
+}
+
+// TestDialedConnReleasesPacketConn is a regression test for
+// https://github.com/ansible/receptor/issues/1646: closing a dialed connection
+// must release the per-dial PacketConn (the ephemeral listenerRegistry entry),
+// even when Close() ran first, and must never release the listener's shared
+// PacketConn on the accepting side. It also asserts that the dial's goroutines
+// exit on every teardown path, including failed dials.
+func TestDialedConnReleasesPacketConn(t *testing.T) {
+	tests := []struct {
+		name     string
+		teardown func(t *testing.T, conn *netceptor.Conn)
+	}{
+		{
+			name: "CloseConnection",
+			teardown: func(t *testing.T, conn *netceptor.Conn) {
+				t.Helper()
+
+				if err := conn.CloseConnection(); err != nil {
+					t.Fatalf("CloseConnection returned error: %v", err)
+				}
+			},
+		},
+		{
+			name: "Close then CloseConnection",
+			teardown: func(t *testing.T, conn *netceptor.Conn) {
+				t.Helper()
+
+				if err := conn.Close(); err != nil {
+					t.Fatalf("Close returned error: %v", err)
+				}
+				if err := conn.CloseConnection(); err != nil {
+					t.Fatalf("CloseConnection returned error: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" releases the dialed PacketConn", func(t *testing.T) {
+			node1, node2 := newMeshedNetceptors(t)
+			l1, err := node1.Listen("echo", nil)
+			if err != nil {
+				t.Fatalf("failed to create listener: %v", err)
+			}
+			defer func() { _ = l1.Close() }()
+			check := trackGoroutines(t)
+
+			baseline := listenerRegistryLen(node2)
+			conn, err := node2.Dial("node1", "echo", nil)
+			if err != nil {
+				t.Fatalf("failed to dial: %v", err)
+			}
+
+			assert.Equal(t, baseline+1, listenerRegistryLen(node2),
+				"dial should register exactly one ephemeral PacketConn")
+
+			tt.teardown(t, conn)
+
+			assert.Eventually(t, func() bool {
+				return listenerRegistryLen(node2) == baseline
+			}, 5*time.Second, 10*time.Millisecond,
+				"dialed PacketConn was not released from the listener registry")
+
+			// The server-side accept goroutines belong to the listener, not to
+			// the dial, so release them before checking for leaked goroutines.
+			_ = l1.Close()
+
+			check()
+		})
+	}
+
+	t.Run("accepted connection keeps the shared PacketConn", func(t *testing.T) {
+		node1, node2 := newMeshedNetceptors(t)
+		l1, err := node1.Listen("echo", nil)
+		if err != nil {
+			t.Fatalf("failed to create listener: %v", err)
+		}
+		defer func() { _ = l1.Close() }()
+		check := trackGoroutines(t)
+
+		acceptCh := make(chan net.Conn, 1)
+		go func() {
+			conn, err := l1.Accept()
+			if err != nil {
+				acceptCh <- nil
+
+				return
+			}
+			acceptCh <- conn
+		}()
+
+		baseline := listenerRegistryLen(node1)
+		conn, err := node2.Dial("node1", "echo", nil)
+		if err != nil {
+			t.Fatalf("failed to dial: %v", err)
+		}
+		defer func() { _ = conn.CloseConnection() }()
+
+		accepted := <-acceptCh
+		if accepted == nil {
+			t.Fatal("listener failed to accept the dialed connection")
+		}
+		defer func() { _ = accepted.Close() }()
+
+		if err := accepted.(interface{ CloseConnection() error }).CloseConnection(); err != nil {
+			t.Fatalf("accepted conn CloseConnection returned error: %v", err)
+		}
+
+		assert.Equal(t, baseline, listenerRegistryLen(node1),
+			"closing an accepted connection must not touch the listener registry")
+
+		lock := node1.GetListenerLock()
+		lock.RLock()
+		_, ok := node1.GetListenerRegistry()["echo"]
+		lock.RUnlock()
+
+		assert.True(t, ok, "listener's shared PacketConn must survive accepted connection teardown")
+
+		check()
+	})
+
+	t.Run("dial failure releases the dialed PacketConn", func(t *testing.T) {
+		_, node2 := newMeshedNetceptors(t)
+		check := trackGoroutines(t)
+
+		baseline := listenerRegistryLen(node2)
+		_, err := node2.Dial("node1", "missing", nil)
+		assert.Error(t, err, "dial to a service with no listener should fail")
+
+		assert.Eventually(t, func() bool {
+			return listenerRegistryLen(node2) == baseline
+		}, 5*time.Second, 10*time.Millisecond,
+			"dialed PacketConn was not released after a failed dial")
+
+		check()
+	})
+
+	t.Run("cancelled context releases the dialed PacketConn", func(t *testing.T) {
+		node1, node2 := newMeshedNetceptors(t)
+		l1, err := node1.Listen("echo", nil)
+		if err != nil {
+			t.Fatalf("failed to create listener: %v", err)
+		}
+		defer func() { _ = l1.Close() }()
+		check := trackGoroutines(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		baseline := listenerRegistryLen(node2)
+		_, err = node2.DialContext(ctx, "node1", "echo", nil)
+		assert.ErrorIs(t, err, context.Canceled)
+
+		assert.Eventually(t, func() bool {
+			return listenerRegistryLen(node2) == baseline
+		}, 5*time.Second, 10*time.Millisecond,
+			"dialed PacketConn was not released after context cancellation")
+
+		check()
+	})
+
+	t.Run("node shutdown releases the dialed PacketConn", func(t *testing.T) {
+		_, node2 := newMeshedNetceptors(t)
+		check := trackGoroutines(t)
+
+		node2.Shutdown()
+
+		baseline := listenerRegistryLen(node2)
+		_, err := node2.Dial("node1", "echo", nil)
+		assert.Error(t, err, "dial on a shut-down node should fail")
+
+		assert.Eventually(t, func() bool {
+			return listenerRegistryLen(node2) == baseline
+		}, 5*time.Second, 10*time.Millisecond,
+			"dialed PacketConn was not released after node shutdown")
+
+		check()
 	})
 }

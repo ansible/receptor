@@ -166,61 +166,75 @@ func TestWorkSigningPolicyMatrix(t *testing.T) {
 		topology := topology
 		t.Run(topology, func(t *testing.T) {
 			t.Parallel()
-
-			m := newSigningPolicyMesh(t, topology, privateKey, publicKey)
-			if err := m.Start(t.Name()); err != nil {
-				t.Fatal(err)
-			}
-			defer m.WaitForShutdown()
-			defer m.Destroy()
-
-			readyCtx, readyCancel := context.WithTimeout(context.Background(), 180*time.Second)
-			defer readyCancel()
-			if err := m.WaitForReady(readyCtx); err != nil {
-				t.Fatal(err, m.GetDataDir())
-			}
-
-			for _, tc := range signingPolicyCases {
-				tc := tc
-				t.Run(tc.name, func(t *testing.T) {
-					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-					defer cancel()
-
-					controller := NewReceptorControl()
-					if err := controller.Connect(m.GetNodes()[tc.originNode()].GetControlSocket()); err != nil {
-						t.Fatal(err, m.GetDataDir())
-					}
-					defer func() { _ = controller.Close() }()
-
-					signwork := ""
-					if tc.signWork {
-						signwork = `,"signwork":"true"`
-					}
-					job := fmt.Sprintf(`{"command":"work","subcommand":"submit","worktype":"echo","node":%q%s}`,
-						tc.targetNode(), signwork)
-
-					unitID, err := controller.WorkSubmitJSON(job)
-					if !tc.wantRun {
-						if err == nil {
-							t.Fatalf("submit unexpectedly succeeded with unit %s", unitID)
-						}
-						if !strings.Contains(err.Error(), tc.wantErr) {
-							t.Fatalf("submit error = %q, want it to contain %q", err, tc.wantErr)
-						}
-
-						return
-					}
-					if err != nil {
-						t.Fatal(err, m.GetDataDir())
-					}
-					if err := controller.AssertWorkSucceeded(ctx, unitID); err != nil {
-						t.Fatal(err, m.GetDataDir())
-					}
-					if err := controller.AssertWorkResults(unitID, []byte(signingPolicyOutput)); err != nil {
-						t.Fatal(err, m.GetDataDir())
-					}
-				})
-			}
+			testSigningPolicyTopology(t, topology, privateKey, publicKey)
 		})
 	}
+}
+
+func testSigningPolicyTopology(t *testing.T, topology, privateKey, publicKey string) {
+	t.Helper()
+
+	m := newSigningPolicyMesh(t, topology, privateKey, publicKey)
+	if err := m.Start(t.Name()); err != nil {
+		t.Fatal(err)
+	}
+	defer m.WaitForShutdown()
+	defer m.Destroy()
+
+	readyCtx, readyCancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer readyCancel()
+	if err := m.WaitForReady(readyCtx); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+
+	for _, tc := range signingPolicyCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runSigningPolicyCase(t, m, tc)
+		})
+	}
+}
+
+func runSigningPolicyCase(t *testing.T, m LibMesh, tc signingPolicyCase) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	controller := NewReceptorControl()
+	if err := controller.Connect(m.GetNodes()[tc.originNode()].GetControlSocket()); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	defer func() { _ = controller.Close() }()
+
+	unitID, err := controller.WorkSubmitJSON(signingSubmitCommand(tc))
+	if !tc.wantRun {
+		if err == nil {
+			t.Fatalf("submit unexpectedly succeeded with unit %s", unitID)
+		}
+		if !strings.Contains(err.Error(), tc.wantErr) {
+			t.Fatalf("submit error = %q, want it to contain %q", err, tc.wantErr)
+		}
+
+		return
+	}
+	if err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	if err := controller.AssertWorkSucceeded(ctx, unitID); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+	if err := controller.AssertWorkResults(unitID, []byte(signingPolicyOutput)); err != nil {
+		t.Fatal(err, m.GetDataDir())
+	}
+}
+
+func signingSubmitCommand(tc signingPolicyCase) string {
+	signwork := ""
+	if tc.signWork {
+		signwork = `,"signwork":"true"`
+	}
+
+	return fmt.Sprintf(`{"command":"work","subcommand":"submit","worktype":"echo","node":%q%s}`,
+		tc.targetNode(), signwork)
 }

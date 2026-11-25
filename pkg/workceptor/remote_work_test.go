@@ -2020,90 +2020,113 @@ func TestRemoteWorkStartCarriesSignWork(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			n1, n2, _ := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
-
-			submitCh := make(chan map[string]interface{}, 1)
-			startFakeControlListener(t, n2, func(conn net.Conn) {
-				defer conn.Close()
-				if _, err := fmt.Fprintf(conn, "%s\n", logTestRemoteNode); err != nil {
-					return
-				}
-				reader := bufio.NewReader(conn)
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					return
-				}
-				payload := map[string]interface{}{}
-				if err := json.Unmarshal([]byte(strings.TrimSpace(line)), &payload); err != nil {
-					return
-				}
-				submitCh <- payload
-				if _, err := io.WriteString(conn, "Work unit created with ID unit1. Send stdin data and EOF.\n"); err != nil {
-					return
-				}
-				if _, err := io.Copy(io.Discard, reader); err != nil {
-					return
-				}
-				_, _ = io.WriteString(conn, "OK\n")
-			})
-			waitForControlService(t, n1, logTestRemoteNode)
-
-			mockBaseWorkUnit, unitDir := newRemoteCloseTestUnit(t, ctx, n1, workceptor.StatusFileData{State: workceptor.WorkStateRunning}, tc.signWork, tc.signingKey)
-			if err := os.WriteFile(filepath.Join(unitDir, "stdin"), []byte("data"), 0o600); err != nil {
-				t.Fatal(err)
-			}
-
-			dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
-			defer dialCancel()
-			conn, err := n1.DialContext(dialCtx, logTestRemoteNode, "control", nil)
-			if err != nil {
-				t.Fatalf("could not dial control service: %v", err)
-			}
-			reader := bufio.NewReader(conn)
-			if _, err := reader.ReadString('\n'); err != nil {
-				t.Fatalf("could not read control greeting: %v", err)
-			}
-
-			if err := workceptor.StartRemoteUnitForTest(mockBaseWorkUnit, ctx, conn, reader); err != nil {
-				t.Fatalf("StartRemoteUnit failed: %v", err)
-			}
-
-			ctrl := gomock.NewController(t)
-			parserNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-			parserNC.EXPECT().NodeID().Return(logTestLocalNode).AnyTimes()
-			parserNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
-			parser, err := workceptor.New(ctx, parserNC, t.TempDir())
-			if err != nil {
-				t.Fatalf("could not create workceptor for payload parsing: %v", err)
-			}
-			commandType := workceptor.NewWorkceptorCommandTypeForTest(parser)
-
-			select {
-			case payload := <-submitCh:
-				if _, err := commandType.InitFromJSON(payload); err != nil {
-					t.Fatalf("forwarded submit payload rejected by the receiver parser: %v", err)
-				}
-				signWork, ok := payload["signwork"]
-				if !ok {
-					t.Fatal("submit command did not carry signwork")
-				}
-				if signWork != tc.want {
-					t.Fatalf("signwork = %#v, want %q", signWork, tc.want)
-				}
-				signature, ok := payload["signature"]
-				if tc.signWork && (!ok || signature == "") {
-					t.Fatal("signed submit command did not carry a signature")
-				}
-				if !tc.signWork && ok {
-					t.Fatalf("unsigned submit command carried a signature: %#v", signature)
-				}
-			case <-time.After(5 * time.Second):
-				t.Fatal("no submit command was captured")
-			}
+			payload := forwardedSignWorkPayload(t, tc.signWork, tc.signingKey)
+			assertForwardedSignWorkPayload(t, tc.signWork, tc.want, payload)
 		})
+	}
+}
+
+func captureForwardedSubmit(t *testing.T, remote *netceptor.Netceptor) chan map[string]interface{} {
+	t.Helper()
+
+	submitCh := make(chan map[string]interface{}, 1)
+	startFakeControlListener(t, remote, func(conn net.Conn) {
+		defer conn.Close()
+		if _, err := fmt.Fprintf(conn, "%s\n", logTestRemoteNode); err != nil {
+			return
+		}
+		reader := bufio.NewReader(conn)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		payload := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(strings.TrimSpace(line)), &payload); err != nil {
+			return
+		}
+		submitCh <- payload
+		if _, err := io.WriteString(conn, "Work unit created with ID unit1. Send stdin data and EOF.\n"); err != nil {
+			return
+		}
+		if _, err := io.Copy(io.Discard, reader); err != nil {
+			return
+		}
+		_, _ = io.WriteString(conn, "OK\n")
+	})
+
+	return submitCh
+}
+
+func forwardedSignWorkPayload(t *testing.T, signWork bool, signingKey string) map[string]interface{} {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	n1, n2, _ := connectTwoNetceptorNodes(t, ctx, logTestLocalNode, logTestRemoteNode)
+
+	submitCh := captureForwardedSubmit(t, n2)
+	waitForControlService(t, n1, logTestRemoteNode)
+
+	mockBaseWorkUnit, unitDir := newRemoteCloseTestUnit(t, ctx, n1, workceptor.StatusFileData{State: workceptor.WorkStateRunning}, signWork, signingKey)
+	if err := os.WriteFile(filepath.Join(unitDir, "stdin"), []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer dialCancel()
+	conn, err := n1.DialContext(dialCtx, logTestRemoteNode, "control", nil)
+	if err != nil {
+		t.Fatalf("could not dial control service: %v", err)
+	}
+	reader := bufio.NewReader(conn)
+	if _, err := reader.ReadString('\n'); err != nil {
+		t.Fatalf("could not read control greeting: %v", err)
+	}
+
+	if err := workceptor.StartRemoteUnitForTest(mockBaseWorkUnit, ctx, conn, reader); err != nil {
+		t.Fatalf("StartRemoteUnit failed: %v", err)
+	}
+
+	select {
+	case payload := <-submitCh:
+		return payload
+	case <-time.After(5 * time.Second):
+		t.Fatal("no submit command was captured")
+	}
+
+	return nil
+}
+
+func assertForwardedSignWorkPayload(t *testing.T, signWork bool, want string, payload map[string]interface{}) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	parserNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
+	parserNC.EXPECT().NodeID().Return(logTestLocalNode).AnyTimes()
+	parserNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	parser, err := workceptor.New(context.Background(), parserNC, t.TempDir())
+	if err != nil {
+		t.Fatalf("could not create workceptor for payload parsing: %v", err)
+	}
+	commandType := workceptor.NewWorkceptorCommandTypeForTest(parser)
+
+	if _, err := commandType.InitFromJSON(payload); err != nil {
+		t.Fatalf("forwarded submit payload rejected by the receiver parser: %v", err)
+	}
+	gotSignWork, ok := payload["signwork"]
+	if !ok {
+		t.Fatal("submit command did not carry signwork")
+	}
+	if gotSignWork != want {
+		t.Fatalf("signwork = %#v, want %q", gotSignWork, want)
+	}
+	signature, ok := payload["signature"]
+	if signWork && (!ok || signature == "") {
+		t.Fatal("signed submit command did not carry a signature")
+	}
+	if !signWork && ok {
+		t.Fatalf("unsigned submit command carried a signature: %#v", signature)
 	}
 }
 

@@ -76,3 +76,31 @@ func SetCloseFileForTest(fn func(*os.File) error) func() {
 
 	return func() { closeFile = old }
 }
+
+// SetCloseConnForTest replaces the connection-close hook for the duration of a
+// test and returns a function that restores the previous hook.
+func SetCloseConnForTest(fn func(net.Conn) error) func() {
+	old := closeConn
+	closeConn = fn
+
+	return func() { closeConn = old }
+}
+
+// SetMarshalWorkResultsCommandForTest replaces the results-command encoder for
+// the duration of a test and returns a function that restores the previous
+// hook.
+func SetMarshalWorkResultsCommandForTest(fn func(interface{}) ([]byte, error)) func() {
+	old := marshalWorkResultsCommand
+	marshalWorkResultsCommand = fn
+
+	return func() { marshalWorkResultsCommand = old }
+}
+
+// SetWriteWorkResultsCommandForTest replaces the results-command writer for the
+// duration of a test and returns a function that restores the previous hook.
+func SetWriteWorkResultsCommandForTest(fn func(net.Conn, []byte) (int, error)) func() {
+	old := writeWorkResultsCommand
+	writeWorkResultsCommand = fn
+
+	return func() { writeWorkResultsCommand = old }
+}

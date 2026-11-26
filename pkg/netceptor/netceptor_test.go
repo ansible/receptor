@@ -1826,3 +1826,44 @@ func TestConnectionTimeoutLogCarriesRemoteID(t *testing.T) {
 
 	logCapture.WaitFor(t, 10*time.Second, "Timing out connection", `"remote_id":"peer-node"`)
 }
+
+// TestRoutingUpdateDebugLogCarriesRemoteID pins the debug "Received routing
+// update" line. The text names the update origin and the direct peer, but
+// remote_id identifies the connection that delivered it.
+func TestRoutingUpdateDebugLogCarriesRemoteID(t *testing.T) {
+	utils.EnableDebugLogs(t)
+	s, session, logCapture := startEstablishedMockPeer(t, "test-node", "peer-node")
+
+	injectRoutingUpdate(t, s, session, &routingUpdate{
+		NodeID:         "other-node",
+		ForwardingNode: "peer-node",
+		UpdateEpoch:    1,
+		UpdateSequence: 1,
+		Connections:    map[string]float64{},
+		UpdateID:       "plain-routing-update",
+	})
+
+	logCapture.WaitFor(t, 5*time.Second, "Received routing update", `"remote_id":"peer-node"`)
+}
+
+// TestServiceAdvertisementDebugLogCarriesRemoteID pins the debug "Received
+// service advertisement" line. The text names the advertising node; remote_id
+// identifies the connection that delivered the advertisement.
+func TestServiceAdvertisementDebugLogCarriesRemoteID(t *testing.T) {
+	utils.EnableDebugLogs(t)
+	s, session, logCapture := startEstablishedMockPeer(t, "test-node", "peer-node")
+
+	msg, err := s.translateStructToNetwork(MsgTypeServiceAdvertisement, &serviceAdvertisementFull{
+		ServiceAdvertisement: &ServiceAdvertisement{
+			NodeID:  "other-node",
+			Service: "svc",
+			Time:    time.Now(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create service advertisement message: %v", err)
+	}
+	session.recvData <- msg
+
+	logCapture.WaitFor(t, 5*time.Second, "Received service advertisement", `"remote_id":"peer-node"`)
+}

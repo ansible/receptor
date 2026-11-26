@@ -7,7 +7,19 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ansible/receptor/pkg/logger"
 )
+
+// EnableDebugLogs raises the global log level for the duration of the test so
+// that debug-level lines are emitted, and restores it afterwards. Tests using
+// it must not run in parallel with other tests that depend on the log level.
+func EnableDebugLogs(t *testing.T) {
+	t.Helper()
+	old := logger.GetLogLevel()
+	logger.SetGlobalLogLevel(logger.DebugLevel)
+	t.Cleanup(func() { logger.SetGlobalLogLevel(old) })
+}
 
 // LogCapture is an io.Writer that captures whole log lines written to it,
 // so tests can assert on the output of a ReceptorLogger.

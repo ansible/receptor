@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2063,6 +2064,7 @@ type remoteMonitorEnv struct {
 	capture *testutils.LogCapture
 	unit    *mock_workceptor.MockBaseWorkUnitForWorkUnit
 	job     *utils.JobContext
+	unitDir string
 }
 
 // newRemoteMonitorEnv connects the two nodes, optionally starts a fake control
@@ -2087,11 +2089,18 @@ func newRemoteMonitorEnv(t *testing.T, opts remoteMonitorOptions) *remoteMonitor
 	job := &utils.JobContext{}
 	job.NewJob(ctx, 1, false)
 
-	return &remoteMonitorEnv{ctx: ctx, capture: capture, unit: unit, job: job}
+	return &remoteMonitorEnv{ctx: ctx, capture: capture, unit: unit, job: job, unitDir: opts.unitDir}
 }
 
-// startStdout launches monitorRemoteStdout on the shared job context.
+// startStdout launches monitorRemoteStdout on the shared job context. It
+// registers the default StdoutFileName and Load expectations so callers need
+// not repeat them. Because gomock picks the first matching expectation, any
+// override a caller registers before calling startStdout still wins.
 func (e *remoteMonitorEnv) startStdout() {
+	if e.unitDir != "" {
+		e.unit.EXPECT().StdoutFileName().Return(filepath.Join(e.unitDir, "stdout")).AnyTimes()
+	}
+	e.unit.EXPECT().Load().Return(nil).AnyTimes()
 	go workceptor.MonitorRemoteStdoutForTest(e.unit, e.job)
 }
 
@@ -2150,7 +2159,6 @@ func TestRemoteWorkStatusFileReadErrorLogCarriesRemoteID(t *testing.T) {
 		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning},
 		unitDir: unitDir,
 	})
-	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
 	env.unit.EXPECT().Load().Return(errors.New("status unreadable")).AnyTimes()
 
 	env.startStdout()
@@ -2245,8 +2253,6 @@ func TestRemoteWorkCreateSignatureErrorLogCarriesRemoteID(t *testing.T) {
 			return true
 		},
 	})
-	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
-	env.unit.EXPECT().Load().Return(nil).AnyTimes()
 
 	env.startStdout()
 	env.capture.WaitFor(t, 5*time.Second, "could not create signature to get results", logRemoteID(logTestRemoteNode))
@@ -2286,8 +2292,6 @@ func TestRemoteWorkCopyToStdoutErrorLogCarriesRemoteID(t *testing.T) {
 	if err := os.Symlink("/dev/full", stdoutPath); err != nil {
 		t.Fatalf("failed to symlink stdout to /dev/full: %v", err)
 	}
-	env.unit.EXPECT().StdoutFileName().Return(stdoutPath).AnyTimes()
-	env.unit.EXPECT().Load().Return(nil).AnyTimes()
 
 	env.startStdout()
 
@@ -2330,7 +2334,6 @@ func TestRemoteWorkInLoopStdoutOpenErrorLogCarriesRemoteID(t *testing.T) {
 
 		return filepath.Join(blocker, "stdout")
 	}).AnyTimes()
-	env.unit.EXPECT().Load().Return(nil).AnyTimes()
 
 	env.startStdout()
 	env.capture.WaitFor(t, 10*time.Second, "Could not open stdout file", logRemoteID(logTestRemoteNode))
@@ -2442,8 +2445,6 @@ func TestRemoteWorkDidNotStreamResultsLogCarriesRemoteID(t *testing.T) {
 			return true
 		},
 	})
-	env.unit.EXPECT().StdoutFileName().Return(filepath.Join(unitDir, "stdout")).AnyTimes()
-	env.unit.EXPECT().Load().Return(nil).AnyTimes()
 
 	env.startStdout()
 	env.capture.WaitFor(t, 5*time.Second, "did not stream results", logRemoteID(logTestRemoteNode))
@@ -2471,5 +2472,283 @@ func TestRemoteWorkReleaseErrorLogCarriesRemoteID(t *testing.T) {
 	}()
 
 	env.capture.WaitFor(t, 5*time.Second, "Error releasing unit", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// closeConnection closes the server side of a connection at the connection
+// (not just stream) level, so the peer's next write fails.
+func closeConnection(t *testing.T, conn net.Conn) {
+	t.Helper()
+	_ = conn.(interface{ CloseConnection() error }).CloseConnection()
+}
+
+// TestRemoteWorkWriteErrorLogCarriesRemoteID pins the debug "Write error
+// sending to" line emitted by monitorRemoteStatus. The remote answers one
+// status poll and then tears the connection down; the next poll, one second
+// later, cannot write to it.
+func TestRemoteWorkWriteErrorLogCarriesRemoteID(t *testing.T) {
+	testutils.EnableDebugLogs(t)
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(conn net.Conn, req string) bool {
+			if strings.HasPrefix(req, "work status") {
+				if _, err := io.WriteString(conn, `{"State":1}`+"\n"); err != nil {
+					return false
+				}
+				// Give the client time to read the answer, then drop the
+				// whole connection so its next write fails.
+				time.Sleep(100 * time.Millisecond)
+				closeConnection(t, conn)
+			}
+
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 10*time.Second, "Write error sending to", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkReadErrorLogCarriesRemoteID pins the debug "Read error
+// reading from" line emitted by monitorRemoteStatus when the remote reads the
+// status request and then closes without answering.
+func TestRemoteWorkReadErrorLogCarriesRemoteID(t *testing.T) {
+	testutils.EnableDebugLogs(t)
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(_ net.Conn, _ string) bool {
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 10*time.Second, "Read error reading from", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkWriteCloseErrorLogCarriesRemoteID pins the "Error closing
+// connection to remote work unit" line on the write-error path of
+// monitorRemoteStatus.
+func TestRemoteWorkWriteCloseErrorLogCarriesRemoteID(t *testing.T) {
+	testutils.EnableDebugLogs(t)
+	restore := workceptor.SetCloseConnForTest(func(net.Conn) error { return errors.New("close boom") })
+	t.Cleanup(restore)
+
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(conn net.Conn, req string) bool {
+			if strings.HasPrefix(req, "work status") {
+				if _, err := io.WriteString(conn, `{"State":1}`+"\n"); err != nil {
+					return false
+				}
+				time.Sleep(100 * time.Millisecond)
+				closeConnection(t, conn)
+			}
+
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 10*time.Second, "Error closing connection to remote work unit", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkReadCloseErrorLogCarriesRemoteID pins the "Error closing
+// connection from node" line on the read-error path of monitorRemoteStatus.
+func TestRemoteWorkReadCloseErrorLogCarriesRemoteID(t *testing.T) {
+	testutils.EnableDebugLogs(t)
+	restore := workceptor.SetCloseConnForTest(func(net.Conn) error { return errors.New("close boom") })
+	t.Cleanup(restore)
+
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(_ net.Conn, _ string) bool {
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 10*time.Second, "Error closing connection from node", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkGoneLogCarriesRemoteID pins the debug "Work unit ... is gone"
+// line emitted by monitorRemoteStatus when the remote reports an unknown unit.
+func TestRemoteWorkGoneLogCarriesRemoteID(t *testing.T) {
+	testutils.EnableDebugLogs(t)
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote: newRemoteExtraData(),
+		status: workceptor.StatusFileData{State: workceptor.WorkStateRunning},
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "ERROR: unknown work unit\n")
+
+			return false
+		},
+	})
+
+	env.startStatus(false)
+	env.capture.WaitFor(t, 10*time.Second, "is gone", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkStdoutReadErrorLogCarriesRemoteID pins the warning "Read error
+// reading from" line emitted by monitorRemoteStdout when the remote reads the
+// results request and then closes without answering.
+func TestRemoteWorkStdoutReadErrorLogCarriesRemoteID(t *testing.T) {
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(_ net.Conn, _ string) bool {
+			return false
+		},
+	})
+
+	env.startStdout()
+	env.capture.WaitFor(t, 10*time.Second, "Read error reading from", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkStreamCloseErrorLogCarriesRemoteID pins the "Error closing
+// connection to" line run from monitorRemoteStdout's deferred close once the
+// stdout stream has been copied and the unit completes.
+func TestRemoteWorkStreamCloseErrorLogCarriesRemoteID(t *testing.T) {
+	restore := workceptor.SetCloseConnForTest(func(net.Conn) error { return errors.New("close boom") })
+	t.Cleanup(restore)
+
+	const payload = "partial"
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateSucceeded, StdoutSize: int64(len(payload))},
+		unitDir: unitDir,
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "Streaming results\n")
+			_, _ = io.WriteString(conn, payload)
+
+			return false
+		},
+	})
+
+	env.startStdout()
+	env.capture.WaitFor(t, 10*time.Second, "Error closing connection to", logRemoteID(logTestRemoteNode))
+	env.wait()
+}
+
+// TestRemoteWorkStreamCancelCloseErrorLogCarriesRemoteID pins the "Error
+// closing connection to" line run from monitorRemoteStdout's cancellation
+// goroutine when the stdout copy is interrupted by the job context.
+func TestRemoteWorkStreamCancelCloseErrorLogCarriesRemoteID(t *testing.T) {
+	var closeCalls atomic.Int32
+	restore := workceptor.SetCloseConnForTest(func(net.Conn) error {
+		closeCalls.Add(1)
+
+		return errors.New("close boom")
+	})
+	t.Cleanup(restore)
+
+	const payload = "streaming"
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(conn net.Conn, _ string) bool {
+			_, _ = io.WriteString(conn, "Streaming results\n")
+			_, _ = io.WriteString(conn, payload)
+
+			// Keep the connection open with no further data so the client
+			// stays blocked in io.Copy until the job context is canceled.
+			return true
+		},
+	})
+
+	env.startStdout()
+
+	// Wait until the client has copied the payload to stdout: io.Copy is then
+	// running and blocked on the open connection, so cancelling the job takes
+	// the cancellation goroutine rather than the deferred-close path.
+	stdoutPath := filepath.Join(unitDir, "stdout")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if !testutils.CheckUntilTimeout(ctx, 10*time.Millisecond, func() bool {
+		info, err := os.Stat(stdoutPath)
+
+		return err == nil && info.Size() >= int64(len(payload))
+	}) {
+		t.Fatalf("stdout copy did not start; %s never reached %d bytes", stdoutPath, len(payload))
+	}
+
+	env.cancel()
+	env.capture.WaitFor(t, 10*time.Second, "Error closing connection to", logRemoteID(logTestRemoteNode))
+	env.wait()
+
+	// Both the cancellation goroutine (which closes the connection to unblock
+	// io.Copy) and the deferred close must have run; if the goroutine were not
+	// joined, the deferred close alone could satisfy the log assertion above.
+	if got := closeCalls.Load(); got != 2 {
+		t.Fatalf("expected the cancellation goroutine and the deferred close to each close the connection once, got %d close call(s)", got)
+	}
+}
+
+// TestRemoteWorkResultsCommandErrorLogCarriesRemoteID pins the "error
+// constructing work results command" line emitted by monitorRemoteStdout when
+// the results command cannot be encoded.
+func TestRemoteWorkResultsCommandErrorLogCarriesRemoteID(t *testing.T) {
+	restore := workceptor.SetMarshalWorkResultsCommandForTest(func(interface{}) ([]byte, error) {
+		return nil, errors.New("marshal boom")
+	})
+	t.Cleanup(restore)
+
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(_ net.Conn, _ string) bool {
+			return true
+		},
+	})
+
+	env.startStdout()
+	env.capture.WaitFor(t, 10*time.Second, "error constructing work results command", logRemoteID(logTestRemoteNode))
+	env.cancel()
+	env.wait()
+}
+
+// TestRemoteWorkStdoutWriteErrorLogCarriesRemoteID pins the warning "Write
+// error sending to" line emitted by monitorRemoteStdout when the results
+// command cannot be sent.
+func TestRemoteWorkStdoutWriteErrorLogCarriesRemoteID(t *testing.T) {
+	restore := workceptor.SetWriteWorkResultsCommandForTest(func(net.Conn, []byte) (int, error) {
+		return 0, errors.New("write boom")
+	})
+	t.Cleanup(restore)
+
+	unitDir := t.TempDir()
+	env := newRemoteMonitorEnv(t, remoteMonitorOptions{
+		remote:  newRemoteExtraData(),
+		status:  workceptor.StatusFileData{State: workceptor.WorkStateRunning, StdoutSize: 1000},
+		unitDir: unitDir,
+		service: func(_ net.Conn, _ string) bool {
+			return true
+		},
+	})
+
+	env.startStdout()
+	env.capture.WaitFor(t, 10*time.Second, "Write error sending to", logRemoteID(logTestRemoteNode))
+	env.cancel()
 	env.wait()
 }

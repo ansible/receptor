@@ -96,7 +96,13 @@ kubectl:
 	fi
 
 GOLANGCI_LINT_VERSION ?= v2.12.2
+GOTOOLCHAIN_VERSION ?= go1.25.14
 GOLANGCI_LINT_BINARY := $(shell go env GOPATH)/bin/golangci-lint
+
+# Pin the Go toolchain for every recipe so local builds/tests/lint match CI.
+# Must come after the $(shell go env ...) above to avoid a toolchain
+# download at parse time.
+export GOTOOLCHAIN := $(GOTOOLCHAIN_VERSION)
 
 lint:
 	@if [ ! -x "$(GOLANGCI_LINT_BINARY)" ] || \

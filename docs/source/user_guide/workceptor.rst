@@ -256,6 +256,8 @@ Signed work
 
 Remote work submissions can be digitally signed by the sender. The target node will verify the signature of the work command before starting the work unit.
 
+Signature verification is decided locally by the receiving node: a work type verifies its submissions when it sets ``verifysignature: true``, using the node's ``work-verification`` public key. A signed submission to a node that does not accept signatures is rejected rather than started unsigned. The submitting node's ``signwork`` flag is carried across relay hops so that a forwarding node cannot downgrade work that was submitted signed.
+
 A *single* pair of RSA public and private keys is created offline and distributed to the nodes. Distribute the public key (PKIX format) to any node that should receive work. Distribute the private key (PKCS1 format) to any node that needs authority to submit work.
 
 The following commands can be used to create keys for signing work:

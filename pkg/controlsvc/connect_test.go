@@ -90,7 +90,7 @@ func TestConnectControlFunc(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	mockControlFunc := mock_controlsvc.NewMockControlFuncOperations(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	controlFuncTestCases := []struct {
 		name          string

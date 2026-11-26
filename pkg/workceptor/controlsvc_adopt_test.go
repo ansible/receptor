@@ -25,7 +25,7 @@ func newAdoptControlTest(t *testing.T, tlsErr error) (*workceptor.Workceptor, co
 	ctx, cancel := context.WithCancel(context.Background())
 	mockNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNC.EXPECT().NodeID().Return("adopting-node").AnyTimes()
-	mockNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockNC.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 	mockNC.EXPECT().GetClientTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Return(&tls.Config{}, tlsErr).AnyTimes()
 	mockNC.EXPECT().DialContext(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("remote unavailable")).AnyTimes()
 	w, err := workceptor.New(ctx, mockNC, t.TempDir())

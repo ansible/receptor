@@ -114,7 +114,7 @@ func TestTCPDialerStart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testLogger := logger.NewReceptorLogger("TCPtest")
+			testLogger := logger.NewReceptorLogger()
 
 			address := tt.address
 			var listener net.Listener
@@ -235,7 +235,7 @@ func TestTCPListener_GetAddr(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := NewTCPListener(tt.address, nil, logger.NewReceptorLogger("TCPtest"))
+			b, err := NewTCPListener(tt.address, nil, logger.NewReceptorLogger())
 			if err != nil {
 				t.Errorf("NewTCPListener() error = %v", err)
 
@@ -334,7 +334,7 @@ func TestTCPListenerStart(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := NewTCPListener(tt.address, tt.tls, logger.NewReceptorLogger("TCPtest"))
+			b, err := NewTCPListener(tt.address, tt.tls, logger.NewReceptorLogger())
 			if err != nil {
 				t.Errorf("NewTCPListener() error = %v", err)
 

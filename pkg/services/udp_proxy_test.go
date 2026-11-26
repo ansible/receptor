@@ -24,7 +24,7 @@ func setUpMocks(ctrl *gomock.Controller) (*mock_services.MockNetcForUDPProxy, *m
 	mockNetter := mock_net_interface.NewMockNetterUDP(ctrl)
 	mockUDPConn := mock_net_interface.NewMockUDPConnInterface(ctrl)
 	mockPacketCon := mock_netceptor.NewMockPacketConner(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
 	return mockNetceptor, mockNetter, mockUDPConn, mockPacketCon
@@ -182,7 +182,7 @@ func TestProcessInboundPacket(t *testing.T) {
 			expectedAddr: expectedAddr,
 			calls: func() {
 				mockPacketConner.EXPECT().ReadFrom(gomock.Any()).Return(0, expectedUDPAddr, fmt.Errorf("ReadFrom error")).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 		{
@@ -190,7 +190,7 @@ func TestProcessInboundPacket(t *testing.T) {
 			expectedAddr: expectedAddr,
 			calls: func() {
 				mockPacketConner.EXPECT().ReadFrom(gomock.Any()).Return(0, unexpectedUDPAddr, nil).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func TestProcessInboundPacket(t *testing.T) {
 			calls: func() {
 				mockPacketConner.EXPECT().ReadFrom(gomock.Any()).Return(1, expectedUDPAddr, nil).Times(1)
 				mockUDPConnInterface.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(1, fmt.Errorf("WriteTo error")).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 		{
@@ -208,7 +208,7 @@ func TestProcessInboundPacket(t *testing.T) {
 			calls: func() {
 				mockPacketConner.EXPECT().ReadFrom(gomock.Any()).Return(7, expectedUDPAddr, nil).Times(1)
 				mockUDPConnInterface.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(5, nil).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 	}
@@ -241,7 +241,7 @@ func TestProcessOutboundPacket(t *testing.T) {
 			name: "Read error",
 			calls: func() {
 				mockUDPConnInterface.EXPECT().Read(gomock.Any()).Return(1, fmt.Errorf("Read error")).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 		{
@@ -249,7 +249,7 @@ func TestProcessOutboundPacket(t *testing.T) {
 			calls: func() {
 				mockUDPConnInterface.EXPECT().Read(gomock.Any()).Return(1, nil).Times(1)
 				mockPacketConner.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(1, fmt.Errorf("WriteTo error")).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 		{
@@ -257,7 +257,7 @@ func TestProcessOutboundPacket(t *testing.T) {
 			calls: func() {
 				mockUDPConnInterface.EXPECT().Read(gomock.Any()).Return(7, nil).Times(1)
 				mockPacketConner.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(5, nil).Times(1)
-				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).Times(1)
+				mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).Times(1)
 			},
 		},
 	}
@@ -310,7 +310,7 @@ func TestRunUDPProxyServiceInbound(t *testing.T) {
 				// Expectations for the goroutine that might run after the test
 				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("test cleanup")).AnyTimes()
 				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
-				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			expectContinue: true,
 		},
@@ -324,7 +324,7 @@ func TestRunUDPProxyServiceInbound(t *testing.T) {
 				// Expectations for the goroutine that might run after the test
 				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("test cleanup")).AnyTimes()
 				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
-				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			expectContinue: true,
 		},
@@ -338,7 +338,7 @@ func TestRunUDPProxyServiceInbound(t *testing.T) {
 				// Expectations for the goroutine that might run after the test
 				mockPacketCon.EXPECT().ReadFrom(gomock.Any()).Return(0, nil, fmt.Errorf("test cleanup")).AnyTimes()
 				mockUDPConn.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
-				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			expectContinue: true,
 		},
@@ -413,7 +413,7 @@ func TestRunUDPProxyServiceOutbound(t *testing.T) {
 				// Expectations for the goroutine that might run after the test
 				mockUDPConn.EXPECT().Read(gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
 				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
-				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			expectContinue: true,
 		},
@@ -426,7 +426,7 @@ func TestRunUDPProxyServiceOutbound(t *testing.T) {
 				// Expectations for the goroutine that might run after the test
 				mockUDPConn.EXPECT().Read(gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
 				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
-				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			expectContinue: true,
 		},
@@ -439,7 +439,7 @@ func TestRunUDPProxyServiceOutbound(t *testing.T) {
 				// Expectations for the goroutine that might run after the test
 				mockUDPConn.EXPECT().Read(gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
 				mockPacketCon.EXPECT().WriteTo(gomock.Any(), gomock.Any()).Return(0, fmt.Errorf("test cleanup")).AnyTimes()
-				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+				mockPacketCon.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 			},
 			expectContinue: true,
 		},

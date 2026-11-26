@@ -126,9 +126,6 @@ generate-clean:
 	@echo "Removing existing mocks"
 	@find . -type d -name 'mock*' -prune -exec rm -rf {} +
 
-pre-commit:
-	@pre-commit run --all-files
-
 build-all:
 	@echo "Running Go builds..." && \
 	GOOS=windows $(GO) build \

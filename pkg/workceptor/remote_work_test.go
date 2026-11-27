@@ -70,7 +70,7 @@ func createRemoteWorkNetworkSetup(t *testing.T, ctrl *gomock.Controller, ctx con
 
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
-	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
@@ -124,7 +124,7 @@ func createRemoteWorkTestSetup(t *testing.T, ctx context.Context) (workceptor.Wo
 	mockBaseWorkUnit := mock_workceptor.NewMockBaseWorkUnitForWorkUnit(ctrl)
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNetceptor.EXPECT().NodeID().Return("NodeID")
-	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockNetceptor.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 	w, err := workceptor.New(ctx, mockNetceptor, "/tmp")
 	if err != nil {
@@ -1002,7 +1002,7 @@ func newStatusStreamErrorConn(ctx context.Context, ctrl *gomock.Controller, fail
 
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
-	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
@@ -1138,7 +1138,7 @@ func TestGetConnectionClearsStaleDetailOnSuccess(t *testing.T) {
 
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
-	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
@@ -1448,7 +1448,7 @@ func newScriptedConn(ctx context.Context, ctrl *gomock.Controller, onWrite func(
 
 	mockPacketConner.EXPECT().Close().Return(nil).AnyTimes()
 	mockPacketConner.EXPECT().LocalService().Return("test-service").AnyTimes()
-	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger("")).AnyTimes()
+	mockPacketConner.EXPECT().GetLogger().Return(logger.NewReceptorLogger()).AnyTimes()
 
 	mockQuicConnection.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mockQuicConnection.EXPECT().RemoteAddr().Return(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}).AnyTimes()
@@ -1471,7 +1471,7 @@ func newRemoteMonitorTestUnit(t *testing.T, ctx context.Context, ctrl *gomock.Co
 	t.Helper()
 	mockNC := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	mockNC.EXPECT().NodeID().Return("testnode").AnyTimes()
-	lg := logger.NewReceptorLogger("")
+	lg := logger.NewReceptorLogger()
 	lg.SetOutput(logBuf)
 	mockNC.EXPECT().GetLogger().Return(lg).AnyTimes()
 

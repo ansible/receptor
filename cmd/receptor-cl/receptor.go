@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	var isV2 bool
 	newArgs := []string{}
 	for _, arg := range os.Args {

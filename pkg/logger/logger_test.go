@@ -9,7 +9,7 @@ import (
 )
 
 func TestGetLogLevelByName(t *testing.T) {
-	receptorLogger := NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 
 	testCases := []struct {
 		name  string
@@ -33,7 +33,7 @@ func TestGetLogLevelByName(t *testing.T) {
 }
 
 func TestGetLogLevelByNameWithError(t *testing.T) {
-	receptorLogger := NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 	_, err := receptorLogger.GetLogLevelByName("does not exist")
 	if err == nil {
 		t.Error("should have error")
@@ -41,7 +41,7 @@ func TestGetLogLevelByNameWithError(t *testing.T) {
 }
 
 func TestLogLevelToName(t *testing.T) {
-	receptorLogger := NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 
 	testCases := []struct {
 		level int
@@ -65,7 +65,7 @@ func TestLogLevelToName(t *testing.T) {
 }
 
 func TestLogLevelToNameWithError(t *testing.T) {
-	receptorLogger := NewReceptorLogger("")
+	receptorLogger := NewReceptorLogger()
 	_, err := receptorLogger.LogLevelToName(123)
 	if err == nil {
 		t.Error("should have error")
@@ -120,7 +120,6 @@ func TestSanitizedLog(t *testing.T) {
 	testCases := []struct {
 		name                  string
 		level                 int
-		prefix                string
 		format                string
 		args                  []interface{}
 		expectContains        []string
@@ -129,19 +128,17 @@ func TestSanitizedLog(t *testing.T) {
 		loggerCheck           func(t *testing.T, level int, format string, v ...interface{})
 	}{
 		{
-			name:                  "valid level with prefix and newline",
+			name:                  "valid level with newline",
 			level:                 InfoLevel,
-			prefix:                "testPrefix",
 			format:                "hello\nworld %d",
 			args:                  []interface{}{42},
-			expectContains:        []string{"testPrefix INFO", "helloworld 42"},
+			expectContains:        []string{"INFO", "helloworld 42"},
 			expectNoNewlineInside: true,
 			registerLogger:        false,
 		},
 		{
 			name:                  "invalid log level triggers error",
 			level:                 9999,
-			prefix:                "testPrefix",
 			format:                "bad\nmessage %d",
 			args:                  []interface{}{7},
 			expectContains:        []string{"Log entry received with invalid level: badmessage 7"},
@@ -149,9 +146,8 @@ func TestSanitizedLog(t *testing.T) {
 			registerLogger:        false,
 		},
 		{
-			name:                  "no prefix",
+			name:                  "simple message",
 			level:                 InfoLevel,
-			prefix:                "",
 			format:                "noprefix %s",
 			args:                  []interface{}{"ok"},
 			expectContains:        []string{"INFO", "noprefix ok"},
@@ -161,7 +157,6 @@ func TestSanitizedLog(t *testing.T) {
 		{
 			name:                  "logger function registered",
 			level:                 InfoLevel,
-			prefix:                "testPrefix",
 			format:                "delegated %d",
 			args:                  []interface{}{1},
 			expectContains:        []string{},
@@ -192,7 +187,7 @@ func TestSanitizedLog(t *testing.T) {
 			}
 
 			var buf bytes.Buffer
-			rl := NewReceptorLogger(tc.prefix)
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 
 			rl.SanitizedLog(tc.level, tc.format, tc.args...)
@@ -221,7 +216,7 @@ func TestSanitizedLog(t *testing.T) {
 func TestDebugPayload(t *testing.T) {
 	var logBuffer bytes.Buffer
 	SetGlobalLogLevel(4)
-	receptorLogger := NewReceptorLogger("testDebugPayload")
+	receptorLogger := NewReceptorLogger()
 	receptorLogger.SetOutput(&logBuffer)
 	payload := "Testing debugPayload"
 	workUnitID := "1234"
@@ -262,7 +257,7 @@ func TestGetLogLevel(t *testing.T) {
 	origLevel := GetLogLevel()
 	defer SetGlobalLogLevel(origLevel)
 
-	rl := NewReceptorLogger("")
+	rl := NewReceptorLogger()
 
 	for _, level := range []int{ErrorLevel, WarningLevel, InfoLevel, DebugLevel, TraceLevel} {
 		SetGlobalLogLevel(level)
@@ -287,7 +282,7 @@ func TestSetGlobalQuietMode(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	rl := NewReceptorLogger("")
+	rl := NewReceptorLogger()
 	rl.SetOutput(&buf)
 	rl.Error("should not be logged")
 	if buf.Len() != 0 {
@@ -343,7 +338,7 @@ func TestLogMethods(t *testing.T) {
 		t.Run(tc.name+"/emits at level", func(t *testing.T) {
 			SetGlobalLogLevel(tc.minLevel)
 			var buf bytes.Buffer
-			rl := NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			got := buf.String()
@@ -358,7 +353,7 @@ func TestLogMethods(t *testing.T) {
 		t.Run(tc.name+"/suppressed below level", func(t *testing.T) {
 			SetGlobalLogLevel(tc.minLevel - 1)
 			var buf bytes.Buffer
-			rl := NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			if buf.Len() != 0 {
@@ -394,7 +389,7 @@ func TestSanitizedLogMethods(t *testing.T) {
 		t.Run(tc.name+"/emits at level", func(t *testing.T) {
 			SetGlobalLogLevel(tc.minLevel)
 			var buf bytes.Buffer
-			rl := NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			got := buf.String()
@@ -409,7 +404,7 @@ func TestSanitizedLogMethods(t *testing.T) {
 		t.Run(tc.name+"/suppressed below level", func(t *testing.T) {
 			SetGlobalLogLevel(tc.minLevel - 1)
 			var buf bytes.Buffer
-			rl := NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "hello")
 			if buf.Len() != 0 {
@@ -420,7 +415,7 @@ func TestSanitizedLogMethods(t *testing.T) {
 		t.Run(tc.name+"/strips embedded newlines", func(t *testing.T) {
 			SetGlobalLogLevel(tc.minLevel)
 			var buf bytes.Buffer
-			rl := NewReceptorLogger("")
+			rl := NewReceptorLogger()
 			rl.SetOutput(&buf)
 			tc.call(rl, "line1\nline2")
 			got := strings.TrimSuffix(buf.String(), "\n")
@@ -436,7 +431,7 @@ func TestSetShowTrace(t *testing.T) {
 	defer SetGlobalLogLevel(origLevel)
 
 	SetGlobalLogLevel(InfoLevel)
-	rl := NewReceptorLogger("")
+	rl := NewReceptorLogger()
 	rl.SetShowTrace(true)
 	if GetLogLevel() != TraceLevel {
 		t.Errorf("expected TraceLevel after SetShowTrace(true), got %d", GetLogLevel())
@@ -476,7 +471,7 @@ func TestGetLoggerWithSuffix(t *testing.T) {
 			"node_id":   "controller",
 			"remote_id": "hop",
 		}
-		receptorLogger := NewReceptorLoggerWithSuffix("", suffix)
+		receptorLogger := NewReceptorLoggerWithSuffix(suffix)
 		receptorLogger.SetOutput(&logBuffer)
 
 		receptorLogger.Error("%s", testname)
@@ -492,7 +487,7 @@ func TestGetLoggerWithSuffix(t *testing.T) {
 			"node_id":   "controller",
 			"remote_id": "hop",
 		}
-		receptorLogger := NewReceptorLoggerWithSuffix("", suffix)
+		receptorLogger := NewReceptorLoggerWithSuffix(suffix)
 		receptorLogger.SetOutput(&logBuffer)
 
 		updated := map[string]string{

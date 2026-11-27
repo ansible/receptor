@@ -91,22 +91,20 @@ func GetRegisteredLogger() MessageFunc {
 
 type ReceptorLogger struct {
 	log.Logger
-	Prefix string
 	m      sync.Mutex
 	Suffix map[string]string
 }
 
 // NewReceptorLogger to instantiate a new logger object.
-func NewReceptorLogger(prefix string) *ReceptorLogger {
+func NewReceptorLogger() *ReceptorLogger {
 	return &ReceptorLogger{
-		Logger: *log.New(os.Stdout, prefix, log.LstdFlags),
-		Prefix: prefix,
+		Logger: *log.New(os.Stdout, "", log.LstdFlags),
 	}
 }
 
 // NewReceptorLoggerWithSuffix to instantiate a new logger object with a new Suffix.
-func NewReceptorLoggerWithSuffix(prefix string, suffix map[string]string) *ReceptorLogger {
-	logger := NewReceptorLogger(prefix)
+func NewReceptorLoggerWithSuffix(suffix map[string]string) *ReceptorLogger {
+	logger := NewReceptorLogger()
 	logger.SetSuffix(suffix)
 
 	return logger
@@ -235,21 +233,16 @@ func (rl *ReceptorLogger) Log(level int, format string, v ...interface{}) {
 
 		return
 	}
-	var prefix string
 	logLevelName, err := LogLevelToName(level)
 	if err != nil {
 		rl.Error("Log entry received with invalid level: %s\n", fmt.Sprintf(format, v...))
 
 		return
 	}
-	if rl.GetPrefix() != "" {
-		prefix = rl.GetPrefix() + " " + strings.ToUpper(logLevelName) + " "
-	} else {
-		prefix = strings.ToUpper(logLevelName) + " "
-	}
+	prefix := strings.ToUpper(logLevelName) + " "
 
 	if int(logLevel.Load()) >= level {
-		rl.Logger.SetPrefix(prefix)
+		rl.SetPrefix(prefix)
 		format, v = rl.appendSuffix(format, v)
 		rl.Printf(format, v...)
 	}
@@ -290,7 +283,6 @@ func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{
 
 		return
 	}
-	var prefix string
 	logLevelName, err := LogLevelToName(level)
 	if err != nil {
 		message := fmt.Sprintf(format, v...)
@@ -299,32 +291,15 @@ func (rl *ReceptorLogger) SanitizedLog(level int, format string, v ...interface{
 
 		return
 	}
-	if rl.GetPrefix() != "" {
-		prefix = rl.GetPrefix() + " " + strings.ToUpper(logLevelName) + " "
-	} else {
-		prefix = strings.ToUpper(logLevelName) + " "
-	}
+	prefix := strings.ToUpper(logLevelName) + " "
 
 	if int(logLevel.Load()) >= level {
 		message, v := rl.appendSuffix(format, v)
 		message = fmt.Sprintf(message, v...)
 		sanMessage := strings.ReplaceAll(message, "\n", "")
-		rl.Logger.SetPrefix(prefix)
+		rl.SetPrefix(prefix)
 		rl.Print(sanMessage)
 	}
-}
-
-func (rl *ReceptorLogger) SetPrefix(prefix string) {
-	rl.m.Lock()
-	defer rl.m.Unlock()
-	rl.Prefix = prefix
-}
-
-func (rl *ReceptorLogger) GetPrefix() string {
-	rl.m.Lock()
-	defer rl.m.Unlock()
-
-	return rl.Prefix
 }
 
 // GetLogLevelByName is a helper function for returning level associated with log

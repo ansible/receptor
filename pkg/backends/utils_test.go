@@ -120,7 +120,7 @@ func TestDialerSessionScenarios(t *testing.T) {
 			defer cancel()
 
 			var wg sync.WaitGroup
-			logger := logger.NewReceptorLogger("test")
+			logger := logger.NewReceptorLogger()
 
 			dialerFunc := tt.dialerFunc()
 			sessChan, err := dialerSession(ctx, &wg, tt.redial, time.Millisecond, logger, dialerFunc)
@@ -195,7 +195,7 @@ func TestContextBehavior(t *testing.T) {
 			defer cancel()
 
 			var wg sync.WaitGroup
-			logger := logger.NewReceptorLogger("test")
+			logger := logger.NewReceptorLogger()
 
 			df := func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 				select {
@@ -292,7 +292,7 @@ func TestListenerSessionScenarios(t *testing.T) {
 			defer cancel()
 
 			var wg sync.WaitGroup
-			logger := logger.NewReceptorLogger("test")
+			logger := logger.NewReceptorLogger()
 
 			var mu sync.Mutex
 			cancelCalled := false
@@ -358,7 +358,7 @@ func TestListenerSessionContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var wg sync.WaitGroup
-	logger := logger.NewReceptorLogger("test")
+	logger := logger.NewReceptorLogger()
 
 	lf := func() error {
 		return nil
@@ -405,7 +405,7 @@ func TestDialerSessionConnectionCloseImmediate(t *testing.T) {
 	defer cancel()
 
 	var wg sync.WaitGroup
-	logger := logger.NewReceptorLogger("test")
+	logger := logger.NewReceptorLogger()
 
 	df := func(closeChan chan struct{}) (netceptor.BackendSession, error) {
 		close(closeChan) // Close immediately
@@ -447,7 +447,7 @@ func TestDialerSessionRedialDelayReset(t *testing.T) {
 	defer cancel()
 
 	var wg sync.WaitGroup
-	logger := logger.NewReceptorLogger("test")
+	logger := logger.NewReceptorLogger()
 
 	callCount := 0
 	df := func(closeChan chan struct{}) (netceptor.BackendSession, error) {

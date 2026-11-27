@@ -88,7 +88,7 @@ func TestIsPending(t *testing.T) {
 func setUp(t *testing.T) (*gomock.Controller, workceptor.BaseWorkUnit, *workceptor.Workceptor, *mock_workceptor.MockNetceptorForWorkceptor, *logger.ReceptorLogger) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 	mockNetceptor.EXPECT().NodeID().Return("NodeID")
@@ -405,7 +405,7 @@ func newTestUnit(t *testing.T, unitID string, stdoutBytes int, state int, create
 	nc := mock_workceptor.NewMockNetceptorForWorkceptor(ctrl)
 	nc.EXPECT().NodeID().Return("testnode").AnyTimes()
 	logBuf := &syncBuf{}
-	lg := logger.NewReceptorLogger("")
+	lg := logger.NewReceptorLogger()
 	lg.SetOutput(logBuf)
 	nc.EXPECT().GetLogger().Return(lg).AnyTimes()
 

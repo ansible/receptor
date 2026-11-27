@@ -20,7 +20,7 @@ func setUpTCPMocks(ctrl *gomock.Controller) (*mock_services.MockNetcForTCPProxy,
 	mockNetListener := mock_services.NewMockNetListenerTCP(ctrl)
 	mockUtilsLib := mock_services.NewMockUtilsLib(ctrl)
 	mockTCPConn := mock_services.NewMockTCPConn(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 	mockNetceptor.EXPECT().GetLogger().AnyTimes().Return(logger)
 
 	return mockNetceptor, mockNetLib, mockTLSLib, mockNetListener, mockUtilsLib, mockTCPConn
@@ -401,6 +401,6 @@ func TestUtilsTCPWrapperBridgeConns(t *testing.T) {
 	mockReadWriteCloser2.EXPECT().Close().Times(1)
 
 	w := &UtilsTCPWrapper{}
-	myLogger := logger.NewReceptorLogger("test")
+	myLogger := logger.NewReceptorLogger()
 	w.BridgeConns(mockReadWriteCloser1, "", mockReadWriteCloser2, "", myLogger)
 }

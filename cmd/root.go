@@ -48,7 +48,7 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	l := logger.NewReceptorLogger("")
+	l := logger.NewReceptorLogger()
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {

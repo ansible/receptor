@@ -1739,7 +1739,7 @@ func TestGetConfigForClientOverride(t *testing.T) {
 		})
 	})
 
-	t.Run("client hello with nil connection causes panic", func(t *testing.T) {
+	t.Run("client hello with nil connection is handled gracefully", func(t *testing.T) {
 		n := netceptor.New(context.Background(), "test-node")
 		t.Cleanup(func() {
 			n.Shutdown()
@@ -1749,8 +1749,14 @@ func TestGetConfigForClientOverride(t *testing.T) {
 		clientHello := &tls.ClientHelloInfo{Conn: nil}
 		overrideFunc := n.GetConfigForClientOverride(originalConfig)
 
-		assert.Panics(t, func() {
-			overrideFunc(clientHello)
+		assert.NotPanics(t, func() {
+			resultConfig, err := overrideFunc(clientHello)
+			if err != nil {
+				t.Errorf("Expected no error, got: %v", err)
+			}
+			if resultConfig == nil {
+				t.Error("Expected a cloned config even without a connection")
+			}
 		})
 	})
 }

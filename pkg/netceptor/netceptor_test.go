@@ -1312,8 +1312,8 @@ func createExistingConnectionWithContext(s *Netceptor, remoteNodeID string, ctx 
 		WriteChan:        make(chan []byte),
 		Cost:             1.0,
 		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
 	}
+	existingConn.logger.Store(s.Logger)
 
 	s.connLock.Lock()
 	if s.connections == nil {
@@ -1493,8 +1493,8 @@ func TestProtoWriterDoesNotDropBufferedMessagesOnContextCancel(t *testing.T) {
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufSize),
 		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
 	}
+	ci.logger.Store(s.Logger)
 
 	protoWriterDone := make(chan struct{})
 	go func() {
@@ -1555,8 +1555,8 @@ func TestProtoWriterLogsDroppedMessagesOnContextCancel(t *testing.T) {
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufSize),
 		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
 	}
+	ci.logger.Store(s.Logger)
 
 	protoWriterDone := make(chan struct{})
 	go func() {
@@ -1606,8 +1606,8 @@ func TestWriteChanBufferDecouplesSendersFromProtoWriter(t *testing.T) {
 		ReadChan:         make(chan []byte),
 		WriteChan:        make(chan []byte, bufferSize),
 		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
 	}
+	ci.logger.Store(s.Logger)
 	go ci.protoWriter(sess)
 
 	blocked := 0

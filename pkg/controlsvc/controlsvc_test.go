@@ -42,7 +42,7 @@ func TestConnectionListenerAcceptSuccess(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	mockListener := mock_utils.NewMockNetListener(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	pipeA, pipeB := net.Pipe()
 	ctx, ctxCancel := context.WithCancel(context.Background())
@@ -73,7 +73,7 @@ func TestConnectionListener(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	mockListener := mock_utils.NewMockNetListener(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	connectionListenerTestCases := []struct {
 		name          string
@@ -110,7 +110,7 @@ func TestSetupConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
 	mockConn := mock_utils.NewMockNetConn(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	setupConnectionTestCases := []struct {
 		name          string
@@ -152,7 +152,7 @@ func TestRunControlSvc(t *testing.T) {
 	mockTLS := mock_controlsvc.NewMockTlser(ctrl)
 	mockListener := mock_utils.NewMockNetListener(ctrl)
 
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	runControlSvcTestCases := []struct {
 		name          string
@@ -317,7 +317,7 @@ func TestSockControlBridgeConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockCon := mock_utils.NewMockNetConn(ctrl)
 	mockUtil := mock_controlsvc.NewMockUtiler(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	sockControl := controlsvc.NewSockControl(mockCon)
 
@@ -540,7 +540,7 @@ func TestRunControlSession(t *testing.T) {
 	mockCon := mock_utils.NewMockNetConn(ctrl)
 	mockAddr := mock_utils.NewMockNetAddr(ctrl)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	mandatoryExpects := func() {
 		mockNetceptor.EXPECT().GetLogger().Return(logger).Times(3)
@@ -600,7 +600,7 @@ func TestRunControlSession(t *testing.T) {
 func TestRunControlSessionTwo(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockNetceptor := mock_controlsvc.NewMockNetceptorForControlsvc(ctrl)
-	logger := logger.NewReceptorLogger("")
+	logger := logger.NewReceptorLogger()
 
 	runControlSessionTestCases := []struct {
 		name          string

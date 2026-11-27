@@ -143,8 +143,9 @@ func startRemoteIDMesh(t *testing.T, captureIDs []string, configure func(t *test
 }
 
 // TestRemoteIDTLSMissingClientCert triggers the server-side
-// "RVF failed: peer certificate missing" line on control, which already carries
-// remote_id execution-a from the mesh handshake.
+// "RVF failed: peer certificate missing" line on control. It happens before the
+// Receptor handshake, so no remote_id is known; the line is attributed to the
+// transport peer via remote_addr instead.
 func TestRemoteIDTLSMissingClientCert(t *testing.T) {
 	t.Parallel()
 
@@ -177,7 +178,7 @@ func TestRemoteIDTLSMissingClientCert(t *testing.T) {
 
 	captures["control"].WaitFor(t, 15*time.Second,
 		"RVF failed: peer certificate missing",
-		`"remote_id":"execution-a"`)
+		`"remote_addr":"`)
 }
 
 // TestRemoteIDTLSPinnedClientCertMismatch triggers the server-side pinned

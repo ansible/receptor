@@ -25,11 +25,10 @@ import (
 )
 
 const (
-	expectedWebsocketListenerError   = "Expected Websocket Listener, got nil"
-	newWebsocketDialerError          = "NewWebsockerDialer return error: %+v"
-	websocketListenerExpectedError   = "Websocket listener expected, nil returned"
-	websocketsTestNewWebsocketDialer = "websockets_test.go>TestNewWebsocketDialer"
-	wssTestTesting                   = "wss://test.testing"
+	expectedWebsocketListenerError = "Expected Websocket Listener, got nil"
+	newWebsocketDialerError        = "NewWebsockerDialer return error: %+v"
+	websocketListenerExpectedError = "Websocket listener expected, nil returned"
+	wssTestTesting                 = "wss://test.testing"
 )
 
 func setupTLSCfg(t *testing.T) tls.Certificate {
@@ -81,7 +80,7 @@ func TestNewWebsocketDialer(t *testing.T) {
 				PreferServerCipherSuites: true,
 			},
 			extraHeader: "",
-			logger:      logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
+			logger:      logger.NewReceptorLogger(),
 			expectedErr: "",
 		},
 		{
@@ -94,7 +93,7 @@ func TestNewWebsocketDialer(t *testing.T) {
 				PreferServerCipherSuites: true,
 			},
 			extraHeader: "",
-			logger:      logger.NewReceptorLogger(websocketsTestNewWebsocketDialer),
+			logger:      logger.NewReceptorLogger(),
 			expectedErr: "",
 		},
 	}
@@ -135,7 +134,7 @@ func TestWebsocketDialerStart(t *testing.T) {
 	ctx := context.Background()
 	defer ctx.Done()
 
-	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
+	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, &tls.Config{}, "", false, logger.NewReceptorLogger(), mockWebsocketDialer)
 	if wdErr != nil {
 		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
@@ -181,7 +180,7 @@ func TestWebsocketDialerGetAddr(t *testing.T) {
 	_, mockWebsocketDialer := setUpDialer(t)
 
 	address := wssTestTesting
-	wd, wdErr := backends.NewWebsocketDialer(address, &tls.Config{}, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
+	wd, wdErr := backends.NewWebsocketDialer(address, &tls.Config{}, "", false, logger.NewReceptorLogger(), mockWebsocketDialer)
 	if wdErr != nil {
 		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
@@ -195,7 +194,7 @@ func TestWebsocketDialerGetTLS(t *testing.T) {
 	_, mockWebsocketDialer := setUpDialer(t)
 
 	blankTLS := &tls.Config{}
-	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, blankTLS, "", false, logger.NewReceptorLogger(websocketsTestNewWebsocketDialer), mockWebsocketDialer)
+	wd, wdErr := backends.NewWebsocketDialer(wssTestTesting, blankTLS, "", false, logger.NewReceptorLogger(), mockWebsocketDialer)
 	if wdErr != nil {
 		t.Errorf("NewWebsockerDialer return error: %+v", wdErr)
 	}
@@ -217,7 +216,7 @@ func setUpListener(t *testing.T) (*gomock.Controller, *mock_backends.MockGorilla
 func TestNewWebsocketListener(t *testing.T) {
 	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 
-	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -230,7 +229,7 @@ func TestNewWebsocketListener(t *testing.T) {
 func TestWebsocketListenerSetandGetPath(t *testing.T) {
 	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 
-	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener("address", &tls.Config{}, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -254,7 +253,7 @@ func TestWebsocketListenerStart(t *testing.T) {
 
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 
-	wi, err := backends.NewWebsocketListener("localhost:21700", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener("localhost:21700", &tls.Config{}, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -281,7 +280,7 @@ func TestWebsocketListenerStartUpgradeError(t *testing.T) {
 	ctx := context.Background()
 	defer ctx.Done()
 
-	wi, err := backends.NewWebsocketListener("localhost:21701", &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener("localhost:21701", &tls.Config{}, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -312,7 +311,7 @@ func TestWebsocketListenerStartNetError(t *testing.T) {
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 
 	badAddress := "127.0.0.1:80"
-	wi, err := backends.NewWebsocketListener(badAddress, &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener(badAddress, &tls.Config{}, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -338,7 +337,7 @@ func TestWebsocketListenerStartTLSNil(t *testing.T) {
 
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 
-	wi, err := backends.NewWebsocketListener("localhost:21702", nil, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener("localhost:21702", nil, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -367,7 +366,7 @@ func TestWebsocketListenerGetAddr(t *testing.T) {
 	mockWebsocketConner := mock_backends.NewMockConner(ctrl)
 	address := "127.0.0.1:21703"
 
-	wi, err := backends.NewWebsocketListener(address, &tls.Config{}, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener(address, &tls.Config{}, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}
@@ -398,7 +397,7 @@ func TestWebsocketListenerGetTLS(t *testing.T) {
 	_, mockWebsocketUpgrader, mockServer := setUpListener(t)
 
 	blankTLS := &tls.Config{}
-	wi, err := backends.NewWebsocketListener("127.0.0.1:21704", blankTLS, logger.NewReceptorLogger("test"), mockWebsocketUpgrader, mockServer)
+	wi, err := backends.NewWebsocketListener("127.0.0.1:21704", blankTLS, logger.NewReceptorLogger(), mockWebsocketUpgrader, mockServer)
 	if err != nil {
 		t.Error(err)
 	}

@@ -53,6 +53,36 @@ type remoteUnit struct {
 	logger *logger.ReceptorLogger
 }
 
+// baseLogger returns the logger bound at construction (carrying node_id), or
+// the netceptor logger as a fallback for units built without one.
+func (rw *remoteUnit) baseLogger() *logger.ReceptorLogger {
+	if rw.logger != nil {
+		return rw.logger
+	}
+
+	return rw.GetWorkceptor().nc.GetLogger()
+}
+
+// loggerFor returns a logger carrying node_id and, when remoteNode is known,
+// remote_id, so a line about a specific peer identifies it.
+func (rw *remoteUnit) loggerFor(remoteNode string) *logger.ReceptorLogger {
+	if remoteNode == "" {
+		return rw.baseLogger()
+	}
+
+	return rw.baseLogger().WithExtraSuffix(map[string]string{"remote_id": remoteNode})
+}
+
+// remoteLogger is loggerFor for callers that do not already have the remote
+// node ID at hand; it reads it from the unit's status.
+func (rw *remoteUnit) remoteLogger() *logger.ReceptorLogger {
+	if red, ok := rw.Status().ExtraData.(*RemoteExtraData); ok {
+		return rw.loggerFor(red.RemoteNode)
+	}
+
+	return rw.baseLogger()
+}
+
 // RemoteExtraData is the content of the ExtraData JSON field for a remote work unit.
 type RemoteExtraData struct {
 	RemoteNode     string
@@ -131,7 +161,7 @@ func (rw *remoteUnit) clearStaleConnectionDetail() {
 // handleConnectionError logs the error and updates unit status. Returns true when the
 // error is fatal (crypto) and the caller should stop retrying.
 func (rw *remoteUnit) handleConnectionError(err error) bool {
-	rw.GetWorkceptor().nc.GetLogger().Info("Connection to %s failed with error: %s",
+	rw.remoteLogger().Info("Connection to %s failed with error: %s",
 		rw.Status().ExtraData.(*RemoteExtraData).RemoteNode, err)
 	errStr := err.Error()
 
@@ -146,7 +176,7 @@ func (rw *remoteUnit) handleConnectionError(err error) bool {
 			}
 		})
 		if shouldExit {
-			rw.GetWorkceptor().nc.GetLogger().Error("%s", detail)
+			rw.remoteLogger().Error("%s", detail)
 		}
 
 		return shouldExit
@@ -227,7 +257,7 @@ func (rw *remoteUnit) getConnectionAndRun(ctx context.Context, firstTimeSync boo
 		if conn != nil {
 			err := action(ctx, conn, reader)
 			if err != nil {
-				rw.GetWorkceptor().nc.GetLogger().Error("Error running action function: %s", err)
+				rw.remoteLogger().Error("Error running action function: %s", err)
 			}
 		} else {
 			failure()
@@ -290,7 +320,7 @@ func (rw *remoteUnit) StartRemoteUnit(ctx context.Context, conn net.Conn, reader
 	defer func() {
 		err := closeFile(stdin)
 		if err != nil {
-			rw.GetWorkceptor().nc.GetLogger().Error("Error closing %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
+			rw.loggerFor(red.RemoteNode).Error("Error closing %s: %s", path.Join(rw.UnitDir(), "stdin"), err)
 		}
 	}()
 	_, err = io.Copy(conn, stdin)
@@ -422,10 +452,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		_, err := fmt.Fprintf(conn, "work status %s\n", remoteUnitID)
 		if err != nil {
 			rw.surfaceRetryableError(err.Error())
-			rw.GetWorkceptor().nc.GetLogger().Debug("Write error sending to %s: %s\n", remoteUnitID, err)
+			rw.loggerFor(remoteNode).Debug("Write error sending to %s: %s\n", remoteUnitID, err)
 			cerr := closeConn(conn)
 			if cerr != nil {
-				rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to remote work unit %s: %s", remoteUnitID, cerr)
+				rw.loggerFor(remoteNode).Error("Error closing connection to remote work unit %s: %s", remoteUnitID, cerr)
 			}
 			conn = nil
 
@@ -434,10 +464,10 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		status, err := utils.ReadStringContext(mw, reader, '\n')
 		if err != nil {
 			rw.surfaceRetryableError(err.Error())
-			rw.GetWorkceptor().nc.GetLogger().Debug("Read error reading from %s: %s\n", remoteNode, err)
+			rw.loggerFor(remoteNode).Debug("Read error reading from %s: %s\n", remoteNode, err)
 			cerr := closeConn(conn)
 			if cerr != nil {
-				rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection from node %s: %s", remoteNode, cerr)
+				rw.loggerFor(remoteNode).Error("Error closing connection from node %s: %s", remoteNode, cerr)
 			}
 			conn = nil
 
@@ -445,7 +475,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		}
 		if status[:5] == "ERROR" {
 			if strings.Contains(status, "unknown work unit") {
-				rw.GetWorkceptor().nc.GetLogger().Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
+				rw.loggerFor(remoteNode).Debug("Work unit %s on node %s is gone.\n", remoteUnitID, remoteNode)
 				rw.UpdateFullStatus(func(status *StatusFileData) {
 					status.State = WorkStateFailed
 					status.Detail = "Remote work unit is gone"
@@ -453,21 +483,21 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 
 				return
 			}
-			rw.GetWorkceptor().nc.GetLogger().Error("Remote error: %s\n", strings.TrimRight(status[6:], "\n"))
+			rw.loggerFor(remoteNode).Error("Remote error: %s\n", strings.TrimRight(status[6:], "\n"))
 
 			return
 		}
 		si := StatusFileData{}
 		err = json.Unmarshal([]byte(status), &si)
 		if err != nil {
-			rw.GetWorkceptor().nc.GetLogger().Error("Error unmarshalling JSON: %s\n", status)
+			rw.loggerFor(remoteNode).Error("Error unmarshalling JSON: %s\n", status)
 
 			return
 		}
 		// Adoption assumes the remote unit is already underway; we never submitted it, so a
 		// pending remote will never be started by anyone and the adoption cannot succeed.
 		if adopted && si.State == WorkStatePending {
-			rw.GetWorkceptor().nc.GetLogger().Error("Adopted work unit %s on node %s has not started.\n", remoteUnitID, remoteNode)
+			rw.loggerFor(remoteNode).Error("Adopted work unit %s on node %s has not started.\n", remoteUnitID, remoteNode)
 			rw.UpdateFullStatus(func(status *StatusFileData) {
 				status.State = WorkStateFailed
 				status.Detail = "Adopted remote work unit was never started"
@@ -487,7 +517,7 @@ func (rw *remoteUnit) monitorRemoteStatus(mw *utils.JobContext, forRelease bool)
 		if updateErr != nil {
 			writeStatusFailures++
 			if writeStatusFailures > 3 {
-				rw.GetWorkceptor().nc.GetLogger().Error("Exceeded retries for updating status file for work unit %s", rw.ID())
+				rw.loggerFor(remoteNode).Error("Exceeded retries for updating status file for work unit %s", rw.ID())
 
 				return
 			}
@@ -522,11 +552,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 	}
 	if err != nil {
 		if rw.IsReleased() || mw.Err() != nil {
-			rw.GetWorkceptor().nc.GetLogger().Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
+			rw.loggerFor(remoteNode).Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 			return
 		}
-		rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
+		rw.loggerFor(remoteNode).Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 		return
 	}
@@ -542,11 +572,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 		err := rw.Load()
 		if err != nil {
 			if rw.IsReleased() || mw.Err() != nil {
-				rw.GetWorkceptor().nc.GetLogger().Debug("Stopped reading status file %s: %s\n", rw.StatusFileName(), err)
+				rw.loggerFor(remoteNode).Debug("Stopped reading status file %s: %s\n", rw.StatusFileName(), err)
 
 				return
 			}
-			rw.GetWorkceptor().nc.GetLogger().Error("Could not read status file %s: %s\n", rw.StatusFileName(), err)
+			rw.loggerFor(remoteNode).Error("Could not read status file %s: %s\n", rw.StatusFileName(), err)
 
 			return
 		}
@@ -561,7 +591,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				if conn != nil {
 					cerr := closeConn(conn)
 					if cerr != nil {
-						rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
+						rw.loggerFor(remoteNode).Error("Error closing connection to %s: %s", remoteUnitID, cerr)
 					}
 				}
 			}()
@@ -576,7 +606,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			if red.SignWork {
 				signature, err := rw.GetWorkceptor().createSignature(red.RemoteNode)
 				if err != nil {
-					rw.GetWorkceptor().nc.GetLogger().Error("could not create signature to get results")
+					rw.loggerFor(remoteNode).Error("could not create signature to get results")
 
 					return
 				}
@@ -584,25 +614,25 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			}
 			wscBytes, err := marshalWorkResultsCommand(workSubmitCmd)
 			if err != nil {
-				rw.GetWorkceptor().nc.GetLogger().Error("error constructing work results command: %s", err)
+				rw.loggerFor(remoteNode).Error("error constructing work results command: %s", err)
 
 				return
 			}
 			wscBytes = append(wscBytes, '\n')
 			_, err = writeWorkResultsCommand(conn, wscBytes)
 			if err != nil {
-				rw.GetWorkceptor().nc.GetLogger().Warning("Write error sending to %s: %s\n", remoteNode, err)
+				rw.loggerFor(remoteNode).Warning("Write error sending to %s: %s\n", remoteNode, err)
 
 				continue
 			}
 			status, err := utils.ReadStringContext(mw, reader, '\n')
 			if err != nil {
-				rw.GetWorkceptor().nc.GetLogger().Warning("Read error reading from %s: %s\n", remoteNode, err)
+				rw.loggerFor(remoteNode).Warning("Read error reading from %s: %s\n", remoteNode, err)
 
 				continue
 			}
 			if !strings.Contains(status, "Streaming results") {
-				rw.GetWorkceptor().nc.GetLogger().Warning("Remote node %s did not stream results for unit %s (signwork=%v): %s\n",
+				rw.loggerFor(remoteNode).Warning("Remote node %s did not stream results for unit %s (signwork=%v): %s\n",
 					remoteNode, red.RemoteUnitID, red.SignWork, strings.TrimSpace(status))
 
 				continue
@@ -610,18 +640,18 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 			stdout, err := os.OpenFile(rw.StdoutFileName(), os.O_CREATE+os.O_APPEND+os.O_WRONLY, 0o600)
 			if err != nil {
 				if rw.IsReleased() || mw.Err() != nil {
-					rw.GetWorkceptor().nc.GetLogger().Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
+					rw.loggerFor(remoteNode).Debug("Stopped opening stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 					return
 				}
-				rw.GetWorkceptor().nc.GetLogger().Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
+				rw.loggerFor(remoteNode).Error("Could not open stdout file %s: %s\n", rw.StdoutFileName(), err)
 
 				return
 			}
 			defer func() {
 				err := closeFile(stdout)
 				if err != nil {
-					rw.GetWorkceptor().nc.GetLogger().Error("Error closing %s: %s", rw.StdoutFileName(), err)
+					rw.loggerFor(remoteNode).Error("Error closing %s: %s", rw.StdoutFileName(), err)
 				}
 			}()
 			doneChan := make(chan struct{})
@@ -638,7 +668,7 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 					}
 					cerr := closeConn(conn)
 					if cerr != nil {
-						rw.GetWorkceptor().nc.GetLogger().Error("Error closing connection to %s: %s", remoteUnitID, cerr)
+						rw.loggerFor(remoteNode).Error("Error closing connection to %s: %s", remoteUnitID, cerr)
 					}
 
 					return
@@ -660,11 +690,11 @@ func (rw *remoteUnit) monitorRemoteStdout(mw *utils.JobContext) {
 				if rw.IsReleased() || mw.Err() != nil {
 					// Cancelling or releasing closed the stream on purpose; the
 					// copy error is expected.
-					rw.GetWorkceptor().nc.GetLogger().Debug("Stopped copying to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
+					rw.loggerFor(remoteNode).Debug("Stopped copying to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
 
 					continue
 				}
-				rw.GetWorkceptor().nc.GetLogger().Warning("Could not copy to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
+				rw.loggerFor(remoteNode).Warning("Could not copy to stdout file %s: %s\n", rw.StdoutFileName(), errmsg)
 
 				continue
 			}
@@ -740,7 +770,7 @@ func (rw *remoteUnit) runAndMonitor(mw *utils.JobContext, forRelease bool, actio
 			if forRelease {
 				err := rw.BaseWorkUnitForWorkUnit.Release(false)
 				if err != nil {
-					rw.GetWorkceptor().nc.GetLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
+					rw.remoteLogger().Error("Error releasing unit %s: %s", rw.UnitDir(), err)
 				}
 			} else {
 				rw.monitorRemoteUnit(ctx)
@@ -843,7 +873,7 @@ func (rw *remoteUnit) cancelOrRelease(release bool, force bool) error {
 			return rw.cancelOrReleaseRemoteUnit(ctx, conn, reader, true)
 		})
 		if err != nil {
-			rw.GetWorkceptor().nc.GetLogger().Error("Error with connect and run: %s", err)
+			rw.remoteLogger().Error("Error with connect and run: %s", err)
 		}
 
 		return rw.BaseWorkUnitForWorkUnit.Release(true)

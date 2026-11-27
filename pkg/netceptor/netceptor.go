@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ansible/receptor/pkg/logger"
@@ -190,7 +191,11 @@ type connInfo struct {
 	Cost             float64
 	lastReceivedData time.Time
 	lastReceivedLock *sync.RWMutex
-	logger           *logger.ReceptorLogger
+	// logger is bound to the base logger at construction and upgraded to the
+	// per-connection logger (with remote_id) once the handshake reveals the
+	// remote node ID. The reader and writer goroutines start before that, so
+	// it is accessed atomically.
+	logger atomic.Pointer[logger.ReceptorLogger]
 }
 
 type nodeInfo struct {
@@ -329,7 +334,7 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		serverTLSConfigs:         make(map[string]*tls.Config),
 		firewallLock:             &sync.RWMutex{},
 		workCommandsLock:         &sync.RWMutex{},
-		Logger:                   logger.NewReceptorLogger(""),
+		Logger:                   logger.NewReceptorLogger().WithExtraSuffix(map[string]string{"node_id": nodeID}),
 	}
 	s.reservedServices = map[string]func(*MessageData) error{
 		"ping":    s.handlePing,
@@ -342,7 +347,6 @@ func NewWithConsts(ctx context.Context, nodeID string,
 		MinVersion: tls.VersionTLS12,
 	}
 	s.AddNameHash(nodeID)
-	s.GetLogger().SetSuffix(map[string]string{"node_id": nodeID})
 	s.context, s.cancelFunc = context.WithCancel(ctx)
 	s.unreachableBroker = utils.NewBroker(s.context, reflect.TypeOf(UnreachableNotification{}))
 	s.routingUpdateBroker = utils.NewBroker(s.context, reflect.TypeOf(map[string]string{}))
@@ -546,10 +550,7 @@ func (s *Netceptor) AddBackend(backend Backend, modifiers ...func(*BackendInfo))
 					// Start() method above)
 					go func() {
 						defer runProtocolWg.Done()
-						err := s.runProtocol(ctxBackend, sess, bi)
-						if err != nil {
-							s.Logger.SanitizedError("Backend error: %s\n", err)
-						}
+						_ = s.runProtocol(ctxBackend, sess, bi)
 					}()
 				} else {
 					return
@@ -772,20 +773,20 @@ func (s *Netceptor) monitorConnectionAging() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			timedOut := make(map[string]context.CancelFunc, 0)
+			timedOut := make(map[string]*connInfo, 0)
 			s.connLock.RLock()
 			for conn := range s.connections {
 				connInfo := s.connections[conn]
 				connInfo.lastReceivedLock.RLock()
 				if time.Since(connInfo.lastReceivedData) > s.maxConnectionIdleTime {
-					timedOut[conn] = s.connections[conn].CancelFunc
+					timedOut[conn] = connInfo
 				}
 				connInfo.lastReceivedLock.RUnlock()
 			}
 			s.connLock.RUnlock()
-			for conn := range timedOut {
-				s.Logger.Warning("Timing out connection %s, idle for the past %s\n", conn, s.maxConnectionIdleTime)
-				timedOut[conn]()
+			for conn, ci := range timedOut {
+				ci.logger.Load().Warning("Timing out connection %s, idle for the past %s\n", conn, s.maxConnectionIdleTime)
+				ci.CancelFunc()
 			}
 		case <-s.context.Done():
 			return
@@ -974,7 +975,11 @@ func (s *Netceptor) GetClientTLSConfig(name string, expectedHostName string, exp
 	}
 	tlscfg = tlscfg.Clone()
 	if !tlscfg.InsecureSkipVerify {
-		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer, s.Logger) //nolint:gosec // G123: custom peer verification is intentional
+		verifyLogger := s.Logger
+		if expectedHostNameType == ExpectedHostnameTypeReceptor && expectedHostName != "" {
+			verifyLogger = s.Logger.WithExtraSuffix(map[string]string{"remote_id": expectedHostName})
+		}
+		tlscfg.VerifyPeerCertificate = ReceptorVerifyFunc(tlscfg, pinnedFingerprints, expectedHostName, expectedHostNameType, VerifyServer, verifyLogger) //nolint:gosec // G123: custom peer verification is intentional
 		switch expectedHostNameType {
 		case ExpectedHostnameTypeDNS:
 			tlscfg.ServerName = expectedHostName
@@ -1185,22 +1190,21 @@ func (s *Netceptor) GetEphemeralService() string {
 // Prints the routing table.
 // The caller must already hold at least a read lock on known connections and routing.
 func (s *Netceptor) printRoutingTable() {
-	logLevel, _ := s.Logger.GetLogLevelByName("Info")
-	if s.Logger.GetLogLevel() < logLevel {
+	if s.Logger.GetLogLevel() < logger.InfoLevel {
 		return
 	}
-	s.Logger.Log(logLevel, "Known Connections:\n")
+	s.Logger.Info("Known Connections:\n")
 	for conn := range s.knownConnectionCosts {
 		sb := &strings.Builder{}
 		_, _ = fmt.Fprintf(sb, "   %s: ", conn)
 		for peer := range s.knownConnectionCosts[conn] {
 			_, _ = fmt.Fprintf(sb, "%s(%.2f) ", peer, s.knownConnectionCosts[conn][peer])
 		}
-		s.Logger.Log(logLevel, "%s\n", sb.String())
+		s.Logger.Info("%s\n", sb.String())
 	}
-	s.Logger.Log(logLevel, "Routing Table:\n")
+	s.Logger.Info("Routing Table:\n")
 	for node := range s.routingTable {
-		s.Logger.Log(logLevel, "   %s via %s\n", node, s.routingTable[node])
+		s.Logger.Info("   %s via %s\n", node, s.routingTable[node])
 	}
 }
 
@@ -1264,7 +1268,7 @@ func (s *Netceptor) sendRoutingUpdate(suspectedDuplicate uint64) {
 }
 
 // Processes a routing update received from a connection.
-func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
+func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string, log *logger.ReceptorLogger) {
 	if ri.NodeID == "" {
 		// Our peer is still trying to initialize
 		return
@@ -1282,7 +1286,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		if ri.UpdateEpoch > s.epoch {
 			// Update has our node ID but a newer epoch - so if clocks are in sync they are a duplicate
-			s.Logger.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
+			log.SanitizedError("Duplicate node ID %s detected via %s\n", ri.NodeID, recvConn)
 			// Send routing update noting our suspicion
 			s.sendRoutingUpdate(ri.UpdateEpoch)
 
@@ -1301,7 +1305,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 	s.seenUpdates[ri.UpdateID] = time.Now()
 	s.seenUpdatesLock.Unlock()
 	if ri.SuspectedDuplicate != 0 {
-		s.Logger.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
+		log.SanitizedWarning("Node %s with epoch %d sent update %s suspecting a duplicate node with epoch %d\n", ri.NodeID, ri.UpdateEpoch, ri.UpdateID, ri.SuspectedDuplicate)
 		s.knownNodeLock.Lock()
 		ni, ok := s.knownNodeInfo[ri.NodeID]
 		if ok {
@@ -1312,7 +1316,7 @@ func (s *Netceptor) handleRoutingUpdate(ri *routingUpdate, recvConn string) {
 		}
 		s.knownNodeLock.Unlock()
 	} else {
-		s.Logger.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
+		log.SanitizedDebug("Received routing update %s from %s via %s\n", ri.UpdateID, ri.NodeID, recvConn)
 		s.knownNodeLock.Lock()
 		ni, ok := s.knownNodeInfo[ri.NodeID]
 		if ok {
@@ -1521,7 +1525,7 @@ func (s *Netceptor) GetServiceInfo(nodeID string, service string) (*ServiceAdver
 }
 
 // Handles an incoming service advertisement.
-func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string) error {
+func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string, log *logger.ReceptorLogger) error {
 	if data[0] != MsgTypeServiceAdvertisement {
 		return fmt.Errorf("message is the wrong type")
 	}
@@ -1530,7 +1534,7 @@ func (s *Netceptor) handleServiceAdvertisement(data []byte, receivedFrom string)
 	if err != nil {
 		return err
 	}
-	s.Logger.SanitizedDebug("Received service advertisement from %s\n", si.NodeID)
+	log.SanitizedDebug("Received service advertisement from %s\n", si.NodeID)
 	s.serviceAdsLock.Lock()
 	defer s.serviceAdsLock.Unlock()
 	n, ok := s.serviceAdsReceived[si.NodeID]
@@ -1569,7 +1573,7 @@ func (ci *connInfo) protoReader(sess BackendSession) {
 		}
 		if err != nil {
 			if err != io.EOF && ci.Context.Err() == nil {
-				ci.logger.Error("Backend receiving error %s\n", err)
+				ci.logger.Load().Error("Backend receiving error %s\n", err)
 			}
 			ci.CancelFunc()
 
@@ -1597,7 +1601,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 				dropped++
 			}
 			if dropped > 0 {
-				ci.logger.Warning("dropping %d queued message(s): connection closed before delivery\n", dropped)
+				ci.logger.Load().Warning("dropping %d queued message(s): connection closed before delivery\n", dropped)
 			}
 
 			return
@@ -1608,7 +1612,7 @@ func (ci *connInfo) protoWriter(sess BackendSession) {
 			err := sess.Send(message)
 			if err != nil {
 				if ci.Context.Err() == nil {
-					ci.logger.Error("Backend sending error %s\n", err)
+					ci.logger.Load().Error("Backend sending error %s\n", err)
 				}
 				ci.CancelFunc()
 
@@ -1691,7 +1695,16 @@ func (s *Netceptor) removeConnection(remoteNodeID string) {
 }
 
 // Main Netceptor protocol loop.
-func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *BackendInfo) error {
+func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *BackendInfo) (err error) {
+	// connLogger is upgraded to the per-connection logger once the handshake
+	// reveals the remote node ID. Logging the returned error here (rather than
+	// in the backend goroutine) lets it carry that remote_id.
+	connLogger := s.Logger
+	defer func() {
+		if err != nil {
+			connLogger.SanitizedError("Backend error: %s\n", err)
+		}
+	}()
 	if bi.connectionCost <= 0.0 {
 		return fmt.Errorf("connection cost must be positive")
 	}
@@ -1719,8 +1732,8 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 		WriteChan:        make(chan []byte, writeChanBufferSize),
 		Cost:             connectionCost,
 		lastReceivedLock: &sync.RWMutex{},
-		logger:           s.Logger,
 	}
+	ci.logger.Store(s.Logger)
 	ci.Context, ci.CancelFunc = context.WithCancel(ctx)
 	go ci.protoReader(sess)
 	go ci.protoWriter(sess)
@@ -1735,21 +1748,21 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 				case MsgTypeData:
 					message, err := s.translateDataToMessage(data)
 					if err != nil {
-						s.Logger.Error("Error translating data to message struct: %s\n", err)
+						connLogger.Error("Error translating data to message struct: %s\n", err)
 
 						continue
 					}
-					s.Logger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
+					connLogger.Trace("--- Received data length %d from %s:%s to %s:%s via %s\n", len(message.Data),
 						message.FromNode, message.FromService, message.ToNode, message.ToService, remoteNodeID)
 					err = s.handleMessageData(message)
 					if err != nil {
-						s.Logger.Error("Error handling message data: %s\n", err)
+						connLogger.Error("Error handling message data: %s\n", err)
 					}
 				case MsgTypeRoute:
 					ri := &routingUpdate{}
 					err := json.Unmarshal(data[1:], ri)
 					if err != nil {
-						s.Logger.Error("Error unpacking routing update: %s\n", err)
+						connLogger.Error("Error unpacking routing update: %s\n", err)
 
 						continue
 					}
@@ -1779,21 +1792,21 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 							return s.sendAndLogConnectionRejection(remoteNodeID, ci, "we disagree about the connection cost")
 						}
 					}
-					s.handleRoutingUpdate(ri, remoteNodeID)
+					s.handleRoutingUpdate(ri, remoteNodeID, connLogger)
 				case MsgTypeServiceAdvertisement:
-					err := s.handleServiceAdvertisement(data, remoteNodeID)
+					err := s.handleServiceAdvertisement(data, remoteNodeID, connLogger)
 					if err != nil {
-						s.Logger.Error("Error handling service advertisement: %s\n", err)
+						connLogger.Error("Error handling service advertisement: %s\n", err)
 
 						continue
 					}
 				case MsgTypeReject:
-					s.Logger.Warning("Received a rejection message from peer.")
+					connLogger.Warning("Received a rejection message from peer.")
 					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
 				default:
-					s.Logger.Warning("Unknown message type\n")
+					connLogger.Warning("Unknown message type\n")
 				}
 			} else {
 				// Connection not established
@@ -1806,12 +1819,12 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						continue
 					}
 					remoteNodeID = ri.ForwardingNode
+					connLogger = s.Logger.WithExtraSuffix(map[string]string{"remote_id": remoteNodeID})
+					ci.logger.Store(connLogger)
 					// Decide whether the remote node is acceptable
 					if remoteNodeID == s.nodeID {
 						return s.sendAndLogConnectionRejection(remoteNodeID, ci, "it tried to connect using our own node ID")
 					}
-					suffix := map[string]string{"remote_id": remoteNodeID}
-					s.GetLogger().UpdateSuffix(suffix)
 					remoteNodeAccepted := true
 					if bi.allowedPeers != nil {
 						remoteNodeAccepted = false
@@ -1849,7 +1862,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 						connError = existingConn.Context.Err()
 					}
 					if ok && connError != nil {
-						s.Logger.Error("Context for existing connection error: %s", connError)
+						connLogger.Error("Context for existing connection error: %s", connError)
 						s.connLock.Unlock()
 						// Remove the canceled connection to prevent resource leak
 						s.removeConnection(remoteNodeID)
@@ -1877,7 +1890,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 
 						return nil
 					}
-					s.Logger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
+					connLogger.SanitizedInfo("Connection established with %s\n", remoteNodeID)
 					s.AddNameHash(remoteNodeID)
 					s.knownNodeLock.Lock()
 					_, ok = s.knownConnectionCosts[s.nodeID]
@@ -1911,7 +1924,7 @@ func (s *Netceptor) runProtocol(ctx context.Context, sess BackendSession, bi *Ba
 					}
 					established = true
 				} else if msgType == MsgTypeReject {
-					s.Logger.Warning("Received a rejection message from peer.")
+					connLogger.Warning("Received a rejection message from peer.")
 					s.removeConnection(remoteNodeID)
 
 					return fmt.Errorf("remote node rejected the connection")
